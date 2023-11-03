@@ -9,7 +9,7 @@ from django.http.request import HttpRequest
 from django.http import HttpResponseRedirect
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_GET
-from django.core.mail import EmailMessage, send_mail
+from django.core.mail import EmailMessage, send_mail, get_connection
 import secrets
 from django.contrib import messages
 from django.contrib.auth import login,logout
@@ -21,6 +21,7 @@ from datetime import datetime
 import imaplib
 import time
 from math import floor
+from django_currentuser.middleware import (get_current_user, get_current_authenticated_user)
 
 LOGIN_TOKEN_LENGTH  = 32
 LOGIN_TOKEN_TIMEOUT_SECONDS = 10 * 60
@@ -56,15 +57,16 @@ The link is valid for {valid} minutes.
         result = email_message.send()
         logging.info('%s sent login email to %s with the result: %s', settings.EMAIL_HOST_USER, email_message.recipients(), result)
         
-        # https://stackoverflow.com/a/59735890/261210
-        with imaplib.IMAP4_SSL(settings.EMAIL_HOST_IMAP, port = settings.EMAIL_PORT_IMAP) as imap:
-            message = str(email_message.message()).encode()
-            imap.login(settings.EMAIL_HOST_USER, settings.EMAIL_HOST_PASSWORD)
-            # must make sure the folder exists
-            folder = settings.EMAIL_IMAP_SENT_FOLDER
-            imap.append(folder, '\\Seen', imaplib.Time2Internaldate(time.time()), message)
-            logging.debug('Saved email to IMAP folder {folder}')
-            
+        # If backend is SMTP, then put the sent email into the configured folder, see also https://stackoverflow.com/a/59735890/261210
+        if str(get_connection().__class__.__module__).endswith("smtp"):
+            with imaplib.IMAP4_SSL(settings.EMAIL_HOST_IMAP, port = settings.EMAIL_PORT_IMAP) as imap:
+                message = str(email_message.message()).encode()
+                imap.login(settings.EMAIL_HOST_USER, settings.EMAIL_HOST_PASSWORD)
+                # must make sure the folder exists
+                folder = settings.EMAIL_IMAP_SENT_FOLDER
+                imap.append(folder, '\\Seen', imaplib.Time2Internaldate(time.time()), message)
+                logging.debug('Saved email to IMAP folder {folder}')
+                
         return render(request,'login_response.html', {
             'email': email,
             'valid_minutes': valid,
@@ -142,7 +144,7 @@ def add_subscriptions(request):
         end_date_object = datetime.strptime(end_date, '%m/%d/%Y')
         
         # save info in db
-        subscription = Subscription(search_text = search_term ,timeperiod_startdate = start_date_object,timeperiod_enddate = end_date_object, user_name = user_name )
+        subscription = Subscription(search_text = search_term, timeperiod_startdate = start_date_object, timeperiod_enddate = end_date_object, user_name = user_name )
         logger.info('Adding new subscription for user %s: %s', user_name, subscription)
         subscription.save()
         return  HttpResponseRedirect('/subscriptions/')

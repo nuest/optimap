@@ -9,19 +9,10 @@
 
 <ul class="nav navbar-nav ml-auto">
   {% if user.is_authenticated %}
-    <li class="nav-item dropdown">
-      <a class="nav-link dropdown" href="#"id="navbarDarkDropdown" role="button" data-toggle="dropdown" aria-expanded="false">
-        <i class="fa fa-user-circle fa-3x"></i> 
-      </a>
-      <ul class="dropdown-menu dropdown-menu-right " aria-labelledby="navbarDarkDropdown">
-        <a class="dropdown-item" >{{user.email}}</a>
-        <div class="dropdown-divider"></div>
-        <li><a class="dropdown-item" href="{% url 'optimap:usersettings' %}">Settings</a></li>
-        <li><a class="dropdown-item" href="{% url 'optimap:subscriptions' %}">Subscription</a></li>
-        <li><a class="dropdown-item" href="{% url 'optimap:logout' %}">Logout</a></li>
-      </ul>
-    </li>
-    {% else %}
+
+  {% include "authenticated_menu_snippet.html" %}
+  
+  {% else %}
     <li class="nav-item dropdown">
       <a class="nav-link dropdown" href="#" id="navbarDarkDropdown1" role="button" data-toggle="dropdown"
         aria-expanded="false">

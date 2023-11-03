@@ -23,9 +23,9 @@ jobs:
       db:
         image: postgis/postgis:14-3.3
         env:
-          POSTGRES_USER: optimeta
-          POSTGRES_PASSWORD: optimeta
-          POSTGRES_DB: optimetaPortal
+          POSTGRES_USER: optimap
+          POSTGRES_PASSWORD: optimap
+          POSTGRES_DB: optimap
         ports:
           - 5432:5432
         options: --mount type=tmpfs,destination=/var/lib/postgresql/data --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5

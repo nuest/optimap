@@ -4,7 +4,7 @@ from django.test import Client, TestCase
 from publications.models import Publication
 from django.contrib.gis.geos import Point, MultiPoint, LineString, Polygon, GeometryCollection
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'optimetaPortal.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'optimap.settings')
 
 class SimpleTest(TestCase):
     

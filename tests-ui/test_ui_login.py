@@ -7,7 +7,7 @@ class SimpleTest(unittest.TestCase):
     def test_login_page(self):
         start_chrome('localhost:8000/login/', headless=True)
 
-        write('optimeta@dev.dev', into='email')
+        write('optimap@dev.dev', into='email')
 
         get_driver().save_screenshot(os.path.join(os.getcwd(), 'tests-ui', 'screenshots', 'login-email.png'))
 

@@ -2,7 +2,7 @@ import os
 import unittest
 from django.test import Client
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'optimetaPortal.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'optimap.settings')
 
 class SimpleTest(unittest.TestCase):
     def setUp(self):
@@ -15,7 +15,7 @@ class SimpleTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get('Content-Type'), 'text/html; charset=utf-8')
 
-        response = self.client.post('/login/', {'email': 'optimeta@dev.dev'})
+        response = self.client.post('/login/', {'email': 'optimap@dev.dev'})
         self.assertEqual(response.status_code, 302)
         self.assertRegex(response.url, 'success')
 

@@ -6,4 +6,4 @@ from publications.models import Publication
 class PublicationAdmin(LeafletGeoAdmin):
     """Publication Admin."""
 
-    list_display = ("title", "publicationDate", "creationDate", "lastUpdate")
+    list_display = ("doi", "creationDate", "lastUpdate", "created_by", "updated_by")

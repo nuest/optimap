@@ -1,0 +1,17 @@
+<li class="nav-item dropdown">
+    <a class="nav-link dropdown" href="#"id="navbarDarkDropdown" role="button" data-toggle="dropdown" aria-expanded="false">
+        <i class="fa fa-user-circle fa-3x"></i> 
+    </a>
+    <ul class="dropdown-menu dropdown-menu-right " aria-labelledby="navbarDarkDropdown">
+        <a class="dropdown-item" >{{user.email}}</a>
+        <div class="dropdown-divider"></div>
+        <li><a class="dropdown-item" href="{% url 'optimap:usersettings' %}">Settings</a></li>
+        <li><a class="dropdown-item" href="{% url 'optimap:subscriptions' %}">Subscriptions</a></li>
+        {% if user.is_superuser %}
+        <div class="dropdown-divider"></div>
+        <li><a class="dropdown-item" href="{% url 'admin:index' %}">Admin</a></li>
+        {% endif %}
+        <div class="dropdown-divider"></div>
+        <li><a class="dropdown-item" href="{% url 'optimap:logout' %}">Logout</a></li>
+    </ul>
+</li>

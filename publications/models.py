@@ -1,17 +1,29 @@
 from django.contrib.gis.db import models
 from django.contrib.postgres.fields import ArrayField
-
+from django_currentuser.db.models import CurrentUserField
 
 class Publication(models.Model):
     # required fields      
-    title = models.CharField(max_length=4096)
-    publicationDate = models.DateField(null=True)
+    doi = models.CharField(max_length=1024)
+    
+    # automatic fields
     creationDate = models.DateTimeField(auto_now_add=True)
     lastUpdate = models.DateTimeField(auto_now=True)
+    # see useful hint at https://github.com/zsoldosp/django-currentuser/issues/69
+    created_by = CurrentUserField(
+        verbose_name=("Created by"),
+        related_name="%(app_label)s_%(class)s_creator",
+    )
+    updated_by = CurrentUserField(
+        verbose_name=("Updated by"),
+        related_name="%(app_label)s_%(class)s_updater",
+        on_update=True,
+    )
 
     # possibly blank fields
+    publicationDate = models.DateField(null=True,blank=True)
     abstract = models.TextField(null=True, blank=True)
-    doi = models.CharField(max_length=1024, null=True, blank=True)
+    
     url = models.URLField(max_length=1024, null=True, blank=True)
     geometry = models.GeometryCollectionField(verbose_name='Publication geometry/ies', srid = 4326, null=True, blank=True)
     journal = models.CharField(max_length=1024, null=True, blank=True)
@@ -20,11 +32,23 @@ class Publication(models.Model):
 
     def __str__(self):
         """Return string representation."""
-        return self.title
+        return self.doi
 
-class OJSservers(models.Model):
+class Source(models.Model):
+    # automatic fields
+    creationDate = models.DateTimeField(auto_now_add=True)
+    lastUpdate = models.DateTimeField(auto_now=True)
+    created_by = CurrentUserField(
+        verbose_name=("Created by"),
+        related_name="%(app_label)s_%(class)s_creator",
+    )
+    updated_by = CurrentUserField(
+        verbose_name=("Updated by"),
+        related_name="%(app_label)s_%(class)s_updater",
+        on_update=True,
+    )
 
-    url_field = models.URLField(max_length = 200)
+    url_field = models.URLField(max_length = 999)
     harvest_interval_minutes = models.IntegerField(default=60*24*3)
     last_harvest = models.DateTimeField(auto_now_add=True,null=True)
     

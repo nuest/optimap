@@ -1,12 +1,13 @@
 [![OPTIMETA Logo](https://projects.tib.eu/fileadmin/_processed_/e/8/csm_Optimeta_Logo_web_98c26141b1.png)](https://projects.tib.eu/optimeta/en/) [![KOMET Logo](https://projects.tib.eu/fileadmin/templates/komet/tib_projects_komet_1150.png)](https://projects.tib.eu/komet/en/)
 
-# OPTIMETA Portal - OPTIMAP
+# OPTIMAP
 
 [![Project Status: WIP – Initial development is in progress, but there has not yet been a stable, usable release suitable for the public.](https://www.repostatus.org/badges/latest/wip.svg)](https://www.repostatus.org/#wip) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.8198944.svg)](https://doi.org/10.5281/zenodo.8198944)
 
 Geospatial discovery of research articles based on open metadata.
 The OPTIMETA Portal is part of the OPTIMETA project (<https://projects.tib.eu/optimeta>) and relies on the spatial and temporal metadata collected for scientific papers with the OPTIMETA Geo Plugin for Open Journal Systems ([OJS](https://pkp.sfu.ca/ojs/)) published at <https://github.com/TIBHannover/optimetaGeo>.
 The product name of the portal is OPTIMAP.
+The development is continued in the project KOMET (<https://projects.tib.eu/komet>).
 
 The OPTIMAP has the following features:
 
@@ -18,11 +19,11 @@ OPTIMAP is based on [Django](https://www.djangoproject.com/) (with [GeoDjango](h
 
 ## Configuration
 
-All configuration is done via the file `optimetaPortal/settings.py`.
+All configuration is done via the file `optimap/settings.py`.
 Configurations that need to be changed for different installations and for deployment are also exposed as environment variables.
 The names of these environment variables start with `OPTIMAP_`.
 The settings files loads these from a file `.env` stored in the same location as `settings.py`, or from the environment the server is run it.
-A complete list of existing parameters is provided in the file `optimetaPortal/.env.example`.
+A complete list of existing parameters is provided in the file `optimap/.env.example`.
 
 ## Run with Docker
 
@@ -56,17 +57,17 @@ python manage.py loaddata fixtures/test_data.json
 Create a `.env` file based on `.env.example` in the same directory where `settings.py` resides and fill in the configuration settings as needed.
 
 ```bash
-# once onle: create virtual environment
-# mkvirtualenv optimetaPortal
-workon optimetaPortal
+# once only: create virtual environment
+# mkvirtualenv optimap
+workon optimap
 
 pip install -r requirements.txt
 
 # create and start local DB (once)
-docker run --name optimetaPortalDB -p 5432:5432 -e POSTGRES_USER=optimeta -e POSTGRES_PASSWORD=optimeta -e POSTGRES_DB=optimetaPortal -d postgis/postgis:14-3.3
+docker run --name optimapDB -p 5432:5432 -e POSTGRES_USER=optimap -e POSTGRES_PASSWORD=optimap -e POSTGRES_DB=optimap -d postgis/postgis:14-3.3
 # stop and restart it with
-# docker stop optimetaPortalDB
-# docker start optimetaPortalDB
+# docker stop optimapDB
+# docker start optimapDB
 
 # run migrations
 python manage.py makemigrations
@@ -89,7 +90,7 @@ Now open a browser at <http://127.0.0.1:8000/>.
 
 ### Debug with VS Code
 
-Select the Python interpreter created above (`optimetaPortal` environment), see instructions at <https://code.visualstudio.com/docs/python/tutorial-django>.
+Select the Python interpreter created above (`optimap` environment), see instructions at <https://code.visualstudio.com/docs/python/tutorial-django> and <https://code.visualstudio.com/docs/python/environments>.
 
 Configuration for debugging with VS Code:
 

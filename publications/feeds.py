@@ -3,7 +3,7 @@ from .models import Publication
 from django.urls import reverse
 from django.utils.feedgenerator import Atom1Feed,Rss201rev2Feed
 import django.utils.feedgenerator as feedgenerator
-class OptimetaFeed(Feed):
+class OptimapFeed(Feed):
     title = "Latest blog"
     link = ""
     description = "Latest blog posts"

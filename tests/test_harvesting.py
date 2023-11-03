@@ -4,7 +4,7 @@ from publications.tasks import parse_oai_xml_and_save_publications
 from publications.models import Publication
 import httpretty
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'optimetaPortal.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'optimap.settings')
 
 class SimpleTest(TestCase):   
   

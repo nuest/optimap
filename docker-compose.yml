@@ -6,15 +6,15 @@ services:
     #volumes:
     #  - ./data/db:/var/lib/postgresql/data
     environment:
-      - POSTGRES_DB=optimetaPortal
-      - POSTGRES_USER=optimeta
-      - POSTGRES_PASSWORD=optimeta
+      - POSTGRES_DB=optimap
+      - POSTGRES_USER=optimap
+      - POSTGRES_PASSWORD=optimap
   web:
     build: .
     environment:
-      - DATABASE_URL=postgis://optimeta:optimeta@db:5432/optimetaPortal?sslmode=disable
+      - DATABASE_URL=postgis://optimap:optimap@db:5432/optimap?sslmode=disable
     # overwrite app code for development:
-    volumes:
+    #volumes:
     #  - .:/code
     # mount test data 
     #  - ./fixtures/:/fixtures

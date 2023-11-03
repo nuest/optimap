@@ -3,7 +3,7 @@ from publications.tasks import harvest_oai_endpoint
 from django.test import TestCase,Client
 import os
 from django.conf import settings
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'optimetaPortal.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'optimap.settings')
 
 class SimpleTest(TestCase):
 

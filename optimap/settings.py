@@ -42,7 +42,7 @@ OPTIMAP_SUPERUSER_EMAILS = [i.strip('[]') for i in env('OPTIMAP_SUPERUSER_EMAILS
 
 TEST_HARVESTING_ONLINE = env('OPTIMAP_TEST_HARVESTING_ONLINE', default=False)
 
-ROOT_URLCONF = 'optimetaPortal.urls'
+ROOT_URLCONF = 'optimap.urls'
 
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
@@ -131,7 +131,7 @@ SPECTACULAR_SETTINGS = {
 }
 
 Q_CLUSTER = {
-    'name': 'optimeta',
+    'name': 'optimap',
     'workers': 1,
     'timeout': 10,
     'retry': 20,
@@ -171,9 +171,9 @@ CACHE_MIDDLEWARE_SECONDS = env('OPTIMAP_CACHE_SECONDS', default=3600)
 
 # for testing email sending EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_BACKEND =       env('OPTIMAP_EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
-EMAIL_HOST =          env('OPTIMAP_EMAIL_HOST', default='optimeta.dev')
+EMAIL_HOST =          env('OPTIMAP_EMAIL_HOST', default='optimap.dev')
 EMAIL_PORT =          env('OPTIMAP_EMAIL_PORT_SMTP', default=587)
-EMAIL_HOST_IMAP =     env('OPTIMAP_EMAIL_HOST_IMAP', default='optimeta.imap')
+EMAIL_HOST_IMAP =     env('OPTIMAP_EMAIL_HOST_IMAP', default='optimap.imap')
 EMAIL_PORT_IMAP =     env('OPTIMAP_EMAIL_PORT_IMAP', default=993)
 EMAIL_HOST_USER =     env('OPTIMAP_EMAIL_HOST_USER', default='optimap@dev')
 EMAIL_HOST_PASSWORD = env('OPTIMAP_EMAIL_HOST_PASSWORD', default='')
@@ -198,9 +198,10 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.sites.middleware.CurrentSiteMiddleware",
     "sesame.middleware.AuthenticationMiddleware",
+    "django_currentuser.middleware.ThreadLocalUserMiddleware",
 ]
 
-ROOT_URLCONF = 'optimetaPortal.urls'
+ROOT_URLCONF = 'optimap.urls'
 
 TEMPLATES = [
     {
@@ -213,13 +214,13 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                'optimetaPortal.urls.site',
+                'optimap.urls.site',
             ],
         },
     },
 ]
 
-WSGI_APPLICATION = 'optimetaPortal.wsgi.application'
+WSGI_APPLICATION = 'optimap.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
@@ -227,7 +228,7 @@ WSGI_APPLICATION = 'optimetaPortal.wsgi.application'
 DATABASES = {
     'default': dj_database_url.config( # this uses DATABASE_URL environment variable
         # value must be URL-encoded: postgres://user:p%23ssword!@localhost/foobar
-        default='postgis://optimeta:optimeta@localhost:5432/optimetaPortal',
+        default='postgis://optimap:optimap@localhost:5432/optimap',
         conn_max_age=600
         )
 }

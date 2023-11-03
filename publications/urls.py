@@ -3,7 +3,7 @@
 from django.urls import path,include
 from django.shortcuts import redirect
 from publications.views import privacypolicy,Confirmationlogin,loginres,optimap,autheticate_via_magic_link,customlogout,user_settings,user_subscriptions,delete_account,change_useremail,data,add_subscriptions
-from .feeds import OptimetaFeed
+from .feeds import OptimapFeed
 from .feeds import atomFeed
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 
@@ -19,7 +19,7 @@ urlpatterns = [
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/schema/ui/', SpectacularRedocView.as_view(url_name='optimap:schema'), name='redoc'),
     path("data/", data, name="data"),
-    path('feed/rss', OptimetaFeed(), name="GeoRSSfeed"), 
+    path('feed/rss', OptimapFeed(), name="GeoRSSfeed"), 
     path("feed/atom", atomFeed(), name="GeoAtomfeed"),
     path("loginres/",loginres,name="loginres"),
     path("privacy/",privacypolicy,name="privacy"),
