@@ -42,28 +42,32 @@ async function initMap() {
 }
 
 function publicationPopup(feature, layer) {
-    var popupContent = '';
+    var popupContent = '<div>';
     if (feature.properties['title']) {
         popupContent += '<h3>'+ feature.properties['title']+'</h3>'
     }
 
     if (feature.properties['timeperiod_startdate'] && feature.properties['timeperiod_enddate']) {       
-        popupContent += '<l>' + '<b>' + "Timeperiod : " + '</b>' + "&nbsp;"+ "from" + "&nbsp;"+ feature.properties['timeperiod_startdate'] + "&nbsp;" + "to" + "&nbsp;" + feature.properties['timeperiod_enddate'] +'</l>' +'<br>';
+        popupContent += '<div>' + '<b>' + "Timeperiod : " + '</b>' + "&nbsp;"+ "from" + "&nbsp;"+ feature.properties['timeperiod_startdate'] + "&nbsp;" + "to" + "&nbsp;" + feature.properties['timeperiod_enddate'] +'</div>';
     }     
 
     if (feature.properties['abstract']) {
-        popupContent += '<p>'+ feature.properties['abstract']+ '</p>'+'<br>'
+        popupContent += '<div><p>'+ feature.properties['abstract']+ '</p></div>'
     }
     
     if (feature.properties['url']) {       
-        popupContent += '<a href=' + feature.properties['url']+ '>' + "Visit Article" + '</a>' ;
+        popupContent += '<div><a href=' + feature.properties['url']+ '>' + "Visit Article" + '</a></div>';
     }  
 
     if (feature.properties && feature.properties.popupContent) {
         popupContent += feature.properties.popupContent;
     }
 
-    layer.bindPopup(popupContent);
+    popupContent += '</div>';
+
+    layer.bindPopup(popupContent, {
+        maxHeight: 225
+    });
 }
 
 async function load_publications() {

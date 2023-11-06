@@ -146,3 +146,21 @@ main {
 .leaflet-top {
   z-index: 999;
 }
+
+/* Popup color and font */
+.custom-popup .leaflet-popup-content-wrapper {
+  background: #fff;
+  color: #158F9B;
+  font-size: 12px;
+}
+
+/* Color of anchor elements in popup */
+.custom-popup .leaflet-popup-content-wrapper a {
+  color: #158F9B;
+}
+
+/* Color of popup tip */
+.custom-popup .leaflet-popup-tip {
+  background: #fff;
+}
+
