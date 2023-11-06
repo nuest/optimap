@@ -20,7 +20,7 @@ flyctl postgres create
 flyctl image show --app optimap-db
 ```
 
-Note the username, password, connection string etc. in a secure place and manually set `DATABASE_URL` for the other app.
+Note the username, password, connection string etc. in a secure place and manually set `DATABASE_URL` for the app.
 Note that you need to change connection type to `postgis`, i.e., start with `postgis://`.
 
 Create database and enable PostGIS
@@ -30,6 +30,13 @@ flyctl postgres connect -a optimap-db
 
 # in postgres=# 
 CREATE DATABASE optimap;
+```
+
+If you want to start from scratch with an empty database, you can use
+
+```bash
+# CAREFUL!
+#DROP DATABASE db_name WITH (FORCE);
 ```
 
 ## Deploy app via Dockerfile
@@ -49,22 +56,11 @@ Now say YES when asked if you want to create a Postgres DB.
 >
 > For detailed documentation, see <https://fly.dev/docs/django/>
 
-Why not - changed configuration style to use `dj-database-uri`.
+The current configuration style uses `dj-database-uri`.
+However, because the database connection is not available when the migrations are run, this does not work rightaway.
+We cannot set database connection because the app does not exist at this point.
 
-THIS DOES STILL NOT WORK because the database connection is not available when the migrations are run.
-
-Cannot set database connection because the app does not exist at this point...
-
-Trying:
-
-```bash
-flyctl launch --dockerfile Dockerfile -e DATABASE_URL=postgis://...:5432/optimap?sslmode=disable
-```
-
-Does not work.
-
-Trying to put the `DATABASE_URL` without encryption into `fly.toml` at least for the first start...
-
+Therefore, put the `DATABASE_URL` without encryption into `fly.toml` at least for the first start (but don't commit to the repo!).
 Seems to work, <https://optimap.fly.dev/> shows the app!
 
 Now removing the env from the `fly.toml` file and adding the secret:
@@ -124,11 +120,13 @@ Configure **login email** password (other values are set in `fly.toml`):
 flyctl secrets set OPTIMAP_EMAIL_HOST_PASSWORD="..."
 ```
 
-Configure the **superusers' email** (users registering with this emailaddress will become Django superusers):
+Configure the **superusers' email** (users registering with this emailaddress will become Django superusers), seperated with `,` (comma):
 
 ```bash
-flyctl secrets set OPTIMAP_SUPERUSER_EMAILS="..."
+flyctl secrets set OPTIMAP_SUPERUSER_EMAILS="email@server,email@server,..."
 ```
+
+You can also set values for the secrets in the Fly.io dashboard.
 
 ## Deploy
 
@@ -147,7 +145,7 @@ and
 - <https://learndjango.com/tutorials/deploy-django-postgresql-flyio>
 - See <https://github.com/ifgi/optimetaPortal/issues/42> for links and issue description around CSRF
 
-Add to `tly.toml`:
+Add to `fly.toml`:
 
 ```toml
   CSRF_TRUSTED_ORIGINS = "https://optimap.science"
@@ -162,6 +160,15 @@ fly proxy 15432:5432 -a optimap-db
 ```
 
 Connect to database locally at port `15432`, e.g., with pgAdmin.
+
+## Disable the app
+
+For example, when you want to manipulate the database without any open connections:
+
+```bash
+flyctl scale count 0
+flyctl status
+```
 
 ## Future
 
