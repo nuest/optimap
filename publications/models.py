@@ -2,9 +2,18 @@ from django.contrib.gis.db import models
 from django.contrib.postgres.fields import ArrayField
 from django_currentuser.db.models import CurrentUserField
 
+STATUS_CHOICES = (
+    ("d", "Draft"),
+    ("p", "Published"),
+    ("t", "Testing"),
+    ("w", "Withdrawn"),
+    ("h", "Harvested"),
+)
+
 class Publication(models.Model):
     # required fields      
-    doi = models.CharField(max_length=1024)
+    doi = models.CharField(max_length=1024, unique=True)
+    status = models.CharField(max_length=1, choices=STATUS_CHOICES, default="d")
     
     # automatic fields
     creationDate = models.DateTimeField(auto_now_add=True)
@@ -21,12 +30,14 @@ class Publication(models.Model):
     )
 
     # possibly blank fields
+    provenance = models.TextField(null=True, blank=True)
     publicationDate = models.DateField(null=True,blank=True)
+    title = models.TextField(null=True, blank=True)
     abstract = models.TextField(null=True, blank=True)
-    
     url = models.URLField(max_length=1024, null=True, blank=True)
     geometry = models.GeometryCollectionField(verbose_name='Publication geometry/ies', srid = 4326, null=True, blank=True)
-    journal = models.CharField(max_length=1024, null=True, blank=True)
+    # https://docs.openalex.org/api-entities/sources
+    source = models.CharField(max_length=4096, null=True, blank=True) # journal, conference, preprint repo, ..
     timeperiod_startdate = ArrayField(models.DateField(null=True), null=True, blank=True)
     timeperiod_enddate = ArrayField(models.DateField(null=True), null=True, blank=True)
 
