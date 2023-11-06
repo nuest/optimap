@@ -14,12 +14,32 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path,include
+from django.urls import path, re_path, include
+from django.contrib.sitemaps import views as sitemaps_views
+from django.http import HttpResponse
+from publications.sitemaps import PublicationsSitemap, StaticViewSitemap
 
+sitemaps = {
+    "static": StaticViewSitemap,
+    "publications": PublicationsSitemap,
+}
 
 urlpatterns = [
     path('admin/', admin.site.urls),    
     path('', include('publications.urls')),
+    path(
+        "sitemap.xml",
+        sitemaps_views.index,
+        {"sitemaps": sitemaps},
+        name="django.contrib.sitemaps.views.index",
+    ),
+    path(
+        "sitemap-<section>.xml",
+        sitemaps_views.sitemap,
+        {"sitemaps": sitemaps},
+        name="django.contrib.sitemaps.views.sitemap",
+    ),
+    re_path(r'^robots.txt', lambda request: HttpResponse("User-Agent: *\nDisallow:\nSitemap: %s://%s/sitemap.xml" % (request.scheme, request.site.domain), content_type="text/plain"), name="robots_file"),
     ]
 
 # https://stackoverflow.com/a/18272203/261210
@@ -31,5 +51,5 @@ def site(request):
     site = SimpleLazyObject(lambda: "{0}://{1}".format(protocol, get_current_site(request)))
     
     return {
-        'site': site
+        'site': site,
     }

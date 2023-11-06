@@ -27,7 +27,7 @@ LOGIN_TOKEN_LENGTH  = 32
 LOGIN_TOKEN_TIMEOUT_SECONDS = 10 * 60
 
 
-def optimap(request):
+def main(request):
     return render(request,"main.html")
 
 def loginres(request):
@@ -82,7 +82,7 @@ The link is valid for {valid} minutes.
             }
         })
 
-def privacypolicy(request):
+def privacy(request):
     return render(request,'privacy.html')
 
 def data(request):
@@ -92,7 +92,7 @@ def Confirmationlogin(request):
     return render(request,'confirmation_login.html')
 
 @require_GET
-def autheticate_via_magic_link(request: HttpRequest, token: str):
+def authenticate_via_magic_link(request: HttpRequest, token: str):
     email = cache.get(token)
     logger.info('Authenticating magic link with token %s: Found user: %s', token, email)
 
@@ -130,6 +130,7 @@ def user_subscriptions(request):
         return render(request,'subscriptions.html',{'sub':subs,'count':count_subs})
     else:
         pass
+
 def add_subscriptions(request):
     if request.method == "POST":
         search_term = request.POST.get("search", False)
@@ -144,7 +145,7 @@ def add_subscriptions(request):
         end_date_object = datetime.strptime(end_date, '%m/%d/%Y')
         
         # save info in db
-        subscription = Subscription(search_text = search_term, timeperiod_startdate = start_date_object, timeperiod_enddate = end_date_object, user_name = user_name )
+        subscription = Subscription(search_term = search_term, timeperiod_startdate = start_date_object, timeperiod_enddate = end_date_object, user_name = user_name )
         logger.info('Adding new subscription for user %s: %s', user_name, subscription)
         subscription.save()
         return  HttpResponseRedirect('/subscriptions/')

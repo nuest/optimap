@@ -41,6 +41,13 @@ class Publication(models.Model):
     timeperiod_startdate = ArrayField(models.DateField(null=True), null=True, blank=True)
     timeperiod_enddate = ArrayField(models.DateField(null=True), null=True, blank=True)
 
+    def get_absolute_url(self):
+        return "/api/v1/publications/%i.json" % self.id
+        # http://localhost:8000/api/v1/publications/5.json
+
+    class Meta:
+        ordering = ['-id']
+
     def __str__(self):
         """Return string representation."""
         return self.doi
@@ -65,6 +72,7 @@ class Source(models.Model):
     
 class Subscription(models.Model):
     name = models.CharField(max_length=4096)
+    search_term = models.CharField(max_length=4096,null=True)
     timeperiod_startdate = models.DateField(null=True)
     timeperiod_enddate = models.DateField(null=True)
     search_area = models.GeometryCollectionField(null=True, blank=True)
