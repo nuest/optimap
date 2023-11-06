@@ -3,7 +3,9 @@ from leaflet.admin import LeafletGeoAdmin
 from publications.models import Publication
 
 @admin.register(Publication)
-class PublicationAdmin(LeafletGeoAdmin):
+class PublicationAdmin(LeafletGeoAdmin, ImportExportModelAdmin):
     """Publication Admin."""
 
-    list_display = ("doi", "creationDate", "lastUpdate", "created_by", "updated_by")
+    list_display = ("doi", "creationDate", "lastUpdate", "created_by", "updated_by", "status", "provenance")
+
+    actions = [make_public,make_draft]
