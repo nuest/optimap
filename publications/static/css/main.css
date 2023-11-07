@@ -18,6 +18,12 @@ main {
   background-color: #158F9B;
 }
 
+@media (max-width: 720px) {
+  span.tagline {
+    display: none;
+  }
+}
+
 .tagline {
   font-weight: 800;
   font-size: 1.6em;
