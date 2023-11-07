@@ -3,7 +3,7 @@
 
 {% block navbar %}
 
-<ul class="nav navbar-nav ml-auto">
+<ul class="nav navbar-nav">
   {% if request.user.is_authenticated %}  
   {% include "authenticated_menu_snippet.html" %}
   {% else %}
