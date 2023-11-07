@@ -85,3 +85,24 @@ class Subscription(models.Model):
     class Meta:
         ordering = ['user_name']
         verbose_name = "subscription"
+
+# handle import/export relations, see https://django-import-export.readthedocs.io/en/stable/advanced_usage.html#creating-non-existent-relations
+from import_export import fields, resources
+from import_export.widgets import ForeignKeyWidget
+from django.conf import settings
+from django.contrib.auth.models import User
+class PublicationResource(resources.ModelResource):
+    #created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='username')
+    #updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='username')
+    created_by = fields.Field(
+        column_name='created_by',
+        attribute='created_by',
+        widget=ForeignKeyWidget(User, field='username'))
+    updated_by = fields.Field(
+        column_name='updated_by',
+        attribute='updated_by',
+        widget=ForeignKeyWidget(settings.AUTH_USER_MODEL, field='username'))
+    
+    class Meta:
+        model = Publication
+        fields = ('created_by','updated_by',)
