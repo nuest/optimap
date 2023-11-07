@@ -14,10 +14,14 @@ curl -L https://fly.io/install.sh | sh
 - <https://fly.io/docs/reference/postgres-on-nomad/>
 
 ```bash
-flyctl postgres create 
-# follow the instructions, use name optimap-db, region Frankfurt
+flyctl postgres create
+# follow the instructions, use name optimap-db, region Frankfurt or Amsterdam, configuration "Development", do not scale to 0
 
 flyctl image show --app optimap-db
+
+# PostGIS needs a bit more memory; THIS IS NOT FREE: https://fly.io/docs/about/pricing/?utm_campaign=oom-notification&utm_medium=email&utm_source=flyio#virtual-machines
+fly status --app optimap-db
+fly machine update [see output from previous command] --memory 512 --app optimap-db
 ```
 
 Note the username, password, connection string etc. in a secure place and manually set `DATABASE_URL` for the app.
@@ -30,27 +34,33 @@ flyctl postgres connect -a optimap-db
 
 # in postgres=# 
 CREATE DATABASE optimap;
+
+\connect optimap
+
+CREATE EXTENSION postgis;
 ```
 
 If you want to start from scratch with an empty database, you can use
 
 ```bash
 # CAREFUL!
-#DROP DATABASE db_name WITH (FORCE);
+#DROP DATABASE optimap WITH (FORCE);
 ```
+
+Using the client connection above or connect with pgAdmin4 and do the same with the UI.
 
 ## Deploy app via Dockerfile
 
 Use Dockerfile instead of [Django on Fly](https://fly.io/docs/django/) because of GIS dependencies.
+See also the following useful tutorials:
 
+- <https://learndjango.com/tutorials/deploy-django-postgresql-flyio>
 - <https://fly.io/docs/languages-and-frameworks/dockerfile/>
+- <https://dev.to/teachmetechy/django-rest-framework-on-flyio-582p>
 
-```bash
-fly launch --dockerfile Dockerfile
-# on first run, overwrite Dockerfile and then roll back needed changes, otherwise error
-```
+_Note:_ See the file `fly.toml` for a number of environment variables and configurations that are already set!
 
-Now say YES when asked if you want to create a Postgres DB.
+From the interactive UI we learned:
 
 > We recommend using the database_url (`pip install dj-database-url`) to parse the DATABASE_URL from os.environ['DATABASE_URL']
 >
@@ -60,16 +70,36 @@ The current configuration style uses `dj-database-uri`.
 However, because the database connection is not available when the migrations are run, this does not work rightaway.
 We cannot set database connection because the app does not exist at this point.
 
-Therefore, put the `DATABASE_URL` without encryption into `fly.toml` at least for the first start (but don't commit to the repo!).
-Seems to work, <https://optimap.fly.dev/> shows the app!
-
-Now removing the env from the `fly.toml` file and adding the secret:
+Therefore, now set the `DATABASE_URL` before deploying.
 
 ```bash
-flyctl secrets set DATABASE_URL=postgis://postgres:z...@optimap-db.internal:5432?sslmode=disable
+flyctl secret set DATABASE_URL=DATABASE_URL=postgis://...
+```
 
+Check the secret exists:
+
+```bash
 flyctl secrets list
 ```
+
+Launch the app using the Dockerfile:
+
+```bash
+# only used for the first configuration:
+flyctl launch --dockerfile Dockerfile
+
+flyctl deploy
+# on first run, overwrite Dockerfile and then roll back needed changes, otherwise error
+```
+
+In the interactive UI of `launch`:
+
+- copy configuration: yes
+- name 'optimap'
+- create a Postgres DB: yes
+- connect to `optimap-db`: yes
+- existing database, continue attachment: yes
+- (ignore the shown secret for the database connection to connect as the app user, because the migrations need the postgres user)
 
 ## Get IPs and certificate
 
@@ -77,23 +107,20 @@ flyctl secrets list
 - <https://fly.io/docs/app-guides/custom-domains-with-fly/>
 
 ```bash
-fly ips allocate-v4
+#fly ips allocate-v4 # paid feature!
 fly ips allocate-v6
 ```
 
 ```bash
-$ fly ips list
-
-VERSION IP                      TYPE    REGION  CREATED AT 
-v4      37.16.20.137            public  global  36m11s ago
-v6      2a09:8280:1::a:acfd     public  global  36m4s ago
+fly ips list
 ```
 
-Configure `A` and `AAAA` records at domain provider. Then continue with
+Configure `A` and `AAAA` records for `@` and `www` (e.g., with IONOS) at domain registrar using the information of the previous command's output.
+Then continue with
 
 ```bash
 flyctl certs create optimap.science
-flyctl certs create www.optimap.science
+#flyctl certs create www.optimap.science
 ```
 
 Check IP config:
@@ -103,7 +130,7 @@ traceroute optimap.fly.dev
 traceroute optimap.science
 ```
 
-Looks good!
+This should all looks good!
 
 ## Secrets and passwords
 
@@ -130,15 +157,13 @@ You can also set values for the secrets in the Fly.io dashboard.
 
 ## Deploy
 
+Using the previously configured settings and configurations:
+
 ```bash
 flyctl deploy
 ```
 
-<https://optimap.fly.dev/>
-
-and
-
-<https://optimap.science/>
+Then open <https://optimap.fly.dev/> and <https://optimap.science/>.
 
 ## Update allowed hosts and configure CSRF
 
@@ -153,7 +178,7 @@ Add to `fly.toml`:
 
 Then `flyctl deploy`.
 
-## Connect to database
+## Connect to database locally
 
 ```bash
 fly proxy 15432:5432 -a optimap-db
@@ -169,6 +194,8 @@ For example, when you want to manipulate the database without any open connectio
 flyctl scale count 0
 flyctl status
 ```
+
+To re-enable, set the scale count to `1`.
 
 ## Future
 
