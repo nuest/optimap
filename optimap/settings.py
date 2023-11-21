@@ -16,6 +16,7 @@ https://djangocentral.com/environment-variables-in-django/
 import os
 import environ
 import dj_database_url
+import re
 
 # .env file in the same directory as settings.py
 env = environ.Env()
@@ -313,6 +314,16 @@ LOGGING = {
         }
     }
 }
+
+IGNORABLE_404_URLS = (
+    re.compile(r"\.(php|cgi|env)$"),
+    re.compile(r"^/phpmyadmin/"),
+    re.compile(r'wp-login$'),
+    re.compile(r'(.*)/wp-includes/(.*)'),
+    re.compile(r"^/(http|https)$"),
+    re.compile(r"ads.txt$"),
+    re.compile(r"^\.git"),
+)
 
 CSRF_TRUSTED_ORIGINS = [i.strip('[]') for i in env('CSRF_TRUSTED_ORIGINS', default='https://localhost:8000').split(',')]
 
