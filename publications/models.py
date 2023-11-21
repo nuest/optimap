@@ -14,32 +14,30 @@ class Publication(models.Model):
     # required fields      
     doi = models.CharField(max_length=1024, unique=True)
     status = models.CharField(max_length=1, choices=STATUS_CHOICES, default="d")
-    
-    # automatic fields
-    creationDate = models.DateTimeField(auto_now_add=True)
-    lastUpdate = models.DateTimeField(auto_now=True)
-    # see useful hint at https://github.com/zsoldosp/django-currentuser/issues/69
-    created_by = CurrentUserField(
+    created_by = CurrentUserField( # see useful hint at https://github.com/zsoldosp/django-currentuser/issues/69
         verbose_name=("Created by"),
         related_name="%(app_label)s_%(class)s_creator",
     )
+
+    # automatic fields
+    creationDate = models.DateTimeField(auto_now_add=True)
+    lastUpdate = models.DateTimeField(auto_now=True)
     updated_by = CurrentUserField(
         verbose_name=("Updated by"),
         related_name="%(app_label)s_%(class)s_updater",
         on_update=True,
     )
-
-    # possibly blank fields
+    
+    # optional fields
+    source = models.CharField(max_length=4096, null=True, blank=True) # journal, conference, preprint repo, ..
     provenance = models.TextField(null=True, blank=True)
     publicationDate = models.DateField(null=True,blank=True)
     title = models.TextField(null=True, blank=True)
     abstract = models.TextField(null=True, blank=True)
     url = models.URLField(max_length=1024, null=True, blank=True)
-    geometry = models.GeometryCollectionField(verbose_name='Publication geometry/ies', srid = 4326, null=True, blank=True)
-    # https://docs.openalex.org/api-entities/sources
-    source = models.CharField(max_length=4096, null=True, blank=True) # journal, conference, preprint repo, ..
-    timeperiod_startdate = ArrayField(models.DateField(null=True), null=True, blank=True)
-    timeperiod_enddate = ArrayField(models.DateField(null=True), null=True, blank=True)
+    geometry = models.GeometryCollectionField(verbose_name='Publication geometry/ies', srid = 4326, null=True, blank=True)# https://docs.openalex.org/api-entities/sources
+    timeperiod_startdate = ArrayField(models.CharField(max_length=1024, null=True), null=True, blank=True)
+    timeperiod_enddate = ArrayField(models.CharField(max_length=1024, null=True), null=True, blank=True)
 
     def get_absolute_url(self):
         return "/api/v1/publications/%i.json" % self.id
