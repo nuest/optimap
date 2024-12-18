@@ -52,22 +52,27 @@ python manage.py dumpdata --exclude=auth --exclude=contenttypes | jq > fixtures/
 python manage.py loaddata fixtures/test_data.json
 ```
 
+If you want to create more testdata manually, copy and paste the existing records or add more records in the admin backend (preferred).
+A useful tool for creating sensible geometries is <https://wktmap.com/>.
+
 ### Run locally
 
-Create a `.env` file based on `.env.example` in the same directory where `settings.py` resides and fill in the configuration settings as needed.
+1. Create a `.env` file based on `.env.example` in the same directory where `settings.py` resides and fill in the configuration settings as needed.
+2. Run the commands below, which use the built-in Python [`venv`](https://docs.python.org/3/library/venv.html), see [this tutorial](https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/#create-and-use-virtual-environments) for details
 
 ```bash
 # once only: create virtual environment
-# mkvirtualenv optimap
-workon optimap
+# python -m venv .venv
+source .venv/bin/activate
+which python
 
 pip install -r requirements.txt
 
-# create and start local DB (once)
-docker run --name optimapDB -p 5432:5432 -e POSTGRES_USER=optimap -e POSTGRES_PASSWORD=optimap -e POSTGRES_DB=optimap -d postgis/postgis:14-3.3
-# stop and restart it with
-# docker stop optimapDB
-# docker start optimapDB
+# create local DB container (once)
+# docker run --name optimapDB -p 5432:5432 -e POSTGRES_USER=optimap -e POSTGRES_PASSWORD=optimap -e POSTGRES_DB=optimap -d postgis/postgis:14-3.3
+
+# start DB
+docker start optimapDB
 
 # run migrations
 python manage.py makemigrations
@@ -87,6 +92,16 @@ OPTIMAP_CACHE=dummy OPTIMAP_DEBUG=True python manage.py runserver
 ```
 
 Now open a browser at <http://127.0.0.1:8000/>.
+
+See instructions below for creating a superuser and above for loading test data.
+
+When you are done, deactivate the virtual environment and stop the DB with:
+
+```bash
+deactivate
+
+docker stop optimapDB
+```
 
 ### Debug with VS Code
 
@@ -137,7 +152,7 @@ OPTIMAP_EMAIL_PORT=5587
 Superusers/admin can be created  using the createsuperuser command:
 
 ```bash
-python manage.py createsuperuser --username=joe --email=joe@example.com
+python manage.py createsuperuser --username=optimap --email=nomail@optimap.science
 ```
 
 You will be prompted for a password.
