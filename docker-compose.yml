@@ -1,24 +1,61 @@
 version: "3.9"
-   
+
 services:
   db:
-    image: postgis/postgis:14-3.3
-    #volumes:
-    #  - ./data/db:/var/lib/postgresql/data
+    image: postgis/postgis:15-3.4
+    container_name: project_db
     environment:
-      - POSTGRES_DB=optimap
-      - POSTGRES_USER=optimap
-      - POSTGRES_PASSWORD=optimap
-  web:
-    build: .
-    environment:
-      - DATABASE_URL=postgis://optimap:optimap@db:5432/optimap?sslmode=disable
-    # overwrite app code for development:
-    #volumes:
-    #  - .:/code
-    # mount test data 
-    #  - ./fixtures/:/fixtures
+      POSTGRES_DB: optimap # Database name
+      POSTGRES_USER: optimap # Database user
+      POSTGRES_PASSWORD: optimap # Database password
     ports:
-      - "8000:8000"
+      - "5434:5432" # Map to a host port that isn't in use
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  app:
+    image: python:3.11-slim
+    container_name: project_app
+    environment:
+      DATABASE_URL: postgis://newuser:newpassword@db:5432/newprojectdb?sslmode=disable
+    volumes:
+      - .:/code
+    working_dir: /code
+    command: python -m http.server 8000
+    ports:
+      - "8002:8000" # Unique port for the app container
     depends_on:
       - db
+
+  web:
+    # Builds from our local Dockerfile in the same directory
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: project_web
+    environment:
+      DATABASE_URL: postgis://optimap:optimap@db:5432/optimap?sslmode=disable
+      OPTIMAP_CACHE: "dummy"
+      OPTIMAP_DEBUG: "True"
+    volumes:
+      - .:/code
+      - ./fixtures:/fixtures # Mount fixture/test data
+    ports:
+      - "8001:8000" # Unique port for the web container
+    depends_on:
+      - db
+    command: python manage.py runserver 0.0.0.0:8000
+
+  webserver:
+    image: nginx:1.24-alpine
+    container_name: project_webserver
+    volumes:
+      - ./test_files:/usr/share/nginx/html:ro # Serve test files
+    ports:
+      - "8080:80"
+    depends_on:
+      - app
+
+volumes:
+  db_data:
+    driver: local
