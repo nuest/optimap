@@ -3,8 +3,7 @@
 from django.urls import path, include
 from django.shortcuts import redirect
 from publications import views
-from .feeds import OptimapFeed
-from .feeds import atomFeed
+from .feeds import GeoRSSFeed, GeoAtomFeed, W3CGeoFeed
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView
 
 app_name = "optimap"
@@ -19,8 +18,9 @@ urlpatterns = [
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/schema/ui/sitemap', SpectacularRedocView.as_view(url_name='optimap:schema'), name='redoc'),
     path("data/", views.data, name="data"),
-    path('feed/rss', OptimapFeed(), name="GeoRSSfeed"), 
-    path("feed/atom", atomFeed(), name="GeoAtomfeed"),
+    path('feed/rss', GeoRSSFeed(), name="GeoRSSFeed"), 
+    path("feed/atom", GeoAtomFeed(), name="GeoAtomFeed"),
+    path("feed/w3cgeo", W3CGeoFeed(), name="W3CGeoFeed"),
     path("loginres/", views.loginres, name="loginres"),
     path("privacy/", views.privacy, name="privacy"),
     path("loginconfirm/", views.Confirmationlogin, name="loginconfirm"),
