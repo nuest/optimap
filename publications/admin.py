@@ -4,11 +4,10 @@ from publications.models import Publication
 from import_export.admin import ImportExportModelAdmin
 from django_q.tasks import schedule
 from django.utils.timezone import now
-from publications.models import SentEmailLog
+from publications.models import SentEmailLog, Subscription
 from publications.tasks import send_monthly_email, schedule_monthly_email_task
 from django_q.models import Schedule
 from datetime import datetime, timedelta
-
 
 @admin.action(description="Mark selected publications as published")
 def make_public(modeladmin, request, queryset):
@@ -50,6 +49,21 @@ def trigger_monthly_email_task(modeladmin, request, queryset):
     except Exception as e:
         messages.error(request, f"Failed to schedule task: {e}")
 
+@admin.action(description="Send subscription-based emails")
+def send_subscription_emails(modeladmin, request, queryset):
+    """
+    Admin action to manually send subscription-based emails to selected users.
+    """
+    from publications.tasks import send_subscription_based_email
+
+    selected_users = queryset.filter(subscribed=True).values_list('user', flat=True)
+    if not selected_users:
+        messages.warning(request, "No active subscribers selected.")
+        return
+
+    send_subscription_based_email(sent_by=request.user, user_ids=list(selected_users))
+    messages.success(request, "Subscription-based emails have been sent.")
+
 @admin.register(Publication)
 class PublicationAdmin(LeafletGeoAdmin, ImportExportModelAdmin):
     """Publication Admin."""
@@ -62,5 +76,9 @@ class SentEmailLogAdmin(admin.ModelAdmin):
     list_display = ("recipient_email", "subject", "sent_at")
     actions = [trigger_monthly_email,trigger_monthly_email_task]  
 
+class SubscriptionAdmin(admin.ModelAdmin):
+    list_display = ("user", "region", "subscribed")
+    actions = [send_subscription_emails]
 
-admin.site.register(SentEmailLog, SentEmailLogAdmin)
+admin.site.register(SentEmailLog, SentEmailLogAdmin)  
+admin.site.register(Subscription, SubscriptionAdmin)  
