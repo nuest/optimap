@@ -13,7 +13,7 @@ STATUS_CHOICES = (
 
 class Publication(models.Model):
     # required fields      
-    doi = models.CharField(max_length=1024, unique=True)
+    doi = models.CharField(max_length=1024, unique=True, null=True, blank=True)  # ✅ Allow NULL DOIs
     status = models.CharField(max_length=1, choices=STATUS_CHOICES, default="d")
     created_by = CurrentUserField( # see useful hint at https://github.com/zsoldosp/django-currentuser/issues/69
         verbose_name=("Created by"),
@@ -132,8 +132,6 @@ class PublicationResource(resources.ModelResource):
     class Meta:
         model = Publication
         fields = ('created_by','updated_by',)
-
-
 
 class HarvestingEvent(models.Model):
     source = models.ForeignKey('Source', on_delete=models.CASCADE, related_name='harvesting_events')

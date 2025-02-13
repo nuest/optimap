@@ -3,6 +3,7 @@ from django.test import Client, TestCase
 from publications.tasks import parse_oai_xml_and_save_publications
 from publications.models import Publication, Source, Schedule
 import httpretty
+import time
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'optimap.settings')
 
@@ -26,7 +27,7 @@ class SimpleTest(TestCase):
                 body = article02.read()
             )
 
-            parse_oai_xml_and_save_publications(oai.read())
+            parse_oai_xml_and_save_publications(oai.read(), event=None)
 
     @classmethod
     def tearDownClass(cls):
@@ -73,16 +74,27 @@ class SimpleTest(TestCase):
         self.assertEqual(body['properties']['url'],'http://localhost:8330/index.php/opti-geo/article/view/2')
 
     def test_task_scheduling(self):
-        source = Source.objects.create(url_field="http://example.com/oai", harvest_interval_minutes=60)
+        oai_file_path = os.path.join(os.getcwd(), "tests", "harvesting", "journal_1", "oai_dc.xml")
+        source = Source.objects.create(
+            url_field=f"file://{oai_file_path}", 
+            harvest_interval_minutes=60
+        )
         source.save()
-
+        time.sleep(2)
         schedule = Schedule.objects.filter(name=f"Harvest Source {source.id}")
         self.assertTrue(schedule.exists(), "Django-Q task not scheduled for source.")
 
     def test_no_duplicates(self):
-        with open("path/to/oai_dc.xml") as oai:
-            parse_oai_xml_and_save_publications(oai.read(), event=None)
-            parse_oai_xml_and_save_publications(oai.read(), event=None)
+        Publication.objects.all().delete()
+        oai_file_path = os.path.join(os.getcwd(), "tests", "harvesting", "journal_1", "oai_dc.xml")
+        print(Publication.objects.count())
 
-        self.assertEqual(Publication.objects.count(), 2, "Duplicate publications were created.")
+        with open(oai_file_path, "r") as oai:
+            content = oai.read()
+
+            parse_oai_xml_and_save_publications(content, event=None)
+            parse_oai_xml_and_save_publications(content, event=None)
+    
+        publications_count = Publication.objects.count()
+        self.assertEqual(publications_count, 2, "Duplicate publications were created!")
 
