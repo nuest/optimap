@@ -2,6 +2,8 @@
 
 from rest_framework_gis import serializers
 from .models import Publication
+from django.contrib.auth import get_user_model
+User = get_user_model()
 
 from publications.models import Publication,Subscription
 
