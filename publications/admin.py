@@ -21,8 +21,8 @@ def delete_user_and_block(modeladmin, request, queryset):
         email = user.email
         domain = email.split('@')[-1]
 
-        BlockedEmail.objects.get_or_create(email=email) # Add email to BlockedEmail table
-        BlockedDomain.objects.get_or_create(domain=domain) # Add domain to BlockedDomain table
+        BlockedEmail.objects.get_or_create(email=email, blocked_by=request.user) 
+        BlockedDomain.objects.get_or_create(domain=domain, blocked_by=request.user) 
 
         # Delete user
         user.delete()
@@ -37,12 +37,12 @@ class PublicationAdmin(LeafletGeoAdmin, ImportExportModelAdmin):
 
 @admin.register(BlockedEmail)
 class BlockedEmailAdmin(admin.ModelAdmin):
-    list_display = ('email', 'created_at')
+    list_display = ('email', 'created_at', 'blocked_by')
     search_fields = ('email',)
 
 @admin.register(BlockedDomain)
 class BlockedDomainAdmin(admin.ModelAdmin):
-    list_display = ('domain', 'created_at')
+    list_display = ('domain', 'created_at', 'blocked_by')
     search_fields = ('domain',)
 
 @admin.register(User)

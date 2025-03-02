@@ -40,7 +40,7 @@ def loginres(request):
             'error': {
                 'class': 'danger',
                 'title': 'Login failed!',
-                'text': 'The email address is blocked. Please contact support for assistance.'
+                'text': 'You attempted to login using an email that is blocked. Please contact support for assistance.'
             }
         })
 
@@ -183,7 +183,7 @@ def change_useremail(request):
             'error': {
                 'class': 'danger',
                 'title': 'Login failed!',
-                'text': 'The email address is blocked. Please contact support for assistance.'
+                'text': 'You attempted to change your email to an address that is blocked. Please contact support for assistance.'
             }
         })
     

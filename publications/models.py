@@ -108,6 +108,7 @@ class PublicationResource(resources.ModelResource):
 class BlockedEmail(models.Model):
     email = models.EmailField(unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    blocked_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="blocked_emails")
 
     def __str__(self):
         return self.email
@@ -115,6 +116,7 @@ class BlockedEmail(models.Model):
 class BlockedDomain(models.Model):
     domain = models.CharField(max_length=255, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    blocked_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="blocked_domains")
 
     def __str__(self):
         return self.domain
