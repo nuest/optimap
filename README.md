@@ -217,6 +217,10 @@ Change the argument `tests` to `tests-ui` to run the UI tests.
 
 See also documentation at <https://code.visualstudio.com/docs/python/tutorial-django>.
 
+### Issues during development
+
+* If you get a message during login that there is an issue with the CSRF token, e.g. `WARNING:django.security.csrf:Forbidden (CSRF token from POST incorrect.): /loginres/` in the log and also i nthe UI, then switch to using `localhost:8000` as the domain, not the localhost IP used in the examples in this README file.
+
 ## Deploy
 
 Deploy using docker-compose or see [`fly.io.md`](fly.io.md) for notes on deploying to Fly.io.
