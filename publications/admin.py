@@ -15,17 +15,21 @@ def make_public(modeladmin, request, queryset):
 def make_draft(modeladmin, request, queryset):
     queryset.update(status="d")
 
-@admin.action(description="Delete user and block email/domain")
-def delete_user_and_block(modeladmin, request, queryset):
+@admin.action(description="Delete user and block email")
+def block_email(modeladmin, request, queryset):
     for user in queryset:
-        email = user.email
-        domain = email.split('@')[-1]
-
-        BlockedEmail.objects.get_or_create(email=email, blocked_by=request.user) 
-        BlockedDomain.objects.get_or_create(domain=domain, blocked_by=request.user) 
-
-        # Delete user
+        BlockedEmail.objects.create(email=user.email) 
         user.delete()
+    modeladmin.message_user(request, "Selected users have been deleted and their emails blocked.")
+
+@admin.action(description="Delete user and block email and domain")
+def block_email_and_domain(modeladmin, request, queryset):
+    for user in queryset:
+        domain = user.email.split("@")[-1]
+        BlockedEmail.objects.create(email=user.email)  
+        BlockedDomain.objects.get_or_create(domain=domain)  
+        user.delete()
+    modeladmin.message_user(request, "Selected users have been deleted and their emails/domains blocked.")
 
 @admin.register(Publication)
 class PublicationAdmin(LeafletGeoAdmin, ImportExportModelAdmin):
@@ -49,4 +53,4 @@ class BlockedDomainAdmin(admin.ModelAdmin):
 class UserAdmin(admin.ModelAdmin):
     """User Admin."""
     list_display = ("username", "email", "is_active")
-    actions = [delete_user_and_block]
+    actions = [block_email, block_email_and_domain]
