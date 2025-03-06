@@ -11,14 +11,11 @@ class CustomGeoFeed(Rss201rev2Feed):
 
     def add_root_elements(self, handler):
         super().add_root_elements(handler)
-
+        handler.startPrefixMapping('georss', 'http://www.georss.org/georss')
         handler.startPrefixMapping('geo', 'http://www.w3.org/2003/01/geo/wgs84_pos#')
 
-        if self.feed_type_variant in ["georss", "geoatom"]:
-            handler.startPrefixMapping('georss', 'http://www.georss.org/georss')
-
-        if self.feed_type_variant in ["w3cgeo", "geoatom"]:
-            handler.startPrefixMapping('geo', 'http://www.w3.org/2003/01/geo/wgs84_pos#')
+    def rss_attributes(self):
+        return {"version": self._version, "xmlns:atom": "http://www.w3.org/2005/Atom", "xmlns:georss": "http://www.georss.org/georss"}
 
     def add_item_elements(self, handler, item):
         super().add_item_elements(handler, item)
@@ -38,6 +35,12 @@ class CustomGeoFeed(Rss201rev2Feed):
 
 
 class CustomGeoAtomFeed(Atom1Feed):
+    def root_attributes(self):
+        attrs = super().root_attributes()
+        attrs['xmlns:georss'] = 'http://www.georss.org/georss'
+        attrs['xmlns:geo'] = 'http://www.w3.org/2003/01/geo/wgs84_pos#'
+        return attrs
+
     def add_root_elements(self, handler):
         super().add_root_elements(handler)
         handler.startPrefixMapping('georss', 'http://www.georss.org/georss')
@@ -55,7 +58,6 @@ class CustomGeoAtomFeed(Atom1Feed):
         if "geo_lat" in item and "geo_long" in item:
             handler.addQuickElement("geo:lat", item["geo_lat"])
             handler.addQuickElement("geo:long", item["geo_long"])
-
 
 def _format_georss_geometry(geometry):
     georss_data = []
