@@ -3,7 +3,7 @@ logger = logging.getLogger(__name__)
 
 from django.contrib.auth.models import User
 from django.contrib.auth import login
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.core.cache import cache
 from django.http.request import HttpRequest
 from django.http import HttpResponseRedirect
@@ -22,7 +22,9 @@ import imaplib
 import time
 from math import floor
 from django_currentuser.middleware import (get_current_user, get_current_authenticated_user)
-
+from publications.models import UserProfile
+from django.views.decorators.cache import never_cache
+from django.urls import reverse  
 LOGIN_TOKEN_LENGTH  = 32
 LOGIN_TOKEN_TIMEOUT_SECONDS = 10 * 60
 
@@ -120,8 +122,17 @@ def customlogout(request):
     messages.info(request, "You have successfully logged out.")
     return render(request, "logout.html")
 
+@never_cache
 def user_settings(request):
-    return render(request,'user_settings.html')
+    profile, created = UserProfile.objects.get_or_create(user=request.user)
+
+    if request.method == "POST":
+        profile.notify_new_manuscripts = request.POST.get("notify_new_manuscripts") == "on"
+        profile.save()
+
+        return redirect(reverse("optimap:usersettings"))
+
+    return render(request, "user_settings.html", {"profile": profile})
 
 def user_subscriptions(request):
     if request.user.is_authenticated:

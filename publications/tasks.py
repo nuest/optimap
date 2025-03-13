@@ -12,8 +12,12 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.utils.timezone import now
 from django.contrib.auth.models import User
-from .models import SentEmailLog
-from datetime import timedelta
+from .models import EmailLog
+from datetime import datetime, timedelta
+from django_q.tasks import schedule
+from django_q.models import Schedule
+import time  
+import calendar
 
 
 def extract_geometry_from_html(content):
@@ -111,20 +115,18 @@ def harvest_oai_endpoint(url):
     except requests.exceptions.RequestException as e:
         print ("The requested URL is invalid or has bad connection.Please change the URL")
 
-def send_monthly_email(sent_by=None):
-    recipients = User.objects.values_list('email', flat=True)
-    last_month = now().replace(day=1) - timedelta(days=1)  # Get last month's last day
+def send_monthly_email(trigger_source='manual', sent_by=None):
+    recipients = User.objects.filter(userprofile__notify_new_manuscripts=True).values_list('email', flat=True)
+    last_month = now().replace(day=1) - timedelta(days=1)
     new_manuscripts = Publication.objects.filter(creationDate__month=last_month.month)
 
-    if not new_manuscripts.exists():
-        print("No new manuscripts found for this month. Skipping email.")
+    if not recipients.exists() or not new_manuscripts.exists():
         return
 
     subject = "New Manuscripts This Month"
     content = "Here are the new manuscripts:\n" + "\n".join([pub.title for pub in new_manuscripts])
 
     for recipient in recipients:
-        print(f"Sending email to {recipient}")
         try:
             send_mail(
                 subject,
@@ -133,15 +135,29 @@ def send_monthly_email(sent_by=None):
                 [recipient],
                 fail_silently=False,
             )
-            SentEmailLog.log_email(recipient, subject, content, sent_by=sent_by)
-            print(f"Email sent successfully to {recipient}")
-        except Exception as e:
-            print(f"Failed to send email to {recipient}: {e}")
+            
+            EmailLog.log_email(
+                recipient, subject, content, sent_by=sent_by, trigger_source=trigger_source, status="success"
+            )
+            time.sleep(getattr(settings, "EMAIL_SEND_DELAY", 2))  
 
-def schedule_monthly_email_task():
-    schedule(
-        'publications.tasks.send_monthly_email',
-        schedule_type='MONTHLY',
-        repeats=-1,
-        next_run=datetime.now().replace(day=28, hour=23, minute=59)
-    )
+        except Exception as e:
+            error_message = str(e)
+            EmailLog.log_email(
+                recipient, subject, content, sent_by=sent_by, trigger_source=trigger_source, status="failed", error_message=error_message
+            )
+
+
+def schedule_monthly_email_task(sent_by=None):
+    if not Schedule.objects.filter(func='publications.tasks.send_monthly_email').exists():
+        now = datetime.now()
+        last_day_of_month = calendar.monthrange(now.year, now.month)[1]  # Get last day of the month
+
+        next_run_date = now.replace(day=last_day_of_month, hour=23, minute=59)  # Run at the end of the last day
+        schedule(
+            'publications.tasks.send_monthly_email',
+            schedule_type='M',
+            repeats=-1,
+            next_run=next_run_date,
+            kwargs={'trigger_source': 'scheduled', 'sent_by': sent_by.id if sent_by else None} 
+        )

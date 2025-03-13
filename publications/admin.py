@@ -4,7 +4,7 @@ from publications.models import Publication
 from import_export.admin import ImportExportModelAdmin
 from django_q.tasks import schedule
 from django.utils.timezone import now
-from publications.models import SentEmailLog
+from publications.models import EmailLog, UserProfile
 from publications.tasks import send_monthly_email, schedule_monthly_email_task
 from django_q.models import Schedule
 from datetime import datetime, timedelta
@@ -24,7 +24,7 @@ def trigger_monthly_email(modeladmin, request, queryset):
     Admin action to trigger the email task manually.
     """
     try:
-        send_monthly_email(sent_by=request.user) 
+        send_monthly_email(trigger_source='admin', sent_by=request.user) 
         messages.success(request, "Monthly manuscript email has been sent successfully.")
     except Exception as e:
         messages.error(request, f"Failed to send email: {e}")
@@ -34,19 +34,9 @@ def trigger_monthly_email_task(modeladmin, request, queryset):
     """
     Admin action to manually schedule the email task.
     """
-    try:
-        if not Schedule.objects.filter(func='publications.tasks.send_monthly_email').exists():
-            next_run_date = datetime.now().replace(day=1) + timedelta(days=30) 
-            
-            schedule(
-                'publications.tasks.send_monthly_email',  
-                schedule_type='M',  
-                repeats=-1,
-                next_run=next_run_date  
-            )
-            messages.success(request, "Monthly email task has been scheduled successfully.")
-        else:
-            messages.warning(request, "The monthly email task is already scheduled.")
+    try:        
+        schedule_monthly_email_task(sent_by=request.user)  
+        messages.success(request, "Monthly email task has been scheduled successfully.")
     except Exception as e:
         messages.error(request, f"Failed to schedule task: {e}")
 
@@ -58,9 +48,25 @@ class PublicationAdmin(LeafletGeoAdmin, ImportExportModelAdmin):
 
     actions = [make_public,make_draft]
 
-class SentEmailLogAdmin(admin.ModelAdmin):
-    list_display = ("recipient_email", "subject", "sent_at")
-    actions = [trigger_monthly_email,trigger_monthly_email_task]  
+class EmailLogAdmin(admin.ModelAdmin):
+    list_display = (
+        "recipient_email",
+        "subject",
+        "sent_at",
+        "sent_by",
+        "trigger_source",
+        "status",  
+        "error_message", 
+    )
+    list_filter = ("status", "trigger_source", "sent_at")  
+    search_fields = ("recipient_email", "subject", "sent_by__username")  
+    actions = [trigger_monthly_email, trigger_monthly_email_task]  
 
 
-admin.site.register(SentEmailLog, SentEmailLogAdmin)
+class UserProfileAdmin(admin.ModelAdmin):
+    list_display = ("user", "notify_new_manuscripts")  
+    search_fields = ("user__email",)
+
+
+admin.site.register(EmailLog, EmailLogAdmin)
+admin.site.register(UserProfile, UserProfileAdmin)
