@@ -152,6 +152,18 @@ deactivate
 docker stop optimapDB
 ```
 
+#### Debug Mode Configuration
+
+By default, `OPTIMAP_DEBUG` is now set to `False` to ensure a secure and stable production environment. If you need to enable debug mode for development purposes, explicitly set the environment variable in your `.env` file or pass it as an argument when running the server.
+
+#### Enable Debug Mode for Development
+
+To enable debug mode, add the following to your `.env` file:
+
+```env
+OPTIMAP_DEBUG=True
+```
+
 ### Debug with VS Code
 
 Select the Python interpreter created above (`optimap` environment), see instructions at <https://code.visualstudio.com/docs/python/tutorial-django> and <https://code.visualstudio.com/docs/python/environments>.
@@ -160,6 +172,22 @@ Configuration for debugging with VS Code:
 
 ```json
 {
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python: Django Run",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/manage.py",
+      "args": ["runserver"],
+      "env": {
+        "OPTIMAP_DEBUG": "True",
+        "OPTIMAP_CACHE": "dummy"
+      },
+      "django": true,
+      "justMyCode": true
+    }
+  ]
   "version": "0.2.0",
   "configurations": [
     {
@@ -216,6 +244,23 @@ docker-compose run web python manage.py createsuperuser
 
 This will run the same process as above but within the Docker environment. Ensure the container is running and accessible before executing this command
 
+## Block Emails/Domains
+
+### What It Does
+
+- Blocks specific emails and entire domains from registering.
+- Prevents login attempts from blocked users.
+- Admin can delete users and instantly block their email/domain.
+
+### How to Use in Django Admin
+
+1. **Manually Add Blocked Emails/Domains**
+   - Go to `/admin/`
+   - Add emails in **Blocked Emails** or domains in **Blocked Domains**.
+2. **Block Users via Admin Action**
+   - Go to `/admin/auth/user/`
+   - Select users → Choose **"Delete user and block email/domain"** → Click **Go**.
+
 ### Run tests
 
 See <https://docs.djangoproject.com/en/4.1/topics/testing/overview/> for testing Django apps.
@@ -259,12 +304,27 @@ A configuration to debug the test code and also print deprecation warnings:
   },
   "django": true,
   "justMyCode": true
+  "name": "Python: Django Test",
+  "type": "python",
+  "request": "launch",
+  "pythonArgs": ["-Wa"],
+  "program": "${workspaceFolder}/manage.py",
+  "args": ["test", "tests"],
+  "env": {
+    "OPTIMAP_DEBUG": "True"
+  },
+  "django": true,
+  "justMyCode": true
 }
 ```
 
 Change the argument `tests` to `tests-ui` to run the UI tests.
 
 See also documentation at <https://code.visualstudio.com/docs/python/tutorial-django>.
+
+### Issues during development
+
+- If you get a message during login that there is an issue with the CSRF token, e.g. `WARNING:django.security.csrf:Forbidden (CSRF token from POST incorrect.): /loginres/` in the log and also i nthe UI, then switch to using `localhost:8000` as the domain, not the localhost IP used in the examples in this README file.
 
 ## Deploy
 
