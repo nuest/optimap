@@ -1,24 +1,46 @@
 version: "3.9"
-   
+
 services:
   db:
-    image: postgis/postgis:14-3.3
-    #volumes:
-    #  - ./data/db:/var/lib/postgresql/data
+    image: postgis/postgis:15-3.4
+    container_name: project_db
     environment:
-      - POSTGRES_DB=optimap
-      - POSTGRES_USER=optimap
-      - POSTGRES_PASSWORD=optimap
-  web:
-    build: .
-    environment:
-      - DATABASE_URL=postgis://optimap:optimap@db:5432/optimap?sslmode=disable
-    # overwrite app code for development:
-    #volumes:
-    #  - .:/code
-    # mount test data 
-    #  - ./fixtures/:/fixtures
+      POSTGRES_DB: optimap
+      POSTGRES_USER: optimap
+      POSTGRES_PASSWORD: optimap
     ports:
-      - "8000:8000"
+      - "5434:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: project_web
+    environment:
+      DATABASE_URL: postgis://optimap:optimap@db:5432/optimap?sslmode=disable
+      OPTIMAP_CACHE: "dummy"
+      OPTIMAP_DEBUG: "True"
+    volumes:
+      - .:/code
+      - ./fixtures:/fixtures # Mount fixture/test data
+    ports:
+      - "8001:8000"
     depends_on:
       - db
+    command: python manage.py runserver 0.0.0.0:8000
+
+  webserver:
+    image: nginx:1.24-alpine
+    container_name: project_webserver
+    volumes:
+      - ./test_files:/usr/share/nginx/html:ro
+    ports:
+      - "8080:80"
+    depends_on:
+      - web
+
+volumes:
+  db_data:
+    driver: local

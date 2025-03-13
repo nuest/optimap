@@ -1,6 +1,7 @@
 from django.contrib import admin, messages
 from leaflet.admin import LeafletGeoAdmin
-from publications.models import Publication
+from django.contrib.auth.models import User
+from publications.models import Publication, BlockedEmail, BlockedDomain
 from import_export.admin import ImportExportModelAdmin
 from django_q.tasks import schedule
 from django.utils.timezone import now
@@ -9,6 +10,9 @@ from publications.tasks import send_monthly_email, schedule_monthly_email_task
 from django_q.models import Schedule
 from datetime import datetime, timedelta
 
+
+# Unregister the default User admin
+admin.site.unregister(User)
 
 @admin.action(description="Mark selected publications as published")
 def make_public(modeladmin, request, queryset):
@@ -40,6 +44,22 @@ def trigger_monthly_email_task(modeladmin, request, queryset):
     except Exception as e:
         messages.error(request, f"Failed to schedule task: {e}")
 
+@admin.action(description="Delete user and block email")
+def block_email(modeladmin, request, queryset):
+    for user in queryset:
+        BlockedEmail.objects.create(email=user.email) 
+        user.delete()
+    modeladmin.message_user(request, "Selected users have been deleted and their emails blocked.")
+
+@admin.action(description="Delete user and block email and domain")
+def block_email_and_domain(modeladmin, request, queryset):
+    for user in queryset:
+        domain = user.email.split("@")[-1]
+        BlockedEmail.objects.create(email=user.email)  
+        BlockedDomain.objects.get_or_create(domain=domain)  
+        user.delete()
+    modeladmin.message_user(request, "Selected users have been deleted and their emails/domains blocked.")
+
 @admin.register(Publication)
 class PublicationAdmin(LeafletGeoAdmin, ImportExportModelAdmin):
     """Publication Admin."""
@@ -70,3 +90,19 @@ class UserProfileAdmin(admin.ModelAdmin):
 
 admin.site.register(EmailLog, EmailLogAdmin)
 admin.site.register(UserProfile, UserProfileAdmin)
+
+@admin.register(BlockedEmail)
+class BlockedEmailAdmin(admin.ModelAdmin):
+    list_display = ('email', 'created_at', 'blocked_by')
+    search_fields = ('email',)
+
+@admin.register(BlockedDomain)
+class BlockedDomainAdmin(admin.ModelAdmin):
+    list_display = ('domain', 'created_at', 'blocked_by')
+    search_fields = ('domain',)
+
+@admin.register(User)
+class UserAdmin(admin.ModelAdmin):
+    """User Admin."""
+    list_display = ("username", "email", "is_active")
+    actions = [block_email, block_email_and_domain]

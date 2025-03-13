@@ -172,6 +172,23 @@ You can acess the admin page at <http://127.0.0.1:8000/admin/>.
 
 You can also run the command in a containerised app with `docker-compose run web python manage.py ...`.
 
+## Block Emails/Domains
+
+### What It Does
+
+- Blocks specific emails and entire domains from registering.
+- Prevents login attempts from blocked users.
+- Admin can delete users and instantly block their email/domain.
+
+### How to Use in Django Admin
+
+1. **Manually Add Blocked Emails/Domains**
+   - Go to `/admin/`
+   - Add emails in **Blocked Emails** or domains in **Blocked Domains**.
+2. **Block Users via Admin Action**
+   - Go to `/admin/auth/user/`
+   - Select users → Choose **"Delete user and block email/domain"** → Click **Go**.
+
 ### Run tests
 
 See <https://docs.djangoproject.com/en/4.1/topics/testing/overview/> for testing Django apps.
@@ -221,6 +238,10 @@ A configuration to debug the test code and also print deprecation warnings:
 Change the argument `tests` to `tests-ui` to run the UI tests.
 
 See also documentation at <https://code.visualstudio.com/docs/python/tutorial-django>.
+
+### Issues during development
+
+* If you get a message during login that there is an issue with the CSRF token, e.g. `WARNING:django.security.csrf:Forbidden (CSRF token from POST incorrect.): /loginres/` in the log and also i nthe UI, then switch to using `localhost:8000` as the domain, not the localhost IP used in the examples in this README file.
 
 ## Deploy
 
