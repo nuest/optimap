@@ -103,6 +103,18 @@ deactivate
 docker stop optimapDB
 ```
 
+#### Debug Mode Configuration
+
+By default, `OPTIMAP_DEBUG` is now set to `False` to ensure a secure and stable production environment. If you need to enable debug mode for development purposes, explicitly set the environment variable in your `.env` file or pass it as an argument when running the server.
+
+#### Enable Debug Mode for Development
+
+To enable debug mode, add the following to your `.env` file:
+
+```env
+OPTIMAP_DEBUG=True
+```
+
 ### Debug with VS Code
 
 Select the Python interpreter created above (`optimap` environment), see instructions at <https://code.visualstudio.com/docs/python/tutorial-django> and <https://code.visualstudio.com/docs/python/environments>.
