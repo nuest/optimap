@@ -103,6 +103,18 @@ deactivate
 docker stop optimapDB
 ```
 
+#### Debug Mode Configuration
+
+By default, `OPTIMAP_DEBUG` is now set to `False` to ensure a secure and stable production environment. If you need to enable debug mode for development purposes, explicitly set the environment variable in your `.env` file or pass it as an argument when running the server.
+
+#### Enable Debug Mode for Development
+
+To enable debug mode, add the following to your `.env` file:
+
+```env
+OPTIMAP_DEBUG=True
+```
+
 ### Debug with VS Code
 
 Select the Python interpreter created above (`optimap` environment), see instructions at <https://code.visualstudio.com/docs/python/tutorial-django> and <https://code.visualstudio.com/docs/python/environments>.
@@ -111,24 +123,22 @@ Configuration for debugging with VS Code:
 
 ```json
 {
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "Python: Django Run",
-            "type": "python",
-            "request": "launch",
-            "program": "${workspaceFolder}/manage.py",
-            "args": [
-                "runserver"
-            ],
-            "env": {
-                "OPTIMAP_DEBUG": "True",
-                "OPTIMAP_CACHE": "dummy"
-            },
-            "django": true,
-            "justMyCode": true
-        }
-    ]
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python: Django Run",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/manage.py",
+      "args": ["runserver"],
+      "env": {
+        "OPTIMAP_DEBUG": "True",
+        "OPTIMAP_CACHE": "dummy"
+      },
+      "django": true,
+      "justMyCode": true
+    }
+  ]
 }
 ```
 
@@ -149,7 +159,7 @@ OPTIMAP_EMAIL_PORT=5587
 
 ### Create superusers/admin
 
-Superusers/admin can be created  using the createsuperuser command:
+Superusers/admin can be created using the createsuperuser command:
 
 ```bash
 python manage.py createsuperuser --username=optimap --email=nomail@optimap.science
@@ -194,22 +204,17 @@ A configuration to debug the test code and also print deprecation warnings:
 
 ```json
 {
-    "name": "Python: Django Test",
-    "type": "python",
-    "request": "launch",
-    "pythonArgs": [
-        "-Wa"
-    ],
-    "program": "${workspaceFolder}/manage.py",
-    "args": [
-        "test",
-        "tests"
-    ],
-    "env": {
-        "OPTIMAP_DEBUG": "True"
-    },
-    "django": true,
-    "justMyCode": true
+  "name": "Python: Django Test",
+  "type": "python",
+  "request": "launch",
+  "pythonArgs": ["-Wa"],
+  "program": "${workspaceFolder}/manage.py",
+  "args": ["test", "tests"],
+  "env": {
+    "OPTIMAP_DEBUG": "True"
+  },
+  "django": true,
+  "justMyCode": true
 }
 ```
 
