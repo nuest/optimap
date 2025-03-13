@@ -168,6 +168,8 @@ OPTIMAP_DEBUG=True
 
 Select the Python interpreter created above (`optimap` environment), see instructions at <https://code.visualstudio.com/docs/python/tutorial-django> and <https://code.visualstudio.com/docs/python/environments>.
 
+**Note:** The `docker-compose.yml` file is intended for **development**, not deployment.
+
 Configuration for debugging with VS Code:
 
 ```json
