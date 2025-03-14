@@ -1,11 +1,13 @@
 import os
+import django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'optimap.settings')
+django.setup()
 from django.test import Client, TestCase
 from publications.tasks import parse_oai_xml_and_save_publications
 from publications.models import Publication, Source, Schedule
+from django_q.tasks import async_task
 import httpretty
 import time
-
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'optimap.settings')
 
 class SimpleTest(TestCase):   
   
@@ -76,13 +78,28 @@ class SimpleTest(TestCase):
     def test_task_scheduling(self):
         oai_file_path = os.path.join(os.getcwd(), "tests", "harvesting", "journal_1", "oai_dc.xml")
         source = Source.objects.create(
-            url_field=f"file://{oai_file_path}", 
+            url_field=f"file://{oai_file_path}",
             harvest_interval_minutes=60
         )
         source.save()
         time.sleep(2)
         schedule = Schedule.objects.filter(name=f"Harvest Source {source.id}")
-        self.assertTrue(schedule.exists(), "Django-Q task not scheduled for source.")
+        self.assertTrue(schedule.exists(), "❌ Django-Q task not scheduled for source.")
+
+        publications_count = Publication.objects.count()
+        async_task("publications.tasks.harvest_oai_endpoint", source.id)
+        time.sleep(5) 
+
+        self.assertGreater(publications_count, 0, " No publications were harvested.")
+
+        with open(oai_file_path, "r") as oai:
+            content = oai.read()
+            parse_oai_xml_and_save_publications(content, event=None)
+            parse_oai_xml_and_save_publications(content, event=None)
+
+        final_count = Publication.objects.count()
+        self.assertEqual(final_count, publications_count, " Duplicate publications were created!")
+
 
     def test_no_duplicates(self):
         Publication.objects.all().delete()
@@ -97,4 +114,3 @@ class SimpleTest(TestCase):
     
         publications_count = Publication.objects.count()
         self.assertEqual(publications_count, 2, "Duplicate publications were created!")
-

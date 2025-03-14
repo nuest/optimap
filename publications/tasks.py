@@ -120,8 +120,8 @@ def harvest_oai_endpoint(source_id):
     source = Source.objects.get(id=source_id)
     event = HarvestingEvent.objects.create(source=source, status="in_progress")
 
-    username = os.getenv("OAI_USERNAME")
-    password = os.getenv("OAI_PASSWORD")
+    username = os.getenv("OPTIMAP_OAI_USERNAME")
+    password = os.getenv("OPTIMAP_OAI_PASSWORD")
 
     try:
         with requests.Session() as session:
