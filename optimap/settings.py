@@ -35,7 +35,7 @@ if os.name == 'nt':
 SECRET_KEY = env('SECRET_KEY', default='django-insecure')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env('OPTIMAP_DEBUG', default=False)
 
 ALLOWED_HOSTS = [i.strip('[]') for i in env('OPTIMAP_ALLOWED_HOST', default='*').split(',')]
 
@@ -185,6 +185,7 @@ EMAIL_USE_SSL =       env('OPTIMAP_EMAIL_USE_SSL', default=False)
 EMAIL_IMAP_SENT_FOLDER = env('OPTIMAP_EMAIL_IMAP_SENT_FOLDER', default='')
 OAI_USERNAME = env("OPTIMAP_OAI_USERNAME", default="")
 OAI_PASSWORD = env("OPTIMAP_OAI_PASSWORD", default="")
+EMAIL_SEND_DELAY = 2
 
 MIDDLEWARE = [
     'django.middleware.cache.UpdateCacheMiddleware',
