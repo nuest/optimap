@@ -32,16 +32,18 @@ User = get_user_model()
 from publications.models import UserProfile
 from django.views.decorators.cache import never_cache
 from django.urls import reverse  
+
 LOGIN_TOKEN_LENGTH  = 32
 LOGIN_TOKEN_TIMEOUT_SECONDS = 10 * 60
-
+ACCOUNT_DELETE_TOKEN_TIMEOUT_SECONDS = 10 * 60
+USER_DELETE_TOKEN_PREFIX = "user_delete_token"
 
 def main(request):
     return render(request,"main.html")
 
 def loginres(request):
     email = request.POST.get('email', False)
-
+    
     if is_email_blocked(email):
         logger.warning('Attempted login with blocked email: %s', email)
         return render(request, "error.html", {
@@ -166,7 +168,10 @@ def user_settings(request):
 
         return redirect(reverse("optimap:usersettings"))
 
-    return render(request, "user_settings.html", {"profile": profile})
+    return render(request, "user_settings.html", {
+        "profile": profile,
+        "delete_token": request.session.get(USER_DELETE_TOKEN_PREFIX, None),  # Fetch token from session
+    })
 
 def user_subscriptions(request):
     if request.user.is_authenticated:
@@ -267,48 +272,64 @@ def request_delete(request):
     user = request.user
     token = uuid.uuid4().hex
 
-    cache.set(f"delete_token_{token}", user.id, timeout=3600)
+    cache.set(f"{USER_DELETE_TOKEN_PREFIX}_{token}", user.id, timeout=ACCOUNT_DELETE_TOKEN_TIMEOUT_SECONDS)
 
     confirm_url = request.build_absolute_uri(reverse('optimap:confirm_delete', args=[token]))
 
     send_mail(  
         'Confirm Your Account Deletion',
-        f'Click the link to confirm deletion: {confirm_url}',
+        f'Click the link to confirm deletion: {confirm_url}\n\n'
+        'This link is valid for 10 minutes. If you did not request this, ignore this email.',
         'no-reply@optimap.com',
         [user.email],
     )
 
     return redirect(reverse('optimap:usersettings') + '?message=Check your email for a confirmation link.')
 
-@login_required
+@login_required(login_url='/')
 def confirm_account_deletion(request, token):
-    user_id = cache.get(f"delete_token_{token}")
+    try:
+        user_id = cache.get(f"{USER_DELETE_TOKEN_PREFIX}_{token}")
 
-    if user_id is None:
-        messages.error(request, "Invalid or expired deletion token.")
+        if user_id is None:
+            messages.error(request, "Invalid or expired deletion token.")
+            return redirect(reverse('optimap:usersettings'))
+
+        # Ensure the logged-in user matches the user stored in the token
+        if request.user.id != user_id:
+            messages.error(request, "You are not authorized to delete this account.")
+            return redirect(reverse('optimap:main'))
+
+        user = get_object_or_404(User, id=user_id)
+
+        request.session[USER_DELETE_TOKEN_PREFIX] = token
+        request.session.modified = True 
+        request.session.save()  
+
+        messages.warning(request, "Please confirm your account deletion. Your contributed data will remain on the platform.")
+        return redirect(reverse('optimap:usersettings'))
+    except Exception as e:
+        messages.error(request, f"An error occurred: {str(e)}")
         return redirect(reverse('optimap:usersettings'))
 
-    user = get_object_or_404(User, id=user_id)
 
-    request.session["delete_token"] = token
-
-    messages.warning(request, "Please confirm your account deletion. Your contributed data will remain on the platform.")
-    return redirect(reverse('optimap:usersettings'))  
-
-
-@login_required
+@login_required(login_url='/')
 def finalize_account_deletion(request):
-    token = request.session.get("delete_token")
+    token = request.session.get(USER_DELETE_TOKEN_PREFIX)
 
     if not token:
         messages.error(request, "No active deletion request found.")
         return redirect(reverse('optimap:usersettings'))
 
-    user_id = cache.get(f"delete_token_{token}")
+    user_id = cache.get(f"{USER_DELETE_TOKEN_PREFIX}_{token}")
 
     if user_id is None:
         messages.error(request, "Invalid or expired deletion request.")
         return redirect(reverse('optimap:usersettings'))
+
+    if request.user.id != user_id:
+        messages.error(request, "You are not authorized to delete this account.")
+        return redirect(reverse('optimap:main'))
 
     user = get_object_or_404(User, id=user_id)
 
@@ -316,16 +337,23 @@ def finalize_account_deletion(request):
         messages.warning(request, "This account has already been deleted.")
         return redirect(reverse('optimap:usersettings'))
 
-    user.deleted = True
-    user.deleted_at = now()
-    user.save()
-    cache.delete(f"delete_token_{token}") 
+    try:
+        user.deleted = True
+        user.deleted_at = now()
+        user.save()
+    except Exception as e:
+        logger.error(f"Error deleting user {user.email}: {str(e)}")
+        messages.error(request, "An error occurred while deleting your account. Please try again.")
+        return redirect(reverse('optimap:usersettings'))
 
-    if "delete_token" in request.session:
-        del request.session["delete_token"]
+    # Ensure cleanup occurs even if saving fails
+    cache.delete(f"{USER_DELETE_TOKEN_PREFIX}_{token}")
+
+    if USER_DELETE_TOKEN_PREFIX in request.session:
+        del request.session[USER_DELETE_TOKEN_PREFIX]
         request.session.modified = True  
 
     logout(request)
 
     messages.success(request, "Your account has been successfully deleted.")
-    return redirect(reverse('optimap:main')) 
+    return redirect(reverse('optimap:main'))
