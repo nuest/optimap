@@ -276,10 +276,12 @@ def request_delete(request):
 
     confirm_url = request.build_absolute_uri(reverse('optimap:confirm_delete', args=[token]))
 
-    send_mail(  
+    timeout_minutes = ACCOUNT_DELETE_TOKEN_TIMEOUT_SECONDS//60
+
+    send_mail(
         'Confirm Your Account Deletion',
         f'Click the link to confirm deletion: {confirm_url}\n\n'
-        'This link is valid for 10 minutes. If you did not request this, ignore this email.',
+        f'This link is valid for {timeout_minutes} minutes. If you did not request this, ignore this email.',
         'no-reply@optimap.com',
         [user.email],
     )
