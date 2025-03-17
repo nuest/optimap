@@ -1,6 +1,10 @@
 from django.contrib.gis.db import models
 from django.contrib.postgres.fields import ArrayField
 from django_currentuser.db.models import CurrentUserField
+from django.utils.timezone import now
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 STATUS_CHOICES = (
     ("d", "Draft"),
@@ -84,6 +88,40 @@ class Subscription(models.Model):
         ordering = ['user_name']
         verbose_name = "subscription"
 
+class EmailLog(models.Model):
+    TRIGGER_CHOICES = [
+        ("admin", "Admin Panel"),
+        ("scheduled", "Scheduled Task"),
+        ("manual", "Manually Triggered"),
+    ]
+    recipient_email = models.EmailField()
+    subject = models.CharField(max_length=255)
+    sent_at = models.DateTimeField(auto_now_add=True)
+    email_content = models.TextField(blank=True, null=True)
+    sent_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL)
+    trigger_source = models.CharField(max_length=50, choices=TRIGGER_CHOICES, default="manual")
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="success") 
+    error_message = models.TextField(null=True, blank=True) 
+
+    def __str__(self):
+        sender = self.sent_by.email if self.sent_by else "System"
+        return f"Email to {self.recipient_email} by {sender} ({self.get_trigger_source_display()})"
+
+    @classmethod
+    def log_email(cls, recipient, subject, content, sent_by=None, trigger_source="manual", status="success", error_message=None):
+        """Logs the sent email, storing who triggered it and how it was sent."""
+        cls.objects.create(
+            recipient_email=recipient,
+            subject=subject,
+            sent_at=now(),
+            email_content=content,
+            sent_by=sent_by,
+            trigger_source=trigger_source, 
+            status=status,  
+            error_message=error_message,  
+
+        )
+
 # handle import/export relations, see https://django-import-export.readthedocs.io/en/stable/advanced_usage.html#creating-non-existent-relations
 from import_export import fields, resources
 from import_export.widgets import ForeignKeyWidget
@@ -104,3 +142,26 @@ class PublicationResource(resources.ModelResource):
     class Meta:
         model = Publication
         fields = ('created_by','updated_by',)
+
+class UserProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    notify_new_manuscripts = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.user.username} - Notifications: {self.notify_new_manuscripts}"
+
+class BlockedEmail(models.Model):
+    email = models.EmailField(unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    blocked_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="blocked_emails")
+
+    def __str__(self):
+        return self.email
+
+class BlockedDomain(models.Model):
+    domain = models.CharField(max_length=255, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    blocked_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="blocked_domains")
+
+    def __str__(self):
+        return self.domain

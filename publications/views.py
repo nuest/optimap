@@ -2,7 +2,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 from django.contrib.auth import login
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.core.cache import cache
 from django.http.request import HttpRequest
 from django.http import HttpResponseRedirect
@@ -13,6 +13,7 @@ import secrets
 from django.contrib import messages
 from django.contrib.auth import login,logout
 from django.views.decorators.http import require_GET
+from publications.models import BlockedEmail, BlockedDomain
 from django.contrib.auth.models import User
 from django.conf import settings
 from publications.models import Subscription
@@ -26,7 +27,8 @@ import uuid
 from django.shortcuts import get_object_or_404
 from django.shortcuts import redirect
 
-
+from publications.models import UserProfile
+from django.views.decorators.cache import never_cache
 LOGIN_TOKEN_LENGTH  = 32
 LOGIN_TOKEN_TIMEOUT_SECONDS = 10 * 60
 EMAIL_CONFIRMATION_TIMEOUT_SECONDS = 10 * 60  
@@ -37,6 +39,17 @@ def main(request):
 
 def loginres(request):
     email = request.POST.get('email', False)
+
+    if is_email_blocked(email):
+        logger.warning('Attempted login with blocked email: %s', email)
+        return render(request, "error.html", {
+            'error': {
+                'class': 'danger',
+                'title': 'Login failed!',
+                'text': 'You attempted to login using an email that is blocked. Please contact support for assistance.'
+            }
+        })
+
     subject = 'OPTIMAP Login'
     link = get_login_link(request, email)
     valid = floor(LOGIN_TOKEN_TIMEOUT_SECONDS / 60)
@@ -125,8 +138,17 @@ def customlogout(request):
     messages.info(request, "You have successfully logged out.")
     return render(request, "logout.html")
 
+@never_cache
 def user_settings(request):
-    return render(request,'user_settings.html')
+    profile, created = UserProfile.objects.get_or_create(user=request.user)
+
+    if request.method == "POST":
+        profile.notify_new_manuscripts = request.POST.get("notify_new_manuscripts") == "on"
+        profile.save()
+
+        return redirect(reverse("optimap:usersettings"))
+
+    return render(request, "user_settings.html", {"profile": profile})
 
 def user_subscriptions(request):
     if request.user.is_authenticated:
@@ -171,6 +193,16 @@ def change_useremail(request):
     email_old = currentuser.email
 
     if not email_new or email_new == email_old:
+
+    if is_email_blocked(email):
+        logger.warning('Attempted login with blocked email: %s', email)
+        return render(request, "error.html", {
+            'error': {
+                'class': 'danger',
+                'title': 'Login failed!',
+                'text': 'You attempted to change your email to an address that is blocked. Please contact support for assistance.'
+            }
+        })
         messages.error(request, "Invalid email change request.")
         return render(request, 'changeuser.html')
 
@@ -248,3 +280,11 @@ def get_login_link(request, email):
     cache.set(token, email, timeout = LOGIN_TOKEN_TIMEOUT_SECONDS)
     logger.info('Created login link for %s with token %s - %s', email, token, link)
     return link
+
+def is_email_blocked(email):
+    domain = email.split('@')[-1]
+    if BlockedEmail.objects.filter(email=email).exists():
+        return True
+    if BlockedDomain.objects.filter(domain=domain).exists():
+        return True
+    return False
