@@ -194,22 +194,6 @@ Configuration for debugging with VS Code:
       "justMyCode": true
     }
   ]
-  "version": "0.2.0",
-  "configurations": [
-    {
-      "name": "Python: Django Run",
-      "type": "python",
-      "request": "launch",
-      "program": "${workspaceFolder}/manage.py",
-      "args": ["runserver"],
-      "env": {
-        "OPTIMAP_DEBUG": "True",
-        "OPTIMAP_CACHE": "dummy"
-      },
-      "django": true,
-      "justMyCode": true
-    }
-  ]
 }
 ```
 
@@ -299,17 +283,6 @@ A configuration to debug the test code and also print deprecation warnings:
 
 ```json
 {
-  "name": "Python: Django Test",
-  "type": "python",
-  "request": "launch",
-  "pythonArgs": ["-Wa"],
-  "program": "${workspaceFolder}/manage.py",
-  "args": ["test", "tests"],
-  "env": {
-    "OPTIMAP_DEBUG": "True"
-  },
-  "django": true,
-  "justMyCode": true
   "name": "Python: Django Test",
   "type": "python",
   "request": "launch",

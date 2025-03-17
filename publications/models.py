@@ -16,7 +16,7 @@ STATUS_CHOICES = (
 
 class Publication(models.Model):
     # required fields      
-    doi = models.CharField(max_length=1024, unique=True, blank=True, null=True)
+    title = models.TextField()
     status = models.CharField(max_length=1, choices=STATUS_CHOICES, default="d")
     created_by = CurrentUserField( # see useful hint at https://github.com/zsoldosp/django-currentuser/issues/69
         verbose_name=("Created by"),
@@ -33,10 +33,10 @@ class Publication(models.Model):
     )
     
     # optional fields
+    doi = models.CharField(max_length=1024, unique=True, blank=True, null=True)
     source = models.CharField(max_length=4096, null=True, blank=True) # journal, conference, preprint repo, ..
     provenance = models.TextField(null=True, blank=True)
-    publicationDate = models.DateField(null=True,blank=True)
-    title = models.TextField(null=True, blank=True)
+    publicationDate = models.DateField(null=True, blank=True)
     abstract = models.TextField(null=True, blank=True)
     url = models.URLField(max_length=1024, null=True, blank=True)
     geometry = models.GeometryCollectionField(verbose_name='Publication geometry/ies', srid = 4326, null=True, blank=True)# https://docs.openalex.org/api-entities/sources

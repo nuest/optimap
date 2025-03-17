@@ -11,36 +11,35 @@ class SimpleTest(TestCase):
     
     def setUp(self):
         self.client = Client()
-
-    @classmethod
-    def setUpClass(cls):
-        cls.user = User.objects.create_user('unittest', 'myemail@test.com', 'test')
-        # self.client.login(username='unittest', password='test')
+        self.user = User.objects.create_user('unittest', 'unit@test.com', 'test')
+        self.client.login(username='unittest', password='test')
 
         pub1 = Publication.objects.create(
             title="Publication One",
             abstract="This is a first publication. It's good.",
+            url="https://test.test/geometries",
+            status="p",
             publicationDate=date(2022, 10, 10),
             geometry=GeometryCollection(
                 Point(0, 0),
                 MultiPoint(Point(10, 10), Point(20, 20)),
                 LineString([Point(11, 12), Point(31, 32)]),
-                Polygon( ((52, 8), (55, 8), (55, 9), (52, 8)) )),
-            created_by=cls.user
+                Polygon( ((52, 8), (55, 8), (55, 9), (52, 8)) ))
         )
         pub1.save()
 
         pub2 = Publication.objects.create(
             title="Publication Two",
             abstract="Seconds are better than firsts.",
+            url="https://example.com/point",
+            status="p",
             publicationDate=date(2022, 10, 24),
-            geometry=GeometryCollection(Point(1, 1)),
-            created_by=cls.user
+            doi="10.1234/test-doi-two",
+            geometry=GeometryCollection(Point(1, 1))
         )
         pub2.save()
 
-    @classmethod
-    def tearDownClass(cls):
+    def tearDown(self):
         Publication.objects.all().delete()
 
     def test_api_redirect(self):
@@ -65,7 +64,7 @@ class SimpleTest(TestCase):
     def test_api_publication(self):
         all = self.client.get('/api/v1/publications/').json()
         one_publication = [feat for feat in all['results']['features'] if feat['properties']['title'] == 'Publication One']
-        print('\n\n %s \n\n' % all)
+        #print('\n\n %s \n\n' % all)
         response = self.client.get('/api/v1/publications/%s.json' % one_publication[0]['id'])
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get('Content-Type'), 'application/json')
