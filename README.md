@@ -109,11 +109,15 @@ source .venv/bin/activate
 # Confirm Python path
 which python
 
-# Install required dependencies
+# Instal GDAL and the Python GDAL bindings, see Dockerfile for example on Ubuntu
+gdalinfo --version
+
+# Install non-GDAL Python dependencies
 pip install -r requirements.txt
 
-# Create a local database container (once only)
-docker run --name optimapDB -p 5432:5432 -e POSTGRES_USER=optimap -e POSTGRES_PASSWORD=optimap -e POSTGRES_DB=optimap -d postgis/postgis:15-3.4
+# create local DB container (once)
+# docker run --name optimapDB -p 5432:5432 -e POSTGRES_USER=optimap -e POSTGRES_PASSWORD=optimap -e POSTGRES_DB=optimap -d postgis/postgis:14-3.3
+# get a clean one later: docker rm -f optimapDB
 
 # Start the database container
 docker start optimapDB
