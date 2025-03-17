@@ -6,6 +6,8 @@ import httpretty
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'optimap.settings')
 
+httpretty.enable(allow_net_connect=True, verbose=True)
+
 class SimpleTest(TestCase):   
   
     def setUp(self):

@@ -3,6 +3,7 @@ import os
 from django.test import Client, TestCase
 from publications.models import Publication
 from django.contrib.gis.geos import Point, MultiPoint, LineString, Polygon, GeometryCollection
+from django.contrib.auth.models import User
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'optimap.settings')
 
@@ -13,6 +14,9 @@ class SimpleTest(TestCase):
 
     @classmethod
     def setUpClass(cls):
+        cls.user = User.objects.create_user('unittest', 'myemail@test.com', 'test')
+        # self.client.login(username='unittest', password='test')
+
         pub1 = Publication.objects.create(
             title="Publication One",
             abstract="This is a first publication. It's good.",
@@ -21,7 +25,8 @@ class SimpleTest(TestCase):
                 Point(0, 0),
                 MultiPoint(Point(10, 10), Point(20, 20)),
                 LineString([Point(11, 12), Point(31, 32)]),
-                Polygon( ((52, 8), (55, 8), (55, 9), (52, 8)) ))
+                Polygon( ((52, 8), (55, 8), (55, 9), (52, 8)) )),
+            created_by=cls.user
         )
         pub1.save()
 
@@ -29,7 +34,8 @@ class SimpleTest(TestCase):
             title="Publication Two",
             abstract="Seconds are better than firsts.",
             publicationDate=date(2022, 10, 24),
-            geometry=GeometryCollection(Point(1, 1))
+            geometry=GeometryCollection(Point(1, 1)),
+            created_by=cls.user
         )
         pub2.save()
 

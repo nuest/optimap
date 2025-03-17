@@ -16,7 +16,7 @@ STATUS_CHOICES = (
 
 class Publication(models.Model):
     # required fields      
-    doi = models.CharField(max_length=1024, unique=True)
+    doi = models.CharField(max_length=1024, unique=True, blank=True, null=True)
     status = models.CharField(max_length=1, choices=STATUS_CHOICES, default="d")
     created_by = CurrentUserField( # see useful hint at https://github.com/zsoldosp/django-currentuser/issues/69
         verbose_name=("Created by"),
