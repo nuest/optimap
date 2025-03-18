@@ -192,10 +192,8 @@ def change_useremail(request):
     currentuser = request.user
     email_old = currentuser.email
 
-    if not email_new or email_new == email_old:
-
-    if is_email_blocked(email):
-        logger.warning('Attempted login with blocked email: %s', email)
+    if is_email_blocked(email_new):
+        logger.warning('Attempted login with blocked email: %s', email_new)
         return render(request, "error.html", {
             'error': {
                 'class': 'danger',
@@ -203,6 +201,10 @@ def change_useremail(request):
                 'text': 'You attempted to change your email to an address that is blocked. Please contact support for assistance.'
             }
         })
+        messages.error(request, "Invalid email change request.")
+        return render(request, 'changeuser.html')
+
+    if not email_new or email_new == email_old:
         messages.error(request, "Invalid email change request.")
         return render(request, 'changeuser.html')
 
