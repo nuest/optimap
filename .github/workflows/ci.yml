@@ -8,7 +8,7 @@ on:
 
 jobs:
   unittests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     
     strategy:
       max-parallel: 4
@@ -31,10 +31,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-
-    - name: Install Chromium
-      run: |
-          sudo apt install -y chromium-browser chromium-chromedriver
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v3
@@ -62,7 +58,7 @@ jobs:
         python -Wa manage.py test tests
 
   uitests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     
     strategy:
       max-parallel: 4
@@ -86,9 +82,18 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Install Chromium
+    
+    # Based on https://github.com/MarketingPipeline/Python-Selenium-Action/blob/main/.github/workflows/Selenium-Action_Template.yaml and put python packages in requirements-dev.txt
+    - name: Removing previous chrome instances on runner 
+      run: sudo apt purge google-chrome-stable  
+    - name: Install xvfb
       run: |
-          sudo apt install -y chromium-browser chromium-chromedriver
+          sudo apt install -y xvfb firefox
+    
+    # See https://github.com/SeleniumHQ/selenium/issues/15327
+    - name: Install deps for chrome
+      run: |
+          sudo apt install libgtk-3-dev libnotify-dev libnss3 libxss1 libasound2t64
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v3

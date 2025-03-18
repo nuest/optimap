@@ -5,7 +5,7 @@ import time
 
 
 class MainpageTest(unittest.TestCase):
-    start_firefox('localhost:8000/')
+    start_chrome('localhost:8000/')
     click(Button("Timeline"))    
     time.sleep(2)
     get_driver().save_screenshot(os.path.join(os.getcwd(), 'tests-ui', 'screenshots', 'Timeline.png'))

@@ -35,7 +35,7 @@ class AdminBlockUserTests(TransactionTestCase):
 
         self.kill_existing_firefox_processes()
         try:
-            self.browser = start_firefox("http://localhost:8000/admin/", headless=False)
+            self.browser = start_chrome("http://localhost:8000/admin/", headless=True)
         except Exception as e:
             print(f"Error starting browser: {e}")
             self.browser = None
