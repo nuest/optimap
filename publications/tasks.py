@@ -28,7 +28,7 @@ def extract_geometry_from_html(content):
                 geom = json.loads(data)
 
                 geom_data = geom["features"][0]["geometry"]
-                # preparing geometry data in accordance to geosAPI fields
+                # preparing geometry data in accordance to geos API fields
                 type_geom= {'type': 'GeometryCollection'}
                 geom_content = {"geometries" : [geom_data]}
                 type_geom.update(geom_content)
@@ -37,10 +37,10 @@ def extract_geometry_from_html(content):
                     geom_object = GEOSGeometry(geom_data_string) # GeometryCollection object
                     logging.debug('Found geometry: %s', geom_object)
                     return geom_object
-                except :
-                    print("Invalid Geometry")
+                except Exception as e:
+                    logger.error("Cannot create geometry from string '%s': %s", geom_data_string, e)
             except ValueError as e:
-                print("Not a valid GeoJSON")
+                logger.error("Error loading JSON from %s: %s", tag.get("name"), e)
 
 def extract_timeperiod_from_html(content):
     period = [None, None]
@@ -61,13 +61,20 @@ def parse_oai_xml_and_save_publications(content):
     for i in range(articles_count_in_journal):
         identifier = collection.getElementsByTagName("dc:identifier")
         identifier_value = identifier[i].firstChild.nodeValue
+        logger.debug("Retrieving %s", identifier_value)
+        
         if identifier_value.startswith('http'):
 
-            with requests.get(identifier_value) as response:
-                soup = BeautifulSoup(response.content, 'html.parser')
+            try:
+                with requests.get(identifier_value) as response:
+                    soup = BeautifulSoup(response.content, 'html.parser')
 
-                geom_object = extract_geometry_from_html(soup)
-                period_start, period_end = extract_timeperiod_from_html(soup)
+                    geom_object = extract_geometry_from_html(soup)
+                    period_start, period_end = extract_timeperiod_from_html(soup)
+            except Exception as e:
+                logger.error("Error retrieving and extracting geometadata from URL %s: %s", identifier_value, e)
+                logger.error("Continueing with the next article...")
+                continue
 
         else:
             geom_object = None
@@ -100,12 +107,12 @@ def parse_oai_xml_and_save_publications(content):
             abstract = abstract_text,
             publicationDate = date_value,
             url = identifier_value,
-            journal = journal_value,
+            source = journal_value,
             geometry = geom_object,
             timeperiod_startdate = period_start,
             timeperiod_enddate = period_end)
         publication.save()
-        logger.info('Saved new publication for %s: %s', identifier_value, publication)
+        logger.info('Saved new publication for %s: %s', identifier_value, publication.get_absolute_url())
 
 def harvest_oai_endpoint(url):
     try:
@@ -113,7 +120,7 @@ def harvest_oai_endpoint(url):
             response = s.get(url)
             parse_oai_xml_and_save_publications(response.content)
     except requests.exceptions.RequestException as e:
-        print ("The requested URL is invalid or has bad connection.Please change the URL")
+        logger.error("The requested URL is invalid or has bad connection. Please check the URL: %s", url)
 
 def send_monthly_email(trigger_source='manual', sent_by=None):
     recipients = User.objects.filter(userprofile__notify_new_manuscripts=True).values_list('email', flat=True)

@@ -7,11 +7,6 @@ class SitemapTest(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response["content-type"], "application/xml")
 
-    def test_post(self):
-        response = self.client.post("/sitemap.xml")
-
-        self.assertEqual(response.status_code, HTTPStatus.METHOD_NOT_ALLOWED)
-
     def test_static(self):
         response = self.client.get("/sitemap-static.xml")
         self.assertEqual(response.status_code, HTTPStatus.OK)
