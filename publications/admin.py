@@ -104,10 +104,6 @@ class UserProfileAdmin(admin.ModelAdmin):
     list_display = ("user", "notify_new_manuscripts")  
     search_fields = ("user__email",)
 
-
-admin.site.register(EmailLog, EmailLogAdmin)
-admin.site.register(UserProfile, UserProfileAdmin)
-
 @admin.register(BlockedEmail)
 class BlockedEmailAdmin(admin.ModelAdmin):
     list_display = ('email', 'created_at', 'blocked_by')
@@ -124,5 +120,6 @@ class UserAdmin(admin.ModelAdmin):
     list_display = ("username", "email", "is_active")
     actions = [block_email, block_email_and_domain]
 
-admin.site.register(SentEmailLog, SentEmailLogAdmin)  
+admin.site.register(EmailLog, EmailLogAdmin)
+admin.site.register(UserProfile, UserProfileAdmin)
 admin.site.register(Subscription, SubscriptionAdmin)  

@@ -9,7 +9,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ('publications', '0005_sentemaillog_sent_by'),
+        ('publications', '0005_emaillog_sent_by'),
     ]
 
     operations = [

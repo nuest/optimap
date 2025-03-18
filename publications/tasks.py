@@ -161,7 +161,7 @@ def send_monthly_email(trigger_source='manual', sent_by=None):
             )
 
 
-def send_subscription_based_email(sent_by=None, user_ids=None):
+def send_subscription_based_email(trigger_source='manual', sent_by=None, user_ids=None):
     query = Subscription.objects.filter(subscribed=True, user__isnull=False) 
     if user_ids:
         query = query.filter(user__id__in=user_ids) 
@@ -202,7 +202,10 @@ def send_subscription_based_email(sent_by=None, user_ids=None):
             email = EmailMultiAlternatives(subject, content, settings.EMAIL_HOST_USER, [user_email])
             email.attach_alternative(content, "text/html")
             email.send()
-            SentEmailLog.log_email(user_email, subject, content, sent_by=sent_by)
+            EmailLog.log_email(
+                user_email, subject, content, sent_by=sent_by, trigger_source=trigger_source, status="success"
+            )
+
             print(f"Email sent to {user_email} for subscription: {subscription.search_term}")
         except Exception as e:
             print(f"Failed to send email to {user_email}: {e}")
@@ -220,11 +223,17 @@ def schedule_monthly_email_task():
             next_run=next_run_date,
             kwargs={'trigger_source': 'scheduled', 'sent_by': sent_by.id if sent_by else None} 
         )
-}
+
 def schedule_subscription_email_task():
-    schedule(
-        'publications.tasks.send_subscription_based_email',  
-        schedule_type='M',  
-        repeats=-1,
-        next_run=timezone.make_aware(datetime.now().replace(day=28, hour=23, minute=59)) 
-    )
+    if not Schedule.objects.filter(func='publications.tasks.send_monthly_email').exists():
+        now = datetime.now()
+        last_day_of_month = calendar.monthrange(now.year, now.month)[1]  # Get last day of the month
+
+        next_run_date = now.replace(day=last_day_of_month, hour=23, minute=59)  # Run at the end of the last day
+        schedule(
+            'publications.tasks.send_subscription_based_email',
+            schedule_type='M',
+            repeats=-1,
+            next_run=next_run_date,
+            kwargs={'trigger_source': 'scheduled', 'sent_by': sent_by.id if sent_by else None} 
+        )
