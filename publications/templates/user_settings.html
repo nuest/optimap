@@ -1,94 +1,213 @@
-{% extends "base.html" %}
-{% load static %}
-
-{% block navbar %}
+{% extends "base.html" %} {% load static %} {% block navbar %}
 
 <ul class="nav navbar-nav">
-  {% if request.user.is_authenticated %}  
-  {% include "authenticated_menu_snippet.html" %}
-  {% else %}
-  {% include "menu_snippet.html" %}
-  {% endif %}
+  {% if request.user.is_authenticated %} {% include
+  "authenticated_menu_snippet.html" %} {% else %} {% include "menu_snippet.html"
+  %} {% endif %}
 </ul>
 
-{% endblock %}
+{% endblock %} {% block content %}
+<div class="row justify-content-center">
+  <div class="col-4 py-5">
+    <div class="accordion m-5" id="user_settings">
+      <div class="card">
+        <div class="card-header" id="headingThree">
+          <h2 class="mb-0">
+            <button
+              class="btn btn-link btn-block text-left collapsed"
+              type="button"
+              data-toggle="collapse"
+              data-target="#collapseThree"
+              aria-expanded="false"
+              aria-controls="collapseThree"
+            >
+              Email Notifications
+            </button>
+          </h2>
+        </div>
+        <div
+          id="collapseThree"
+          class="collapse show"
+          aria-labelledby="headingThree"
+          data-parent="#user_settings"
+        >
+          <div class="card-body">
+            <form method="post" action="{% url 'optimap:usersettings' %}">
+              {% csrf_token %}
 
-  {% block content %}
-  <div class="row justify-content-center">
-    <div class="col-4 py-5">
+              <div class="form-group d-flex align-items-center">
+                <label class="mr-3 mb-0" for="notify_new_manuscripts"
+                  >Get notifications for all new manuscripts</label
+                >
 
-      <div class="accordion m-5" id="user_settings">
-        <div class="card">
-          <div class="card-header" id="headingOne">
-            <h2 class="mb-0">
-              <button class="btn btn-link btn-block text-left" type="button" data-toggle="collapse"
-                data-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
-                Change email
+                <div class="custom-control custom-switch">
+                  <input
+                    type="checkbox"
+                    class="custom-control-input"
+                    id="notify_new_manuscripts"
+                    name="notify_new_manuscripts"
+                    {%
+                    if
+                    profile.notify_new_manuscripts
+                    %}
+                    checked
+                    {%
+                    endif
+                    %}
+                  />
+
+                  <label
+                    class="custom-control-label"
+                    for="notify_new_manuscripts"
+                  ></label>
+                </div>
+              </div>
+
+              <button type="submit" class="btn btn-outline-primary">
+                Save Changes
               </button>
-            </h2>
-          </div>
-
-          <div id="collapseOne" class="collapse show" aria-labelledby="headingOne" data-parent="#user_settings">
-            <div class="card-body">
-              <form class="formchange" method="POST" action="{% url 'optimap:changeuser' %}">
-                {% csrf_token %}
-                <div class="form-group row px-3">
-                  <label for="staticEmail" class="col-form-label">Current email</label>
-                  <div class="col">
-                    <input type="text" readonly class="form-control-plaintext" id="staticEmail" value="{{user.email}}">
-                  </div>
-                </div>
-                <div class="form-group row px-3">
-                  <input id="email_new" placeholder="Enter your new email" class="form-control form-control-sm"
-                    type="email" required="" name="email_new">
-                </div>
-                <div class="form-group row px-3">
-                  <button type="submit" class="btn btn-outline-warning">Save Changes</button>
-                  <div class="col-sm-2">
-                    <button type="reset" class="btn btn-outline-danger">Cancel</button>
-                  </div>
-                </div>
-              </form>
-            </div>
+            </form>
           </div>
         </div>
+      </div>
 
-        <div class="card">
-          <div class="card-header" id="headingTwo">
-            <h2 class="mb-0">
-              <button class="btn btn-link btn-block text-left collapsed" type="button" data-toggle="collapse"
-                data-target="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo">
-                Delete account
-              </button>
-            </h2>
+      <div class="card">
+        <div class="card-header" id="headingOne">
+          <h2 class="mb-0">
+            <button
+              class="btn btn-link btn-block text-left"
+              type="button"
+              data-toggle="collapse"
+              data-target="#collapseOne"
+              aria-expanded="true"
+              aria-controls="collapseOne"
+            >
+              Change email
+            </button>
+          </h2>
+        </div>
+
+        <div
+          id="collapseOne"
+          class="collapse"
+          aria-labelledby="headingOne"
+          data-parent="#user_settings"
+        >
+          <div class="card-body">
+            <form
+              class="formchange"
+              method="POST"
+              action="{% url 'optimap:changeuser' %}"
+            >
+              {% csrf_token %}
+              <div class="form-group row px-3">
+                <label for="staticEmail" class="col-form-label"
+                  >Current email</label
+                >
+                <div class="col">
+                  <input
+                    type="text"
+                    readonly
+                    class="form-control-plaintext"
+                    id="staticEmail"
+                    value="{{user.email}}"
+                  />
+                </div>
+              </div>
+              <div class="form-group row px-3">
+                <input
+                  id="email_new"
+                  placeholder="Enter your new email"
+                  class="form-control form-control-sm"
+                  type="email"
+                  required=""
+                  name="email_new"
+                />
+              </div>
+              <div class="form-group row px-3">
+                <button type="submit" class="btn btn-outline-warning">
+                  Save Changes
+                </button>
+                <div class="col-sm-2">
+                  <button type="reset" class="btn btn-outline-danger">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </form>
           </div>
-          <div id="collapseTwo" class="collapse" aria-labelledby="headingTwo" data-parent="#user_settings">
-            <div class="card-body">
+        </div>
+      </div>
 
-              <p>Deleting account is permenant. It cannot be reversed.</p>
+      <div class="card">
+        <div class="card-header" id="headingTwo">
+          <h2 class="mb-0">
+            <button
+              class="btn btn-link btn-block text-left collapsed"
+              type="button"
+              data-toggle="collapse"
+              data-target="#collapseTwo"
+              aria-expanded="false"
+              aria-controls="collapseTwo"
+            >
+              Delete account
+            </button>
+          </h2>
+        </div>
+        <div
+          id="collapseTwo"
+          class="collapse"
+          aria-labelledby="headingTwo"
+          data-parent="#user_settings"
+        >
+          <div class="card-body">
+            <p>Deleting account is permenant. It cannot be reversed.</p>
 
-              <button type="button" class="btn btn-outline-danger" data-toggle="modal" data-target="#modal1"
-                aria-expanded="false">Delete Account</button>
+            <button
+              type="button"
+              class="btn btn-outline-danger"
+              data-toggle="modal"
+              data-target="#modal1"
+              aria-expanded="false"
+            >
+              Delete Account
+            </button>
 
-              <div id="modal1" class="modal" tabindex="-1" role="dialog">
-                <div class="modal-dialog" role="document">
-                  <div class="modal-content">
-                    <div class="modal-header">
-                      <h5 class="modal-title">Delete Account</h5>
-                      <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
+            <div id="modal1" class="modal" tabindex="-1" role="dialog">
+              <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                  <div class="modal-header">
+                    <h5 class="modal-title">Delete Account</h5>
+                    <button
+                      type="button"
+                      class="close"
+                      data-dismiss="modal"
+                      aria-label="Close"
+                    >
+                      <span aria-hidden="true">&times;</span>
+                    </button>
+                  </div>
+                  <div class="modal-body">
+                    <p>Do you really want to delete this account ?</p>
+                  </div>
+                  <div class="modal-footer">
+                    <form action="{% url 'optimap:delete' %}" method="post">
+                      {% csrf_token %}
+                      <button
+                        type="submit"
+                        class="btn btn-primary"
+                        name="dltbutton"
+                      >
+                        Delete
                       </button>
-                    </div>
-                    <div class="modal-body">
-                      <p>Do you really want to delete this account ?</p>
-                    </div>
-                    <div class="modal-footer">
-                      <form action="{% url 'optimap:delete' %}" method="post">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-primary" name='dltbutton'>Delete</button>
-                      </form>
-                      <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                    </div>
+                    </form>
+                    <button
+                      type="button"
+                      class="btn btn-secondary"
+                      data-dismiss="modal"
+                    >
+                      Close
+                    </button>
                   </div>
                 </div>
               </div>
@@ -98,4 +217,17 @@
       </div>
     </div>
   </div>
-  {% endblock %}
+</div>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    let toggle = document.getElementById("notify_new_manuscripts");
+
+    if ("{{ profile.notify_new_manuscripts }}" === "True") {
+      toggle.checked = true;
+    } else {
+      toggle.checked = false;
+    }
+  });
+</script>
+
+{% endblock %}

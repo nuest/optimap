@@ -12,13 +12,17 @@ from django.core.mail import send_mail, EmailMultiAlternatives
 from django.conf import settings
 from django.utils.timezone import now
 from django.contrib.auth.models import User
-from .models import SentEmailLog, Subscription
-from datetime import timedelta
+from .models import EmailLog, Subscription
+from datetime import datetime, timedelta
 from django.urls import reverse
 from urllib.parse import quote
 from datetime import datetime
 from django_q.tasks import schedule
 from django.utils import timezone 
+from django_q.tasks import schedule
+from django_q.models import Schedule
+import time  
+import calendar
 
 BASE_URL = settings.BASE_URL
 
@@ -30,7 +34,7 @@ def extract_geometry_from_html(content):
                 geom = json.loads(data)
 
                 geom_data = geom["features"][0]["geometry"]
-                # preparing geometry data in accordance to geosAPI fields
+                # preparing geometry data in accordance to geos API fields
                 type_geom= {'type': 'GeometryCollection'}
                 geom_content = {"geometries" : [geom_data]}
                 type_geom.update(geom_content)
@@ -39,10 +43,10 @@ def extract_geometry_from_html(content):
                     geom_object = GEOSGeometry(geom_data_string) # GeometryCollection object
                     logging.debug('Found geometry: %s', geom_object)
                     return geom_object
-                except :
-                    print("Invalid Geometry")
+                except Exception as e:
+                    logger.error("Cannot create geometry from string '%s': %s", geom_data_string, e)
             except ValueError as e:
-                print("Not a valid GeoJSON")
+                logger.error("Error loading JSON from %s: %s", tag.get("name"), e)
 
 def extract_timeperiod_from_html(content):
     period = [None, None]
@@ -63,13 +67,20 @@ def parse_oai_xml_and_save_publications(content):
     for i in range(articles_count_in_journal):
         identifier = collection.getElementsByTagName("dc:identifier")
         identifier_value = identifier[i].firstChild.nodeValue
+        logger.debug("Retrieving %s", identifier_value)
+        
         if identifier_value.startswith('http'):
 
-            with requests.get(identifier_value) as response:
-                soup = BeautifulSoup(response.content, 'html.parser')
+            try:
+                with requests.get(identifier_value) as response:
+                    soup = BeautifulSoup(response.content, 'html.parser')
 
-                geom_object = extract_geometry_from_html(soup)
-                period_start, period_end = extract_timeperiod_from_html(soup)
+                    geom_object = extract_geometry_from_html(soup)
+                    period_start, period_end = extract_timeperiod_from_html(soup)
+            except Exception as e:
+                logger.error("Error retrieving and extracting geometadata from URL %s: %s", identifier_value, e)
+                logger.error("Continueing with the next article...")
+                continue
 
         else:
             geom_object = None
@@ -102,12 +113,12 @@ def parse_oai_xml_and_save_publications(content):
             abstract = abstract_text,
             publicationDate = date_value,
             url = identifier_value,
-            journal = journal_value,
+            source = journal_value,
             geometry = geom_object,
             timeperiod_startdate = period_start,
             timeperiod_enddate = period_end)
         publication.save()
-        logger.info('Saved new publication for %s: %s', identifier_value, publication)
+        logger.info('Saved new publication for %s: %s', identifier_value, publication.get_absolute_url())
 
 def harvest_oai_endpoint(url):
     try:
@@ -115,22 +126,20 @@ def harvest_oai_endpoint(url):
             response = s.get(url)
             parse_oai_xml_and_save_publications(response.content)
     except requests.exceptions.RequestException as e:
-        print ("The requested URL is invalid or has bad connection.Please change the URL")
+        logger.error("The requested URL is invalid or has bad connection. Please check the URL: %s", url)
 
-def send_monthly_email(sent_by=None):
-    recipients = User.objects.values_list('email', flat=True)
-    last_month = now().replace(day=1) - timedelta(days=1)  # Get last month's last day
+def send_monthly_email(trigger_source='manual', sent_by=None):
+    recipients = User.objects.filter(userprofile__notify_new_manuscripts=True).values_list('email', flat=True)
+    last_month = now().replace(day=1) - timedelta(days=1)
     new_manuscripts = Publication.objects.filter(creationDate__month=last_month.month)
 
-    if not new_manuscripts.exists():
-        print("No new manuscripts found for this month. Skipping email.")
+    if not recipients.exists() or not new_manuscripts.exists():
         return
 
     subject = "New Manuscripts This Month"
     content = "Here are the new manuscripts:\n" + "\n".join([pub.title for pub in new_manuscripts])
 
     for recipient in recipients:
-        print(f"Sending email to {recipient}")
         try:
             send_mail(
                 subject,
@@ -139,10 +148,18 @@ def send_monthly_email(sent_by=None):
                 [recipient],
                 fail_silently=False,
             )
-            SentEmailLog.log_email(recipient, subject, content, sent_by=sent_by)
-            print(f"Email sent successfully to {recipient}")
+            
+            EmailLog.log_email(
+                recipient, subject, content, sent_by=sent_by, trigger_source=trigger_source, status="success"
+            )
+            time.sleep(getattr(settings, "EMAIL_SEND_DELAY", 2))  
+
         except Exception as e:
-            print(f"Failed to send email to {recipient}: {e}")
+            error_message = str(e)
+            EmailLog.log_email(
+                recipient, subject, content, sent_by=sent_by, trigger_source=trigger_source, status="failed", error_message=error_message
+            )
+
 
 def send_subscription_based_email(sent_by=None, user_ids=None):
     query = Subscription.objects.filter(subscribed=True, user__isnull=False) 
@@ -191,13 +208,19 @@ def send_subscription_based_email(sent_by=None, user_ids=None):
             print(f"Failed to send email to {user_email}: {e}")
 
 def schedule_monthly_email_task():
-    schedule(
-        'publications.tasks.send_monthly_email',
-        schedule_type='MONTHLY',
-        repeats=-1,
-        next_run=datetime.now().replace(day=28, hour=23, minute=59)
-    )
+    if not Schedule.objects.filter(func='publications.tasks.send_monthly_email').exists():
+        now = datetime.now()
+        last_day_of_month = calendar.monthrange(now.year, now.month)[1]  # Get last day of the month
 
+        next_run_date = now.replace(day=last_day_of_month, hour=23, minute=59)  # Run at the end of the last day
+        schedule(
+            'publications.tasks.send_monthly_email',
+            schedule_type='M',
+            repeats=-1,
+            next_run=next_run_date,
+            kwargs={'trigger_source': 'scheduled', 'sent_by': sent_by.id if sent_by else None} 
+        )
+}
 def schedule_subscription_email_task():
     schedule(
         'publications.tasks.send_subscription_based_email',  
