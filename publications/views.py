@@ -302,8 +302,6 @@ def confirm_account_deletion(request, token):
             messages.error(request, "You are not authorized to delete this account.")
             return redirect(reverse('optimap:main'))
 
-        user = get_object_or_404(User, id=user_id)
-
         request.session[USER_DELETE_TOKEN_PREFIX] = token
         request.session.modified = True 
         request.session.save()  
@@ -343,19 +341,19 @@ def finalize_account_deletion(request):
         user.deleted = True
         user.deleted_at = now()
         user.save()
+        logout(request)
+        messages.success(request, "Your account has been successfully deleted.")
+        return redirect(reverse('optimap:main'))
+
     except Exception as e:
         logger.error(f"Error deleting user {user.email}: {str(e)}")
         messages.error(request, "An error occurred while deleting your account. Please try again.")
         return redirect(reverse('optimap:usersettings'))
 
-    # Ensure cleanup occurs even if saving fails
-    cache.delete(f"{USER_DELETE_TOKEN_PREFIX}_{token}")
+    finally:
+        cache.delete(f"{USER_DELETE_TOKEN_PREFIX}_{token}")
 
-    if USER_DELETE_TOKEN_PREFIX in request.session:
-        del request.session[USER_DELETE_TOKEN_PREFIX]
-        request.session.modified = True  
+        if USER_DELETE_TOKEN_PREFIX in request.session:
+            del request.session[USER_DELETE_TOKEN_PREFIX]
+            request.session.modified = True  
 
-    logout(request)
-
-    messages.success(request, "Your account has been successfully deleted.")
-    return redirect(reverse('optimap:main'))

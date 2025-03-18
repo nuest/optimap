@@ -40,10 +40,10 @@ class AccountDeletionTests(TestCase):
         # Send delete request
         response = self.client.post(reverse("optimap:finalize_delete"))
 
+        self.assertEqual(response.status_code, 302) 
+
         # Fetch user from DB again
         user = User.objects.filter(id=self.user.id).first()
-
-        self.assertEqual(response.status_code, 302) 
 
         if user:  
             self.assertTrue(user.deleted)  
@@ -59,7 +59,14 @@ class AccountDeletionTests(TestCase):
 
     def test_logout_and_click_delete_link(self):
         """Test scenario where user logs out and clicks deletion link"""
-        self.client.logout()
+        self.client.logout()  # Log out user
+
         response = self.client.get(reverse("optimap:confirm_delete", args=[self.delete_token]))
+
+        self.assertEqual(response.status_code, 302, "Expected a redirect (302) after clicking the deletion link while logged out.")
+
         expected_redirect = reverse("optimap:main")
-        self.assertTrue(response.url.startswith(expected_redirect))
+        self.assertTrue(
+            response.url.startswith(expected_redirect),
+            f"Expected redirect to {expected_redirect}, but got {response.url}"
+        )

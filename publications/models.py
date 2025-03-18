@@ -5,6 +5,8 @@ from django.utils.timezone import now
 from django.contrib.auth.models import AbstractUser, Group, Permission
 import uuid
 from django.utils.timezone import now
+import logging
+logger = logging.getLogger(__name__)
 
 STATUS_CHOICES = (
     ("d", "Draft"),
@@ -25,12 +27,15 @@ class CustomUser(AbstractUser):
         self.deleted = True
         self.deleted_at = now()
         self.save()
+        logger.info(f"User {self.username} (ID: {self.id}) was soft deleted at {self.deleted_at}")
+
     
     def restore(self):
         """Restores a previously deleted user."""
         self.deleted = False
         self.deleted_at = None
         self.save()
+        logger.info(f"User {self.username} (ID: {self.id}) was restored.")
 
 class Publication(models.Model):
     # required fields      
