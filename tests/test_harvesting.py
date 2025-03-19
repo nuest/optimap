@@ -14,20 +14,20 @@ class SimpleTest(TestCase):
     def setUp(self):
         self.client = Client()
 
+        results = self.client.get('/api/v1/publications/').json()['results']
+        self.id1 = results['features'][1]['id'] # newest first
+        self.id2 = results['features'][0]['id']
+
     @classmethod
+    @responses.activate
     def setUpClass(cls):
+        Publication.objects.all().delete()
+
         with open(os.path.join(os.getcwd(), 'tests', 'harvesting', 'journal_1', 'oai_dc.xml')) as oai, open(os.path.join(os.getcwd(), 'tests', 'harvesting', 'journal_1', 'article_01.html')) as article01, open(os.path.join(os.getcwd(), 'tests', 'harvesting', 'journal_1', 'article_02.html')) as article02:
-            httpretty.enable(verbose=True, allow_net_connect=False)  # enable HTTPretty so that it will monkey patch the socket module
-            httpretty.register_uri(
-                httpretty.GET,
-                'http://localhost:8330/index.php/opti-geo/article/view/1',
-                body = article01.read()
-            )
-            httpretty.register_uri(
-                httpretty.GET,
-                'http://localhost:8330/index.php/opti-geo/article/view/2',
-                body = article02.read()
-            )
+            responses.get('http://localhost:8330/index.php/opti-geo/article/view/1',
+                          body = article01.read())
+            responses.get('http://localhost:8330/index.php/opti-geo/article/view/2',
+                          body = article02.read())
 
             parse_oai_xml_and_save_publications(oai.read(), event=None)
 
@@ -49,7 +49,7 @@ class SimpleTest(TestCase):
         self.assertEqual(results['features'][0]['properties']['publicationDate'], '2022-07-01')
 
     def test_api_publication_1(self):
-        response = self.client.get('/api/v1/publications/1.json')
+        response = self.client.get('/api/v1/publications/%s.json' % self.id1)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get('Content-Type'), 'application/json')
 
@@ -63,7 +63,7 @@ class SimpleTest(TestCase):
         self.assertEqual(body['properties']['url'],'http://localhost:8330/index.php/opti-geo/article/view/1')
         
     def test_api_publication_2(self):
-        response = self.client.get('/api/v1/publications/2.json')
+        response = self.client.get('/api/v1/publications/%s.json' % self.id2)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get('Content-Type'), 'application/json')
 

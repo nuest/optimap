@@ -30,7 +30,7 @@ def extract_geometry_from_html(content):
             try:
                 geom = json.loads(data)
                 geom_data = geom["features"][0]["geometry"]
-                # preparing geometry data in accordance to geosAPI fields
+                # preparing geometry data in accordance to geos API fields
                 type_geom= {'type': 'GeometryCollection'}
                 geom_content = {"geometries" : [geom_data]}
                 type_geom.update(geom_content)
@@ -39,10 +39,10 @@ def extract_geometry_from_html(content):
                     geom_object = GEOSGeometry(geom_data_string) # GeometryCollection object
                     logging.debug('Found geometry: %s', geom_object)
                     return geom_object
-                except :
-                    print("Invalid Geometry")
+                except Exception as e:
+                    logger.error("Cannot create geometry from string '%s': %s", geom_data_string, e)
             except ValueError as e:
-                print("Not a valid GeoJSON")
+                logger.error("Error loading JSON from %s: %s", tag.get("name"), e)
 
 def extract_timeperiod_from_html(content):
     period = [None, None]
