@@ -16,8 +16,8 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, re_path, include
 from django.contrib.sitemaps import views as sitemaps_views
-from django.http import HttpResponse
 from publications.sitemaps import PublicationsSitemap, StaticViewSitemap
+from publications.views import RobotsView
 
 sitemaps = {
     "static": StaticViewSitemap,
@@ -39,7 +39,7 @@ urlpatterns = [
         {"sitemaps": sitemaps},
         name="django.contrib.sitemaps.views.sitemap",
     ),
-    re_path(r'^robots.txt', lambda request: HttpResponse("User-Agent: *\nDisallow:\nSitemap: %s://%s/sitemap.xml" % (request.scheme, request.site.domain), content_type="text/plain"), name="robots_file"),
+    re_path(r'^robots.txt', RobotsView.as_view(), name="robots_file"),
     ]
 
 # https://stackoverflow.com/a/18272203/261210

@@ -1,8 +1,8 @@
 import os
-import unittest
+from unittest import TestCase
 from helium import *
 
-class SimpleTest(unittest.TestCase):
+class SimpleTest(TestCase):
 
     def test_login_page(self):
         start_chrome('localhost:8000/login/', headless=True)

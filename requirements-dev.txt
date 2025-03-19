@@ -1,2 +1,4 @@
 helium
-httpretty
+chromedriver-autoinstaller
+pyvirtualdisplay
+responses

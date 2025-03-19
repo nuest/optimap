@@ -29,7 +29,9 @@ urlpatterns = [
     path("usersettings/", views.user_settings, name="usersettings"),
     path("subscriptions/", views.user_subscriptions, name="subscriptions"),
     path("addsubscriptions/", views.add_subscriptions, name="addsubscriptions"),
-    path("delete/", views.delete_account, name="delete"),
+    path("request-delete/", views.request_delete, name="request_delete"),
+    path("confirm-delete/<str:token>/", views.confirm_account_deletion, name="confirm_delete"),
+    path("finalize-delete/", views.finalize_account_deletion, name="finalize_delete"),
     path("changeuser/", views.change_useremail, name="changeuser"),
     path("confirm-email/<str:token>/<str:email_new>/", views.confirm_email_change, name="confirm-email-change"),
 ]

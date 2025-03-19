@@ -2,9 +2,11 @@ from django.contrib.gis.db import models
 from django.contrib.postgres.fields import ArrayField
 from django_currentuser.db.models import CurrentUserField
 from django.utils.timezone import now
-from django.contrib.auth import get_user_model
-
-User = get_user_model()
+from django.contrib.auth.models import AbstractUser, Group, Permission
+import uuid
+from django.utils.timezone import now
+import logging
+logger = logging.getLogger(__name__)
 
 STATUS_CHOICES = (
     ("d", "Draft"),
@@ -14,9 +16,30 @@ STATUS_CHOICES = (
     ("h", "Harvested"),
 )
 
+class CustomUser(AbstractUser):
+    deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    groups = models.ManyToManyField(Group, related_name="publications_users", blank=True)
+    user_permissions = models.ManyToManyField(Permission, related_name="publications_users_permissions", blank=True)
+
+    def soft_delete(self):
+        """Marks the user as deleted instead of removing from the database."""
+        self.deleted = True
+        self.deleted_at = now()
+        self.save()
+        logger.info(f"User {self.username} (ID: {self.id}) was soft deleted at {self.deleted_at}")
+
+    
+    def restore(self):
+        """Restores a previously deleted user."""
+        self.deleted = False
+        self.deleted_at = None
+        self.save()
+        logger.info(f"User {self.username} (ID: {self.id}) was restored.")
+
 class Publication(models.Model):
     # required fields      
-    doi = models.CharField(max_length=1024, unique=True)
+    title = models.TextField()
     status = models.CharField(max_length=1, choices=STATUS_CHOICES, default="d")
     created_by = CurrentUserField( # see useful hint at https://github.com/zsoldosp/django-currentuser/issues/69
         verbose_name=("Created by"),
@@ -33,10 +56,10 @@ class Publication(models.Model):
     )
     
     # optional fields
+    doi = models.CharField(max_length=1024, unique=True, blank=True, null=True)
     source = models.CharField(max_length=4096, null=True, blank=True) # journal, conference, preprint repo, ..
     provenance = models.TextField(null=True, blank=True)
-    publicationDate = models.DateField(null=True,blank=True)
-    title = models.TextField(null=True, blank=True)
+    publicationDate = models.DateField(null=True, blank=True)
     abstract = models.TextField(null=True, blank=True)
     url = models.URLField(max_length=1024, null=True, blank=True)
     geometry = models.GeometryCollectionField(verbose_name='Publication geometry/ies', srid = 4326, null=True, blank=True)# https://docs.openalex.org/api-entities/sources
@@ -88,6 +111,9 @@ class Subscription(models.Model):
         ordering = ['user_name']
         verbose_name = "subscription"
 
+from django.contrib.auth import get_user_model
+User = get_user_model()
+
 class EmailLog(models.Model):
     TRIGGER_CHOICES = [
         ("admin", "Admin Panel"),
@@ -126,7 +152,7 @@ class EmailLog(models.Model):
 from import_export import fields, resources
 from import_export.widgets import ForeignKeyWidget
 from django.conf import settings
-from django.contrib.auth.models import User
+
 class PublicationResource(resources.ModelResource):
     #created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='username')
     #updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='username')
