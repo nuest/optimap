@@ -35,7 +35,9 @@ from django.urls import reverse
 
 LOGIN_TOKEN_LENGTH  = 32
 LOGIN_TOKEN_TIMEOUT_SECONDS = 10 * 60
-EMAIL_CONFIRMATION_TIMEOUT_SECONDS = 10 * 60  
+EMAIL_CONFIRMATION_TIMEOUT_SECONDS = 10 * 60
+ACCOUNT_DELETE_TOKEN_TIMEOUT_SECONDS = 10 * 60
+USER_DELETE_TOKEN_PREFIX = "user_delete_token" 
 
 def main(request):
     return render(request,"main.html")
