@@ -6,10 +6,11 @@ from django.contrib.auth import login
 from django.shortcuts import render, redirect
 from django.core.cache import cache
 from django.http.request import HttpRequest
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, HttpResponse
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_GET
 from django.core.mail import EmailMessage, send_mail, get_connection
+from django.views.generic import View
 import secrets
 from django.contrib import messages
 from django.contrib.auth import login,logout
@@ -357,3 +358,11 @@ def finalize_account_deletion(request):
             del request.session[USER_DELETE_TOKEN_PREFIX]
             request.session.modified = True  
 
+class RobotsView(View):
+    http_method_names = ['get']
+
+    def get(self, request):
+        response = HttpResponse("User-Agent: *\nDisallow:\nSitemap: %s://%s/sitemap.xml" % (request.scheme, request.site.domain),
+                                content_type = "text/plain")
+
+        return response

@@ -109,11 +109,15 @@ source .venv/bin/activate
 # Confirm Python path
 which python
 
-# Install required dependencies
+# Instal GDAL and the Python GDAL bindings, see Dockerfile for example on Ubuntu
+gdalinfo --version
+
+# Install non-GDAL Python dependencies
 pip install -r requirements.txt
 
-# Create a local database container (once only)
-docker run --name optimapDB -p 5432:5432 -e POSTGRES_USER=optimap -e POSTGRES_PASSWORD=optimap -e POSTGRES_DB=optimap -d postgis/postgis:15-3.4
+# create local DB container (once)
+# docker run --name optimapDB -p 5432:5432 -e POSTGRES_USER=optimap -e POSTGRES_PASSWORD=optimap -e POSTGRES_DB=optimap -d postgis/postgis:14-3.3
+# get a clean one later: docker rm -f optimapDB
 
 # Start the database container
 docker start optimapDB
@@ -174,22 +178,6 @@ Configuration for debugging with VS Code:
 
 ```json
 {
-  "version": "0.2.0",
-  "configurations": [
-    {
-      "name": "Python: Django Run",
-      "type": "python",
-      "request": "launch",
-      "program": "${workspaceFolder}/manage.py",
-      "args": ["runserver"],
-      "env": {
-        "OPTIMAP_DEBUG": "True",
-        "OPTIMAP_CACHE": "dummy"
-      },
-      "django": true,
-      "justMyCode": true
-    }
-  ]
   "version": "0.2.0",
   "configurations": [
     {
@@ -295,17 +283,6 @@ A configuration to debug the test code and also print deprecation warnings:
 
 ```json
 {
-  "name": "Python: Django Test",
-  "type": "python",
-  "request": "launch",
-  "pythonArgs": ["-Wa"],
-  "program": "${workspaceFolder}/manage.py",
-  "args": ["test", "tests"],
-  "env": {
-    "OPTIMAP_DEBUG": "True"
-  },
-  "django": true,
-  "justMyCode": true
   "name": "Python: Django Test",
   "type": "python",
   "request": "launch",
