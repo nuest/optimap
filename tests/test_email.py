@@ -1,18 +1,18 @@
 import django
 import os
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "optimap.settings") 
-django.setup()
-
 from django.test import TestCase, override_settings
 from django.core import mail
 from publications.tasks import send_monthly_email
 from publications.models import EmailLog, Publication, UserProfile
 from django.utils.timezone import now
-from django.contrib.auth.models import User
 from datetime import timedelta
-from datetime import datetime
-from django.contrib.gis.geos import Point, LineString, Polygon, GeometryCollection
+from django.contrib.gis.geos import Point, GeometryCollection
+from django.contrib.auth import get_user_model
+User = get_user_model()
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "optimap.settings") 
+django.setup()
 
 @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
 class EmailIntegrationTest(TestCase):

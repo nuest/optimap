@@ -1,7 +1,6 @@
 import logging
 logger = logging.getLogger(__name__)
 
-from django.contrib.auth.models import User
 from django.contrib.auth import login
 from django.shortcuts import render, redirect
 from django.core.cache import cache
