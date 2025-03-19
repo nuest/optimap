@@ -39,8 +39,8 @@ class CustomUser(AbstractUser):
         logger.info(f"User {self.username} (ID: {self.id}) was restored.")
 
 class Publication(models.Model):
-    # required fields      
-    doi = models.CharField(max_length=1024, unique=True, null=True, blank=True)  # ✅ Allow NULL DOIs
+    # required fields
+    title = models.TextField()
     status = models.CharField(max_length=1, choices=STATUS_CHOICES, default="d")
     created_by = CurrentUserField( # see useful hint at https://github.com/zsoldosp/django-currentuser/issues/69
         verbose_name=("Created by"),

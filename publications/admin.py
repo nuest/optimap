@@ -1,6 +1,6 @@
 from django.contrib import admin, messages
 from leaflet.admin import LeafletGeoAdmin
-from publications.models import Publication, BlockedEmail, BlockedDomain
+from publications.models import Publication, Source, HarvestingEvent, BlockedEmail, BlockedDomain
 from import_export.admin import ImportExportModelAdmin
 from publications.tasks import harvest_oai_endpoint  
 from django_q.models import Schedule
