@@ -176,13 +176,12 @@ def send_subscription_based_email(trigger_source='manual', sent_by=None, user_id
         )
 
         if not new_publications.exists():
-            print(f"No new publications found for subscription: {subscription.search_term}. Skipping email.")
             continue 
 
         unsubscribe_specific = f"{BASE_URL}{reverse('optimap:unsubscribe')}?search={quote(subscription.search_term)}" # TODO: Change base_url to actual URL
         unsubscribe_all = f"{BASE_URL}{reverse('optimap:unsubscribe')}?all=true"
 
-        subject = f"📚 New Manuscripts Matching '{subscription.search_term}'"
+        subject = f"New Manuscripts Matching '{subscription.search_term}'"
 
         content = f"""
             <html>
@@ -206,15 +205,16 @@ def send_subscription_based_email(trigger_source='manual', sent_by=None, user_id
                 user_email, subject, content, sent_by=sent_by, trigger_source=trigger_source, status="success"
             )
 
-            print(f"Email sent to {user_email} for subscription: {subscription.search_term}")
         except Exception as e:
-            print(f"Failed to send email to {user_email}: {e}")
+            error_message = str(e)
+            EmailLog.log_email(
+                user_email, subject, content, sent_by=sent_by, trigger_source=trigger_source, status="failed", error_message=error_message
+            )
 
 def schedule_monthly_email_task():
     if not Schedule.objects.filter(func='publications.tasks.send_monthly_email').exists():
         now = datetime.now()
         last_day_of_month = calendar.monthrange(now.year, now.month)[1]  # Get last day of the month
-
         next_run_date = now.replace(day=last_day_of_month, hour=23, minute=59)  # Run at the end of the last day
         schedule(
             'publications.tasks.send_monthly_email',
@@ -225,10 +225,9 @@ def schedule_monthly_email_task():
         )
 
 def schedule_subscription_email_task():
-    if not Schedule.objects.filter(func='publications.tasks.send_monthly_email').exists():
+    if not Schedule.objects.filter(func='publications.tasks.send_subscription_based_email').exists():
         now = datetime.now()
         last_day_of_month = calendar.monthrange(now.year, now.month)[1]  # Get last day of the month
-
         next_run_date = now.replace(day=last_day_of_month, hour=23, minute=59)  # Run at the end of the last day
         schedule(
             'publications.tasks.send_subscription_based_email',

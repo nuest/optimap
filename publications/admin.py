@@ -58,6 +58,18 @@ def send_subscription_emails(modeladmin, request, queryset):
     send_subscription_based_email(sent_by=request.user, user_ids=list(selected_users))
     messages.success(request, "Subscription-based emails have been sent.")
 
+@admin.action(description="Schedule subscription-based Email Task")
+def send_subscription_emails_scheduler(modeladmin, request, queryset):
+    """
+    Admin action to manually schedule the email task.
+    """
+    try:        
+        schedule_subscription_email_task(sent_by=request.user)  
+        messages.success(request, "Monthly email task has been scheduled successfully.")
+    except Exception as e:
+        messages.error(request, f"Failed to schedule task: {e}")
+
+
 @admin.action(description="Delete user and block email")
 def block_email(modeladmin, request, queryset):
     for user in queryset:
@@ -98,7 +110,7 @@ class EmailLogAdmin(admin.ModelAdmin):
 
 class SubscriptionAdmin(admin.ModelAdmin):
     list_display = ("user", "region", "subscribed")
-    actions = [send_subscription_emails]
+    actions = [send_subscription_emails, send_subscription_emails_scheduler]
 
 class UserProfileAdmin(admin.ModelAdmin):
     list_display = ("user", "notify_new_manuscripts")  
