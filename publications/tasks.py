@@ -11,7 +11,8 @@ import requests
 from django.core.mail import send_mail
 from django.conf import settings
 from django.utils.timezone import now
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
+User = get_user_model()
 from .models import EmailLog
 from datetime import datetime, timedelta
 from django_q.tasks import schedule

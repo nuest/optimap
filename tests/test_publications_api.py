@@ -3,11 +3,12 @@ import os
 from django.test import Client, TestCase
 from publications.models import Publication
 from django.contrib.gis.geos import Point, MultiPoint, LineString, Polygon, GeometryCollection
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
+User = get_user_model()
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'optimap.settings')
 
-class SimpleTest(TestCase):
+class PublicationsApiTest(TestCase):
     
     def setUp(self):
         self.client = Client()

@@ -1,14 +1,11 @@
 from django.contrib import admin, messages
 from leaflet.admin import LeafletGeoAdmin
-from django.contrib.auth.models import User
 from publications.models import Publication, BlockedEmail, BlockedDomain
 from import_export.admin import ImportExportModelAdmin
-from django_q.tasks import schedule
-from django.utils.timezone import now
 from publications.models import EmailLog, UserProfile
 from publications.tasks import send_monthly_email, schedule_monthly_email_task
-from django_q.models import Schedule
-from datetime import datetime, timedelta
+from django.contrib.auth import get_user_model
+User = get_user_model()
 
 @admin.action(description="Mark selected publications as published")
 def make_public(modeladmin, request, queryset):
