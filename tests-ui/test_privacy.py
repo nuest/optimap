@@ -1,12 +1,12 @@
 import unittest
-from django.test import SimpleTestCase
+from django.test import TestCase
 from django.urls import reverse  
-from helium import start_firefox,click,get_driver
+from helium import start_chrome,click,get_driver,kill_browser
 import os
 
-class PrivacypageTests(SimpleTestCase):
+class PrivacypageTests(TestCase):
     def test_privacy_link(self):
-        start_firefox('localhost:8000/')
+        start_chrome('localhost:8000/')
         click("privacy")    
         get_driver().save_screenshot(os.path.join(os.getcwd(), 'tests-ui', 'screenshots', 'privacy.png'))
         kill_browser()
