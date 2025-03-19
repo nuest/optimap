@@ -3,19 +3,23 @@ import os
 from django.test import Client, TestCase
 from publications.models import Publication
 from django.contrib.gis.geos import Point, MultiPoint, LineString, Polygon, GeometryCollection
+from django.contrib.auth import get_user_model
+User = get_user_model()
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'optimap.settings')
 
-class SimpleTest(TestCase):
+class PublicationsApiTest(TestCase):
     
     def setUp(self):
         self.client = Client()
+        self.user = User.objects.create_user('unittest', 'unit@test.com', 'test')
+        self.client.login(username='unittest', password='test')
 
-    @classmethod
-    def setUpClass(cls):
         pub1 = Publication.objects.create(
             title="Publication One",
             abstract="This is a first publication. It's good.",
+            url="https://test.test/geometries",
+            status="p",
             publicationDate=date(2022, 10, 10),
             geometry=GeometryCollection(
                 Point(0, 0),
@@ -28,13 +32,15 @@ class SimpleTest(TestCase):
         pub2 = Publication.objects.create(
             title="Publication Two",
             abstract="Seconds are better than firsts.",
+            url="https://example.com/point",
+            status="p",
             publicationDate=date(2022, 10, 24),
+            doi="10.1234/test-doi-two",
             geometry=GeometryCollection(Point(1, 1))
         )
         pub2.save()
 
-    @classmethod
-    def tearDownClass(cls):
+    def tearDown(self):
         Publication.objects.all().delete()
 
     def test_api_redirect(self):
@@ -59,7 +65,7 @@ class SimpleTest(TestCase):
     def test_api_publication(self):
         all = self.client.get('/api/v1/publications/').json()
         one_publication = [feat for feat in all['results']['features'] if feat['properties']['title'] == 'Publication One']
-        print('\n\n %s \n\n' % all)
+        #print('\n\n %s \n\n' % all)
         response = self.client.get('/api/v1/publications/%s.json' % one_publication[0]['id'])
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get('Content-Type'), 'application/json')

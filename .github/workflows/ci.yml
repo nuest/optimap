@@ -1,0 +1,133 @@
+name: Django CI Tests
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  unittests:
+    runs-on: ubuntu-24.04
+    
+    strategy:
+      max-parallel: 4
+      matrix:
+        python-version: [
+          3.11,
+          #3.13
+        ]
+
+    services:
+      db:
+        image: postgis/postgis:14-3.3
+        env:
+          POSTGRES_USER: optimap
+          POSTGRES_PASSWORD: optimap
+          POSTGRES_DB: optimap
+        ports:
+          - 5432:5432
+        options: --mount type=tmpfs,destination=/var/lib/postgresql/data --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install GDAL from UbuntuGIS
+      run: |
+        sudo apt-get update
+        sudo add-apt-repository ppa:ubuntugis/ppa
+        sudo apt-get install -y -qq gdal-bin libgdal-dev python3-gdal
+
+    - name: Install Python Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+
+    - name: Run Django migrations
+      run: |
+        python manage.py migrate
+
+    - name: Run Tests
+      run: |
+        python -Wa manage.py test tests
+
+  uitests:
+    runs-on: ubuntu-24.04
+    
+    strategy:
+      max-parallel: 4
+      matrix:
+        python-version: [
+          3.11,
+          #3.13
+        ]
+
+    services:
+      db:
+        image: postgis/postgis:14-3.3
+        env:
+          POSTGRES_USER: optimap
+          POSTGRES_PASSWORD: optimap
+          POSTGRES_DB: optimap
+        ports:
+          - 5432:5432
+        options: --mount type=tmpfs,destination=/var/lib/postgresql/data --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+
+    steps:
+    - uses: actions/checkout@v3
+
+    
+    # Based on https://github.com/MarketingPipeline/Python-Selenium-Action/blob/main/.github/workflows/Selenium-Action_Template.yaml and put python packages in requirements-dev.txt
+    - name: Removing previous chrome instances on runner 
+      run: sudo apt purge google-chrome-stable  
+    - name: Install xvfb
+      run: |
+          sudo apt install -y xvfb firefox
+    
+    # See https://github.com/SeleniumHQ/selenium/issues/15327
+    - name: Install deps for chrome
+      run: |
+          sudo apt install libgtk-3-dev libnotify-dev libnss3 libxss1 libasound2t64
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install GDAL from UbuntuGIS
+      run: |
+        sudo apt-get update
+        sudo add-apt-repository ppa:ubuntugis/ppa
+        sudo apt-get install -y -qq gdal-bin libgdal-dev python3-gdal
+
+    - name: Install Python Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+
+    - name: Run Django migrations
+      run: |
+        python manage.py migrate
+
+    - name: Run UI Tests
+      run: |
+        python -Wa manage.py runserver > server.log 2>&1 & python -Wa manage.py test tests-ui
+
+    - name: Print Server Logs
+      run: |
+        cat server.log
+
+    - name: Upload screenshots
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: screenshots for Python ${{ matrix.python-version }}
+        path: |
+          ${{ github.workspace }}/tests-ui/screenshots/
