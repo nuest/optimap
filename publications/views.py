@@ -314,6 +314,7 @@ Thank you for using OPTIMAP!
 
     login(request, user, backend="django.contrib.auth.backends.ModelBackend")
 
+    messages.success(request, "Your email has been successfully updated!")
     return redirect("/usersettings/")
 
 def get_login_link(request, email):
