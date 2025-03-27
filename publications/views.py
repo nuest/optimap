@@ -293,11 +293,27 @@ def confirm_email_change(request, token, email_new):
     user.username = email_new  
     user.save()
 
+    contactURL = f"{settings.BASE_URL}/contact"
+    notify_subject = 'Your OPTIMAP Email Was Changed'
+    notify_message = f"""Hello,
+
+Your email associated with OPTIMAP was changed from {old_email} to {email_new}.
+If you did NOT request this change, please contact us immediately at {contactURL}.
+
+Thank you for using OPTIMAP!
+"""
+    
+    send_mail(
+        notify_subject,
+        notify_message,
+        from_email=settings.EMAIL_HOST_USER,
+        recipient_list=[old_email]
+    )
+
     cache.delete(f"email_confirmation_{email_new}")
 
     login(request, user, backend="django.contrib.auth.backends.ModelBackend")
 
-    messages.success(request, "Your email has been successfully updated!")
     return redirect("/usersettings/")
 
 def get_login_link(request, email):
