@@ -114,6 +114,11 @@ def data(request):
 def Confirmationlogin(request):
     return render(request,'confirmation_login.html')
 
+def login_user(request, user):
+    login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+    #user.last_login = now # this should be set by Django's UserManager
+    user.save()
+
 @require_GET
 def authenticate_via_magic_link(request: HttpRequest, token: str):
     email = cache.get(token)
@@ -146,7 +151,7 @@ def authenticate_via_magic_link(request: HttpRequest, token: str):
         user = User.objects.create_user(username=email, email=email)
         is_new = True
 
-    login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+    login_user(request, user)
 
     cache.delete(token)
     return render(request, "confirmation_login.html", {
@@ -312,7 +317,7 @@ Thank you for using OPTIMAP!
 
     cache.delete(f"email_confirmation_{email_new}")
 
-    login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+    login_user(request, user)
 
     messages.success(request, "Your email has been successfully updated!")
     return redirect("/usersettings/")
