@@ -184,7 +184,7 @@ EMAIL_HOST_USER =     env('OPTIMAP_EMAIL_HOST_USER', default='optimap@dev')
 EMAIL_HOST_PASSWORD = env('OPTIMAP_EMAIL_HOST_PASSWORD', default='')
 EMAIL_USE_TLS =       env('OPTIMAP_EMAIL_USE_TLS', default=False)
 EMAIL_USE_SSL =       env('OPTIMAP_EMAIL_USE_SSL', default=False)
-BASE_URL =            env("BASE_URL", default="http://localhost:8000")
+BASE_URL =            env("OPTIMAP_BASE_URL", default="http://localhost:8000")
 EMAIL_IMAP_SENT_FOLDER = env('OPTIMAP_EMAIL_IMAP_SENT_FOLDER', default='')
 EMAIL_SEND_DELAY = 2
 
