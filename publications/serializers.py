@@ -2,8 +2,12 @@
 
 from rest_framework_gis import serializers
 from .models import Publication
+from django.contrib.auth import get_user_model
+User = get_user_model()
 
 from publications.models import Publication,Subscription
+from django.contrib.auth import get_user_model
+User = get_user_model()
 
 class PublicationSerializer(serializers.GeoFeatureModelSerializer):
     """publication GeoJSON serializer."""
@@ -24,3 +28,26 @@ class SubscriptionSerializer(serializers.GeoFeatureModelSerializer):
         geo_field = "search_area"
         auto_bbox = True
         
+class EmailChangeSerializer(serializers.ModelSerializer):  
+    """Handles email change requests."""
+
+    class Meta:
+        model = User
+        fields = ['email']
+
+    def validate_email(self, value):
+        """Ensure the new email is not already in use."""
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("This email is already registered.")
+        return value
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ["id", "username", "email"] 
+
+    def to_representation(self, instance):
+        """Ensure deleted users are excluded from serialization."""
+        if instance.deleted:  
+            return None 
+        return super().to_representation(instance)

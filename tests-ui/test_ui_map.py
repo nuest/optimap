@@ -1,9 +1,7 @@
-from pprint import pprint
-import unittest
+from unittest import TestCase
 from helium import *
-from pprint import pprint
 
-class SimpleTest(unittest.TestCase):
+class SimpleTest(TestCase):
 
     def test_map_page(self):
         start_chrome('localhost:8000/map/', headless=True)
