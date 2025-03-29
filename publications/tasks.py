@@ -8,12 +8,12 @@ import json
 import xml.dom.minidom
 from django.contrib.gis.geos import GEOSGeometry
 import requests
-from django.core.mail import send_mail, EmailMultiAlternatives
+from django.core.mail import send_mail, EmailMessage
 from django.conf import settings
 from django.utils.timezone import now
 from django.contrib.auth import get_user_model
 User = get_user_model()
-from .models import EmailLog
+from .models import EmailLog, Subscription
 from datetime import datetime, timedelta
 from django.urls import reverse
 from urllib.parse import quote
@@ -137,7 +137,7 @@ def send_monthly_email(trigger_source='manual', sent_by=None):
     if not recipients.exists() or not new_manuscripts.exists():
         return
 
-    subject = "New Manuscripts This Month"
+    subject = "📚 New Manuscripts This Month"
     content = "Here are the new manuscripts:\n" + "\n".join([pub.title for pub in new_manuscripts])
 
     for recipient in recipients:
@@ -153,10 +153,11 @@ def send_monthly_email(trigger_source='manual', sent_by=None):
             EmailLog.log_email(
                 recipient, subject, content, sent_by=sent_by, trigger_source=trigger_source, status="success"
             )
-            time.sleep(getattr(settings, "EMAIL_SEND_DELAY", 2))  
+            time.sleep(settings.EMAIL_SEND_DELAY) 
 
         except Exception as e:
             error_message = str(e)
+            logger.error(f"Failed to send monthly email to {user_email}: {error_message}")
             EmailLog.log_email(
                 recipient, subject, content, sent_by=sent_by, trigger_source=trigger_source, status="failed", error_message=error_message
             )
@@ -172,7 +173,7 @@ def send_subscription_based_email(trigger_source='manual', sent_by=None, user_id
 
         new_publications = Publication.objects.filter(
                     geometry__intersects=subscription.region, 
-                    # publicationDate__gte=subscription.timeperiod_startdate,  TODO: If we need to add query for timeperiod
+                    # publicationDate__gte=subscription.timeperiod_startdate, 
                     # publicationDate__lte=subscription.timeperiod_enddate  
         )
 
@@ -182,32 +183,31 @@ def send_subscription_based_email(trigger_source='manual', sent_by=None, user_id
         unsubscribe_specific = f"{BASE_URL}{reverse('optimap:unsubscribe')}?search={quote(subscription.search_term)}" # TODO: Change base_url to actual URL
         unsubscribe_all = f"{BASE_URL}{reverse('optimap:unsubscribe')}?all=true"
 
-        subject = f"New Manuscripts Matching '{subscription.search_term}'"
+        subject = f"📚 New Manuscripts Matching '{subscription.search_term}'"
 
         content = f"""
-            <html>
-            <body>
-                <p>Dear {subscription.user.username},</p>
-                <p>Here are the latest manuscripts matching your subscription:</p>
-                <ul>
-                    {"".join([f'<li>{pub.title} ({pub.publicationDate})</li>' for pub in new_publications])}
-                </ul>
-                <p><a href="{unsubscribe_specific}">Unsubscribe from '{subscription.search_term}'</a> | 
-                <a href="{unsubscribe_all}">Unsubscribe from All</a></p>
-            </body>
-            </html>
-            """
+Dear {subscription.user.username},
+
+Here are the latest manuscripts matching your subscription:
+
+{"\n".join([f"- {pub.title}" for pub in new_publications])}
+
+Manage your subscriptions:
+Unsubscribe from '{subscription.search_term}': {unsubscribe_specific}
+Unsubscribe from All: {unsubscribe_all}
+"""
 
         try:
-            email = EmailMultiAlternatives(subject, content, settings.EMAIL_HOST_USER, [user_email])
-            email.attach_alternative(content, "text/html")
+            email = EmailMessage(subject, content, settings.EMAIL_HOST_USER, [user_email])
             email.send()
             EmailLog.log_email(
                 user_email, subject, content, sent_by=sent_by, trigger_source=trigger_source, status="success"
             )
+            time.sleep(settings.EMAIL_SEND_DELAY) 
 
         except Exception as e:
             error_message = str(e)
+            logger.error(f"Failed to send subscription email to {user_email}: {error_message}")
             EmailLog.log_email(
                 user_email, subject, content, sent_by=sent_by, trigger_source=trigger_source, status="failed", error_message=error_message
             )
@@ -224,6 +224,7 @@ def schedule_monthly_email_task():
             next_run=next_run_date,
             kwargs={'trigger_source': 'scheduled', 'sent_by': sent_by.id if sent_by else None} 
         )
+        logger.info(f"Scheduled 'schedule_monthly_email_task' for {next_run_date}")
 
 def schedule_subscription_email_task():
     if not Schedule.objects.filter(func='publications.tasks.send_subscription_based_email').exists():
@@ -237,3 +238,5 @@ def schedule_subscription_email_task():
             next_run=next_run_date,
             kwargs={'trigger_source': 'scheduled', 'sent_by': sent_by.id if sent_by else None} 
         )
+        logger.info(f"Scheduled 'send_subscription_based_email' for {next_run_date}")
+
