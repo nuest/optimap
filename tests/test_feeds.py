@@ -10,6 +10,8 @@ from django.contrib.gis.geos import Point, LineString, Polygon, GeometryCollecti
 from datetime import datetime
 from publications.models import Publication
 
+from xmldiff import main as xmldiff_main
+from xmldiff import formatting
 
 class GeoFeedTestCase(TestCase):
     @classmethod
@@ -80,13 +82,14 @@ class GeoFeedTestCase(TestCase):
         with open(reference_path, "r", encoding="utf-8") as f:
             reference_xml = f.read()
 
-        self.maxDiff = None  
-
-        self.assertEqual(
-            generated_xml.strip(),
-            reference_xml.strip(),
-            f"{filename} does not match reference! Check {reference_path}."
+        diff = xmldiff_main.diff_texts(
+            reference_xml.encode("utf-8"),
+            generated_xml.encode("utf-8"),
+            formatter=formatting.DiffFormatter()
         )
+
+        if diff:
+            self.fail(f"{filename} does not match reference!\n\nDiff:\n{diff}")
 
     def _extract_namespaces(self, xml_content):
         """ Extract namespaces dynamically from XML content """
@@ -120,7 +123,7 @@ class GeoFeedTestCase(TestCase):
         namespace = self._extract_namespaces(georss_xml) 
 
         points = root.findall(".//georss:point", namespaces=namespace)
-        self.assertGreaterEqual(len(points), 1, "Expected at least one <georss:point> element")
+        self.assertEqual(len(points), 1, "Expected at least one <georss:point> element")
 
     def test_geoatom_feed(self):
         """ Test GeoAtom feed structure and content """
@@ -133,4 +136,13 @@ class GeoFeedTestCase(TestCase):
         latitudes = root.findall(".//geo:lat", namespaces=namespace)
         longitudes = root.findall(".//geo:long", namespaces=namespace)
         self.assertGreaterEqual(len(latitudes), 1, "Expected at least one <geo:lat> element")
-        self.assertGreaterEqual(len(longitudes), 1, "Expected at least one <geo:long> element")
+
+        # Validate content of the fields
+        expected_lat = "41.8902"
+        expected_lon = "12.4924"
+
+        lat_texts = [lat.text for lat in latitudes]
+        lon_texts = [lon.text for lon in longitudes]
+
+        self.assertIn(expected_lat, lat_texts, f"Expected latitude '{expected_lat}' not found in feed")
+        self.assertIn(expected_lon, lon_texts, f"Expected longitude '{expected_lon}' not found in feed")

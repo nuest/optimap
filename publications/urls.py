@@ -4,6 +4,7 @@ from django.urls import path, include
 from django.shortcuts import redirect
 from publications import views
 from .feeds import GeoFeed
+from django.views.generic import RedirectView
 
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView
 
@@ -22,6 +23,7 @@ urlpatterns = [
     path('feed/georss/', GeoFeed(feed_type_variant="georss"), name='georss_feed'),
     path('feed/geoatom/', GeoFeed(feed_type_variant="geoatom"), name='geoatom_feed'),
     path('feed/w3cgeo/', GeoFeed(feed_type_variant="w3cgeo"), name='w3cgeo_feed'),
+    path('feed/', RedirectView.as_view(pattern_name='optimap:georss_feed', permanent=True)),
     path("loginres/", views.loginres, name="loginres"),
     path("privacy/", views.privacy, name="privacy"),
     path("loginconfirm/", views.Confirmationlogin, name="loginconfirm"),
