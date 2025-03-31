@@ -1,4 +1,3 @@
 helium
-chromedriver-autoinstaller
 pyvirtualdisplay
 responses
