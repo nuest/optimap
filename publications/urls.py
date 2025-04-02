@@ -3,8 +3,7 @@
 from django.urls import path, include
 from django.shortcuts import redirect
 from publications import views
-from .feeds import OptimapFeed
-from .feeds import atomFeed
+from .feeds import OptimapFeed, atomFeed
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView
 
 app_name = "optimap"
@@ -34,5 +33,6 @@ urlpatterns = [
     path("finalize-delete/", views.finalize_account_deletion, name="finalize_delete"),
     path("changeuser/", views.change_useremail, name="changeuser"),
     path('download/geojson/', views.download_geojson, name='download_geojson'),
+    path('download/geopackage/', views.download_geopackage, name='download_geopackage'),
     path("confirm-email/<str:token>/<str:email_new>/", views.confirm_email_change, name="confirm-email-change"),
 ]
