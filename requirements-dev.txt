@@ -2,3 +2,4 @@ helium
 chromedriver-autoinstaller
 pyvirtualdisplay
 responses
+xmldiff
