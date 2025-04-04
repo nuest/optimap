@@ -180,7 +180,7 @@ def send_subscription_based_email(trigger_source='manual', sent_by=None, user_id
         if not new_publications.exists():
             continue 
 
-        unsubscribe_specific = f"{BASE_URL}{reverse('optimap:unsubscribe')}?search={quote(subscription.search_term)}" # TODO: Change base_url to actual URL
+        unsubscribe_specific = f"{BASE_URL}{reverse('optimap:unsubscribe')}?search={quote(subscription.search_term)}"
         unsubscribe_all = f"{BASE_URL}{reverse('optimap:unsubscribe')}?all=true"
 
         subject = f"📚 New Manuscripts Matching '{subscription.search_term}'"
