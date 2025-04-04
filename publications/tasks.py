@@ -22,7 +22,7 @@ from django_q.tasks import schedule
 from django_q.models import Schedule
 import time  
 import calendar
-
+import re
 
 def extract_geometry_from_html(content):
     for tag in content.find_all("meta"):
@@ -56,6 +56,8 @@ def extract_timeperiod_from_html(content):
     # returning arrays for array field in DB
     return [period[0]], [period[1]]
 
+DOI_REGEX = re.compile(r'10\.\d{4,9}/[-._;()/:A-Z0-9]+', re.IGNORECASE)
+
 def parse_oai_xml_and_save_publications(content, event):
 
     DOMTree = xml.dom.minidom.parseString(content)
@@ -82,8 +84,15 @@ def parse_oai_xml_and_save_publications(content, event):
             journal_value = get_text("dc:publisher")
             date_value = get_text("dc:date")
 
+            doi_text = None
             doi_nodes = record.getElementsByTagName("dc:identifier")
-            doi_text = next((node.firstChild.nodeValue.strip() for node in doi_nodes if "doi.org" in node.firstChild.nodeValue), None)
+            for node in doi_nodes:
+                if node.firstChild and node.firstChild.nodeValue:
+                    candidate = node.firstChild.nodeValue.strip()
+                    match = DOI_REGEX.search(candidate)
+                    if match:
+                        doi_text = match.group(0)
+                        break
 
             if not identifier_value or not identifier_value.startswith("http"):
                 logger.warning("Skipping record with invalid URL: %s", identifier_value)

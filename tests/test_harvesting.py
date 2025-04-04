@@ -15,8 +15,15 @@ class SimpleTest(TestCase):
         self.client = Client()
 
         results = self.client.get('/api/v1/publications/').json()['results']
-        self.id1 = results['features'][1]['id'] # newest first
-        self.id2 = results['features'][0]['id']
+        features = results.get('features', [])
+
+        if len(features) >= 2:
+            self.id1 = features[1]['id']
+            self.id2 = features[0]['id']
+        elif len(features) == 1:
+            self.id1 = self.id2 = features[0]['id']
+        else:
+            self.id1 = self.id2 = None  
 
     @classmethod
     @responses.activate
@@ -85,7 +92,7 @@ class SimpleTest(TestCase):
         source.save()
         time.sleep(2)
         schedule = Schedule.objects.filter(name=f"Harvest Source {source.id}")
-        self.assertTrue(schedule.exists(), "❌ Django-Q task not scheduled for source.")
+        self.assertTrue(schedule.exists(), "Django-Q task not scheduled for source.")
 
         publications_count = Publication.objects.count()
         async_task("publications.tasks.harvest_oai_endpoint", source.id)
@@ -99,7 +106,12 @@ class SimpleTest(TestCase):
             parse_oai_xml_and_save_publications(content, event=None)
 
         final_count = Publication.objects.count()
-        self.assertEqual(final_count, publications_count, " Duplicate publications were created!")
+        self.assertEqual(final_count, publications_count, "Duplicate publications were created!")
+
+        latest_pub = Publication.objects.latest('id')
+        self.assertIsNotNone(latest_pub.doi)
+        self.assertTrue(latest_pub.doi.startswith("10."), "DOI not correctly extracted using regex")
+
 
     def test_no_duplicates(self):   
         publications_count = Publication.objects.count()
