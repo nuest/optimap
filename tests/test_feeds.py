@@ -17,6 +17,7 @@ class GeoFeedTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         """ Set up test publications with geospatial data """
+        Publication.objects.all().delete()
         cls.pub1 = Publication.objects.create(
             title="Point Test",
             abstract="Publication with a single point inside a collection.",
