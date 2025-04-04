@@ -184,18 +184,18 @@ def send_subscription_based_email(trigger_source='manual', sent_by=None, user_id
         unsubscribe_all = f"{BASE_URL}{reverse('optimap:unsubscribe')}?all=true"
 
         subject = f"📚 New Manuscripts Matching '{subscription.search_term}'"
+        
+        bullet_list = "\n".join([f"- {pub.title}" for pub in new_publications])
 
-        content = f"""
-Dear {subscription.user.username},
+        content = f"""Dear {subscription.user.username},
+        Here are the latest manuscripts matching your subscription:
 
-Here are the latest manuscripts matching your subscription:
+        {bullet_list}
 
-{"\n".join([f"- {pub.title}" for pub in new_publications])}
-
-Manage your subscriptions:
-Unsubscribe from '{subscription.search_term}': {unsubscribe_specific}
-Unsubscribe from All: {unsubscribe_all}
-"""
+        Manage your subscriptions:
+        Unsubscribe from '{subscription.search_term}': {unsubscribe_specific}
+        Unsubscribe from All: {unsubscribe_all}
+        """
 
         try:
             email = EmailMessage(subject, content, settings.EMAIL_HOST_USER, [user_email])
