@@ -32,15 +32,9 @@ LOGIN_TOKEN_LENGTH  = 32
 LOGIN_TOKEN_TIMEOUT_SECONDS = 10 * 60
 EMAIL_CONFIRMATION_TIMEOUT_SECONDS = 10 * 60
 ACCOUNT_DELETE_TOKEN_TIMEOUT_SECONDS = 10 * 60
-USER_DELETE_TOKEN_PREFIX = "user_delete_token" 
-
-# -----------------------------------------------------------------------------
-# Helper Functions
+USER_DELETE_TOKEN_PREFIX = "user_delete_token"
 
 def format_file_size(num_bytes):
-    """
-    Convert a file size in bytes into a human-readable string.
-    """
     if num_bytes < 1024:
         return f"{num_bytes} B"
     elif num_bytes < 1024 * 1024:
@@ -48,83 +42,113 @@ def format_file_size(num_bytes):
     else:
         return f"{num_bytes / (1024 * 1024):.2f} MB"
 
+# ------------------------------
+# Download Endpoints
+# ------------------------------
+
+@require_GET
+def download_geojson(request):
+    """
+    Serializes all Publication objects into GeoJSON format
+    and returns it as a downloadable file.
+    """
+    geojson_data = serialize("geojson", Publication.objects.all(), geometry_field='geometry')
+    response = HttpResponse(geojson_data, content_type="application/json")
+    response['Content-Disposition'] = 'attachment; filename="publications.geojson"'
+    return response
+
 def generate_geopackage():
     """
     Generates a GeoPackage file from Publication data using GDAL/OGR.
-    This creates a real GeoPackage with a layer named 'publications'
-    containing fields for title, abstract, doi, and source.
     The file is written to a temporary file, read into memory, and then deleted.
     """
     from osgeo import ogr, osr
     import tempfile, os
 
-    # Create a temporary file for the GeoPackage.
-    temp_file = tempfile.NamedTemporaryFile(suffix=".gpkg", delete=False)
-    filename = temp_file.name
-    temp_file.close()
+    try:
+        # Create a secure temporary file.
+        temp_file = tempfile.NamedTemporaryFile(suffix=".gpkg", delete=False)
+        filename = temp_file.name
+        temp_file.close()
 
-    # Get the GeoPackage driver.
-    driver = ogr.GetDriverByName("GPKG")
-    if driver is None:
-        logger.error("GeoPackage driver not available.")
-        return b""
+        # Get the GeoPackage driver.
+        driver = ogr.GetDriverByName("GPKG")
+        if driver is None:
+            logger.error("GeoPackage driver not available.")
+            return b""
 
-    # Create a new datasource.
-    datasource = driver.CreateDataSource(filename)
-    if datasource is None:
-        logger.error("Could not create GeoPackage datasource.")
-        return b""
+        # Create a new datasource.
+        datasource = driver.CreateDataSource(filename)
+        if datasource is None:
+            logger.error("Could not create GeoPackage datasource.")
+            return b""
 
-    # Create spatial reference for EPSG:4326.
-    srs = osr.SpatialReference()
-    srs.ImportFromEPSG(4326)
+        # Define spatial reference.
+        srs = osr.SpatialReference()
+        srs.ImportFromEPSG(4326)
 
-    # Create a new layer. Using ogr.wkbUnknown allows any geometry type.
-    layer = datasource.CreateLayer("publications", srs, geom_type=ogr.wkbUnknown)
-    if layer is None:
-        logger.error("Failed to create layer in GeoPackage.")
-        return b""
+        # Create a new layer called 'publications'.
+        layer = datasource.CreateLayer("publications", srs, geom_type=ogr.wkbUnknown)
+        if layer is None:
+            logger.error("Failed to create layer in GeoPackage.")
+            return b""
 
-    # Create fields for publication attributes.
-    for field_name, field_width in (("title", 255), ("abstract", 1024), ("doi", 255), ("source", 4096)):
-        field_defn = ogr.FieldDefn(field_name, ogr.OFTString)
-        field_defn.SetWidth(field_width)
-        ret = layer.CreateField(field_defn)
-        if ret != 0:
-            logger.error("Failed to create field %s", field_name)
+        # Create fields for publication attributes.
+        fields = [("title", 255), ("abstract", 1024), ("doi", 255), ("source", 4096)]
+        for field_name, field_width in fields:
+            field_defn = ogr.FieldDefn(field_name, ogr.OFTString)
+            field_defn.SetWidth(field_width)
+            ret = layer.CreateField(field_defn)
+            if ret != 0:
+                logger.error("Failed to create field %s", field_name)
 
-    # Add each Publication as a feature.
-    for pub in Publication.objects.all():
-        feature_defn = layer.GetLayerDefn()
-        feature = ogr.Feature(feature_defn)
-        feature.SetField("title", pub.title)
-        feature.SetField("abstract", pub.abstract if pub.abstract else "")
-        feature.SetField("doi", pub.doi if pub.doi else "")
-        feature.SetField("source", pub.source if pub.source else "")
-        
-        # Convert Django geometry to OGR geometry.
-        if pub.geometry:
-            try:
-                ogr_geom = ogr.CreateGeometryFromWkt(pub.geometry.wkt)
-                feature.SetGeometry(ogr_geom)
-            except Exception as e:
-                logger.error("Failed to convert geometry for publication %s: %s", pub.id, e)
+        # Add each Publication as a feature.
+        for pub in Publication.objects.all():
+            feature_defn = layer.GetLayerDefn()
+            feature = ogr.Feature(feature_defn)
+            feature.SetField("title", pub.title or "")
+            feature.SetField("abstract", pub.abstract or "")
+            feature.SetField("doi", pub.doi or "")
+            feature.SetField("source", pub.source or "")
+
+            if pub.geometry:
+                try:
+                    ogr_geom = ogr.CreateGeometryFromWkt(pub.geometry.wkt)
+                    feature.SetGeometry(ogr_geom)
+                except Exception as e:
+                    logger.error("Failed to convert geometry for publication %s: %s", pub.id, e)
+                    feature.SetGeometry(None)
+            else:
                 feature.SetGeometry(None)
-        else:
-            feature.SetGeometry(None)
-        ret = layer.CreateFeature(feature)
-        if ret != 0:
-            logger.error("Failed to create feature for publication %s", pub.id)
-        feature = None
+            ret = layer.CreateFeature(feature)
+            if ret != 0:
+                logger.error("Failed to create feature for publication %s", pub.id)
+            feature = None
 
-    datasource = None  # Closes datasource and flushes data.
+        datasource = None  # Ensure data is flushed and file closed.
 
-    # Read the generated GeoPackage file content.
-    with open(filename, "rb") as f:
-        geopackage_data = f.read()
+        # Read the generated GeoPackage file content.
+        with open(filename, "rb") as f:
+            geopackage_data = f.read()
 
-    os.remove(filename)
-    return geopackage_data
+        os.remove(filename)
+        return geopackage_data
+
+    except Exception as e:
+        logger.error("An error occurred in generate_geopackage: %s", e)
+        return b""
+
+@require_GET
+def download_geopackage(request):
+    """
+    Generates a GeoPackage file from Publication data and returns it as a downloadable file.
+    """
+    geopackage_data = generate_geopackage()
+    if not geopackage_data:
+        return HttpResponse("Error generating GeoPackage.", status=500)
+    response = HttpResponse(geopackage_data, content_type="application/geopackage+sqlite3")
+    response['Content-Disposition'] = 'attachment; filename="publications.gpkg"'
+    return response
 
 # -----------------------------------------------------------------------------
 # Views
