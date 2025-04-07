@@ -69,9 +69,8 @@ def parse_oai_xml_and_save_publications(content, event):
         logger.warning("No articles found in OAI-PMH response!")
         return
 
-    existing_urls = set(Publication.objects.values_list('url', flat=True))  # ✅ Cache existing URLs
-    existing_dois = set(Publication.objects.exclude(doi__isnull=True).values_list('doi', flat=True))  # ✅ Cache existing DOIs
-
+    existing_urls = set(Publication.objects.values_list('url', flat=True))
+    existing_dois = set(Publication.objects.exclude(doi__isnull=True).values_list('doi', flat=True)) 
     for record in records:
         try:
             def get_text(tag_name):

@@ -90,7 +90,7 @@ class Publication(models.Model):
 
     def __str__(self):
         """Return string representation."""
-        return self.doi
+        return self.title
 
 class Source(models.Model):
     # automatic fields
@@ -214,7 +214,7 @@ class HarvestingEvent(models.Model):
     )  
 
     def __str__(self):
-        return f"Harvesting Event ({self.status}) for {self.source.url} at {self.started_at}"
+        return f"Harvesting Event ({self.status}) for {self.source.url_field} at {self.started_at}"
 
 
 class UserProfile(models.Model):

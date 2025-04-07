@@ -94,11 +94,11 @@ class SimpleTest(TestCase):
         schedule = Schedule.objects.filter(name=f"Harvest Source {source.id}")
         self.assertTrue(schedule.exists(), "Django-Q task not scheduled for source.")
 
-        publications_count = Publication.objects.count()
-        async_task("publications.tasks.harvest_oai_endpoint", source.id)
-        time.sleep(5) 
+        from publications.tasks import harvest_oai_endpoint
+        harvest_oai_endpoint(source.id)
 
-        self.assertGreater(publications_count, 0, " No publications were harvested.")
+        publications_count = Publication.objects.count()
+        self.assertGreater(publications_count, 0, "No publications were harvested.")
 
         with open(oai_file_path, "r") as oai:
             content = oai.read()
@@ -108,9 +108,11 @@ class SimpleTest(TestCase):
         final_count = Publication.objects.count()
         self.assertEqual(final_count, publications_count, "Duplicate publications were created!")
 
-        latest_pub = Publication.objects.latest('id')
-        self.assertIsNotNone(latest_pub.doi)
-        self.assertTrue(latest_pub.doi.startswith("10."), "DOI not correctly extracted using regex")
+        publications_with_doi = Publication.objects.exclude(doi__isnull=True)
+
+        self.assertTrue(publications_with_doi.exists(), "No publication with DOI found.")
+        for pub in publications_with_doi:
+            self.assertTrue(pub.doi.startswith("10."), f"DOI '{pub.doi}' is not correctly formatted.")
 
 
     def test_no_duplicates(self):   
