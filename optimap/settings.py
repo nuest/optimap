@@ -188,6 +188,8 @@ BASE_URL =            env("OPTIMAP_BASE_URL", default="http://localhost:8000")
 EMAIL_IMAP_SENT_FOLDER = env('OPTIMAP_EMAIL_IMAP_SENT_FOLDER', default='')
 OPTIMAP_EMAIL_SEND_DELAY = env("OPTIMAP_EMAIL_SEND_DELAY", default=2)
 BASE_URL = env("BASE_URL", default="http://127.0.0.1:8000")
+OAI_USERNAME = env("OPTIMAP_OAI_USERNAME", default="")
+OAI_PASSWORD = env("OPTIMAP_OAI_PASSWORD", default="")
 EMAIL_SEND_DELAY = 2
 
 MIDDLEWARE = [
