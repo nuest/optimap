@@ -248,7 +248,7 @@ def send_subscription_based_email(trigger_source='manual', sent_by=None, user_id
                 user_email, subject, content, sent_by=sent_by, trigger_source=trigger_source, status="failed", error_message=error_message
             )
 
-def schedule_monthly_email_task():
+def schedule_monthly_email_task(sent_by=None):
     if not Schedule.objects.filter(func='publications.tasks.send_monthly_email').exists():
         now = datetime.now()
         last_day_of_month = calendar.monthrange(now.year, now.month)[1]  # Get last day of the month
@@ -262,7 +262,7 @@ def schedule_monthly_email_task():
         )
         logger.info(f"Scheduled 'schedule_monthly_email_task' for {next_run_date}")
 
-def schedule_subscription_email_task():
+def schedule_subscription_email_task(sent_by=None):
     if not Schedule.objects.filter(func='publications.tasks.send_subscription_based_email').exists():
         now = datetime.now()
         last_day_of_month = calendar.monthrange(now.year, now.month)[1]  # Get last day of the month

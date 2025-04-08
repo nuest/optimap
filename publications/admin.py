@@ -3,13 +3,10 @@ from leaflet.admin import LeafletGeoAdmin
 from publications.models import Publication, Source, HarvestingEvent, BlockedEmail, BlockedDomain
 from import_export.admin import ImportExportModelAdmin
 from publications.models import EmailLog, Subscription, UserProfile
-from publications.tasks import harvest_oai_endpoint  
+from publications.tasks import harvest_oai_endpoint, schedule_subscription_email_task, send_monthly_email, schedule_monthly_email_task
 from django_q.models import Schedule
 from django.utils.timezone import now
-from django_q.tasks import schedule
-from publications.tasks import send_monthly_email, schedule_monthly_email_task
-from django.contrib.auth import get_user_model
-User = get_user_model()
+from publications.models import CustomUser
 
 @admin.action(description="Mark selected publications as published")
 def make_public(modeladmin, request, queryset):
@@ -167,7 +164,7 @@ class BlockedDomainAdmin(admin.ModelAdmin):
     list_display = ('domain', 'created_at', 'blocked_by')
     search_fields = ('domain',)
 
-@admin.register(User)
+@admin.register(CustomUser)
 class UserAdmin(admin.ModelAdmin):
     """User Admin."""
     list_display = ("username", "email", "is_active")

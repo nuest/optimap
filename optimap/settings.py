@@ -50,8 +50,6 @@ AUTHENTICATION_BACKENDS = [
     "sesame.backends.ModelBackend",
 ]
 
-AUTH_USER_MODEL = "publications.CustomUser" 
-
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -61,15 +59,17 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.contrib.gis',
     'django.contrib.sitemaps',
+    'publications',
     'rest_framework',
     'rest_framework_gis',
-    'publications',
     'django_q',
     'drf_spectacular',
     'drf_spectacular_sidecar',
     'leaflet',
     'import_export',
 ]
+
+AUTH_USER_MODEL = "publications.CustomUser" 
 
 REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
