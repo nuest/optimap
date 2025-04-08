@@ -193,7 +193,7 @@ def send_monthly_email(trigger_source='manual', sent_by=None):
 
         except Exception as e:
             error_message = str(e)
-            logger.error(f"Failed to send monthly email to {user_email}: {error_message}")
+            logger.error(f"Failed to send monthly email to {recipient}: {error_message}")
             EmailLog.log_email(
                 recipient, subject, content, sent_by=sent_by, trigger_source=trigger_source, status="failed", error_message=error_message
             )
