@@ -4,8 +4,12 @@ from django_currentuser.db.models import CurrentUserField
 from django_q.models import Schedule
 from django.utils.timezone import now
 from django.contrib.auth.models import AbstractUser, Group, Permission
-import uuid
 from django.utils.timezone import now
+# handle import/export relations, see https://django-import-export.readthedocs.io/en/stable/advanced_usage.html#creating-non-existent-relations
+from import_export import fields, resources
+from import_export.widgets import ForeignKeyWidget
+from django.conf import settings
+
 import logging
 logger = logging.getLogger(__name__)
 
@@ -122,25 +126,22 @@ class Source(models.Model):
         )
 
 
-
 class Subscription(models.Model):
-    name = models.CharField(max_length=4096)
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="subscriptions", null=True, blank=True)
+    name = models.CharField(max_length=4096, default="default_subscription")
     search_term = models.CharField(max_length=4096,null=True)
     timeperiod_startdate = models.DateField(null=True)
     timeperiod_enddate = models.DateField(null=True)
-    search_area = models.GeometryCollectionField(null=True, blank=True)
-    user_name = models.CharField(max_length=4096)
+    region = models.GeometryCollectionField(null=True, blank=True)
+    subscribed = models.BooleanField(default=True) 
 
     def __str__(self):
         """Return string representation."""
         return self.name
 
     class Meta:
-        ordering = ['user_name']
+        ordering = ['name']
         verbose_name = "subscription"
-
-from django.contrib.auth import get_user_model
-User = get_user_model()
 
 class EmailLog(models.Model):
     TRIGGER_CHOICES = [
@@ -152,7 +153,7 @@ class EmailLog(models.Model):
     subject = models.CharField(max_length=255)
     sent_at = models.DateTimeField(auto_now_add=True)
     email_content = models.TextField(blank=True, null=True)
-    sent_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL)
+    sent_by = models.ForeignKey(CustomUser, null=True, blank=True, on_delete=models.SET_NULL)
     trigger_source = models.CharField(max_length=50, choices=TRIGGER_CHOICES, default="manual")
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="success") 
     error_message = models.TextField(null=True, blank=True) 
@@ -176,18 +177,13 @@ class EmailLog(models.Model):
 
         )
 
-# handle import/export relations, see https://django-import-export.readthedocs.io/en/stable/advanced_usage.html#creating-non-existent-relations
-from import_export import fields, resources
-from import_export.widgets import ForeignKeyWidget
-from django.conf import settings
-
 class PublicationResource(resources.ModelResource):
     #created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='username')
     #updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='username')
     created_by = fields.Field(
         column_name='created_by',
         attribute='created_by',
-        widget=ForeignKeyWidget(User, field='username'))
+        widget=ForeignKeyWidget(CustomUser, field='username'))
     updated_by = fields.Field(
         column_name='updated_by',
         attribute='updated_by',
@@ -199,7 +195,7 @@ class PublicationResource(resources.ModelResource):
 
 class HarvestingEvent(models.Model):
     source = models.ForeignKey('Source', on_delete=models.CASCADE, related_name='harvesting_events')
-    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True) 
+    user = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True) 
     started_at = models.DateTimeField(auto_now_add=True)  
     completed_at = models.DateTimeField(null=True, blank=True) 
     status = models.CharField(
@@ -218,7 +214,7 @@ class HarvestingEvent(models.Model):
 
 
 class UserProfile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
     notify_new_manuscripts = models.BooleanField(default=False)
 
     def __str__(self):
@@ -227,7 +223,7 @@ class UserProfile(models.Model):
 class BlockedEmail(models.Model):
     email = models.EmailField(unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    blocked_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="blocked_emails")
+    blocked_by = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name="blocked_emails")
 
     def __str__(self):
         return self.email
@@ -235,7 +231,7 @@ class BlockedEmail(models.Model):
 class BlockedDomain(models.Model):
     domain = models.CharField(max_length=255, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    blocked_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="blocked_domains")
+    blocked_by = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name="blocked_domains")
 
     def __str__(self):
         return self.domain
