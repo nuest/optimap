@@ -3,7 +3,9 @@
 from django.urls import path, include
 from django.shortcuts import redirect
 from publications import views
-from .feeds import OptimapFeed, atomFeed
+from .feeds import GeoFeed
+from django.views.generic import RedirectView
+
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView
 
 app_name = "optimap"
@@ -18,8 +20,10 @@ urlpatterns = [
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/schema/ui/sitemap', SpectacularRedocView.as_view(url_name='optimap:schema'), name='redoc'),
     path("data/", views.data, name="data"),
-    path('feed/rss', OptimapFeed(), name="GeoRSSfeed"), 
-    path("feed/atom", atomFeed(), name="GeoAtomfeed"),
+    path('feed/georss/', GeoFeed(feed_type_variant="georss"), name='georss_feed'),
+    path('feed/geoatom/', GeoFeed(feed_type_variant="geoatom"), name='geoatom_feed'),
+    path('feed/w3cgeo/', GeoFeed(feed_type_variant="w3cgeo"), name='w3cgeo_feed'),
+    path('feed/', RedirectView.as_view(pattern_name='optimap:georss_feed', permanent=True)),
     path("loginres/", views.loginres, name="loginres"),
     path("privacy/", views.privacy, name="privacy"),
     path("loginconfirm/", views.Confirmationlogin, name="loginconfirm"),
@@ -27,6 +31,7 @@ urlpatterns = [
     path("logout/", views.customlogout, name="logout"),
     path("usersettings/", views.user_settings, name="usersettings"),
     path("subscriptions/", views.user_subscriptions, name="subscriptions"),
+    path("unsubscribe/", views.unsubscribe, name="unsubscribe"),
     path("addsubscriptions/", views.add_subscriptions, name="addsubscriptions"),
     path("request-delete/", views.request_delete, name="request_delete"),
     path("confirm-delete/<str:token>/", views.confirm_account_deletion, name="confirm_delete"),
