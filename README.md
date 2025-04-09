@@ -310,6 +310,18 @@ See also documentation at <https://code.visualstudio.com/docs/python/tutorial-dj
 
 - If you get a message during login that there is an issue with the CSRF token, e.g. `WARNING:django.security.csrf:Forbidden (CSRF token from POST incorrect.): /loginres/` in the log and also i nthe UI, then switch to using `localhost:8000` as the domain, not the localhost IP used in the examples in this README file.
 
+### Design colours and logos
+
+Optimeta colour = _primary colour_: #158F9B
+
+Complimentary colour for _warnings_, _errors_: #9B2115
+
+Colours for _highlighting_ (split complimentary): #3C159B #9B7115
+
+For future use, optional colours for variation, e.g., for different map features: #158F9B #159B71 #159B8C #158F9B #15749B #15599B
+
+The **logos** and favicon are in the repository in the folder [`publications/static/`](https://github.com/nuest/optimap/tree/main/publications/static).
+
 ## Deploy
 
 Deploy using docker-compose or see [`fly.io.md`](fly.io.md) for notes on deploying to Fly.io.
