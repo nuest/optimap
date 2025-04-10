@@ -4,7 +4,6 @@ logger = logging.getLogger(__name__)
 from django.contrib.auth import login, logout
 from django.shortcuts import render, redirect, get_object_or_404
 from django.core.cache import cache
-from django.http.request import HttpRequest
 from django.http import HttpResponseRedirect, HttpResponse
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_GET
@@ -20,15 +19,21 @@ from datetime import datetime
 import imaplib
 import time
 from math import floor
-from django_currentuser.middleware import (get_current_user, get_current_authenticated_user)
-from django.shortcuts import redirect, get_object_or_404
+from django_currentuser.middleware import get_current_user, get_current_authenticated_user
 from urllib.parse import unquote
-from django.urls import reverse  
 from django.core.serializers import serialize
 from django.conf import settings
 from publications.models import BlockedEmail, BlockedDomain, Subscription, UserProfile, Publication
 from django.contrib.auth import get_user_model
 User = get_user_model()
+
+import tempfile, os
+
+# Fiona and Shapely imports for Fiona-based GeoPackage generation
+import fiona
+from fiona.crs import from_epsg
+from shapely import wkt
+from shapely.geometry import mapping
 
 LOGIN_TOKEN_LENGTH  = 32
 LOGIN_TOKEN_TIMEOUT_SECONDS = 10 * 60
@@ -43,6 +48,7 @@ def format_file_size(num_bytes):
         return f"{num_bytes / 1024:.2f} KB"
     else:
         return f"{num_bytes / (1024 * 1024):.2f} MB"
+
 
 # ------------------------------
 # Download Endpoints
@@ -61,89 +67,56 @@ def download_geojson(request):
 
 def generate_geopackage():
     """
-    Generates a GeoPackage file from Publication data using GDAL/OGR.
-    The file is written to a temporary file, read into memory, and then deleted.
+    Generates a GeoPackage file from Publication data using Fiona.
+    This implementation creates a 'publications' layer with fields for title,
+    abstract, doi, and source. The Publication.geometry (WKT string) is converted
+    using Shapely and Fiona writes the features to a temporary GeoPackage.
+    The file is then read into memory and deleted.
     """
-    from osgeo import ogr, osr
-    import tempfile, os
-
-    try:
-        # Create a secure temporary file.
-        temp_file = tempfile.NamedTemporaryFile(suffix=".gpkg", delete=False)
-        filename = temp_file.name
-        temp_file.close()
-
-        # Get the GeoPackage driver.
-        driver = ogr.GetDriverByName("GPKG")
-        if driver is None:
-            logger.error("GeoPackage driver not available.")
-            return b""
-
-        # Create a new datasource.
-        datasource = driver.CreateDataSource(filename)
-        if datasource is None:
-            logger.error("Could not create GeoPackage datasource.")
-            return b""
-
-        # Define spatial reference.
-        srs = osr.SpatialReference()
-        srs.ImportFromEPSG(4326)
-
-        # Create a new layer called 'publications'.
-        layer = datasource.CreateLayer("publications", srs, geom_type=ogr.wkbUnknown)
-        if layer is None:
-            logger.error("Failed to create layer in GeoPackage.")
-            return b""
-
-        # Create fields for publication attributes.
-        fields = [("title", 255), ("abstract", 1024), ("doi", 255), ("source", 4096)]
-        for field_name, field_width in fields:
-            field_defn = ogr.FieldDefn(field_name, ogr.OFTString)
-            field_defn.SetWidth(field_width)
-            ret = layer.CreateField(field_defn)
-            if ret != 0:
-                logger.error("Failed to create field %s", field_name)
-
-        # Add each Publication as a feature.
-        for pub in Publication.objects.all():
-            feature_defn = layer.GetLayerDefn()
-            feature = ogr.Feature(feature_defn)
-            feature.SetField("title", pub.title or "")
-            feature.SetField("abstract", pub.abstract or "")
-            feature.SetField("doi", pub.doi or "")
-            feature.SetField("source", pub.source or "")
-
-            if pub.geometry:
-                try:
-                    ogr_geom = ogr.CreateGeometryFromWkt(pub.geometry.wkt)
-                    feature.SetGeometry(ogr_geom)
-                except Exception as e:
-                    logger.error("Failed to convert geometry for publication %s: %s", pub.id, e)
-                    feature.SetGeometry(None)
-            else:
-                feature.SetGeometry(None)
-            ret = layer.CreateFeature(feature)
-            if ret != 0:
-                logger.error("Failed to create feature for publication %s", pub.id)
-            feature = None
-
-        datasource = None  # Ensure data is flushed and file closed.
-
-        # Read the generated GeoPackage file content.
+    # Define the schema for the layer.
+    schema = {
+        'geometry': 'Unknown',  # This allows any geometry type.
+        'properties': {
+            'title': 'str',
+            'abstract': 'str',
+            'doi': 'str',
+            'source': 'str',
+        },
+    }
+    # Use a temporary directory to ensure a unique file location.
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        filename = os.path.join(tmpdirname, "publications.gpkg")
+        # Open the file with Fiona in write mode using the GPKG driver.
+        with fiona.open(filename, 'w', driver='GPKG', schema=schema, crs=from_epsg(4326)) as collection:
+            for pub in Publication.objects.all():
+                geom = None
+                if pub.geometry:
+                    try:
+                        geom_obj = wkt.loads(pub.geometry.wkt)
+                        geom = mapping(geom_obj)
+                    except Exception as e:
+                        logger.error("Error converting geometry for publication %s: %s", pub.id, e)
+                        geom = None
+                feature = {
+                    'geometry': geom,
+                    'properties': {
+                        'title': pub.title or "",
+                        'abstract': pub.abstract or "",
+                        'doi': pub.doi or "",
+                        'source': pub.source or "",
+                    },
+                }
+                collection.write(feature)
+        # Read the contents of the GeoPackage.
         with open(filename, "rb") as f:
             geopackage_data = f.read()
-
-        os.remove(filename)
-        return geopackage_data
-
-    except Exception as e:
-        logger.error("An error occurred in generate_geopackage: %s", e)
-        return b""
+    return geopackage_data
 
 @require_GET
 def download_geopackage(request):
     """
     Generates a GeoPackage file from Publication data and returns it as a downloadable file.
+    Uses the Fiona-based GeoPackage generation function.
     """
     geopackage_data = generate_geopackage()
     if not geopackage_data:
@@ -153,7 +126,7 @@ def download_geopackage(request):
     return response
 
 # -----------------------------------------------------------------------------
-# Views
+# Other Views
 
 def main(request):
     return render(request, "main.html")
@@ -200,10 +173,7 @@ The link is valid for {valid} minutes.
                 folder = settings.EMAIL_IMAP_SENT_FOLDER
                 imap.append(folder, '\\Seen', imaplib.Time2Internaldate(time.time()), message)
                 logger.debug('Saved email to IMAP folder {folder}')
-        return render(request, 'login_response.html', {
-            'email': email,
-            'valid_minutes': valid,
-        })
+        return render(request, 'login_response.html', {'email': email, 'valid_minutes': valid})
     except Exception as ex:
         logger.exception('Error sending login email to %s from %s', email, settings.EMAIL_HOST_USER)
         logger.error(ex)
@@ -223,7 +193,7 @@ def data(request):
     geojson_content = serialize("geojson", Publication.objects.all())
     geojson_size = format_file_size(len(geojson_content))
     
-    # Generate actual GeoPackage content using GDAL/OGR and compute its file size.
+    # Generate GeoPackage content using the Fiona-based function and compute its file size.
     geopackage_content = generate_geopackage()
     geopackage_size = format_file_size(len(geopackage_content))
     
@@ -241,7 +211,7 @@ def login_user(request, user):
     user.save()
 
 @require_GET
-def authenticate_via_magic_link(request: HttpRequest, token: str):
+def authenticate_via_magic_link(request, token):
     email = cache.get(token)
     logger.info('Authenticating magic link with token %s: Found user: %s', token, email)
     if email is None:
@@ -265,7 +235,7 @@ def authenticate_via_magic_link(request: HttpRequest, token: str):
             is_new = False  
     else:
         user = User.objects.create_user(username=email, email=email)
-        is_new = True
+        is_new = True  
     login_user(request, user)
     cache.delete(token)
     return render(request, "confirmation_login.html", {'is_new': is_new})
@@ -294,7 +264,7 @@ def user_subscriptions(request):
         count_subs = subs.count()
         return render(request, 'subscriptions.html', {'sub': subs, 'count': count_subs})
     else:
-        pass
+        return HttpResponse("Unauthorized", status=401)
 
 def add_subscriptions(request):
     if request.method == "POST":
@@ -314,7 +284,7 @@ def add_subscriptions(request):
         )
         logger.info('Adding new subscription for user %s: %s', user_name, subscription)
         subscription.save()
-        return  HttpResponseRedirect('/subscriptions/')
+        return HttpResponseRedirect('/subscriptions/')
 
 @login_required 
 def unsubscribe(request):
@@ -328,21 +298,17 @@ def unsubscribe(request):
         messages.success(request, "You have been unsubscribed from all subscriptions.")
         return redirect("/") 
     if search_term:
-
         exact_search_term = unquote(search_term).strip() 
         subscription = get_object_or_404(Subscription, user=user, search_term=exact_search_term)
-
         if not subscription:
             messages.warning(request, f"No subscription found for '{search_term}'.")
             return redirect("/") 
-
         subscription.subscribed = False
         subscription.save()
         messages.success(request, f"You have unsubscribed from '{search_term}'.")
         return redirect("/") 
 
     return HttpResponse("Invalid request.", status=400)
-
 
 def delete_account(request):
     email = request.user.email
@@ -530,191 +496,71 @@ def download_geojson(request):
     Serializes all Publication objects into GeoJSON format
     and returns it as a downloadable file.
     """
-    geojson_data = serialize("geojson", Publication.objects.all())
+    geojson_data = serialize("geojson", Publication.objects.all(), geometry_field='geometry')
     response = HttpResponse(geojson_data, content_type="application/json")
     response['Content-Disposition'] = 'attachment; filename="publications.geojson"'
     return response
 
-# New Functionality: Download as GeoPackage (concrete implementation)
+# New Functionality: Download as GeoPackage using Fiona and Shapely
 @require_GET
 def download_geopackage(request):
     """
-    Generates a GeoPackage file from Publication data and returns it as a downloadable file.
-    Uses GDAL/OGR to create a real GeoPackage file.
+    Generates a GeoPackage file from Publication data using Fiona and returns it as a downloadable file.
     """
     geopackage_data = generate_geopackage()
-    response = HttpResponse(geopackage_data, content_type="application/octet-stream")
+    if not geopackage_data:
+        return HttpResponse("Error generating GeoPackage.", status=500)
+    response = HttpResponse(geopackage_data, content_type="application/geopackage+sqlite3")
     response['Content-Disposition'] = 'attachment; filename="publications.gpkg"'
     return response
 
 def generate_geopackage():
     """
-    Generates a GeoPackage file from Publication data using GDAL/OGR.
-    This creates a real GeoPackage with a layer named 'publications'
-    containing fields for title, abstract, doi, and source.
-    The file is written to a temporary file, read into memory, and then deleted.
+    Generates a GeoPackage file from Publication data using Fiona.
+    This implementation creates a 'publications' layer with fields for title,
+    abstract, doi, and source. Geometry is converted using Shapely (wkt.loads and mapping).
+    The file is written to a temporary directory, read into memory, and then deleted.
     """
-    from osgeo import ogr, osr
-    import tempfile, os
-
-    # Generate a temporary file name without creating the file.
-    filename = tempfile.mktemp(suffix=".gpkg")
-    
-    # Get the GeoPackage driver.
-    driver = ogr.GetDriverByName("GPKG")
-    if driver is None:
-        logger.error("GeoPackage driver not available.")
-        return b""
-
-    # Create a new datasource. Since the file doesn't exist, GDAL can create it.
-    datasource = driver.CreateDataSource(filename)
-    if datasource is None:
-        logger.error("Could not create GeoPackage datasource.")
-        return b""
-
-    # Create spatial reference for EPSG:4326.
-    srs = osr.SpatialReference()
-    srs.ImportFromEPSG(4326)
-
-    # Create a new layer. Using ogr.wkbUnknown allows any geometry type.
-    layer = datasource.CreateLayer("publications", srs, geom_type=ogr.wkbUnknown)
-    if layer is None:
-        logger.error("Failed to create layer in GeoPackage.")
-        return b""
-
-    # Create fields for publication attributes.
-    for field_name, field_width in (("title", 255), ("abstract", 1024), ("doi", 255), ("source", 4096)):
-        field_defn = ogr.FieldDefn(field_name, ogr.OFTString)
-        field_defn.SetWidth(field_width)
-        ret = layer.CreateField(field_defn)
-        if ret != 0:
-            logger.error("Failed to create field %s", field_name)
-
-    # Add each Publication as a feature.
-    for pub in Publication.objects.all():
-        feature_defn = layer.GetLayerDefn()
-        feature = ogr.Feature(feature_defn)
-        feature.SetField("title", pub.title)
-        feature.SetField("abstract", pub.abstract if pub.abstract else "")
-        feature.SetField("doi", pub.doi if pub.doi else "")
-        feature.SetField("source", pub.source if pub.source else "")
-        
-        # Convert Django geometry to OGR geometry.
-        if pub.geometry:
-            try:
-                ogr_geom = ogr.CreateGeometryFromWkt(pub.geometry.wkt)
-                feature.SetGeometry(ogr_geom)
-            except Exception as e:
-                logger.error("Failed to convert geometry for publication %s: %s", pub.id, e)
-                feature.SetGeometry(None)
-        else:
-            feature.SetGeometry(None)
-        ret = layer.CreateFeature(feature)
-        if ret != 0:
-            logger.error("Failed to create feature for publication %s", pub.id)
-        feature = None
-
-    datasource = None  # Close datasource and flush data.
-
-    # Read the generated GeoPackage file content.
-    with open(filename, "rb") as f:
-        geopackage_data = f.read()
-
-    os.remove(filename)
-    return geopackage_data
-    """
-    Generates a GeoPackage file from Publication data using GDAL/OGR.
-    This creates a real GeoPackage with a layer named 'publications'
-    containing fields for title, abstract, doi, and source.
-    The file is written to a temporary file, read into memory, and then deleted.
-    """
-    from osgeo import ogr, osr
-    import tempfile, os
-
-    # Create a temporary file for the GeoPackage.
-    temp_file = tempfile.NamedTemporaryFile(suffix=".gpkg", delete=False)
-    filename = temp_file.name
-    temp_file.close()
-
-    # Get the GeoPackage driver.
-    driver = ogr.GetDriverByName("GPKG")
-    if driver is None:
-        logger.error("GeoPackage driver not available.")
-        return b""
-
-    # Create a new datasource.
-    datasource = driver.CreateDataSource(filename)
-    if datasource is None:
-        logger.error("Could not create GeoPackage datasource.")
-        return b""
-
-    # Create spatial reference for EPSG:4326.
-    srs = osr.SpatialReference()
-    srs.ImportFromEPSG(4326)
-
-    # Create a new layer. Using ogr.wkbUnknown allows any geometry type.
-    layer = datasource.CreateLayer("publications", srs, geom_type=ogr.wkbUnknown)
-    if layer is None:
-        logger.error("Failed to create layer in GeoPackage.")
-        return b""
-
-    # Create fields for publication attributes.
-    for field_name, field_width in (("title", 255), ("abstract", 1024), ("doi", 255), ("source", 4096)):
-        field_defn = ogr.FieldDefn(field_name, ogr.OFTString)
-        field_defn.SetWidth(field_width)
-        ret = layer.CreateField(field_defn)
-        if ret != 0:
-            logger.error("Failed to create field %s", field_name)
-
-    # Add each Publication as a feature.
-    for pub in Publication.objects.all():
-        feature_defn = layer.GetLayerDefn()
-        feature = ogr.Feature(feature_defn)
-        feature.SetField("title", pub.title)
-        feature.SetField("abstract", pub.abstract if pub.abstract else "")
-        feature.SetField("doi", pub.doi if pub.doi else "")
-        feature.SetField("source", pub.source if pub.source else "")
-        
-        # Convert Django geometry to OGR geometry.
-        if pub.geometry:
-            try:
-                ogr_geom = ogr.CreateGeometryFromWkt(pub.geometry.wkt)
-                feature.SetGeometry(ogr_geom)
-            except Exception as e:
-                logger.error("Failed to convert geometry for publication %s: %s", pub.id, e)
-                feature.SetGeometry(None)
-        else:
-            feature.SetGeometry(None)
-        ret = layer.CreateFeature(feature)
-        if ret != 0:
-            logger.error("Failed to create feature for publication %s", pub.id)
-        feature = None
-
-    datasource = None  # Closes datasource and flushes data.
-
-    # Read the generated GeoPackage file content.
-    with open(filename, "rb") as f:
-        geopackage_data = f.read()
-
-    os.remove(filename)
-    return geopackage_data
-
-def data(request):
-    geojson_content = serialize("geojson", Publication.objects.all())
-    geojson_size = format_file_size(len(geojson_content))
-    
-    geopackage_content = generate_geopackage()
-    geopackage_size = format_file_size(len(geopackage_content))
-    
-    context = {
-        'geojson_size': geojson_size,
-        'geopackage_size': geopackage_size,
+    schema = {
+        'geometry': 'Unknown',
+        'properties': {
+            'title': 'str',
+            'abstract': 'str',
+            'doi': 'str',
+            'source': 'str',
+        },
     }
-    return render(request, 'data.html', context)
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        filename = os.path.join(tmpdirname, "publications.gpkg")
+        with fiona.open(filename, 'w', driver='GPKG', schema=schema, crs=from_epsg(4326)) as collection:
+            for pub in Publication.objects.all():
+                geom = None
+                if pub.geometry:
+                    try:
+                        geom_obj = wkt.loads(pub.geometry.wkt)
+                        geom = mapping(geom_obj)
+                    except Exception as e:
+                        logger.error("Error converting geometry for publication %s: %s", pub.id, e)
+                        geom = None
+                feature = {
+                    'geometry': geom,
+                    'properties': {
+                        'title': pub.title or "",
+                        'abstract': pub.abstract or "",
+                        'doi': pub.doi or "",
+                        'source': pub.source or "",
+                    },
+                }
+                collection.write(feature)
+        with open(filename, "rb") as f:
+            geopackage_data = f.read()
+    return geopackage_data
 
 class RobotsView(View):
     http_method_names = ['get']
     def get(self, request):
-        response = HttpResponse("User-Agent: *\nDisallow:\nSitemap: %s://%s/sitemap.xml" % (request.scheme, request.site.domain),
-                                content_type="text/plain")
+        response = HttpResponse(
+            "User-Agent: *\nDisallow:\nSitemap: %s://%s/sitemap.xml" % (request.scheme, request.site.domain),
+            content_type="text/plain"
+        )
         return response
