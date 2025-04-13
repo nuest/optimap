@@ -36,7 +36,7 @@ class SimpleTest(TestCase):
             responses.get('http://localhost:8330/index.php/opti-geo/article/view/2',
                           body = article02.read())
 
-            parse_oai_xml_and_save_publications(oai.read(), event=None)
+            parse_oai_xml_and_save_publications(oai.read(), event=None, include_geometry=True)
 
             # set status to published
             Publication.objects.all().update(status="p")
@@ -102,8 +102,8 @@ class SimpleTest(TestCase):
 
         with open(oai_file_path, "r") as oai:
             content = oai.read()
-            parse_oai_xml_and_save_publications(content, event=None)
-            parse_oai_xml_and_save_publications(content, event=None)
+            parse_oai_xml_and_save_publications(content, event=None, include_geometry=True)
+            parse_oai_xml_and_save_publications(content, event=None, include_geometry=True)
 
         final_count = Publication.objects.count()
         self.assertEqual(final_count, publications_count, "Duplicate publications were created!")

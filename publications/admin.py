@@ -3,7 +3,7 @@ from leaflet.admin import LeafletGeoAdmin
 from publications.models import Publication, Source, HarvestingEvent, BlockedEmail, BlockedDomain
 from import_export.admin import ImportExportModelAdmin
 from publications.models import EmailLog, Subscription, UserProfile
-from publications.tasks import harvest_oai_endpoint, schedule_subscription_email_task, send_monthly_email, schedule_monthly_email_task
+from publications.tasks import harvest_oai_endpoint, schedule_subscription_email_task, send_monthly_email, schedule_monthly_email_task, harvest_regular_metadata_from_source
 from django_q.models import Schedule
 from django.utils.timezone import now
 from publications.models import CustomUser
@@ -110,20 +110,37 @@ def block_email_and_domain(modeladmin, request, queryset):
         user.delete()
     modeladmin.message_user(request, "Selected users have been deleted and their emails/domains blocked.")
 
+@admin.action(description="Harvest regular metadata (without geospatial) from selected sources")
+def harvest_regular_metadata(modeladmin, request, queryset):
+    user = request.user
+    for source in queryset:
+        new_count = harvest_regular_metadata_from_source(source.id, user)
+        messages.success(
+            request,
+            f"Harvested {new_count} new records from source {source.url_field}"
+        )
+
 @admin.register(Publication)
 class PublicationAdmin(LeafletGeoAdmin, ImportExportModelAdmin):
     """Publication Admin."""
+    list_display = ("title", "doi", "creationDate", "lastUpdate", "created_by", "updated_by", "status", "provenance", "source")
+    search_fields = ("title", "doi", "abstract", "source")
+    list_filter = ("status", "creationDate")
+    actions = [make_public, make_draft]
 
-    list_display = ("doi", "creationDate", "lastUpdate", "created_by", "updated_by", "status", "provenance")
-
-    actions = [make_public,make_draft]
+    fields = (
+        "title", "doi", "status", "source", "abstract",
+        "geometry", "timeperiod_startdate", "timeperiod_enddate",
+        "created_by", "updated_by", "provenance"
+    )
+    readonly_fields = ("created_by", "updated_by")
 
 @admin.register(Source)
 class SourceAdmin(admin.ModelAdmin):
-    list_display = ("id", "url_field", "harvest_interval_minutes", "last_harvest")
-    list_filter = ("harvest_interval_minutes",)
-    search_fields = ("url_field",)
-    actions = [trigger_harvesting_for_specific,trigger_harvesting_for_all, schedule_harvesting]
+    list_display = ("id", "url_field", "harvest_interval_minutes", "last_harvest", "collection_name", "tags")
+    list_filter = ("harvest_interval_minutes", "collection_name")
+    search_fields = ("url_field", "collection_name", "tags")
+    actions = [trigger_harvesting_for_specific, trigger_harvesting_for_all, schedule_harvesting, harvest_regular_metadata]
 
 @admin.register(HarvestingEvent)
 class HarvestingEventAdmin(admin.ModelAdmin):
