@@ -132,12 +132,12 @@ def parse_oai_xml_and_save_publications(content, event):
                         logger.error("Geometry extraction failed for URL %s: %s", identifier_value, geo_err)
                         geom_object = None
                     # Extract temporal metadata.
-                    ps, pe = extract_timeperiod_from_html(soup)
-                    if not ps or ps in ([None], [""]):
-                        ps = []
-                    if not pe or pe in ([None], [""]):
-                        pe = []
-                    period_start, period_end = ps, pe
+                    start_time, end_time = extract_timeperiod_from_html(soup)
+                    if not start_time or start_dates in ([None], [""]):
+                        start_time = []
+                    if not end_dates or end_dates in ([None], [""]):
+                        end_dates = []
+                    period_start, period_end = start_time, end_time
             except Exception as fetch_err:
                 logger.error("Error fetching HTML for %s: %s", identifier_value, fetch_err)
                 geom_object = None
