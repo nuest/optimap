@@ -28,12 +28,14 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 
 import tempfile, os
-
-# Fiona and Shapely imports for Fiona-based GeoPackage generation
 import fiona
 from fiona.crs import from_epsg
 from shapely import wkt
 from shapely.geometry import mapping
+from django.contrib.gis.geos import GEOSGeometry
+from publications.tasks import regenerate_geojson_cache
+from django.http import FileResponse
+
 
 LOGIN_TOKEN_LENGTH  = 32
 LOGIN_TOKEN_TIMEOUT_SECONDS = 10 * 60
@@ -50,32 +52,27 @@ def format_file_size(num_bytes):
         return f"{num_bytes / (1024 * 1024):.2f} MB"
 
 
-# ------------------------------
-# Download Endpoints
-# ------------------------------
-
 @require_GET
 def download_geojson(request):
     """
-    Serializes all Publication objects into GeoJSON format
-    and returns it as a downloadable file.
+    Returns the cached GeoJSON file as a downloadable file.
     """
-    geojson_data = serialize("geojson", Publication.objects.all(), geometry_field='geometry')
-    response = HttpResponse(geojson_data, content_type="application/json")
-    response['Content-Disposition'] = 'attachment; filename="publications.geojson"'
-    return response
+    cache_dir = os.path.join(tempfile.gettempdir(), "optimap_cache")
+    os.makedirs(cache_dir, exist_ok=True)
+    json_path = os.path.join(cache_dir, 'geojson_cache.json')
+    if not os.path.exists(json_path):
+        json_path = regenerate_geojson_cache()
+    return FileResponse(open(json_path, 'rb'), content_type="application/json",
+                        as_attachment=True, filename="publications.geojson")
 
 def generate_geopackage():
     """
     Generates a GeoPackage file from Publication data using Fiona.
-    This implementation creates a 'publications' layer with fields for title,
-    abstract, doi, and source. The Publication.geometry (WKT string) is converted
-    using Shapely and Fiona writes the features to a temporary GeoPackage.
-    The file is then read into memory and deleted.
+    Geometry is converted using Shapely. The file is written to a persistent
+    cache directory and its filename is returned.
     """
-    # Define the schema for the layer.
     schema = {
-        'geometry': 'Unknown',  # This allows any geometry type.
+        'geometry': 'Unknown',
         'properties': {
             'title': 'str',
             'abstract': 'str',
@@ -83,47 +80,45 @@ def generate_geopackage():
             'source': 'str',
         },
     }
-    # Use a temporary directory to ensure a unique file location.
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        filename = os.path.join(tmpdirname, "publications.gpkg")
-        # Open the file with Fiona in write mode using the GPKG driver.
-        with fiona.open(filename, 'w', driver='GPKG', schema=schema, crs=from_epsg(4326)) as collection:
-            for pub in Publication.objects.all():
-                geom = None
-                if pub.geometry:
-                    try:
-                        geom_obj = wkt.loads(pub.geometry.wkt)
-                        geom = mapping(geom_obj)
-                    except Exception as e:
-                        logger.error("Error converting geometry for publication %s: %s", pub.id, e)
-                        geom = None
-                feature = {
-                    'geometry': geom,
-                    'properties': {
-                        'title': pub.title or "",
-                        'abstract': pub.abstract or "",
-                        'doi': pub.doi or "",
-                        'source': pub.source or "",
-                    },
-                }
-                collection.write(feature)
-        # Read the contents of the GeoPackage.
-        with open(filename, "rb") as f:
-            geopackage_data = f.read()
-    return geopackage_data
+    cache_dir = os.path.join(tempfile.gettempdir(), "optimap_cache")
+    os.makedirs(cache_dir, exist_ok=True)
+    filename = os.path.join(cache_dir, "publications.gpkg")
+    with fiona.open(filename, 'w', driver='GPKG', schema=schema, crs=from_epsg(4326)) as collection:
+        for pub in Publication.objects.all():
+            geom = None
+            if pub.geometry:
+                try:
+                    geom_wkt = pub.geometry.wkt if hasattr(pub.geometry, 'wkt') else str(pub.geometry)                    
+                    if geom_wkt.startswith("SRID="):
+                        geom_wkt = geom_wkt.split(";", 1)[1]
+                    geom_obj = wkt.loads(geom_wkt)
+                    geom = mapping(geom_obj)                                        
+                except Exception as e:
+                    logger.error("Error converting geometry for publication %s: %s", pub.id, e)
+                    geom = None
+            feature = {
+                'geometry': geom,
+                'properties': {
+                    'title': pub.title or "",
+                    'abstract': pub.abstract or "",
+                    'doi': pub.doi or "",
+                    'source': pub.source or "",
+                },
+            }
+            collection.write(feature)
+    return filename
 
 @require_GET
 def download_geopackage(request):
     """
-    Generates a GeoPackage file from Publication data and returns it as a downloadable file.
-    Uses the Fiona-based GeoPackage generation function.
+    Returns the generated GeoPackage file as a downloadable file.
     """
-    geopackage_data = generate_geopackage()
-    if not geopackage_data:
+    filename = generate_geopackage()
+    if not os.path.exists(filename):
         return HttpResponse("Error generating GeoPackage.", status=500)
-    response = HttpResponse(geopackage_data, content_type="application/geopackage+sqlite3")
-    response['Content-Disposition'] = 'attachment; filename="publications.gpkg"'
-    return response
+    return FileResponse(open(filename, 'rb'), content_type="application/geopackage+sqlite3",
+                        as_attachment=True, filename="publications.gpkg")
+
 
 # -----------------------------------------------------------------------------
 # Other Views
@@ -189,17 +184,21 @@ def privacy(request):
     return render(request, 'privacy.html')
 
 def data(request):
-    # Generate GeoJSON content and compute its file size.
-    geojson_content = serialize("geojson", Publication.objects.all())
-    geojson_size = format_file_size(len(geojson_content))
-    
-    # Generate GeoPackage content using the Fiona-based function and compute its file size.
-    geopackage_content = generate_geopackage()
-    geopackage_size = format_file_size(len(geopackage_content))
-    
+    cache_dir = os.path.join(tempfile.gettempdir(), "optimap_cache")
+    os.makedirs(cache_dir, exist_ok=True)
+    json_path = os.path.join(cache_dir, 'geojson_cache.json')
+    if not os.path.exists(json_path):
+        json_path = regenerate_geojson_cache()
+    geojson_size = format_file_size(os.path.getsize(json_path))
+    last_updated = datetime.fromtimestamp(os.path.getmtime(json_path)).strftime('%Y-%m-%d %H:%M:%S')
+    logger.info("GeoJSON cache last updated at %s", last_updated)
+
+    gpkg_filename = generate_geopackage()
+    geopackage_size = format_file_size(os.path.getsize(gpkg_filename)) if os.path.exists(gpkg_filename) else "0 B"
     context = {
         'geojson_size': geojson_size,
         'geopackage_size': geopackage_size,
+        'last_updated': last_updated  
     }
     return render(request, 'data.html', context)
 
@@ -489,72 +488,30 @@ def finalize_account_deletion(request):
             del request.session[USER_DELETE_TOKEN_PREFIX]
             request.session.modified = True  
 
-# New Functionality: Download all geometries and metadata as GeoJSON
 @require_GET
 def download_geojson(request):
     """
-    Serializes all Publication objects into GeoJSON format
-    and returns it as a downloadable file.
+    Returns the cached GeoJSON file as a downloadable file.
     """
-    geojson_data = serialize("geojson", Publication.objects.all(), geometry_field='geometry')
-    response = HttpResponse(geojson_data, content_type="application/json")
-    response['Content-Disposition'] = 'attachment; filename="publications.geojson"'
-    return response
+    cache_dir = os.path.join(tempfile.gettempdir(), "optimap_cache")
+    os.makedirs(cache_dir, exist_ok=True)
+    json_path = os.path.join(cache_dir, 'geojson_cache.json')
+    if not os.path.exists(json_path):
+        json_path = regenerate_geojson_cache()
+    return FileResponse(open(json_path, 'rb'), content_type="application/json",
+                        as_attachment=True, filename="publications.geojson")
 
 # New Functionality: Download as GeoPackage using Fiona and Shapely
 @require_GET
 def download_geopackage(request):
     """
-    Generates a GeoPackage file from Publication data using Fiona and returns it as a downloadable file.
+    Generates a GeoPackage file from Publication data and returns it as a downloadable file.
     """
-    geopackage_data = generate_geopackage()
-    if not geopackage_data:
+    filename = generate_geopackage()
+    if not os.path.exists(filename):
         return HttpResponse("Error generating GeoPackage.", status=500)
-    response = HttpResponse(geopackage_data, content_type="application/geopackage+sqlite3")
-    response['Content-Disposition'] = 'attachment; filename="publications.gpkg"'
-    return response
-
-def generate_geopackage():
-    """
-    Generates a GeoPackage file from Publication data using Fiona.
-    This implementation creates a 'publications' layer with fields for title,
-    abstract, doi, and source. Geometry is converted using Shapely (wkt.loads and mapping).
-    The file is written to a temporary directory, read into memory, and then deleted.
-    """
-    schema = {
-        'geometry': 'Unknown',
-        'properties': {
-            'title': 'str',
-            'abstract': 'str',
-            'doi': 'str',
-            'source': 'str',
-        },
-    }
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        filename = os.path.join(tmpdirname, "publications.gpkg")
-        with fiona.open(filename, 'w', driver='GPKG', schema=schema, crs=from_epsg(4326)) as collection:
-            for pub in Publication.objects.all():
-                geom = None
-                if pub.geometry:
-                    try:
-                        geom_obj = wkt.loads(pub.geometry.wkt)
-                        geom = mapping(geom_obj)
-                    except Exception as e:
-                        logger.error("Error converting geometry for publication %s: %s", pub.id, e)
-                        geom = None
-                feature = {
-                    'geometry': geom,
-                    'properties': {
-                        'title': pub.title or "",
-                        'abstract': pub.abstract or "",
-                        'doi': pub.doi or "",
-                        'source': pub.source or "",
-                    },
-                }
-                collection.write(feature)
-        with open(filename, "rb") as f:
-            geopackage_data = f.read()
-    return geopackage_data
+    return FileResponse(open(filename, 'rb'), content_type="application/geopackage+sqlite3",
+                        as_attachment=True, filename="publications.gpkg")
 
 class RobotsView(View):
     http_method_names = ['get']

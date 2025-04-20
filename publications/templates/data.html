@@ -21,10 +21,10 @@
     
     <p>
       You can query all publications with the following request (using 
-      <a href="https://stedolan.github.io/jq/" title="Link to jq project website"><code>jq</code></a> for formatting):
+      <a href="https://stedolan.github.io/jq/" title="Link to jq project website" target="_blank"><code>jq</code></a> for formatting):
     </p>
     <pre>
-      curl -X GET {{ site|addstr:"/api" }}/api/publications/ | jq
+curl -X GET {{ site|addstr:"/api" }}/api/publications/ | jq
     </pre>
     
     <h2 class="py-2">OpenAPI Schema</h2>
@@ -39,7 +39,6 @@
     
     <hr>
     
-    <!-- New Section: File Downloads -->
     <h2 class="py-2">Download Publication Data</h2>
     <p>
       Choose your desired file format.
@@ -47,13 +46,14 @@
     <ul>
       <li>
         <a class="btn btn-primary" href="{% url 'publications:download_geojson' %}">Download GeoJSON</a>
-        ({{ geojson_size }})
+        (<a href="https://geojson.org/" target="_blank">GeoJSON spec</a>) ({{ geojson_size }})
       </li>
       <li>
         <a class="btn btn-primary" href="{% url 'publications:download_geopackage' %}">Download GeoPackage</a>
-        ({{ geopackage_size }})
+        (<a href="https://www.geopackage.org/" target="_blank">GeoPackage spec</a>) ({{ geopackage_size }})
       </li>
     </ul>
+    <p class="small text-muted">Data dumps are recreated each night. Last updated: {{ last_updated }}</p>
   </div>
 </div>
 {% endblock %}
