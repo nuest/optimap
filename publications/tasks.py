@@ -28,6 +28,7 @@ from django_q.models import Schedule
 import time  
 import calendar
 import re
+from django.contrib.gis.geos import GeometryCollection
 
 BASE_URL = settings.BASE_URL
 
@@ -83,29 +84,34 @@ def parse_oai_xml_and_save_publications(content, event):
         return
     
     for record in records:
-        # Initialize defaults so variables are always defined.
-        period_start, period_end, geom_object = [], [], None
-        
         try:
             def get_text(tag_name):
                 nodes = record.getElementsByTagName(tag_name)
                 return nodes[0].firstChild.nodeValue.strip() if nodes and nodes[0].firstChild else None
-            
-            identifier_value = get_text("dc:identifier")
+
+            # collect all dc:identifier values
+            id_nodes = record.getElementsByTagName("dc:identifier")
+            identifiers = [
+                n.firstChild.nodeValue.strip()
+                for n in id_nodes
+                if n.firstChild and n.firstChild.nodeValue
+            ]
+            http_urls = [u for u in identifiers if u.lower().startswith("http")]
+            view_urls = [u for u in http_urls if "/view/" in u]
+            identifier_value = (view_urls or http_urls or [None])[0]
+
             title_value = get_text("dc:title")
             abstract_text = get_text("dc:description")
             journal_value = get_text("dc:publisher")
             date_value = get_text("dc:date")
+
             doi_text = None
-            doi_nodes = record.getElementsByTagName("dc:identifier")
-            for node in doi_nodes:
-                if node.firstChild and node.firstChild.nodeValue:
-                    candidate = node.firstChild.nodeValue.strip()
-                    match = DOI_REGEX.search(candidate)
-                    if match:
-                        doi_text = match.group(0)
-                        break
-            
+            for ident in identifiers:
+                match = DOI_REGEX.search(ident)
+                if match:
+                    doi_text = match.group(0)
+                    break
+
             # Duplicate checking.
             if doi_text and doi_text in existing_dois:
                 logger.info("Skipping duplicate publication (DOI): %s", doi_text)
@@ -121,28 +127,36 @@ def parse_oai_xml_and_save_publications(content, event):
             if not identifier_value or not identifier_value.startswith("http"):
                 logger.warning("Skipping record with invalid URL: %s", identifier_value)
                 continue
-            
+
+            geom_object = GeometryCollection()
+            period_start, period_end = [], []
+
             try:
-                with requests.get(identifier_value) as resp:
-                    resp.raise_for_status()
-                    soup = BeautifulSoup(resp.content, "html.parser")
-                    try:
-                        geom_object = extract_geometry_from_html(soup)
-                    except Exception as geo_err:
-                        logger.error("Geometry extraction failed for URL %s: %s", identifier_value, geo_err)
-                        geom_object = None
-                    # Extract temporal metadata.
+                resp = requests.get(identifier_value, timeout=10)
+                resp.raise_for_status()
+                soup = BeautifulSoup(resp.content, "html.parser")
+                
+                try:
+                    geom = extract_geometry_from_html(soup)
+                    geom_object = geom or GeometryCollection()
+                except Exception as geo_err:
+                    logger.error("Geometry extraction failed for URL %s: %s", identifier_value, geo_err)
+                    geom_object = GeometryCollection()
+
+                try:
                     start_time, end_time = extract_timeperiod_from_html(soup)
-                    if not start_time or start_dates in ([None], [""]):
-                        start_time = []
-                    if not end_dates or end_dates in ([None], [""]):
-                        end_dates = []
-                    period_start, period_end = start_time, end_time
+                    if isinstance(start_time, list):
+                        period_start = [d for d in start_time if d]
+                    if isinstance(end_time, list):
+                        period_end = [d for d in end_time if d]
+                except Exception as time_err:
+                    logger.error("Time period extraction failed for URL %s: %s", identifier_value, time_err)
+
             except Exception as fetch_err:
                 logger.error("Error fetching HTML for %s: %s", identifier_value, fetch_err)
-                geom_object = None
+                geom_object = GeometryCollection()
                 period_start, period_end = [], []
-            
+
             publication = Publication(
                 title=title_value,
                 abstract=abstract_text,
@@ -156,6 +170,7 @@ def parse_oai_xml_and_save_publications(content, event):
                 job=event
             )
             publication.save()
+
         except Exception as e:
             logger.error("Error parsing record: %s", e)
             continue
