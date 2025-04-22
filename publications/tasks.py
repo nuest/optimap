@@ -1,6 +1,6 @@
 import logging
-logger = logging.getLogger(__name__)
 
+logger = logging.getLogger(__name__)
 import os
 import json
 import subprocess
@@ -14,6 +14,7 @@ import xml.dom.minidom
 
 import requests
 from bs4 import BeautifulSoup
+from requests.auth import HTTPBasicAuth
 from urllib.parse import quote
 
 from django.conf import settings
@@ -27,9 +28,9 @@ from django_q.models import Schedule
 from publications.models import Publication, HarvestingEvent, Source
 from .models import EmailLog, Subscription
 from django.contrib.auth import get_user_model
-User = get_user_model()
 from django.urls import reverse
-from django.utils.timezone import now
+
+User = get_user_model()
 BASE_URL = settings.BASE_URL
 
 DOI_REGEX = re.compile(r'10\.\d{4,9}/[-._;()/:A-Z0-9]+', re.IGNORECASE)
@@ -42,265 +43,262 @@ def extract_geometry_from_html(content):
             try:
                 geom = json.loads(data)
                 geom_data = geom["features"][0]["geometry"]
-                type_geom = {'type': 'GeometryCollection', "geometries": [geom_data]}
-                geom_data_string = json.dumps(type_geom)
+                feature_collection = {
+                    'type': 'GeometryCollection',
+                    'geometries': [geom_data]
+                }
+                geom_string = json.dumps(feature_collection)
                 try:
-                    geom_object = GEOSGeometry(geom_data_string)
-                    logger.debug('Found geometry: %s', geom_object)
-                    return geom_object
+                    return GEOSGeometry(geom_string)
                 except Exception as e:
-                    logger.error("Cannot create geometry from string '%s': %s", geom_data_string, e)
+                    logger.error("Invalid GEOS geometry: %s", e)
+                    return None
             except ValueError as e:
-                logger.error("Error loading JSON from %s: %s", tag.get("name"), e)
+                logger.error("Invalid JSON in DC.SpatialCoverage: %s", e)
+                return None
+    return None
 
-def extract_geometry_from_html(content):
-    for tag in content.find_all("meta"):
-        if tag.get("name", None) == "DC.SpatialCoverage":
-            data = tag.get("content", None)
-            try:
-                geom = json.loads(data)
-                geom_data = geom["features"][0]["geometry"]
-                # Prepare geometry data as a GeometryCollection
-                type_geom = {'type': 'GeometryCollection'}
-                geom_content = {"geometries": [geom_data]}
-                type_geom.update(geom_content)
-                geom_data_string = json.dumps(type_geom)
-                try:
-                    geom_object = GEOSGeometry(geom_data_string)
-	@@ -55,31 +53,27 @@ def extract_geometry_from_html(content):
-            except ValueError as e:
-                logger.error("Error loading JSON from %s: %s", tag.get("name"), e)
 
 def extract_timeperiod_from_html(content):
-    period = [None, None]
+    """Extract DC.temporal or DC.PeriodOfTime (start/end) from HTML meta."""
     for tag in content.find_all("meta"):
-        if tag.get("name", None) in ['DC.temporal', 'DC.PeriodOfTime']:
-            data = tag.get("content", None)
-            period = data.split("/")
-            logger.debug('Found time period: %s', period)
-            break
-    return [period[0]], [period[1]]
+        if tag.get("name") in ['DC.temporal', 'DC.PeriodOfTime']:
+            data = tag.get("content", "")
+            parts = data.split("/")
+            start = parts[0] if parts else None
+            end = parts[1] if len(parts) > 1 else None
+            return [start], [end]
+    return [None], [None]
 
-DOI_REGEX = re.compile(r'10\.\d{4,9}/[-._;()/:A-Z0-9]+', re.IGNORECASE)
 
 def parse_oai_xml_and_save_publications(content, event):
-
-    DOMTree = xml.dom.minidom.parseString(content)
-    collection = DOMTree.documentElement
-
-    records = collection.getElementsByTagName("record")
-
+    DOM = xml.dom.minidom.parseString(content)
+    records = DOM.getElementsByTagName("record")
     if not records:
-        logger.warning("No articles found in OAI-PMH response!")
+        logger.warning("No records in OAI response")
         return
 
     existing_urls = set(Publication.objects.values_list('url', flat=True))
-    existing_dois = set(Publication.objects.exclude(doi__isnull=True).values_list('doi', flat=True)) 
+    existing_dois = set(
+        Publication.objects.exclude(doi__isnull=True).values_list('doi', flat=True)
+    )
+
     for record in records:
         try:
-            def get_text(tag_name):
-	@@ -118,9 +112,6 @@ def get_text(tag_name):
-            if doi_text:
-                existing_dois.add(doi_text)
+            def get_text(tag):
+                nodes = record.getElementsByTagName(tag)
+                return (nodes[0].firstChild.nodeValue.strip()
+                        if nodes and nodes[0].firstChild else None)
 
-            geom_object = None
-            period_start = []
-            period_end = []
-            with requests.get(identifier_value) as response:
-                soup = BeautifulSoup(response.content, "html.parser")
-                geom_object = extract_geometry_from_html(soup)
+            identifier = get_text("dc:identifier")
+            if not identifier or not identifier.startswith("http"):
+                logger.warning("Bad identifier: %s", identifier)
+                continue
+
+            doi = None
+            for node in record.getElementsByTagName("dc:identifier"):
+                val = node.firstChild.nodeValue.strip() if node.firstChild else ""
+                m = DOI_REGEX.search(val)
+                if m:
+                    doi = m.group(0)
+                    break
+
+            if doi and doi in existing_dois:
+                logger.info("Duplicate DOI: %s", doi)
+                continue
+            if identifier in existing_urls:
+                logger.info("Duplicate URL: %s", identifier)
+                continue
+
+            # fetch HTML for geometry + period
+            geom_obj, period_start, period_end = None, [None], [None]
+            try:
+                r = requests.get(identifier)
+                r.raise_for_status()
+                soup = BeautifulSoup(r.content, "html.parser")
+                geom_obj = extract_geometry_from_html(soup)
                 period_start, period_end = extract_timeperiod_from_html(soup)
-            publication = Publication(
-                title=title_value,
-                abstract=abstract_text,
-                publicationDate=date_value,
-                url=identifier_value,
-                doi=doi_text if doi_text else None,
-                source=journal_value,
-                geometry=geom_object,
+            except Exception as err:
+                logger.error("Error scraping %s: %s", identifier, err)
+
+            pub = Publication(
+                title=get_text("dc:title"),
+                abstract=get_text("dc:description"),
+                publicationDate=get_text("dc:date"),
+                url=identifier,
+                doi=doi,
+                source=get_text("dc:publisher"),
+                geometry=geom_obj,
                 timeperiod_startdate=period_start,
                 timeperiod_enddate=period_end
             )
-            publication.save()
-            print("Saved new publication: %s", identifier_value)
+            pub.save()
+            logger.info("Saved publication: %s", identifier)
+
+            existing_urls.add(identifier)
+            if doi:
+                existing_dois.add(doi)
 
         except Exception as e:
-            print("Error parsing record: %s", str(e))
+            logger.error("Failed record parse: %s", e)
             continue
+
 
 def harvest_oai_endpoint(source_id):
     source = Source.objects.get(id=source_id)
     event = HarvestingEvent.objects.create(source=source, status="in_progress")
-
     username = os.getenv("OPTIMAP_OAI_USERNAME")
     password = os.getenv("OPTIMAP_OAI_PASSWORD")
 
     try:
-        with requests.Session() as session:
-            response = session.get(source.url_field, auth=HTTPBasicAuth(username, password))
-            response.raise_for_status() 
-            parse_oai_xml_and_save_publications(response.content, event)
-
-            event.status = "completed"
-            event.completed_at = timezone.now()
-            event.save()
-            print("Harvesting completed for", source.url_field)
-
-    except requests.exceptions.RequestException as e:
-        print("Error harvesting from", source.url_field, ":", e)
+        r = requests.get(source.url_field, auth=HTTPBasicAuth(username, password))
+        r.raise_for_status()
+        parse_oai_xml_and_save_publications(r.content, event)
+        event.status = "completed"
+    except Exception as e:
+        logger.error("Harvest error: %s", e)
         event.status = "failed"
         event.log = str(e)
+    finally:
+        event.completed_at = timezone.now()
         event.save()
-def send_monthly_email(trigger_source='manual', sent_by=None):
-    recipients = User.objects.filter(userprofile__notify_new_manuscripts=True).values_list('email', flat=True)
-    last_month = now().replace(day=1) - timedelta(days=1)
-    new_manuscripts = Publication.objects.filter(creationDate__month=last_month.month)
 
-    if not recipients.exists() or not new_manuscripts.exists():
+
+def send_monthly_email(trigger_source='manual', sent_by=None):
+    last_month = timezone.now().replace(day=1) - timedelta(days=1)
+    recipients = User.objects.filter(
+        userprofile__notify_new_manuscripts=True
+    ).values_list('email', flat=True)
+    new_pubs = Publication.objects.filter(
+        creationDate__month=last_month.month
+    )
+
+    if not recipients or not new_pubs.exists():
         return
 
     subject = "📚 New Manuscripts This Month"
-    content = "Here are the new manuscripts:\n" + "\n".join([pub.title for pub in new_manuscripts])
-
-    for recipient in recipients:
+    body = "\n".join([pub.title for pub in new_pubs])
+    for email in recipients:
         try:
-            send_mail(
-	@@ -187,140 +173,108 @@ def send_monthly_email(trigger_source='manual', sent_by=None):
-                [recipient],
-                fail_silently=False,
-            )
+            send_mail(subject, body, settings.EMAIL_HOST_USER, [email])
             EmailLog.log_email(
-                recipient, subject, content, sent_by=sent_by, trigger_source=trigger_source, status="success"
+                email, subject, body,
+                sent_by=sent_by, trigger_source=trigger_source, status="success"
             )
-            time.sleep(settings.EMAIL_SEND_DELAY) 
-
-        except Exception as e:
-            error_message = str(e)
-            logger.error(f"Failed to send monthly email to {recipient}: {error_message}")
+            time.sleep(settings.EMAIL_SEND_DELAY)
+        except Exception as ex:
+            logger.error("Email failed for %s: %s", email, ex)
             EmailLog.log_email(
-                recipient, subject, content, sent_by=sent_by, trigger_source=trigger_source, status="failed", error_message=error_message
+                email, subject, body,
+                sent_by=sent_by, trigger_source=trigger_source,
+                status="failed", error_message=str(ex)
             )
 
 
 def send_subscription_based_email(trigger_source='manual', sent_by=None, user_ids=None):
-    query = Subscription.objects.filter(subscribed=True, user__isnull=False) 
+    subs = Subscription.objects.filter(subscribed=True, user__isnull=False)
     if user_ids:
-        query = query.filter(user__id__in=user_ids) 
+        subs = subs.filter(user__id__in=user_ids)
 
-    for subscription in query:
-        user_email = subscription.user.email  
+    for sub in subs:
+        pubs = Publication.objects.filter(geometry__intersects=sub.region)
+        if not pubs.exists():
+            continue
 
-        new_publications = Publication.objects.filter(
-                    geometry__intersects=subscription.region, 
-                    # publicationDate__gte=subscription.timeperiod_startdate, 
-                    # publicationDate__lte=subscription.timeperiod_enddate  
+        bullet = "\n".join(f"- {p.title}" for p in pubs)
+        unsub_one = f"{BASE_URL}{reverse('optimap:unsubscribe')}?search={quote(sub.search_term)}"
+        unsub_all = f"{BASE_URL}{reverse('optimap:unsubscribe')}?all=true"
+        content = (
+            f"Dear {sub.user.username},\n"
+            f"{bullet}\n"
+            f"Unsubscribe here: {unsub_one}\n"
+            f"Unsubscribe all: {unsub_all}\n"
         )
-
-        if not new_publications.exists():
-            continue 
-
-        unsubscribe_specific = f"{BASE_URL}{reverse('optimap:unsubscribe')}?search={quote(subscription.search_term)}"
-        unsubscribe_all = f"{BASE_URL}{reverse('optimap:unsubscribe')}?all=true"
-
-        subject = f"📚 New Manuscripts Matching '{subscription.search_term}'"
-
-        bullet_list = "\n".join([f"- {pub.title}" for pub in new_publications])
-
-        content = f"""Dear {subscription.user.username},
-        Here are the latest manuscripts matching your subscription:
-        {bullet_list}
-        Manage your subscriptions:
-        Unsubscribe from '{subscription.search_term}': {unsubscribe_specific}
-        Unsubscribe from All: {unsubscribe_all}
-        """
-
         try:
-            email = EmailMessage(subject, content, settings.EMAIL_HOST_USER, [user_email])
-            email.send()
+            EmailMessage(
+                f"📚 New Manuscripts for '{sub.search_term}'",
+                content, settings.EMAIL_HOST_USER, [sub.user.email]
+            ).send()
             EmailLog.log_email(
-                user_email, subject, content, sent_by=sent_by, trigger_source=trigger_source, status="success"
+                sub.user.email,
+                f"📚 New Manuscripts for '{sub.search_term}'",
+                content, sent_by, trigger_source, status="success"
             )
-            time.sleep(settings.EMAIL_SEND_DELAY) 
-
+            time.sleep(settings.EMAIL_SEND_DELAY)
         except Exception as e:
-            error_message = str(e)
-            logger.error(f"Failed to send subscription email to {user_email}: {error_message}")
+            logger.error("Subscription email failed: %s", e)
             EmailLog.log_email(
-                user_email, subject, content, sent_by=sent_by, trigger_source=trigger_source, status="failed", error_message=error_message
+                sub.user.email,
+                f"📚 New Manuscripts for '{sub.search_term}'",
+                content, sent_by, trigger_source,
+                status="failed", error_message=str(e)
             )
+
 
 def schedule_monthly_email_task(sent_by=None):
     if not Schedule.objects.filter(func='publications.tasks.send_monthly_email').exists():
-        now = datetime.now()
-        last_day_of_month = calendar.monthrange(now.year, now.month)[1]  # Get last day of the month
-        next_run_date = now.replace(day=last_day_of_month, hour=23, minute=59)  # Run at the end of the last day
+        now_dt = datetime.now()
+        last_day = calendar.monthrange(now_dt.year, now_dt.month)[1]
+        next_run = now_dt.replace(day=last_day, hour=23, minute=59)
         schedule(
             'publications.tasks.send_monthly_email',
-            schedule_type='M',
-            repeats=-1,
-            next_run=next_run_date,
+            schedule_type='M', repeats=-1, next_run=next_run,
             kwargs={'trigger_source': 'scheduled', 'sent_by': sent_by.id if sent_by else None}
         )
-        logger.info(f"Scheduled 'schedule_monthly_email_task' for {next_run_date}")
+        logger.info("Scheduled monthly email for %s", next_run)
+
 
 def schedule_subscription_email_task(sent_by=None):
     if not Schedule.objects.filter(func='publications.tasks.send_subscription_based_email').exists():
-        now = datetime.now()
-        last_day_of_month = calendar.monthrange(now.year, now.month)[1]  # Get last day of the month
-        next_run_date = now.replace(day=last_day_of_month, hour=23, minute=59)  # Run at the end of the last day
+        now_dt = datetime.now()
+        last_day = calendar.monthrange(now_dt.year, now_dt.month)[1]
+        next_run = now_dt.replace(day=last_day, hour=23, minute=59)
         schedule(
             'publications.tasks.send_subscription_based_email',
-            schedule_type='M',
-            repeats=-1,
-            next_run=next_run_date,
-            kwargs={'trigger_source': 'scheduled', 'sent_by': sent_by.id if sent_by else None} 
+            schedule_type='M', repeats=-1, next_run=next_run,
+            kwargs={'trigger_source': 'scheduled', 'sent_by': sent_by.id if sent_by else None}
         )
-        logger.info(f"Scheduled 'send_subscription_based_email' for {next_run_date}")
+        logger.info("Scheduled subscription email for %s", next_run)
+
+
 def regenerate_geojson_cache():
     cache_dir = os.path.join(tempfile.gettempdir(), "optimap_cache")
     os.makedirs(cache_dir, exist_ok=True)
-    geojson_str = serialize(
-        'geojson',
-        Publication.objects.filter(status='p'),
-        geometry_field='geometry'
-    )
-    try:
-        geojson_obj = json.loads(geojson_str)
-        features = geojson_obj.get("features", [])
-    except Exception as e:
-        logger.error("Error parsing GeoJSON: %s", e)
-        features = []
-    full_collection = {
-        "type": "FeatureCollection",
-        "crs": {"type": "name", "properties": {"name": "EPSG:4326"}},
-        "features": features
-    }
+
     json_path = os.path.join(cache_dir, 'geojson_cache.json')
     with open(json_path, 'w') as f:
-        json.dump(full_collection, f)
-    gzip_path = os.path.join(cache_dir, 'geojson_cache.json.gz')
-    with gzip.open(gzip_path, 'wt') as f:
-        json.dump(full_collection, f)
-    json_size = os.path.getsize(json_path)
-    logger.info("GeoJSON cache regenerated at %s (size: %d bytes); gzipped at %s", json_path, json_size, gzip_path)
+        serialize(
+            'geojson',
+            Publication.objects.filter(status='p'),
+            geometry_field='geometry',
+            srid=4326,
+            stream=f
+        )
+
+    gzip_path = json_path + '.gz'
+    with open(json_path, 'rb') as fin, gzip.open(gzip_path, 'wb') as fout:
+        fout.writelines(fin)
+
+    size = os.path.getsize(json_path)
+    logger.info("Cached GeoJSON at %s (%d bytes), gzipped at %s", json_path, size, gzip_path)
     return json_path
 
 
 def convert_geojson_to_geopackage(geojson_path):
     cache_dir = os.path.join(tempfile.gettempdir(), "optimap_cache")
     os.makedirs(cache_dir, exist_ok=True)
-    geopackage_path = os.path.join(cache_dir, 'publications.gpkg')
-    cmd = ["ogr2ogr", "-f", "GPKG", geopackage_path, geojson_path]
+    gpkg = os.path.join(cache_dir, 'publications.gpkg')
+    cmd = ["ogr2ogr", "-f", "GPKG", gpkg, geojson_path]
     try:
         subprocess.check_call(cmd)
-        logger.info("GeoPackage generated at: %s", geopackage_path)
+        logger.info("Generated GeoPackage at %s", gpkg)
     except subprocess.CalledProcessError as e:
-        logger.error("Error converting GeoJSON to GeoPackage: %s", e)
-        geopackage_path = None
-    return geopackage_path
+        logger.error("ogr2ogr failed: %s", e)
+        return None
+    return gpkg
 
 
 def regenerate_geopackage_cache():
     json_path = regenerate_geojson_cache()
     gpkg_path = convert_geojson_to_geopackage(json_path)
-    return gpkg_path
+    return json_path, gpkg_path

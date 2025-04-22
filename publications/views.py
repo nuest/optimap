@@ -4,7 +4,7 @@ logger = logging.getLogger(__name__)
 from django.contrib.auth import login, logout
 from django.shortcuts import render, redirect, get_object_or_404
 from django.core.cache import cache
-from django.http import HttpResponseRedirect, HttpResponse
+from django.http import HttpResponseRedirect, HttpResponse, FileResponse
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_GET
 from django.core.mail import EmailMessage, send_mail, get_connection
@@ -34,8 +34,6 @@ from shapely import wkt
 from shapely.geometry import mapping
 from django.contrib.gis.geos import GEOSGeometry
 from publications.tasks import regenerate_geojson_cache
-from django.http import FileResponse
-
 
 LOGIN_TOKEN_LENGTH  = 32
 LOGIN_TOKEN_TIMEOUT_SECONDS = 10 * 60
@@ -51,19 +49,38 @@ def format_file_size(num_bytes):
     else:
         return f"{num_bytes / (1024 * 1024):.2f} MB"
 
+# ------------------------------
+# Download Endpoints
+# ------------------------------
 
 @require_GET
 def download_geojson(request):
     """
-    Returns the cached GeoJSON file as a downloadable file.
+    Returns the cached GeoJSON file, gzipped if the client accepts it.
     """
     cache_dir = os.path.join(tempfile.gettempdir(), "optimap_cache")
     os.makedirs(cache_dir, exist_ok=True)
     json_path = os.path.join(cache_dir, 'geojson_cache.json')
+    gzip_path = os.path.join(cache_dir, 'geojson_cache.json.gz')
     if not os.path.exists(json_path):
         json_path = regenerate_geojson_cache()
-    return FileResponse(open(json_path, 'rb'), content_type="application/json",
-                        as_attachment=True, filename="publications.geojson")
+    accept_enc = request.META.get('HTTP_ACCEPT_ENCODING', '')
+    if 'gzip' in accept_enc and os.path.exists(gzip_path):
+        response = FileResponse(
+            open(gzip_path, 'rb'),
+            content_type="application/json",
+            as_attachment=True,
+            filename="publications.geojson"
+        )
+        response['Content-Encoding'] = 'gzip'
+    else:
+        response = FileResponse(
+            open(json_path, 'rb'),
+            content_type="application/json",
+            as_attachment=True,
+            filename="publications.geojson"
+        )
+    return response
 
 def generate_geopackage():
     """
@@ -72,7 +89,7 @@ def generate_geopackage():
     cache directory and its filename is returned.
     """
     schema = {
-        'geometry': 'Unknown',
+        'geometry': 'Unknown', 
         'properties': {
             'title': 'str',
             'abstract': 'str',
@@ -116,12 +133,12 @@ def download_geopackage(request):
     filename = generate_geopackage()
     if not os.path.exists(filename):
         return HttpResponse("Error generating GeoPackage.", status=500)
-    return FileResponse(open(filename, 'rb'), content_type="application/geopackage+sqlite3",
-                        as_attachment=True, filename="publications.gpkg")
-
-
-# -----------------------------------------------------------------------------
-# Other Views
+    return FileResponse(
+        open(filename, 'rb'),
+        content_type="application/geopackage+sqlite3",
+        as_attachment=True,
+        filename="publications.gpkg"
+    )
 
 def main(request):
     return render(request, "main.html")

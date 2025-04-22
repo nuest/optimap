@@ -1,7 +1,7 @@
 import os
 import json
 import tempfile
-from datetime import datetime
+from datetime import datetime, timedelta
 from django.test import TestCase
 from django.core.serializers import serialize
 import fiona
@@ -60,7 +60,7 @@ class GeoDataAlternativeTestCase(TestCase):
         features = geojson_obj.get("features", [])
         self.assertEqual(len(features), Publication.objects.count(), "Feature count should match Publication count")
         self.assertIn("title", features[0]["properties"], "Each feature should have a 'title' property")
-    
+
     def test_geopackage_generation(self):
         gpkg_path = generate_geopackage()
         self.assertTrue(os.path.exists(gpkg_path), "GeoPackage file should exist")
@@ -68,38 +68,28 @@ class GeoDataAlternativeTestCase(TestCase):
             features = list(layer)
             self.assertEqual(len(features), Publication.objects.count(),
                              "Feature count in GeoPackage should match the Publication count")
-    
+
     def test_update_reflects_in_generated_data(self):
         initial_geojson = serialize('geojson', Publication.objects.all(), geometry_field='geometry')
         initial_obj = json.loads(initial_geojson)
         initial_title = initial_obj['features'][0]['properties']['title']
         pub = Publication.objects.first()
-        pub.title = pub.title + " Updated"
+        pub.title += " Updated"
         pub.save()
         
         updated_geojson = serialize('geojson', Publication.objects.all(), geometry_field='geometry')
         updated_obj = json.loads(updated_geojson)
         updated_title = updated_obj['features'][0]['properties']['title']
-        
         self.assertNotEqual(initial_title, updated_title,
                             "The title of the first publication should update in the GeoJSON output")
-        
-        initial_gpkg_path = generate_geopackage()
-        with open(initial_gpkg_path, 'rb') as f:
-            initial_gpkg = f.read()
-        
-        updated_gpkg_path = generate_geopackage()
-        with open(updated_gpkg_path, 'rb') as f:
-            updated_gpkg = f.read()
-        
+
+        # Test GeoPackage update
+        initial_gpkg = open(generate_geopackage(), 'rb').read()
+        updated_gpkg = open(generate_geopackage(), 'rb').read()
         self.assertNotEqual(initial_gpkg, updated_gpkg,
                             "The GeoPackage data should update when a Publication changes")
-    
+
     def test_data_endpoint(self):
-        """
-        Use the Django test client to request the /data/ endpoint and
-        verify that the response contains the 'last updated' information.
-        """
         response = self.client.get(reverse('optimap:data_and_api'))
         self.assertEqual(response.status_code, 200, "Data endpoint should return status 200")
         content = response.content.decode()
@@ -108,3 +98,25 @@ class GeoDataAlternativeTestCase(TestCase):
         match = re.search(r'Last updated:\s*(\S+)', content)
         self.assertIsNotNone(match, "Data page should display a Last updated timestamp")
         self.assertTrue(match.group(1).strip() != "", "Last updated timestamp should not be empty")
+
+    def test_download_geojson_gzip(self):
+        # Ensure cache exists
+        regenerate_geojson_cache()
+        url = reverse('optimap:download_geojson')
+        response = self.client.get(url, HTTP_ACCEPT_ENCODING='gzip')
+        self.assertEqual(response.status_code, 200, "Gzip download should return status 200")
+        self.assertEqual(response['Content-Encoding'], 'gzip', "Response should be gzipped when requested")
+        self.assertEqual(response['Content-Type'], 'application/json', "Content-Type should be application/json")
+        self.assertIn('publications.geojson', response['Content-Disposition'],
+                      "Content-Disposition should include the filename")
+
+    def test_download_geojson_no_gzip(self):
+        # Ensure cache exists
+        regenerate_geojson_cache()
+        url = reverse('optimap:download_geojson')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200, "JSON download should return status 200")
+        self.assertNotIn('Content-Encoding', response, "Response should not be gzipped when not requested")
+        self.assertEqual(response['Content-Type'], 'application/json', "Content-Type should be application/json")
+        self.assertIn('publications.geojson', response['Content-Disposition'],
+                      "Content-Disposition should include the filename")
