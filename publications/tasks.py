@@ -168,7 +168,7 @@ def harvest_oai_endpoint(source_id):
         event.save()
 def send_monthly_email(trigger_source='manual', sent_by=None):
     recipients = User.objects.filter(userprofile__notify_new_manuscripts=True).values_list('email', flat=True)
-    last_month = now().replace(day=1) - timedelta(days=1)
+    last_month = timezone.now().replace(day=1) - timedelta(days=1)
     new_manuscripts = Publication.objects.filter(creationDate__month=last_month.month)
 
     if not recipients.exists() or not new_manuscripts.exists():
