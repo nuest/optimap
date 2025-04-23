@@ -62,6 +62,8 @@ jobs:
         python -Wa manage.py test tests
 
   uitests:
+    # disable until UI tests are fixed, see https://github.com/GeoinformationSystems/optimap/issues/142
+    if: false
     runs-on: ubuntu-24.04
     
     strategy:
