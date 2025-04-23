@@ -67,9 +67,6 @@ def extract_timeperiod_from_html(content):
 DOI_REGEX = re.compile(r'10\.\d{4,9}/[-._;()/:A-Z0-9]+', re.IGNORECASE)
 
 def parse_oai_xml_and_save_publications(content, event):
-    existing_urls = set(Publication.objects.values_list('url', flat=True))
-    existing_dois = set(Publication.objects.exclude(doi__isnull=True).values_list('doi', flat=True))
-    
     try:
         DOMTree = xml.dom.minidom.parseString(content)
     except Exception as e:
@@ -78,11 +75,9 @@ def parse_oai_xml_and_save_publications(content, event):
 
     collection = DOMTree.documentElement
     records = collection.getElementsByTagName("record")
-    
     if not records:
         logger.warning("No articles found in OAI-PMH response!")
         return
-    
     for record in records:
         try:
             def get_text(tag_name):
@@ -107,22 +102,16 @@ def parse_oai_xml_and_save_publications(content, event):
 
             doi_text = None
             for ident in identifiers:
-                match = DOI_REGEX.search(ident)
-                if match:
+                if match := DOI_REGEX.search(ident):
                     doi_text = match.group(0)
                     break
 
-            # Duplicate checking.
-            if doi_text and doi_text in existing_dois:
+            if doi_text and Publication.objects.filter(doi=doi_text).exists():
                 logger.info("Skipping duplicate publication (DOI): %s", doi_text)
                 continue
-            if identifier_value in existing_urls:
+            if identifier_value and Publication.objects.filter(url=identifier_value).exists():
                 logger.info("Skipping duplicate publication (URL): %s", identifier_value)
                 continue
-            existing_urls.add(identifier_value)
-            if doi_text:
-                existing_dois.add(doi_text)
-            
             # Skip records without a valid URL.
             if not identifier_value or not identifier_value.startswith("http"):
                 logger.warning("Skipping record with invalid URL: %s", identifier_value)
@@ -130,12 +119,11 @@ def parse_oai_xml_and_save_publications(content, event):
 
             geom_object = GeometryCollection()
             period_start, period_end = [], []
-
             try:
                 resp = requests.get(identifier_value, timeout=10)
                 resp.raise_for_status()
                 soup = BeautifulSoup(resp.content, "html.parser")
-                
+
                 try:
                     geom = extract_geometry_from_html(soup)
                     geom_object = geom or GeometryCollection()
