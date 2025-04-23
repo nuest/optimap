@@ -11,13 +11,11 @@
       All publication metadata published in OPTIMAP is licensed under a Creative Commons Zero 
       (<a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank">CC-0</a>) license.
     </p>
-
     <h2 class="py-2">API Endpoint</h2>
     <p>
       The API endpoint is <b>{{ site|addstr:"/api"|urlize }}</b>. Visit the URL in your browser 
       to get an interactive interface for exploring the API.
     </p>
-
     <p>
       You can query all publications with the following request (using 
       <a href="https://stedolan.github.io/jq/" title="Link to jq project website" target="_blank"><code>jq</code></a> for formatting):
@@ -25,19 +23,15 @@
     <pre>
 curl -X GET {{ site|addstr:"/api" }}/api/publications/ | jq
     </pre>
-
     <h2 class="py-2">OpenAPI Schema</h2>
     <p>
       You can download an OpenAPI specification of the API at <b>{{ site|addstr:"/api/schema"|urlize }}</b>.
     </p>
-
     <h2 class="py-2">OpenAPI User Interface</h2>
     <p>
       Explore the API with an interactive user interface built based on the OpenAPI schema at <b>{{ site|addstr:"/api/schema/ui"|urlize }}</b>.
     </p>
-
     <hr>
-
     <h2 class="py-2">Download Publication Data</h2>
     <p>
       Choose your desired file format.
