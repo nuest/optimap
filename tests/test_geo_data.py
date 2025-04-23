@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from django.test import TestCase
 from django.core.serializers import serialize
 import fiona
+import gzip
 from django.urls import reverse
 import re
 from publications.models import Publication
@@ -120,3 +121,40 @@ class GeoDataAlternativeTestCase(TestCase):
         self.assertEqual(response['Content-Type'], 'application/json', "Content-Type should be application/json")
         self.assertIn('publications.geojson', response['Content-Disposition'],
                       "Content-Disposition should include the filename")
+
+    # New tests for caching functionality
+    def test_regenerate_geojson_cache_creates_files(self):
+        # Remove any existing cache
+        cache_dir = tempfile.gettempdir() + '/optimap_cache'
+        json_path = os.path.join(cache_dir, 'geojson_cache.json')
+        gzip_path = os.path.join(cache_dir, 'geojson_cache.json.gz')
+        if os.path.exists(json_path): os.remove(json_path)
+        if os.path.exists(gzip_path): os.remove(gzip_path)
+
+        returned_path = regenerate_geojson_cache()
+        # The function should return the JSON path
+        self.assertEqual(returned_path, json_path)
+        # Both JSON and gz files should now exist
+        self.assertTrue(os.path.exists(json_path), "GeoJSON cache file should be created")
+        self.assertTrue(os.path.exists(gzip_path), "Gzipped GeoJSON cache file should be created")
+
+    def test_cached_json_content_valid(self):
+        # Generate cache
+        json_path = regenerate_geojson_cache()
+        with open(json_path, 'r') as f:
+            obj = json.load(f)
+        # It should have type and features keys
+        self.assertEqual(obj.get('type'), 'FeatureCollection')
+        self.assertIn('features', obj)
+        # Feature count should match database
+        self.assertEqual(len(obj['features']), Publication.objects.filter(status='p').count())
+
+    def test_cached_gzip_can_be_unpacked(self):
+        # Generate cache
+        regenerate_geojson_cache()
+        gzip_path = os.path.join(tempfile.gettempdir(), 'optimap_cache', 'geojson_cache.json.gz')
+        with gzip.open(gzip_path, 'rt') as f:
+            obj = json.load(f)
+        self.assertEqual(obj.get('type'), 'FeatureCollection')
+        self.assertIn('features', obj)
+        self.assertEqual(len(obj['features']), Publication.objects.filter(status='p').count())
