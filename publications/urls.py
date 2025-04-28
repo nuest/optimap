@@ -19,7 +19,7 @@ urlpatterns = [
     path("api/v1/", include("publications.api")),
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/schema/ui/sitemap', SpectacularRedocView.as_view(url_name='optimap:schema'), name='redoc'),
-    path("data/", views.data, name="data_and_api"),
+    path("data_and_api/", views.data, name="data_and_api"),
     path('feed/georss/', GeoFeed(feed_type_variant="georss"), name='georss_feed'),
     path('feed/geoatom/', GeoFeed(feed_type_variant="geoatom"), name='geoatom_feed'),
     path('feed/w3cgeo/', GeoFeed(feed_type_variant="w3cgeo"), name='w3cgeo_feed'),

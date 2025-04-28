@@ -26,8 +26,7 @@ sitemaps = {
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    # Updated inclusion with namespace
-    path('', include(('publications.urls', 'publications'), namespace='publications')),
+    path('', include(('publications.urls', 'optimap'), namespace='optimap')),
     path(
         "sitemap.xml",
         sitemaps_views.index,

@@ -14,7 +14,8 @@ from django.contrib import messages
 from django.views.decorators.cache import never_cache
 from django.urls import reverse
 import uuid
-from django.utils.timezone import now
+from django.utils.timezone import now, get_default_timezone
+from django.utils import timezone
 from datetime import datetime
 import imaplib
 import time
@@ -26,7 +27,6 @@ from django.conf import settings
 from publications.models import BlockedEmail, BlockedDomain, Subscription, UserProfile, Publication
 from django.contrib.auth import get_user_model
 User = get_user_model()
-
 import tempfile, os
 import fiona
 from fiona.crs import from_epsg
@@ -203,21 +203,32 @@ def privacy(request):
 def data(request):
     cache_dir = os.path.join(tempfile.gettempdir(), "optimap_cache")
     os.makedirs(cache_dir, exist_ok=True)
-    json_path = os.path.join(cache_dir, 'geojson_cache.json')
+
+    # --- GeoJSON cache + size ---------------------------
+    json_path = os.path.join(cache_dir, "geojson_cache.json")
     if not os.path.exists(json_path):
         json_path = regenerate_geojson_cache()
     geojson_size = format_file_size(os.path.getsize(json_path))
-    last_updated = datetime.fromtimestamp(os.path.getmtime(json_path)).strftime('%Y-%m-%d %H:%M:%S')
-    logger.info("GeoJSON cache last updated at %s", last_updated)
+
+    # Build a timezone-aware datetime from the file’s modification time
+    mtime = os.path.getmtime(json_path)
+    tz = get_default_timezone()
+    # Option A: directly from timestamp
+    last_updated = datetime.fromtimestamp(mtime, tz)
+    # — or — Option B: make a naive datetime aware
+    # last_updated = make_aware(datetime.fromtimestamp(mtime), tz)
 
     gpkg_filename = generate_geopackage()
-    geopackage_size = format_file_size(os.path.getsize(gpkg_filename)) if os.path.exists(gpkg_filename) else "0 B"
-    context = {
-        'geojson_size': geojson_size,
-        'geopackage_size': geopackage_size,
-        'last_updated': last_updated  
-    }
-    return render(request, 'data.html', context)
+    if os.path.exists(gpkg_filename):
+        geopackage_size = format_file_size(os.path.getsize(gpkg_filename))
+    else:
+        geopackage_size = "0 B"
+
+    return render(request, "data.html", {
+        "geojson_size":     geojson_size,
+        "geopackage_size":  geopackage_size,
+        "last_updated":     last_updated,  # pass the aware datetime
+    })
 
 def Confirmationlogin(request):
     return render(request, 'confirmation_login.html')

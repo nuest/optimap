@@ -24,7 +24,7 @@ class StaticViewSitemap(Sitemap):
 
     def items(self):
         return ["main",
-                "data",
+                "data_and_api",
                 "api",
                 "privacy"]
 

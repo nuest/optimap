@@ -1,6 +1,6 @@
 {% extends "main.html" %}
 {% load optimap_extras %}
-
+{% load humanize %}
 {% block title %}Data & API | {% endblock %}
 
 {% block content %}
@@ -21,7 +21,7 @@
       <a href="https://stedolan.github.io/jq/" title="Link to jq project website" target="_blank"><code>jq</code></a> for formatting):
     </p>
     <pre>
-curl -X GET {{ site|addstr:"/api" }}/api/publications/ | jq
+curl -X GET {{ site|addstr:"/api" }}/api/optimap/ | jq
     </pre>
     <h2 class="py-2">OpenAPI Schema</h2>
     <p>
@@ -38,7 +38,7 @@ curl -X GET {{ site|addstr:"/api" }}/api/publications/ | jq
     </p>
     <ul>
       <li class="text-nowrap">
-        <a class="btn btn-primary" href="{% url 'publications:download_geojson' %}">
+        <a class="btn btn-primary" href="{% url 'optimap:download_geojson' %}">
           Download GeoJSON
         </a>
         <span class="text-nowrap">
@@ -46,7 +46,7 @@ curl -X GET {{ site|addstr:"/api" }}/api/publications/ | jq
         </span>
       </li>
       <li class="text-nowrap">
-        <a class="btn btn-primary" href="{% url 'publications:download_geopackage' %}">
+        <a class="btn btn-primary" href="{% url 'optimap:download_geopackage' %}">
           Download GeoPackage
         </a>
         <span class="text-nowrap">
@@ -56,8 +56,8 @@ curl -X GET {{ site|addstr:"/api" }}/api/publications/ | jq
     </ul>
 
     <p class="small text-muted">
-      Data dumps are recreated every 6 hours.&nbsp;Last updated: {{ last_updated }}
-    </p>
+      Data dumps are recreated every 6&nbsp;hours.&nbsp;Last updated:   {{ last_updated|naturaltime }}
+    </p>    
   </div>
 </div>
 {% endblock %}
