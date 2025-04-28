@@ -15,7 +15,6 @@ from django.views.decorators.cache import never_cache
 from django.urls import reverse
 import uuid
 from django.utils.timezone import now, get_default_timezone
-from django.utils import timezone
 from datetime import datetime
 import imaplib
 import time
@@ -28,12 +27,11 @@ from publications.models import BlockedEmail, BlockedDomain, Subscription, UserP
 from django.contrib.auth import get_user_model
 User = get_user_model()
 import tempfile, os
-import fiona
-from fiona.crs import from_epsg
-from shapely import wkt
-from shapely.geometry import mapping
-from django.contrib.gis.geos import GEOSGeometry
 from publications.tasks import regenerate_geojson_cache
+from osgeo import ogr, osr
+
+ogr.UseExceptions()
+osr.UseExceptions()
 
 LOGIN_TOKEN_LENGTH  = 32
 LOGIN_TOKEN_TIMEOUT_SECONDS = 10 * 60
@@ -83,47 +81,50 @@ def download_geojson(request):
     return response
 
 def generate_geopackage():
-    """
-    Generates a GeoPackage file from Publication data using Fiona.
-    Geometry is converted using Shapely. The file is written to a persistent
-    cache directory and its filename is returned.
-    """
-    schema = {
-        'geometry': 'Unknown', 
-        'properties': {
-            'title': 'str',
-            'abstract': 'str',
-            'doi': 'str',
-            'source': 'str',
-        },
-    }
     cache_dir = os.path.join(tempfile.gettempdir(), "optimap_cache")
     os.makedirs(cache_dir, exist_ok=True)
-    filename = os.path.join(cache_dir, "publications.gpkg")
-    with fiona.open(filename, 'w', driver='GPKG', schema=schema, crs=from_epsg(4326)) as collection:
-        for pub in Publication.objects.all():
-            geom = None
-            if pub.geometry:
-                try:
-                    geom_wkt = pub.geometry.wkt if hasattr(pub.geometry, 'wkt') else str(pub.geometry)                    
-                    if geom_wkt.startswith("SRID="):
-                        geom_wkt = geom_wkt.split(";", 1)[1]
-                    geom_obj = wkt.loads(geom_wkt)
-                    geom = mapping(geom_obj)                                        
-                except Exception as e:
-                    logger.error("Error converting geometry for publication %s: %s", pub.id, e)
-                    geom = None
-            feature = {
-                'geometry': geom,
-                'properties': {
-                    'title': pub.title or "",
-                    'abstract': pub.abstract or "",
-                    'doi': pub.doi or "",
-                    'source': pub.source or "",
-                },
-            }
-            collection.write(feature)
-    return filename
+    gpkg_path = os.path.join(cache_dir, "publications.gpkg")
+
+    # Delete old file so driver can re-create it
+    driver = ogr.GetDriverByName("GPKG")
+    if os.path.exists(gpkg_path):
+        driver.DeleteDataSource(gpkg_path)
+
+    # Create data source & layer
+    ds = driver.CreateDataSource(gpkg_path)
+    srs = osr.SpatialReference()
+    srs.ImportFromEPSG(4326)
+    layer = ds.CreateLayer("publications", srs, ogr.wkbUnknown)
+
+    # Define fields
+    for name in ("title", "abstract", "doi", "source"):
+        field_defn = ogr.FieldDefn(name, ogr.OFTString)
+        field_defn.SetWidth(255)
+        layer.CreateField(field_defn)
+
+    # Populate features
+    layer_defn = layer.GetLayerDefn()
+    for pub in Publication.objects.all():
+        feat = ogr.Feature(layer_defn)
+        feat.SetField("title", pub.title or "")
+        feat.SetField("abstract", pub.abstract or "")
+        feat.SetField("doi", pub.doi or "")
+        feat.SetField("source", pub.source or "")
+
+        if pub.geometry:
+            # Use the GEOSGeometry WKB directly
+            wkb = pub.geometry.wkb  # bytes
+            geom = ogr.CreateGeometryFromWkb(wkb)
+            geom.AssignSpatialReference(srs)
+            feat.SetGeometry(geom)
+
+        layer.CreateFeature(feat)
+        feat = None
+
+    # Clean up
+    ds = None
+    return gpkg_path
+
 
 @require_GET
 def download_geopackage(request):
@@ -203,8 +204,6 @@ def privacy(request):
 def data(request):
     cache_dir = os.path.join(tempfile.gettempdir(), "optimap_cache")
     os.makedirs(cache_dir, exist_ok=True)
-
-    # --- GeoJSON cache + size ---------------------------
     json_path = os.path.join(cache_dir, "geojson_cache.json")
     if not os.path.exists(json_path):
         json_path = regenerate_geojson_cache()
@@ -213,11 +212,8 @@ def data(request):
     # Build a timezone-aware datetime from the file’s modification time
     mtime = os.path.getmtime(json_path)
     tz = get_default_timezone()
-    # Option A: directly from timestamp
+    
     last_updated = datetime.fromtimestamp(mtime, tz)
-    # — or — Option B: make a naive datetime aware
-    # last_updated = make_aware(datetime.fromtimestamp(mtime), tz)
-
     gpkg_filename = generate_geopackage()
     if os.path.exists(gpkg_filename):
         geopackage_size = format_file_size(os.path.getsize(gpkg_filename))
@@ -515,31 +511,6 @@ def finalize_account_deletion(request):
         if USER_DELETE_TOKEN_PREFIX in request.session:
             del request.session[USER_DELETE_TOKEN_PREFIX]
             request.session.modified = True  
-
-@require_GET
-def download_geojson(request):
-    """
-    Returns the cached GeoJSON file as a downloadable file.
-    """
-    cache_dir = os.path.join(tempfile.gettempdir(), "optimap_cache")
-    os.makedirs(cache_dir, exist_ok=True)
-    json_path = os.path.join(cache_dir, 'geojson_cache.json')
-    if not os.path.exists(json_path):
-        json_path = regenerate_geojson_cache()
-    return FileResponse(open(json_path, 'rb'), content_type="application/json",
-                        as_attachment=True, filename="publications.geojson")
-
-# New Functionality: Download as GeoPackage using Fiona and Shapely
-@require_GET
-def download_geopackage(request):
-    """
-    Generates a GeoPackage file from Publication data and returns it as a downloadable file.
-    """
-    filename = generate_geopackage()
-    if not os.path.exists(filename):
-        return HttpResponse("Error generating GeoPackage.", status=500)
-    return FileResponse(open(filename, 'rb'), content_type="application/geopackage+sqlite3",
-                        as_attachment=True, filename="publications.gpkg")
 
 class RobotsView(View):
     http_method_names = ['get']
