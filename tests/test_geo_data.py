@@ -94,7 +94,7 @@ class GeoDataAlternativeTestCase(TestCase):
         response = self.client.get(reverse('optimap:data_and_api'))
         self.assertEqual(response.status_code, 200, "Data endpoint should return status 200")
         content = response.content.decode()
-        +   self.assertIn("Data dumps are recreated every 6 hours.", content,
+        self.assertIn("Data dumps are recreated every 6 hours.", content,
                       "The data page should mention the six-hour schedule")
         match = re.search(r'Last updated:\s*(\S+)', content)
         self.assertIsNotNone(match, "Data page should display a Last updated timestamp")
