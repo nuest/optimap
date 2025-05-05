@@ -91,17 +91,17 @@ class GeoDataAlternativeTestCase(TestCase):
                             "The GeoPackage data should update when a Publication changes")
 
     def test_data_endpoint(self):
-        response = self.client.get(reverse('optimap:data_and_api'))
+        url = reverse('optimap:data')
+        response = self.client.get(url)
         self.assertEqual(response.status_code, 200, "Data endpoint should return status 200")
         content = response.content.decode()
-        self.assertIn("Data dumps are recreated every 6 hours.", content,
+        self.assertIn("Data dumps run every 6 hours.", content,
                       "The data page should mention the six-hour schedule")
         match = re.search(r'Last updated:\s*(\S+)', content)
         self.assertIsNotNone(match, "Data page should display a Last updated timestamp")
         self.assertTrue(match.group(1).strip() != "", "Last updated timestamp should not be empty")
 
     def test_download_geojson_gzip(self):
-        # Ensure cache exists
         regenerate_geojson_cache()
         url = reverse('optimap:download_geojson')
         response = self.client.get(url, HTTP_ACCEPT_ENCODING='gzip')
@@ -112,7 +112,6 @@ class GeoDataAlternativeTestCase(TestCase):
                       "Content-Disposition should include the filename")
 
     def test_download_geojson_no_gzip(self):
-        # Ensure cache exists
         regenerate_geojson_cache()
         url = reverse('optimap:download_geojson')
         response = self.client.get(url)
@@ -122,35 +121,27 @@ class GeoDataAlternativeTestCase(TestCase):
         self.assertIn('publications.geojson', response['Content-Disposition'],
                       "Content-Disposition should include the filename")
 
-    # New tests for caching functionality
     def test_regenerate_geojson_cache_creates_files(self):
-        # Remove any existing cache
-        cache_dir = tempfile.gettempdir() + '/optimap_cache'
+        cache_dir = os.path.join(tempfile.gettempdir(), 'optimap_cache')
         json_path = os.path.join(cache_dir, 'geojson_cache.json')
         gzip_path = os.path.join(cache_dir, 'geojson_cache.json.gz')
         if os.path.exists(json_path): os.remove(json_path)
         if os.path.exists(gzip_path): os.remove(gzip_path)
 
         returned_path = regenerate_geojson_cache()
-        # The function should return the JSON path
         self.assertEqual(returned_path, json_path)
-        # Both JSON and gz files should now exist
         self.assertTrue(os.path.exists(json_path), "GeoJSON cache file should be created")
         self.assertTrue(os.path.exists(gzip_path), "Gzipped GeoJSON cache file should be created")
 
     def test_cached_json_content_valid(self):
-        # Generate cache
         json_path = regenerate_geojson_cache()
         with open(json_path, 'r') as f:
             obj = json.load(f)
-        # It should have type and features keys
         self.assertEqual(obj.get('type'), 'FeatureCollection')
         self.assertIn('features', obj)
-        # Feature count should match database
         self.assertEqual(len(obj['features']), Publication.objects.filter(status='p').count())
 
     def test_cached_gzip_can_be_unpacked(self):
-        # Generate cache
         regenerate_geojson_cache()
         gzip_path = os.path.join(tempfile.gettempdir(), 'optimap_cache', 'geojson_cache.json.gz')
         with gzip.open(gzip_path, 'rt') as f:
@@ -158,3 +149,9 @@ class GeoDataAlternativeTestCase(TestCase):
         self.assertEqual(obj.get('type'), 'FeatureCollection')
         self.assertIn('features', obj)
         self.assertEqual(len(obj['features']), Publication.objects.filter(status='p').count())
+    def test_download_geopackage(self):
+        url = reverse('optimap:download_geopackage')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/geopackage+sqlite3')
+        self.assertIn('publications.gpkg', response['Content-Disposition'])

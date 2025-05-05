@@ -338,7 +338,7 @@ def regenerate_geojson_cache():
     with open(json_path, 'w') as f:
         serialize(
             'geojson',
-            Publication.objects.filter(status='p'),
+            Publication.objects.filter(status__in=['p', 'P', "p", "P"]),
             geometry_field='geometry',
             srid=4326,
             stream=f
@@ -354,20 +354,18 @@ def regenerate_geojson_cache():
 
 
 def convert_geojson_to_geopackage(geojson_path):
-    cache_dir = os.path.join(tempfile.gettempdir(), "optimap_cache")
-    os.makedirs(cache_dir, exist_ok=True)
-    gpkg = os.path.join(cache_dir, 'publications.gpkg')
-    cmd = ["ogr2ogr", "-f", "GPKG", gpkg, geojson_path]
+    cache_dir = os.path.dirname(geojson_path)
+    gpkg_path = os.path.join(cache_dir, 'publications.gpkg')
     try:
-        subprocess.check_call(cmd)
-        logger.info("Generated GeoPackage at %s", gpkg)
+        subprocess.check_call([
+            "ogr2ogr", "-f", "GPKG", gpkg_path, geojson_path
+        ])
+        logger.info("GeoPackage generated at %s", gpkg_path)
+        return gpkg_path
     except subprocess.CalledProcessError as e:
         logger.error("ogr2ogr failed: %s", e)
         return None
-    return gpkg
-
 
 def regenerate_geopackage_cache():
-    json_path = regenerate_geojson_cache()
-    gpkg_path = convert_geojson_to_geopackage(json_path)
-    return json_path, gpkg_path
+    geojson_path = regenerate_geojson_cache()
+    return convert_geojson_to_geopackage(geojson_path)

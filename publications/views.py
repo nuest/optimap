@@ -14,12 +14,14 @@ from django.contrib import messages
 from django.views.decorators.cache import never_cache
 from django.urls import reverse
 import uuid
+from django.utils import timezone
 from django.utils.timezone import now, get_default_timezone
 from datetime import datetime
 import imaplib
 import time
 from math import floor
-from django_currentuser.middleware import get_current_user, get_current_authenticated_user
+from django.utils.timezone import make_aware, get_default_timezone, localtime
+from datetime import datetime
 from urllib.parse import unquote
 from django.core.serializers import serialize
 from django.conf import settings
@@ -27,11 +29,10 @@ from publications.models import BlockedEmail, BlockedDomain, Subscription, UserP
 from django.contrib.auth import get_user_model
 User = get_user_model()
 import tempfile, os
-from publications.tasks import regenerate_geojson_cache
+from publications.tasks import regenerate_geojson_cache, regenerate_geopackage_cache
 from osgeo import ogr, osr
-
 ogr.UseExceptions()
-osr.UseExceptions()
+#osr.UseExceptions()
 
 LOGIN_TOKEN_LENGTH  = 32
 LOGIN_TOKEN_TIMEOUT_SECONDS = 10 * 60
@@ -89,7 +90,7 @@ def generate_geopackage():
     driver = ogr.GetDriverByName("GPKG")
     if os.path.exists(gpkg_path):
         driver.DeleteDataSource(gpkg_path)
-
+    
     # Create data source & layer
     ds = driver.CreateDataSource(gpkg_path)
     srs = osr.SpatialReference()
@@ -201,31 +202,30 @@ The link is valid for {valid} minutes.
 def privacy(request):
     return render(request, 'privacy.html')
 
+@never_cache
 def data(request):
     cache_dir = os.path.join(tempfile.gettempdir(), "optimap_cache")
-    os.makedirs(cache_dir, exist_ok=True)
     json_path = os.path.join(cache_dir, "geojson_cache.json")
-    if not os.path.exists(json_path):
-        json_path = regenerate_geojson_cache()
-    geojson_size = format_file_size(os.path.getsize(json_path))
+    gpkg_path = os.path.join(cache_dir, "publications.gpkg")
 
-    # Build a timezone-aware datetime from the file’s modification time
-    mtime = os.path.getmtime(json_path)
+    # If dumps don’t exist yet, trigger one synchronously
+    if not os.path.exists(json_path) or not os.path.exists(gpkg_path):
+        regenerate_geopackage_cache()
+
+    geojson_size = os.path.getsize(json_path)
+    geopackage_size = os.path.getsize(gpkg_path)
+    ts = os.path.getmtime(json_path)
     tz = get_default_timezone()
-    
-    last_updated = datetime.fromtimestamp(mtime, tz)
-    gpkg_filename = generate_geopackage()
-    if os.path.exists(gpkg_filename):
-        geopackage_size = format_file_size(os.path.getsize(gpkg_filename))
-    else:
-        geopackage_size = "0 B"
+    last_updated = datetime.fromtimestamp(ts, tz)
 
-    return render(request, "data.html", {
-        "geojson_size":     geojson_size,
-        "geopackage_size":  geopackage_size,
-        "last_updated":     last_updated,  # pass the aware datetime
+
+    return render(request, 'data.html', {
+        'geojson_size': geojson_size,
+        'geopackage_size': geopackage_size,
+        'interval': settings.DATA_DUMP_INTERVAL_HOURS,
+        'last_updated': last_updated,
     })
-
+    
 def Confirmationlogin(request):
     return render(request, 'confirmation_login.html')
 
