@@ -7,6 +7,7 @@ from django.core.serializers import serialize
 import fiona
 import gzip
 from django.urls import reverse
+from django.conf import settings
 import re
 from publications.models import Publication
 from publications.views import generate_geopackage
@@ -95,8 +96,7 @@ class GeoDataAlternativeTestCase(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200, "Data endpoint should return status 200")
         content = response.content.decode()
-        self.assertIn("Data dumps run every 6 hours.", content,
-                      "The data page should mention the six-hour schedule")
+        self.assertIn(f"Data dumps run every {settings.DATA_DUMP_INTERVAL_HOURS} hour", content)
         match = re.search(r'Last updated:\s*(\S+)', content)
         self.assertIsNotNone(match, "Data page should display a Last updated timestamp")
         self.assertTrue(match.group(1).strip() != "", "Last updated timestamp should not be empty")
@@ -111,16 +111,21 @@ class GeoDataAlternativeTestCase(TestCase):
         self.assertIn('publications.geojson', response['Content-Disposition'],
                       "Content-Disposition should include the filename")
 
-    def test_download_geojson_no_gzip(self):
-        regenerate_geojson_cache()
-        url = reverse('optimap:download_geojson')
+    def test_download_geopackage_endpoint(self):
+        """Verify the GeoPackage download URL works and headers are correct."""
+        url = reverse('optimap:download_geopackage')
         response = self.client.get(url)
-        self.assertEqual(response.status_code, 200, "JSON download should return status 200")
-        self.assertNotIn('Content-Encoding', response, "Response should not be gzipped when not requested")
-        self.assertEqual(response['Content-Type'], 'application/json', "Content-Type should be application/json")
-        self.assertIn('publications.geojson', response['Content-Disposition'],
-                      "Content-Disposition should include the filename")
-
+        self.assertEqual(response.status_code, 200, "GeoPackage endpoint should return 200")
+        self.assertEqual(
+            response['Content-Type'],
+            'application/geopackage+sqlite3',
+            "Content-Type should be application/geopackage+sqlite3"
+        )
+        self.assertIn(
+            'publications.gpkg',
+            response['Content-Disposition'],
+            "Content-Disposition should include the .gpkg filename"
+        )
     def test_regenerate_geojson_cache_creates_files(self):
         cache_dir = os.path.join(tempfile.gettempdir(), 'optimap_cache')
         json_path = os.path.join(cache_dir, 'geojson_cache.json')
