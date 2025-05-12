@@ -20,11 +20,9 @@ from datetime import datetime
 import imaplib
 import time
 from math import floor
-from django.utils.timezone import make_aware, get_default_timezone, localtime
-from datetime import datetime
 from urllib.parse import unquote
-from django.core.serializers import serialize
 from django.conf import settings
+from django.core.serializers import serialize
 from publications.models import BlockedEmail, BlockedDomain, Subscription, UserProfile, Publication
 from django.contrib.auth import get_user_model
 User = get_user_model()
@@ -32,21 +30,13 @@ import tempfile, os
 from publications.tasks import regenerate_geojson_cache, regenerate_geopackage_cache
 from osgeo import ogr, osr
 ogr.UseExceptions()
-#osr.UseExceptions()
+import humanize
 
 LOGIN_TOKEN_LENGTH  = 32
 LOGIN_TOKEN_TIMEOUT_SECONDS = 10 * 60
 EMAIL_CONFIRMATION_TIMEOUT_SECONDS = 10 * 60
 ACCOUNT_DELETE_TOKEN_TIMEOUT_SECONDS = 10 * 60
 USER_DELETE_TOKEN_PREFIX = "user_delete_token"
-
-def format_file_size(num_bytes):
-    if num_bytes < 1024:
-        return f"{num_bytes} B"
-    elif num_bytes < 1024 * 1024:
-        return f"{num_bytes / 1024:.2f} KB"
-    else:
-        return f"{num_bytes / (1024 * 1024):.2f} MB"
 
 # ------------------------------
 # Download Endpoints
@@ -86,24 +76,19 @@ def generate_geopackage():
     os.makedirs(cache_dir, exist_ok=True)
     gpkg_path = os.path.join(cache_dir, "publications.gpkg")
 
-    # Delete old file so driver can re-create it
     driver = ogr.GetDriverByName("GPKG")
     if os.path.exists(gpkg_path):
         driver.DeleteDataSource(gpkg_path)
-    
-    # Create data source & layer
     ds = driver.CreateDataSource(gpkg_path)
     srs = osr.SpatialReference()
     srs.ImportFromEPSG(4326)
     layer = ds.CreateLayer("publications", srs, ogr.wkbUnknown)
 
-    # Define fields
     for name in ("title", "abstract", "doi", "source"):
         field_defn = ogr.FieldDefn(name, ogr.OFTString)
         field_defn.SetWidth(255)
         layer.CreateField(field_defn)
 
-    # Populate features
     layer_defn = layer.GetLayerDefn()
     for pub in Publication.objects.all():
         feat = ogr.Feature(layer_defn)
@@ -111,21 +96,16 @@ def generate_geopackage():
         feat.SetField("abstract", pub.abstract or "")
         feat.SetField("doi", pub.doi or "")
         feat.SetField("source", pub.source or "")
-
         if pub.geometry:
-            # Use the GEOSGeometry WKB directly
             wkb = pub.geometry.wkb  # bytes
             geom = ogr.CreateGeometryFromWkb(wkb)
             geom.AssignSpatialReference(srs)
             feat.SetGeometry(geom)
-
         layer.CreateFeature(feat)
         feat = None
 
-    # Clean up
     ds = None
     return gpkg_path
-
 
 @require_GET
 def download_geopackage(request):
@@ -142,8 +122,10 @@ def download_geopackage(request):
         filename="publications.gpkg"
     )
 
+
 def main(request):
     return render(request, "main.html")
+
 
 def loginres(request):
     email = request.POST.get('email', False)
@@ -199,8 +181,10 @@ The link is valid for {valid} minutes.
             }
         })
 
+
 def privacy(request):
     return render(request, 'privacy.html')
+
 
 @never_cache
 def data(request):
@@ -212,12 +196,18 @@ def data(request):
     if not os.path.exists(json_path) or not os.path.exists(gpkg_path):
         regenerate_geopackage_cache()
 
-    geojson_size = os.path.getsize(json_path)
-    geopackage_size = os.path.getsize(gpkg_path)
+    if os.path.exists(json_path):
+        geojson_size = humanize.naturalsize(os.path.getsize(json_path), binary=True)
+    else:
+        geojson_size = None
+
+    if os.path.exists(gpkg_path):
+        geopackage_size = humanize.naturalsize(os.path.getsize(gpkg_path), binary=True)
+    else:
+        geopackage_size = None
     ts = os.path.getmtime(json_path)
     tz = get_default_timezone()
     last_updated = datetime.fromtimestamp(ts, tz)
-
 
     return render(request, 'data.html', {
         'geojson_size': geojson_size,
@@ -228,6 +218,7 @@ def data(request):
     
 def Confirmationlogin(request):
     return render(request, 'confirmation_login.html')
+
 
 def login_user(request, user):
     login(request, user, backend='django.contrib.auth.backends.ModelBackend')

@@ -160,3 +160,21 @@ class GeoDataAlternativeTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'application/geopackage+sqlite3')
         self.assertIn('publications.gpkg', response['Content-Disposition'])
+
+def test_data_page_hides_links_when_missing_cache(self):
+    # Ensure cache is cleared
+    cache_dir = os.path.join(tempfile.gettempdir(), 'optimap_cache')
+    for fname in ('geojson_cache.json', 'publications.gpkg'):
+        path = os.path.join(cache_dir, fname)
+        if os.path.exists(path):
+            os.remove(path)
+
+    response = self.client.get(reverse('optimap:data'))
+    content = response.content.decode()
+    self.assertNotIn('Download GeoJSON', content)
+    self.assertNotIn('Download GeoPackage', content)
+    regenerate_geojson_cache()
+    response = self.client.get(reverse('optimap:data'))
+    content = response.content.decode()
+    self.assertIn('Download GeoJSON', content)
+    self.assertNotIn('Download GeoPackage', content)

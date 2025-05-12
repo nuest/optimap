@@ -39,6 +39,7 @@ curl -X GET {{ site|addstr:"/api" }}/api/optimap/ | jq
 
     <h2 class="py-2">Download Publication Data</h2>
     <ul class="list-unstyled mb-4">
+      {% if geojson_size %}
       <li class="mb-3">
         <div class="d-flex align-items-center">
           <a class="btn btn-primary btn-sm" href="{% url 'optimap:download_geojson' %}">
@@ -47,22 +48,25 @@ curl -X GET {{ site|addstr:"/api" }}/api/optimap/ | jq
           (<a href="https://geojson.org/" target="_blank" class="ms-2 small">GeoJSON spec</a>)
         </div>
         <div class="small text-muted mt-1">
-          File size: {{ geojson_size|filesizeformat }}
+          File size: {{ geojson_size }}
         </div>
       </li>
+      {% endif %}
+
+      {% if geopackage_size %}
       <li>
         <div class="d-flex align-items-center">
           <a class="btn btn-primary btn-sm" href="{% url 'optimap:download_geopackage' %}">
             Download GeoPackage
-          </a>
+         </a>
           (<a href="https://www.geopackage.org/" target="_blank" class="ms-2 small">GeoPackage spec</a>)
         </div>
         <div class="small text-muted mt-1">
-          File size: {{ geopackage_size|filesizeformat }}
+         File size: {{ geopackage_size }}
         </div>
       </li>
+      {% endif %}
     </ul>
-
     <p class="small text-muted text-center mb-0">
       Data dumps run every {{ interval }} hour{{ interval|pluralize }}.<br>
       Last updated: {{ last_updated|naturaltime }}
