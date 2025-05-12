@@ -248,3 +248,20 @@ class BlockedDomain(models.Model):
 
     def __str__(self):
         return self.domain
+
+class Journal(models.Model):
+    display_name = models.CharField(max_length=255)
+    issn_l = models.CharField(max_length=9, blank=True, null=True)
+    issn_list = ArrayField(
+        base_field=models.CharField(max_length=9),
+        default=list,
+        blank=True
+    )
+    publisher = models.CharField(max_length=255, blank=True, null=True)
+    openalex_id = models.URLField(blank=True, null=True)
+
+    class Meta:
+        ordering = ['display_name']
+
+    def __str__(self):
+        return self.display_name
