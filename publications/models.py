@@ -257,6 +257,12 @@ class Journal(models.Model):
         default=list,
         blank=True
     )
+    articles = ArrayField(
+        models.CharField(max_length=255),
+        default=list,
+        blank=True,
+        help_text="List of OpenAlex IDs (works) published in this journal"
+    )
     publisher = models.CharField(max_length=255, blank=True, null=True)
     openalex_id = models.URLField(blank=True, null=True)
 
@@ -265,3 +271,4 @@ class Journal(models.Model):
 
     def __str__(self):
         return self.display_name
+    
