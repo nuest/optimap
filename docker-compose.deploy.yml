@@ -24,6 +24,8 @@ services:
     volumes:
       - ".:/code:ro"
       - "./fixtures:/fixtures"
+    ports:
+      - "8000:8000"
     depends_on:
       - db
 
@@ -38,7 +40,6 @@ services:
 
 volumes:
   optimap-volume:
-    external: true
     driver: local
 
 #secrets:
