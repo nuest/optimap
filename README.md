@@ -32,7 +32,7 @@ A complete list of existing parameters is provided in the file `optimap/.env.exa
 The project is containerized using Docker, with services defined in `docker-compose.yml`. To start all services, run:
 
 ```bash
-docker-compose up
+docker compose up
 ```
 
 ### Initial Setup
@@ -41,8 +41,9 @@ After starting the containers, apply database migrations:
 
 ```bash
 # run migrations, in the directory where docker-compose is to resolve the name "web"
-docker-compose run app python manage.py makemigrations # should not detect and changes, otherwise your local config might be outdated
-docker-compose run app python manage.py migrate
+docker compose run app python manage.py makemigrations # should not detect and changes, otherwise your local config might be outdated
+docker compose run app python manage.py migrate
+docker compose run app python manage.py loaddata fixtures/test_data.json
 ```
 
 Now open a browser at <http://localhost:80/>.

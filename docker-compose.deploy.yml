@@ -1,0 +1,46 @@
+services:
+  db:
+    image: postgis/postgis:17-3.5
+    environment:
+      POSTGRES_DB: optimap
+      POSTGRES_USER: optimap
+      POSTGRES_PASSWORD: optimap
+      #POSTGRES_PASSWORD_FILE: database_password
+    ports:
+      - "5434:5432"
+    volumes:
+      - optimap-volume:/var/lib/postgresql/data
+    #secrets:
+    #  - database_password
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      #see local .env file on the server
+      DATABASE_URL: postgis://optimap:optimap@db:5432/optimap?sslmode=disable
+      OPTIMAP_DEBUG: "False"
+    volumes:
+      - ".:/code:ro"
+      - "./fixtures:/fixtures"
+    depends_on:
+      - db
+
+  webserver:
+    image: nginx:1.27-alpine
+    volumes:
+      - "./etc/nginx.deploy.conf:/etc/nginx/nginx.conf:ro"
+    ports:
+      - "80:80"
+    depends_on:
+      - app
+
+volumes:
+  optimap-volume:
+    external: true
+    driver: local
+
+#secrets:
+#  database_password:
+#    file: /var/www/komet/database_password.secret

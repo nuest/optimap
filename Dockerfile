@@ -10,8 +10,6 @@ ENV OPTIMAP_ALLOWED_HOST=*
 
 ENV DEBIAN_FRONTEND="noninteractive" TZ="Europe/Berlin"
 
-# TODO: see https://www.joseferben.com/posts/django-on-flyio/ for more improvements
-
 # install Python
 RUN apt-get update && \
     apt-get install -y -qq python-is-python3 && \
