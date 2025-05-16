@@ -43,6 +43,7 @@ After starting the containers, apply database migrations:
 # run migrations, in the directory where docker-compose is to resolve the name "web"
 docker compose run app python manage.py makemigrations # should not detect and changes, otherwise your local config might be outdated
 docker compose run app python manage.py migrate
+docker compose run app python manage.py collectstatic --noinput
 docker compose run app python manage.py loaddata fixtures/test_data.json
 ```
 
