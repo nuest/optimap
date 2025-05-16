@@ -22,7 +22,7 @@ services:
       DATABASE_URL: postgis://optimap:optimap@db:5432/optimap?sslmode=disable
       OPTIMAP_DEBUG: "False"
     volumes:
-      - ".:/code:ro"
+      - ".:/code" # need to run collectstatic
       - "./fixtures:/fixtures"
     ports:
       - "8000:8000"
