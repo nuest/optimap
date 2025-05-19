@@ -45,6 +45,8 @@ TEST_HARVESTING_ONLINE = env('OPTIMAP_TEST_HARVESTING_ONLINE', default=False)
 
 ROOT_URLCONF = 'optimap.urls'
 
+DATA_DUMP_RETENTION = int(os.getenv("OPTIMAP_DATA_DUMP_RETENTION", 3))
+
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
     "sesame.backends.ModelBackend",

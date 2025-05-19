@@ -4,7 +4,7 @@ logger = logging.getLogger(__name__)
 from django.contrib.auth import login, logout
 from django.shortcuts import render, redirect, get_object_or_404
 from django.core.cache import cache
-from django.http import HttpResponseRedirect, HttpResponse, FileResponse
+from django.http import HttpResponseRedirect, HttpResponse, FileResponse, Http404
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_GET
 from django.core.mail import EmailMessage, send_mail, get_connection
@@ -26,7 +26,8 @@ from django.core.serializers import serialize
 from publications.models import BlockedEmail, BlockedDomain, Subscription, UserProfile, Publication
 from django.contrib.auth import get_user_model
 User = get_user_model()
-import tempfile, os
+import tempfile, os, glob
+from pathlib import Path
 from publications.tasks import regenerate_geojson_cache, regenerate_geopackage_cache
 from osgeo import ogr, osr
 ogr.UseExceptions()
@@ -45,31 +46,33 @@ USER_DELETE_TOKEN_PREFIX = "user_delete_token"
 @require_GET
 def download_geojson(request):
     """
-    Returns the cached GeoJSON file, gzipped if the client accepts it.
+    Returns the latest GeoJSON dump file, gzipped if the client accepts it.
     """
-    cache_dir = os.path.join(tempfile.gettempdir(), "optimap_cache")
-    os.makedirs(cache_dir, exist_ok=True)
-    json_path = os.path.join(cache_dir, 'geojson_cache.json')
-    gzip_path = os.path.join(cache_dir, 'geojson_cache.json.gz')
-    if not os.path.exists(json_path):
-        json_path = regenerate_geojson_cache()
+    cache_dir = Path(tempfile.gettempdir()) / "optimap_cache"
+    cache_dir.mkdir(exist_ok=True)
+
+    # regenerate and find latest geojson dump
+    path = regenerate_geojson_cache()
+    gzip_path = Path(str(path) + ".gz")
     accept_enc = request.META.get('HTTP_ACCEPT_ENCODING', '')
-    if 'gzip' in accept_enc and os.path.exists(gzip_path):
+
+    if 'gzip' in accept_enc and gzip_path.exists():
         response = FileResponse(
             open(gzip_path, 'rb'),
             content_type="application/json",
             as_attachment=True,
-            filename="publications.geojson"
+            filename=gzip_path.name
         )
         response['Content-Encoding'] = 'gzip'
     else:
         response = FileResponse(
-            open(json_path, 'rb'),
+            open(path, 'rb'),
             content_type="application/json",
             as_attachment=True,
-            filename="publications.geojson"
+            filename=Path(path).name
         )
     return response
+
 
 def generate_geopackage():
     cache_dir = os.path.join(tempfile.gettempdir(), "optimap_cache")
@@ -97,7 +100,7 @@ def generate_geopackage():
         feat.SetField("doi", pub.doi or "")
         feat.SetField("source", pub.source or "")
         if pub.geometry:
-            wkb = pub.geometry.wkb  # bytes
+            wkb = pub.geometry.wkb
             geom = ogr.CreateGeometryFromWkb(wkb)
             geom.AssignSpatialReference(srs)
             feat.SetGeometry(geom)
@@ -110,16 +113,16 @@ def generate_geopackage():
 @require_GET
 def download_geopackage(request):
     """
-    Returns the generated GeoPackage file as a downloadable file.
+    Returns the latest GeoPackage dump file.
     """
-    filename = generate_geopackage()
-    if not os.path.exists(filename):
-        return HttpResponse("Error generating GeoPackage.", status=500)
+    path = regenerate_geopackage_cache()
+    if not os.path.exists(path):
+        raise Http404('GeoPackage dump not found')
     return FileResponse(
-        open(filename, 'rb'),
+        open(path, 'rb'),
         content_type="application/geopackage+sqlite3",
         as_attachment=True,
-        filename="publications.gpkg"
+        filename=Path(path).name
     )
 
 
@@ -188,32 +191,37 @@ def privacy(request):
 
 @never_cache
 def data(request):
-    cache_dir = os.path.join(tempfile.gettempdir(), "optimap_cache")
-    json_path = os.path.join(cache_dir, "geojson_cache.json")
-    gpkg_path = os.path.join(cache_dir, "publications.gpkg")
+    """
+    Renders the data page showing links and sizes for the latest dumps.
+    """
+    cache_dir = Path(tempfile.gettempdir()) / "optimap_cache"
+    cache_dir.mkdir(exist_ok=True)
 
-    # If dumps don’t exist yet, trigger one synchronously
-    if not os.path.exists(json_path) or not os.path.exists(gpkg_path):
-        regenerate_geopackage_cache()
+    # locate latest dumps
+    geojson_files = sorted(cache_dir.glob('optimap_data_dump_*.geojson'), reverse=True)
+    gpkg_files    = sorted(cache_dir.glob('optimap_data_dump_*.gpkg'), reverse=True)
 
-    if os.path.exists(json_path):
-        geojson_size = humanize.naturalsize(os.path.getsize(json_path), binary=True)
+    last_geo = geojson_files[0] if geojson_files else None
+    last_gpkg = gpkg_files[0]   if gpkg_files else None
+
+    # humanized sizes
+    geojson_size = humanize.naturalsize(last_geo.stat().st_size, binary=True) if last_geo else None
+    gpkg_size    = humanize.naturalsize(last_gpkg.stat().st_size, binary=True) if last_gpkg else None
+
+    # last updated timestamp
+    if last_geo:
+        ts = last_geo.stat().st_mtime
+        last_updated = datetime.fromtimestamp(ts, get_default_timezone())
     else:
-        geojson_size = None
-
-    if os.path.exists(gpkg_path):
-        geopackage_size = humanize.naturalsize(os.path.getsize(gpkg_path), binary=True)
-    else:
-        geopackage_size = None
-    ts = os.path.getmtime(json_path)
-    tz = get_default_timezone()
-    last_updated = datetime.fromtimestamp(ts, tz)
+        last_updated = None
 
     return render(request, 'data.html', {
         'geojson_size': geojson_size,
-        'geopackage_size': geopackage_size,
+        'geopackage_size': gpkg_size,
         'interval': settings.DATA_DUMP_INTERVAL_HOURS,
         'last_updated': last_updated,
+        'last_geojson': last_geo.name if last_geo else None,
+        'last_gpkg': last_gpkg.name if last_gpkg else None,
     })
     
 def Confirmationlogin(request):
