@@ -188,7 +188,6 @@ The link is valid for {valid} minutes.
 def privacy(request):
     return render(request, 'privacy.html')
 
-
 @never_cache
 def data(request):
     """
@@ -197,18 +196,31 @@ def data(request):
     cache_dir = Path(tempfile.gettempdir()) / "optimap_cache"
     cache_dir.mkdir(exist_ok=True)
 
-    # locate latest dumps
+    # scan for existing dumps
     geojson_files = sorted(cache_dir.glob('optimap_data_dump_*.geojson'), reverse=True)
-    gpkg_files    = sorted(cache_dir.glob('optimap_data_dump_*.gpkg'), reverse=True)
+    gpkg_files    = sorted(cache_dir.glob('optimap_data_dump_*.gpkg'),   reverse=True)
 
-    last_geo = geojson_files[0] if geojson_files else None
-    last_gpkg = gpkg_files[0]   if gpkg_files else None
+    last_geo  = geojson_files[0] if geojson_files else None
+    last_gzip = Path(str(last_geo) + ".gz") if last_geo else None
+    last_gpkg = gpkg_files[0]    if gpkg_files    else None
+
+    # — Supervisor check: ensure all dump file times are within 1 hour
+    mtimes = []
+    for p in (last_geo, last_gzip, last_gpkg):
+        if p and p.exists():
+            mtimes.append(p.stat().st_mtime)
+    if mtimes and (max(mtimes) - min(mtimes) > 3600):
+        ts_map = {
+            p.name: datetime.fromtimestamp(p.stat().st_mtime, get_default_timezone())
+            for p in (last_geo, last_gzip, last_gpkg) if p and p.exists()
+        }
+        logger.warning("Data dump timestamps differ by >1h: %s", ts_map)
 
     # humanized sizes
-    geojson_size = humanize.naturalsize(last_geo.stat().st_size, binary=True) if last_geo else None
-    gpkg_size    = humanize.naturalsize(last_gpkg.stat().st_size, binary=True) if last_gpkg else None
+    geojson_size    = humanize.naturalsize(last_geo.stat().st_size, binary=True) if last_geo else None
+    geopackage_size = humanize.naturalsize(last_gpkg.stat().st_size, binary=True) if last_gpkg else None
 
-    # last updated timestamp
+    # last updated timestamp (using JSON file)
     if last_geo:
         ts = last_geo.stat().st_mtime
         last_updated = datetime.fromtimestamp(ts, get_default_timezone())
@@ -216,14 +228,14 @@ def data(request):
         last_updated = None
 
     return render(request, 'data.html', {
-        'geojson_size': geojson_size,
-        'geopackage_size': gpkg_size,
-        'interval': settings.DATA_DUMP_INTERVAL_HOURS,
-        'last_updated': last_updated,
-        'last_geojson': last_geo.name if last_geo else None,
-        'last_gpkg': last_gpkg.name if last_gpkg else None,
+        'geojson_size':    geojson_size,
+        'geopackage_size': geopackage_size,
+        'interval':        settings.DATA_DUMP_INTERVAL_HOURS,
+        'last_updated':    last_updated,
+        'last_geojson':    last_geo.name  if last_geo else None,
+        'last_gpkg':       last_gpkg.name if last_gpkg else None,
     })
-    
+
 def Confirmationlogin(request):
     return render(request, 'confirmation_login.html')
 

@@ -2,19 +2,21 @@ import os
 import json
 import tempfile
 import gzip
-import json
-tempfile
 from datetime import datetime, timedelta
 from django.test import TestCase
 from django.core.serializers import serialize
 import fiona
-gzip
 from django.urls import reverse
 from django.conf import settings
 import re
 from publications.models import Publication
 from publications.views import generate_geopackage
-from publications.tasks import regenerate_geojson_cache, generate_data_dump_filename, cleanup_old_data_dumps
+from publications.tasks import (
+    regenerate_geojson_cache,
+    regenerate_geopackage_cache,
+    generate_data_dump_filename,
+    cleanup_old_data_dumps,
+)
 from pathlib import Path
 
 class GeoDataAlternativeTestCase(TestCase):
@@ -101,12 +103,9 @@ class GeoDataAlternativeTestCase(TestCase):
         self.assertEqual(response.status_code, 200, "Data endpoint should return status 200")
         content = response.content.decode()
         self.assertIn(f"Data dumps run every {settings.DATA_DUMP_INTERVAL_HOURS} hour", content)
-        # find the most recent JSON dump
         cache_dir = Path(tempfile.gettempdir()) / 'optimap_cache'
         dumps = sorted(cache_dir.glob('optimap_data_dump_*.geojson'), reverse=True)
         self.assertTrue(dumps, "At least one data dump should exist for Last updated check")
-        last = dumps[0]
-        mtime = last.stat().st_mtime
         self.assertIn("Last updated:", content)
 
     def test_download_geojson_gzip(self):
@@ -122,12 +121,12 @@ class GeoDataAlternativeTestCase(TestCase):
         url = reverse('optimap:download_geopackage')
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200, "GeoPackage endpoint should return 200")
-        self.assertEqual(response['Content-Type'], 'application/geopackage+sqlite3', "Content-Type should be application/geopackage+sqlite3")
+        self.assertEqual(response['Content-Type'], 'application/geopackage+sqlite3',
+                         "Content-Type should be application/geopackage+sqlite3")
         self.assertRegex(response['Content-Disposition'], r'optimap_data_dump_.*\.gpkg')
 
     def test_regenerate_geojson_cache_creates_files(self):
         cache_dir = Path(tempfile.gettempdir()) / 'optimap_cache'
-        # clean out all existing dump files
         for f in cache_dir.glob('optimap_data_dump_*'):
             f.unlink()
 
@@ -162,9 +161,8 @@ class GeoDataAlternativeTestCase(TestCase):
         self.assertEqual(response['Content-Type'], 'application/geopackage+sqlite3')
         self.assertRegex(response['Content-Disposition'], r'optimap_data_dump_.*\.gpkg')
 
-    def test_data_page_hides_links_when_missing_cache(self):
+    def test_data_page_hides_and_shows_links_correctly(self):
         cache_dir = Path(tempfile.gettempdir()) / 'optimap_cache'
-        # clear only our dynamic dumps
         for f in cache_dir.glob('optimap_data_dump_*'):
             f.unlink()
 
@@ -178,3 +176,9 @@ class GeoDataAlternativeTestCase(TestCase):
         content = response.content.decode()
         self.assertIn('Download GeoJSON', content)
         self.assertNotIn('Download GeoPackage', content)
+
+        regenerate_geopackage_cache()
+        response = self.client.get(reverse('optimap:data'))
+        content = response.content.decode()
+        self.assertIn('Download GeoJSON', content)
+        self.assertIn('Download GeoPackage', content)
