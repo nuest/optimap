@@ -14,9 +14,7 @@ services:
     #  - database_password
 
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    build: .
     environment:
       #see local .env file on the server
       DATABASE_URL: postgis://optimap:optimap@db:5432/optimap?sslmode=disable
@@ -26,6 +24,19 @@ services:
       - "./fixtures:/fixtures"
     ports:
       - "8000:8000"
+    depends_on:
+      - db
+
+  djangoq:
+    build: .
+    environment:
+      #see local .env file on the server
+      DATABASE_URL: postgis://optimap:optimap@db:5432/optimap?sslmode=disable    
+    command: python manage.py qcluster
+    volumes:
+      - ".:/code:ro"
+    ports:
+      - "8000:8001"
     depends_on:
       - db
 

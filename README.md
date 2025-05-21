@@ -137,6 +137,9 @@ python manage.py createcachetable
 # Collect static files
 python manage.py collectstatic --noinput
 
+# If you need to run tasks (harvesting, data export) then start a cluster in a separate shell
+python manage.py qcluster
+
 # Start the Django development server
 python manage.py runserver
 
@@ -309,7 +312,7 @@ The changelog follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0
 
 The version is managed in `optimap/__init__.py`.
 
-### Design colours and logos
+## Design colours and logos
 
 Optimeta colour = _primary colour_: #158F9B
 
@@ -323,7 +326,7 @@ The **logos** and favicon are in the repository in the folder [`publications/sta
 
 ## Deploy
 
-Deploy using `docker-compose` or see [`fly.io.md`](fly.io.md) for notes on deploying to Fly.io.
+~~Deploy using `docker-compose` or see [`fly.io.md`](fly.io.md) for notes on deploying to Fly.io.~~
 
 ## Operation
 
@@ -343,6 +346,32 @@ Deploy using `docker-compose` or see [`fly.io.md`](fly.io.md) for notes on deplo
 2. **Block Users via Admin Action**
    - Go to `/admin/auth/user/`
    - Select users → Choose **"Delete user and block email/domain"** → Click **Go**.
+
+### Tasks
+
+We use [Django Q2](https://django-q2.readthedocs.io/) for scheduling (repeated) tasks.
+
+#### Run the cluster
+
+```bash
+python manage.py qcluster
+```
+
+#### Monitor
+
+Details: <https://django-q2.readthedocs.io/en/master/monitor.html>
+
+tl;dr:
+
+```bash
+python manage.py qmonitorq
+
+python manage.py qinfo
+```
+
+### Trigger creation of data export files
+
+TODO
 
 ## License
 
