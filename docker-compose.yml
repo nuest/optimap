@@ -11,9 +11,7 @@ services:
       - db_data:/var/lib/postgresql/data
 
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    build: .
     environment:
       DATABASE_URL: postgis://optimap:optimap@db:5432/optimap?sslmode=disable
       OPTIMAP_CACHE: "dummy"
@@ -23,6 +21,20 @@ services:
       - "./fixtures:/fixtures:ro"
     ports:
       - "8000:8000"
+    depends_on:
+      - db
+
+  djangoq:
+    build: .
+    environment:
+      DATABASE_URL: postgis://optimap:optimap@db:5432/optimap?sslmode=disable
+      OPTIMAP_CACHE: "dummy"
+      OPTIMAP_DEBUG: "True"
+    command: python manage.py qcluster
+    volumes:
+      - ".:/code:ro"
+    ports:
+      - "8000:8001"
     depends_on:
       - db
 
