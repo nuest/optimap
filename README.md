@@ -29,22 +29,21 @@ A complete list of existing parameters is provided in the file `optimap/.env.exa
 
 ## Run with Docker
 
-The project is containerized using Docker, with services defined in `docker-compose.yml`. To start all services, run:
+The project is containerized using Docker, with services defined in `docker-compose.(deploy.)yml`. To start all services, run:
 
 ```bash
 docker compose up
+
+docker compose run --entrypoint python app manage.py loaddata fixtures/test_data.json
 ```
 
-### Initial Setup
-
-After starting the containers, apply database migrations:
+The database migrations are applied as part of the startup script, see file `etc/manage-and-run.sh`.
+You can still run the commands below manually if need be, e.g., during development.
 
 ```bash
-# run migrations, in the directory where docker-compose is to resolve the name "web"
-docker compose run app python manage.py makemigrations # should not detect and changes, otherwise your local config might be outdated
-docker compose run app python manage.py migrate
-docker compose run app python manage.py collectstatic --noinput
-docker compose run app python manage.py loaddata fixtures/test_data.json
+docker compose run --entrypoint python app manage.py makemigrations # should not detect and changes, otherwise your local config might be outdated
+docker compose run --entrypoint python app manage.py migrate
+docker compose run --entrypoint python app manage.py collectstatic --noinput
 ```
 
 Now open a browser at <http://localhost:80/>.

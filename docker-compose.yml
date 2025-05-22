@@ -5,8 +5,8 @@ services:
       POSTGRES_DB: optimap
       POSTGRES_USER: optimap
       POSTGRES_PASSWORD: optimap
-    ports:
-      - "5434:5432"
+    #ports:
+    #  - "5434:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
 
@@ -17,10 +17,10 @@ services:
       OPTIMAP_CACHE: "dummy"
       OPTIMAP_DEBUG: "True"
     volumes:
-      - ".:/code:ro"
+      - ".:/code" # mount the code for development and testing
       - "./fixtures:/fixtures:ro"
-    ports:
-      - "8000:8000"
+    #ports:
+    #  - "8000:8000"
     depends_on:
       - db
 
@@ -30,13 +30,13 @@ services:
       DATABASE_URL: postgis://optimap:optimap@db:5432/optimap?sslmode=disable
       OPTIMAP_CACHE: "dummy"
       OPTIMAP_DEBUG: "True"
-    command: python manage.py qcluster
+    entrypoint: ["python"] # do not run manage-and-run.sh script
+    command: ["manage.py", "qcluster"]
     volumes:
       - ".:/code:ro"
-    ports:
-      - "8000:8001"
     depends_on:
       - db
+      - app
 
   webserver:
     image: nginx:1.27-alpine
