@@ -48,17 +48,19 @@ docker compose run --entrypoint python app manage.py collectstatic --noinput
 
 Now open a browser at <http://localhost:80/>.
 
-#### Services Overview
+### Services Overview
 
 - db: Runs a PostgreSQL database with PostGIS extensions. Data is persisted in a Docker volume named db_data.
 - app: Our primary Django web application.
 - webserver: An Nginx server for serving static files and test files.
 
-#### Ports
+### Ports
 
-- 5434: Database (PostgreSQL/PostGIS)
-- 8000: App (Django server)
-- 8080: Webserver (Nginx)
+Not all of these ports are exposed by default, but they are available for local development - just uncomment the matching lines in the `docker-compose.yml` file.
+
+- `5432`: Database (PostgreSQL/PostGIS)
+- `8000`: App (Django server)
+- `80`: Webserver (Nginx)
 
 ## Development
 
