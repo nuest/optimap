@@ -19,8 +19,8 @@ services:
       #see local .env file on the server
       DATABASE_URL: postgis://optimap:optimap@db:5432/optimap?sslmode=disable
       OPTIMAP_DEBUG: "False"
-    #volumes:
-    #  - "./fixtures:/fixtures"
+    volumes:
+      - "./optimap/.env:/code/optimap/.env:ro"
     #ports:
     #  - "8000:8000"
     depends_on:
