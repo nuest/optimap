@@ -24,7 +24,7 @@ class SubscriptionSerializer(serializers.GeoFeatureModelSerializer):
 
     class Meta:
         model = Subscription
-        fields = ("search_term","timeperiod_startdate","timeperiod_enddate","user_name")
+        fields = ("search_term","timeperiod_startdate","timeperiod_enddate","user")
         geo_field = "region"
         auto_bbox = True
         
