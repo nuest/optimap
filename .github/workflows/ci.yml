@@ -63,7 +63,7 @@ jobs:
 
     - name: Run Tests
       run: |
-        python -Wa manage.py check tests
+        python -Wa manage.py test tests
 
   uitests:
     # disable until UI tests are fixed, see https://github.com/GeoinformationSystems/optimap/issues/142
