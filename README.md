@@ -270,7 +270,7 @@ python manage.py test tests
 python -Wa manage.py test
 
 # configure logging level for cleaner test progress output
-OPTIMAP_LOGGING_CONSOLE_LEVEL=WARNING python manage.py test tests
+OPTIMAP_LOGGING_LEVEL=WARNING python manage.py test tests
 
 # running UI tests needs either compose configuration or a manage.py runserver in a seperate shell
 docker-compose up --build
