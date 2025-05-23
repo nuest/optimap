@@ -57,9 +57,13 @@ jobs:
       run: |
         python manage.py loaddata fixtures/test_data.json
 
+    - name: Run deploy checks
+      run: |
+        python -Wa manage.py check --deploy
+
     - name: Run Tests
       run: |
-        python -Wa manage.py test tests
+        python -Wa manage.py check tests
 
   uitests:
     # disable until UI tests are fixed, see https://github.com/GeoinformationSystems/optimap/issues/142
