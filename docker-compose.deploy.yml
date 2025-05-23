@@ -33,6 +33,8 @@ services:
       DATABASE_URL: postgis://optimap:optimap@db:5432/optimap?sslmode=disable   
     entrypoint: ["python"] # do not run manage-and-run.sh script
     command: ["manage.py", "qcluster"]
+    volumes:
+      - "./optimap/.env:/code/optimap/.env:ro"
     depends_on:
       - db
       - app
