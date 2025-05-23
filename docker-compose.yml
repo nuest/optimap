@@ -15,7 +15,6 @@ services:
     environment:
       DATABASE_URL: postgis://optimap:optimap@db:5432/optimap?sslmode=disable
       OPTIMAP_CACHE: "dummy"
-      OPTIMAP_DEBUG: "True"
     volumes:
       - ".:/code" # mount the code for development and testing
       - "./fixtures:/fixtures:ro"
@@ -29,7 +28,6 @@ services:
     environment:
       DATABASE_URL: postgis://optimap:optimap@db:5432/optimap?sslmode=disable
       OPTIMAP_CACHE: "dummy"
-      OPTIMAP_DEBUG: "True"
     entrypoint: ["python"] # do not run manage-and-run.sh script
     command: ["manage.py", "qcluster"]
     volumes:

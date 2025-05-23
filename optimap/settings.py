@@ -282,8 +282,7 @@ LOGGING = {
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
-            'style': '{',
+            'format': "%(levelname)-9s %(asctime)s | %(module)-12s | %(message)s",
         },
         'simple': {
             'format': '{levelname} {message}',
@@ -301,9 +300,8 @@ LOGGING = {
     'handlers': {
         'console': {
             'level': 'DEBUG',
-            'filters': ['require_debug_true'],
             'class': 'logging.StreamHandler',
-            'formatter': 'simple'
+            'formatter': 'verbose'
         },
         'mail_admins': {
             'level': 'WARNING',
@@ -315,17 +313,17 @@ LOGGING = {
     'loggers': {
         'django': {
             'handlers': ['console', 'mail_admins'],
-            'level': 'INFO',
+            'level': env('DJANGO_LOGGING_LEVEL', default='INFO'),
         },
         'publications': {
             'handlers': ['console', 'mail_admins'],
-            'level': env('OPTIMAP_LOGGING_CONSOLE_LEVEL', default='INFO'),
+            'level': env('OPTIMAP_LOGGING_LEVEL', default='INFO'),
         },
         'django.request': {
             'handlers': ['mail_admins'],
             'level': 'WARNING',
             'propagate': False,
-        }
+        },
     }
 }
 
