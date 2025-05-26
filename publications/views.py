@@ -14,7 +14,9 @@ import secrets
 from django.contrib import messages
 from django.contrib.auth import login,logout
 from django.views.decorators.http import require_GET
-from publications.models import BlockedEmail, BlockedDomain
+from publications.models import BlockedEmail, BlockedDomain, GlobalRegion
+from django.contrib.gis.serializers import geojson
+from django.http import JsonResponse
 from django.conf import settings
 from publications.models import Subscription
 from datetime import datetime
@@ -31,9 +33,10 @@ from django.shortcuts import redirect
 from django.utils.timezone import now
 from django.contrib.auth import get_user_model
 User = get_user_model()
-from publications.models import UserProfile
+from publications.models import UserProfile, Publication
 from django.views.decorators.cache import never_cache
 from django.urls import reverse  
+import urllib.parse
 
 LOGIN_TOKEN_LENGTH  = 32
 LOGIN_TOKEN_TIMEOUT_SECONDS = 10 * 60
@@ -466,3 +469,56 @@ class RobotsView(View):
                                 content_type = "text/plain")
 
         return response
+
+def global_feed(request, region_type, name):
+    decoded = urllib.parse.unquote(name)
+    if decoded.lower().endswith(".geojson"):
+        decoded = decoded[:-len(".geojson")]
+    decoded = decoded.strip().replace("_", " ")
+
+    try:
+        region = GlobalRegion.objects.get(
+            region_type=region_type,
+            name__iexact=decoded
+        )
+    except GlobalRegion.DoesNotExist:
+        logger.warning("Region not found: %s %s", region_type, decoded)
+        return JsonResponse({
+            "type": "FeatureCollection",
+            "features": []
+        }, safe=False, content_type="application/geo+json")
+
+    pubs = Publication.objects.filter(
+        status="p",
+        geometry__isnull=False,
+        geometry__intersects=region.geom
+    )
+
+    geojson_str = geojson.Serializer().serialize(
+        pubs,
+        geometry_field="geometry",
+        fields=(
+            "id",
+            "title",
+            "abstract",
+            "publicationDate",
+            "url",
+            "doi",
+            "creationDate",
+            "lastUpdate",
+            "timeperiod_startdate",
+            "timeperiod_enddate",
+        ),
+    )
+
+    return JsonResponse(
+        geojson_str,
+        safe=False,
+        content_type="application/geo+json"
+    )
+    
+def feeds_list(request):
+    regions = GlobalRegion.objects.all().order_by("region_type", "name")
+    return render(request,
+                  "feeds_list.html",
+                  {"regions": regions})

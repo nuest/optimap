@@ -5,6 +5,7 @@ from django.shortcuts import redirect
 from publications import views
 from .feeds import GeoFeed
 from django.views.generic import RedirectView
+from .views import global_feed, feeds_list
 
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView
 
@@ -37,5 +38,6 @@ urlpatterns = [
     path("confirm-delete/<str:token>/", views.confirm_account_deletion, name="confirm_delete"),
     path("finalize-delete/", views.finalize_account_deletion, name="finalize_delete"),
     path("changeuser/", views.change_useremail, name="changeuser"),
-    path("confirm-email/<str:token>/<str:email_new>/", views.confirm_email_change, name="confirm-email-change"),
+    path("feeds/<str:region_type>/<path:name>.geojson",global_feed,name="global_feed",),
+    path("feeds/", feeds_list, name="feeds_list"),
 ]

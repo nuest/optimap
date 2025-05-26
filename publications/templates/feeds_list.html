@@ -1,0 +1,48 @@
+{% extends "base.html" %} {% block content %}
+<div class="container mx-auto px-4 py-8">
+  <h1 class="text-3xl font-bold mb-6">GeoJSON Feeds</h1>
+  <ul class="list-disc list-inside space-y-2">
+    {% for region in regions %}
+    <li>
+      <span class="font-semibold">{{ region.get_region_type_display }}:</span>
+      <a
+        href="{% url 'optimap:global_feed' region.region_type region.name %}.geojson"
+        class="text-blue-600 hover:underline"
+      >
+        {{ region.name }}.geojson
+      </a>
+      <small class="text-gray-500">
+        (updated {{ region.last_loaded|date:"Y-m-d H:i" }})
+      </small>
+    </li>
+    {% endfor %}
+  </ul>
+
+  <h2 class="text-2xl font-semibold mt-8 mb-4">Sources &amp; Licenses</h2>
+  <ul class="list-disc list-inside space-y-2 text-sm text-gray-700">
+    {% for region in regions %}
+    <li>
+      {{ region.name }}:
+
+      <a
+        href="{{ region.source_url }}"
+        target="_blank"
+        title="{{ region.source_url }}"
+        style="
+          display: inline-block;
+          max-width: 300px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        "
+        class="text-blue-600 hover:underline"
+      >
+        {{ region.source_url }}
+      </a>
+
+      (<em>{{ region.license }}</em>)
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}
