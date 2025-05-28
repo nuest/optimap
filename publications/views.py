@@ -53,22 +53,22 @@ def download_geojson(request):
     gzip_path = os.path.join(cache_dir, 'geojson_cache.json.gz')
     if not os.path.exists(json_path):
         json_path = regenerate_geojson_cache()
-    accept_enc = request.META.get('HTTP_ACCEPT_ENCODING', '')
-    if 'gzip' in accept_enc and os.path.exists(gzip_path):
-        response = FileResponse(
+        # so tools like QGIS will auto-decompress it for you.
+    if os.path.exists(gzip_path) and 'gzip' in request.META.get('HTTP_ACCEPT_ENCODING', ''):
+        return FileResponse(
             open(gzip_path, 'rb'),
-            content_type="application/json",
+            content_type="application/gzip",
             as_attachment=True,
-            filename="publications.geojson"
+            filename="publications.geojson.gz",
         )
-        response['Content-Encoding'] = 'gzip'
-    else:
-        response = FileResponse(
-            open(json_path, 'rb'),
-            content_type="application/json",
-            as_attachment=True,
-            filename="publications.geojson"
-        )
+
+    # Otherwise send a normal GeoJSON
+    return FileResponse(
+        open(json_path, 'rb'),
+        content_type="application/geo+json",
+        as_attachment=True,
+        filename="publications.geojson",
+    )
     return response
 
 def generate_geopackage():
@@ -82,7 +82,7 @@ def generate_geopackage():
     ds = driver.CreateDataSource(gpkg_path)
     srs = osr.SpatialReference()
     srs.ImportFromEPSG(4326)
-    layer = ds.CreateLayer("publications", srs, ogr.wkbUnknown)
+    layer = ds.CreateLayer("publications", srs, ogr.wkbGeometryCollection)
 
     for name in ("title", "abstract", "doi", "source"):
         field_defn = ogr.FieldDefn(name, ogr.OFTString)
