@@ -7,6 +7,7 @@ from publications.viewsets import PublicationViewSet, SubscriptionViewset, Journ
 router = routers.DefaultRouter()
 router.register(r"publications", PublicationViewSet)
 router.register(r"subscriptions", SubscriptionViewset, basename="subscription")
-router.register(r"journals", JournalViewSet, basename="journal")
+router.register(r'journals', JournalViewSet, basename='journal')
+app_name = "publications"
 
 urlpatterns = router.urls

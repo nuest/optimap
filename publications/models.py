@@ -1,16 +1,18 @@
+import logging
+
+from django.contrib.auth.models import AbstractUser, Group, Permission
 from django.contrib.gis.db import models
 from django.contrib.postgres.fields import ArrayField
+from django.conf import settings
 from django_currentuser.db.models import CurrentUserField
 from django_q.models import Schedule
 from django.utils.timezone import now
-from django.contrib.auth.models import AbstractUser, Group, Permission
-from django.utils.timezone import now
-# handle import/export relations, see https://django-import-export.readthedocs.io/en/stable/advanced_usage.html#creating-non-existent-relations
 from import_export import fields, resources
 from import_export.widgets import ForeignKeyWidget
-from django.conf import settings
+from django.core.exceptions import ValidationError
+from stdnum.issn import is_valid as is_valid_issn
+from django.contrib.gis.db import models as gis_models 
 
-import logging
 logger = logging.getLogger(__name__)
 
 STATUS_CHOICES = (
@@ -251,7 +253,12 @@ class BlockedDomain(models.Model):
 
 class Journal(models.Model):
     display_name = models.CharField(max_length=255)
-    issn_l = models.CharField(max_length=9, blank=True, null=True)
+    issn_l = models.CharField(
+        max_length=9,
+        blank=True,
+        null=True,
+        help_text="The primary ISSN (ISSN-L) — must be valid."
+    )
     issn_list = ArrayField(
         base_field=models.CharField(max_length=9),
         default=list,
@@ -261,14 +268,35 @@ class Journal(models.Model):
         models.CharField(max_length=255),
         default=list,
         blank=True,
-        help_text="List of OpenAlex IDs (works) published in this journal"
+        help_text="List of OpenAlex work IDs"
     )
     publisher = models.CharField(max_length=255, blank=True, null=True)
     openalex_id = models.URLField(blank=True, null=True)
+    geometry = models.PointField(
+        srid=4326,
+        null=True,
+        blank=True,
+        help_text="Primary coordinates for this journal"
+    )
 
     class Meta:
         ordering = ['display_name']
 
+    def clean(self):
+        super().clean()
+        if self.issn_l and not is_valid_issn(self.issn_l):
+            raise ValidationError({
+                'issn_l': "Invalid ISSN-L format; must be e.g. '1234-567X'."
+            })
+
+    @property
+    def identifier(self):
+        return self.issn_l or self.openalex_id
+
+    def get_absolute_url(self):
+        return reverse('journal-detail', kwargs={'pk': self.pk})
+
     def __str__(self):
         return self.display_name
     
+    geometry = gis_models.PointField(null=True, blank=True)  
