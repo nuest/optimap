@@ -470,53 +470,6 @@ class RobotsView(View):
 
         return response
 
-def global_feed(request, region_type, name):
-    decoded = urllib.parse.unquote(name)
-    if decoded.lower().endswith(".geojson"):
-        decoded = decoded[:-len(".geojson")]
-    decoded = decoded.strip().replace("_", " ")
-
-    try:
-        region = GlobalRegion.objects.get(
-            region_type=region_type,
-            name__iexact=decoded
-        )
-    except GlobalRegion.DoesNotExist:
-        logger.warning("Region not found: %s %s", region_type, decoded)
-        return JsonResponse({
-            "type": "FeatureCollection",
-            "features": []
-        }, safe=False, content_type="application/geo+json")
-
-    pubs = Publication.objects.filter(
-        status="p",
-        geometry__isnull=False,
-        geometry__intersects=region.geom
-    )
-
-    geojson_str = geojson.Serializer().serialize(
-        pubs,
-        geometry_field="geometry",
-        fields=(
-            "id",
-            "title",
-            "abstract",
-            "publicationDate",
-            "url",
-            "doi",
-            "creationDate",
-            "lastUpdate",
-            "timeperiod_startdate",
-            "timeperiod_enddate",
-        ),
-    )
-
-    return JsonResponse(
-        geojson_str,
-        safe=False,
-        content_type="application/geo+json"
-    )
-    
 def feeds_list(request):
     regions = GlobalRegion.objects.all().order_by("region_type", "name")
     return render(request,
