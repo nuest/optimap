@@ -19,7 +19,7 @@ urlpatterns = [
     path("api/v1", lambda request: redirect('/api/v1/', permanent=False)),
     path("api/v1/", include("publications.api")),
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
-    path('api/schema/ui/sitemap', SpectacularRedocView.as_view(url_name='optimap:schema'), name='redoc'),
+    path('api/schema/ui/sitemap',SpectacularRedocView.as_view(url_name='optimap:schema'),name='redoc'),
     path("data/", views.data, name="data"),
     path('feed/georss/', GeoFeed(feed_type_variant="georss"), name='georss_feed'),
     path('feed/geoatom/', GeoFeed(feed_type_variant="geoatom"), name='geoatom_feed'),
@@ -42,4 +42,6 @@ urlpatterns = [
     path("feeds/geoatom/<slug:geometry_slug>/", GeoFeedByGeometry(feed_type_variant="geoatom"), name="feed-geoatom-by-slug"),
     path("feeds/w3cgeo/<slug:geometry_slug>/", GeoFeedByGeometry(feed_type_variant="w3cgeo"), name="feed-w3cgeo-by-slug"),
     path("feeds/", views.feeds_list, name="feeds_list"),
+    path('download/geojson/', views.download_geojson, name='download_geojson'),
+    path('download/geopackage/', views.download_geopackage, name='download_geopackage'),
 ]
