@@ -17,7 +17,7 @@ class PublicationViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = PublicationSerializer
 
  # filter on the GeoDjango PointField called `geometry`
-    bbox_filter_field = "geometry"
+    bbox_filter_field = "geometery"
     filter_backends = (filters.InBBoxFilter,)
 
 

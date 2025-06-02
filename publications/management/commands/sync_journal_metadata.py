@@ -117,7 +117,7 @@ class Command(BaseCommand):
                 resp = session.get(
                     url,
                     params=params,
-                    timeout=10,
+                    timeout=100,
                     headers={'Accept': 'application/json'},
                 )
 

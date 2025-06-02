@@ -59,8 +59,13 @@ function publicationPopup(feature, layer) {
         popupContent += '<h3>' + feature.properties['title'] + '</h3>';
     }
 
+        // Show the source (journal name / ISSN) if it exists
+    if (feature.properties['source']) {
+        popupContent += `<div><b>Journal:</b> ${feature.properties['source']}</div>`;
+    }
+
     if (feature.properties['timeperiod_startdate'] && feature.properties['timeperiod_enddate']) {
-        popupContent += '<div><b>Timeperiod:</b> from '
+    popupContent += '<div><b>Timeperiod:</b> from '
             + feature.properties['timeperiod_startdate']
             + ' to ' + feature.properties['timeperiod_enddate']
             + '</div>';

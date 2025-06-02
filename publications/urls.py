@@ -10,8 +10,13 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView
 
 app_name = "optimap"
 
+router = DefaultRouter()
+router.register("publications", PublicationViewSet, basename="publication")
+router.register("journals", JournalViewSet, basename="journal")
+
 urlpatterns = [
     path('', views.main, name="main"),
+    path("api/v1/", include(router.urls)),
     path('favicon.ico', lambda request: redirect('static/favicon.ico', permanent=True)),
     path("api", lambda request: redirect('/api/v1/', permanent=False), name="api"),
     path("api/", lambda request: redirect('/api/v1/', permanent=False)),

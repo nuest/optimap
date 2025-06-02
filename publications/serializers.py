@@ -15,6 +15,8 @@ class PublicationSerializer(gis_serializers.GeoFeatureModelSerializer):
 
     class Meta:
         model = Publication
+        geo_field    = "geometery"
+        auto_bbox    = True
         fields = (
             "id",
             "title",
@@ -26,10 +28,10 @@ class PublicationSerializer(gis_serializers.GeoFeatureModelSerializer):
             "lastUpdate",
             "timeperiod_startdate",
             "timeperiod_enddate",
+            "source",       # journal name
+            "issn_l",       # journal ISSN-L
+            "journal_url",  # journal OpenAlex URL
         )
-        geo_field = "geometry"
-        auto_bbox = True
-
 
 class SubscriptionSerializer(gis_serializers.GeoFeatureModelSerializer):
     """Subscription GeoJSON serializer."""

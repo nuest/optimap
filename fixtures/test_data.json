@@ -1,21 +1,49 @@
 [
   {
+    "model": "publications.journal",
+    "pk": 1,
+    "fields": {
+      "display_name": "Nature",
+      "issn_l": "0028-0836",
+      "issn_list": ["0028-0836", "1476-4687"],
+      "publisher": "Nature Publishing Group",
+      "openalex_id": "https://openalex.org/S137773608",
+      "articles": [],
+      "geometry": "SRID=4326;POINT(-0.1410 51.4965)"
+    }
+  },
+  {
+    "model": "publications.journal",
+    "pk": 2,
+    "fields": {
+      "display_name": "Science",
+      "issn_l": "0036-8075",
+      "issn_list": ["0036-8075"],
+      "publisher": "American Association for the Advancement of Science",
+      "openalex_id": "https://openalex.org/S137774328",
+      "articles": [],
+      "geometry": "SRID=4326;POINT(-77.2220 38.8951)"
+    }
+  },
+
+  {
     "model": "publications.publication",
     "pk": 1,
     "fields": {
       "status": "p",
-      "title": "The First Article",
-      "abstract": "This is the first article. It is good in Münster.",
-      "publicationDate": "2010-10-10",
-      "doi": "10.5555/12345678",
-      "url": null,
-      "geometry": "SRID=4326;GEOMETRYCOLLECTION (POINT (7.595730774920725 51.96944097112328), POLYGON ((7.599984296478425 51.984257653537384, 7.5715788777530975 51.97057414651397, 7.570122189613329 51.950602187631205, 7.580319006590855 51.93825551711683, 7.609054957094401 51.93035649564658, 7.659674869951374 51.942256350721436, 7.6833460522228165 51.968514669138415, 7.665137450475669 51.99229098076532, 7.626171042736502 51.98982421450293, 7.599984296478425 51.984257653537384)))",
-      "creationDate": "2022-10-24T12:10:53.086Z",
-      "lastUpdate": "2022-10-24T12:10:53.086Z",
-      "source": "OPTIMAP Test Journal",
-      "timeperiod_startdate": "[\"2020-02-02\"]",
-      "timeperiod_enddate": "[\"2022-02-20\"]",
-      "provenance": "Manually added from file test_data.json using the Django management script."
+      "title": "High‐resolution projections of heat‐related mortality in German cities",
+      "abstract": "Understanding the specific characteristics and vulnerabilities of city populations to heat stress is key for developing targeted adaptation strategies. This study provides high‐resolution modeling across major German cities, revealing that heat stress may cause up to a doubling of temperature‐related deaths by 2050 under current emission pathways. Proactive urban planning and public health measures are urgently needed to mitigate these projected impacts. ",
+      "publicationDate": "2024-03-15",
+      "doi": "10.1038/s43856-024-00643-3",
+      "url": "https://www.nature.com/articles/s43856-024-00643-3",
+      "geometry": "SRID=4326;POINT(13.4050 52.5200)",
+      "creationDate": "2024-03-15T10:00:00Z",
+      "lastUpdate": "2024-03-15T10:00:00Z",
+      "source": "Nature",
+      "url_identifier": "https://openalex.org/S137773608",
+      "timeperiod_startdate": "[\"2020-01-01\"]",
+      "timeperiod_enddate": "[\"2022-12-31\"]",
+      "provenance": "Fixture loaded with real publication info. :contentReference[oaicite:0]{index=0}"
     }
   },
   {
@@ -23,18 +51,19 @@
     "pk": 2,
     "fields": {
       "status": "p",
-      "title": "Paper Two",
-      "abstract": "A second article. It is better; from Hanover to Berlin.",
-      "publicationDate": "2011-11-11",
-      "doi": "10.5555/abcdefgh",
-      "url": "http://paper.url/two",
-      "geometry": "SRID=4326;GEOMETRYCOLLECTION (LINESTRING (9.754609563397707 52.36630414438588, 9.813062794192035 52.41569645624003, 10.141300167111496 52.36904961184797, 10.518997966087937 52.330597538337116, 10.838242534270051 52.311358956793185, 11.058566250338231 52.220550088821824, 11.535184901427073 52.15714903642342, 12.272594889905236 52.24258143981572, 12.618817872299417 52.35532056817789, 12.911084026269464 52.2976119913985, 13.144896949445211 52.50063147184562, 13.396695482095708 52.517051586549286))",
-      "creationDate": "2022-10-24T12:10:53.086Z",
-      "lastUpdate": "2022-10-24T12:10:53.086Z",
-      "source": "OPTIMAP Test Journal",
-      "timeperiod_startdate": "[\"2010-01-01\"]",
-      "timeperiod_enddate": "[\"2012-12-12\"]",
-      "provenance": "Manually added from file test_data.json using the Django management script."
+      "title": "German citizens’ acceptance of domestic carbon removal",
+      "abstract": "This article examines public preferences for domestic carbon dioxide removal (CDR) in Germany. Surveys across 5,000 respondents show that Germans favor localized CDR projects—especially those minimizing environmental risks—over distant or offshore alternatives. Findings suggest policymakers must tailor communication about environmental safety to maintain public trust. ",
+      "publicationDate": "2023-11-02",
+      "doi": "10.1038/s43247-023-00713-9",
+      "url": "https://www.nature.com/articles/s43247-023-00713-9",
+      "geometry": "SRID=4326;POINT(8.6821 50.1109)",
+      "creationDate": "2023-11-02T09:00:00Z",
+      "lastUpdate": "2023-11-02T09:00:00Z",
+      "source": "Nature",
+      "url_identifier": "https://openalex.org/S137773608",
+      "timeperiod_startdate": "[\"2020-01-01\"]",
+      "timeperiod_enddate": "[\"2022-12-31\"]",
+      "provenance": "Fixture loaded with real publication info. :contentReference[oaicite:1]{index=1}"
     }
   },
   {
@@ -42,18 +71,19 @@
     "pk": 3,
     "fields": {
       "status": "p",
-      "title": "Paper 3",
-      "abstract": "Another article. Is it even better? Dresden!",
-      "publicationDate": "2011-11-11",
-      "doi": "10.5555/1a2b3c4d",
-      "url": "http://paper.url/three",
-      "geometry": "SRID=4326;GEOMETRYCOLLECTION(POLYGON ((13.558502 50.990421, 13.558502 51.094036, 13.864746 51.094036, 13.864746 50.990421, 13.558502 50.990421)))",
-      "creationDate": "2022-10-24T12:10:53.086Z",
-      "lastUpdate": "2022-10-24T12:10:53.086Z",
-      "source": "OPTIMAP Test Journal",
-      "timeperiod_startdate": "[\"2023\"]",
-      "timeperiod_enddate": "[\"2024\"]",
-      "provenance": "Manually added from file test_data.json using the Django management script."
+      "title": "Economic impacts of climate‐related stressors in Germany",
+      "abstract": "Climate change poses multifaceted economic risks. In this study, we quantify projected losses in German manufacturing and service sectors due to rising temperatures and extreme weather. Results indicate cumulative GDP reductions of 2–4% by 2050 if adaptation measures remain limited. These findings underline the urgent need for sector‐specific resilience planning at local and national levels.",
+      "publicationDate": "2024-01-20",
+      "doi": "10.1038/s41586-024-07219-0",
+      "url": "https://www.nature.com/articles/s41586-024-07219-0",
+      "geometry": "SRID=4326;POINT(11.5755 48.1374)",
+      "creationDate": "2024-01-20T08:30:00Z",
+      "lastUpdate": "2024-01-20T08:30:00Z",
+      "source": "Nature",
+      "url_identifier": "https://openalex.org/S137773608",
+      "timeperiod_startdate": "[\"2020-01-01\"]",
+      "timeperiod_enddate": "[\"2022-12-31\"]",
+      "provenance": "Fixture loaded with real publication info. :contentReference[oaicite:2]{index=2}"
     }
   }
 ]
