@@ -63,7 +63,18 @@ jobs:
 
     - name: Run Tests
       run: |
-        python -Wa manage.py test tests
+        coverage run --source='publications' --omit='*/migrations/**' manage.py test tests
+
+    - name: Save coverage to files
+      run: |
+        coverage html
+        coverage xml
+
+    - name: Get code coverage
+      uses: orgoro/coverage@v3.2
+      with:
+          coverageFile: coverage.xml
+          token: ${{ secrets.GITHUB_TOKEN }}
 
   uitests:
     # disable until UI tests are fixed, see https://github.com/GeoinformationSystems/optimap/issues/142

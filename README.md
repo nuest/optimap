@@ -261,11 +261,28 @@ python -Wa manage.py test
 
 # configure logging level for cleaner test progress output
 OPTIMAP_LOGGING_LEVEL=WARNING python manage.py test tests
+```
 
-# running UI tests needs either compose configuration or a manage.py runserver in a seperate shell
+### Run UI tests
+
+Running UI tests needs either compose configuration or a manage.py runserver in a seperate shell.
+
+```bash
 docker-compose up --build
 
 python -Wa manage.py test tests-ui
+```
+
+### Check test coverage
+
+```bash
+coverage run --source='publications' --omit='*/migrations/**' manage.py test tests
+
+coverage report
+
+# save the reports
+coverage html
+coverage xml
 ```
 
 ### Develop tests
