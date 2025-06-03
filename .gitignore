@@ -137,3 +137,7 @@ tests-ui/screenshots/
 
 # nano's edit files on the server
 *.swp
+
+*.docx#
+
+publications/static/OPTIMAP_Data-Privacy-Concept.docx
