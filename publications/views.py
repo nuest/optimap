@@ -130,6 +130,9 @@ def download_geopackage(request):
 def main(request):
     return render(request, "main.html")
 
+def about(request):
+    return render(request, 'about.html')
+
 
 def loginres(request):
     email = request.POST.get('email', False)
@@ -176,7 +179,7 @@ The link is valid for {valid} minutes.
                     'text': 'Error sending the login email. Please try again or contact us!'
                 }
             })
-        
+
         try:
             if str(get_connection().__class__.__module__).endswith("smtp"):
                 with imaplib.IMAP4_SSL(settings.EMAIL_HOST_IMAP, port=settings.EMAIL_PORT_IMAP) as imap:
@@ -242,7 +245,7 @@ def data(request):
         'last_gpkg':       last_gpkg.name if last_gpkg else None,
     })
 
-def Confirmationlogin(request):
+def confirmation_login(request):
     return render(request, 'confirmation_login.html')
 
 
@@ -265,12 +268,19 @@ def authenticate_via_magic_link(request, token):
         })
     user = User.objects.filter(email=email).first()
     if user:
-        is_new = False  
-    else:
+        is_new = False
+        needs_confirmation = False
+        login_user(request, user)
+    elif request.GET.get('confirmed', None) == 'true':
         user = User.objects.create_user(username=email, email=email)
-        is_new = True  
-    login_user(request, user)
-    return render(request, "confirmation_login.html", {'is_new': is_new})
+        is_new = True
+        needs_confirmation = False
+        login_user(request, user)
+    else:
+        is_new = True
+        needs_confirmation = True
+    
+    return render(request, "confirmation_login.html", {'email': email, 'token': token, 'is_new': is_new, 'needs_confirmation': needs_confirmation})
 
 @login_required
 def customlogout(request):
@@ -307,7 +317,7 @@ def add_subscriptions(request):
         user_name = currentuser.username if currentuser.is_authenticated else None
         start_date_object = datetime.strptime(start_date, '%m/%d/%Y')
         end_date_object = datetime.strptime(end_date, '%m/%d/%Y')
-        
+
         subscription = Subscription(
             search_term=search_term,
             timeperiod_startdate=start_date_object,
@@ -318,7 +328,7 @@ def add_subscriptions(request):
         subscription.save()
         return HttpResponseRedirect('/subscriptions/')
 
-@login_required 
+@login_required
 def unsubscribe(request):
     """Handles unsubscription requests from emails."""
     user = request.user
@@ -328,17 +338,17 @@ def unsubscribe(request):
     if unsubscribe_all:
         Subscription.objects.filter(user=user).update(subscribed=False)
         messages.success(request, "You have been unsubscribed from all subscriptions.")
-        return redirect("/") 
+        return redirect("/")
     if search_term:
-        exact_search_term = unquote(search_term).strip() 
+        exact_search_term = unquote(search_term).strip()
         subscription = get_object_or_404(Subscription, user=user, search_term=exact_search_term)
         if not subscription:
             messages.warning(request, f"No subscription found for '{search_term}'.")
-            return redirect("/") 
+            return redirect("/")
         subscription.subscribed = False
         subscription.save()
         messages.success(request, f"You have unsubscribed from '{search_term}'.")
-        return redirect("/") 
+        return redirect("/")
 
     return HttpResponse("Invalid request.", status=400)
 
@@ -374,7 +384,7 @@ def change_useremail(request):
     token = secrets.token_urlsafe(32)
     cache.set(
         f"{EMAIL_CONFIRMATION_TOKEN_PREFIX}_{email_new}",
-        {"token": token, "old_email": request.user.email}, 
+        {"token": token, "old_email": request.user.email},
         timeout=EMAIL_CONFIRMATION_TIMEOUT_SECONDS,
     )
     confirm_url = request.build_absolute_uri(
@@ -402,7 +412,7 @@ def confirm_email_change(request, token, email_new):
     if not cached_data:
         messages.error(request, "Invalid or expired confirmation link.")
         return HttpResponseRedirect("/")
-    if isinstance(cached_data, str):  
+    if isinstance(cached_data, str):
         messages.error(request, "Cache error: Expected dictionary, got string.")
         return HttpResponseRedirect("/")
     stored_token = cached_data.get("token")
@@ -415,7 +425,7 @@ def confirm_email_change(request, token, email_new):
         messages.error(request, "User not found.")
         return HttpResponseRedirect("/")
     user.email = email_new
-    user.username = email_new  
+    user.username = email_new
     user.save()
     contactURL = f"{settings.BASE_URL}/contact"
     notify_subject = 'Your OPTIMAP Email Was Changed'
@@ -479,8 +489,8 @@ def confirm_account_deletion(request, token):
             messages.error(request, "You are not authorized to delete this account.")
             return redirect(reverse('optimap:main'))
         request.session[USER_DELETE_TOKEN_PREFIX] = token
-        request.session.modified = True 
-        request.session.save()  
+        request.session.modified = True
+        request.session.save()
         messages.warning(request, "Please confirm your account deletion. Your contributed data will remain on the platform.")
         return redirect(reverse('optimap:usersettings'))
     except Exception as e:
@@ -514,7 +524,7 @@ def finalize_account_deletion(request):
         cache.delete(f"{USER_DELETE_TOKEN_PREFIX}_{token}")
         if USER_DELETE_TOKEN_PREFIX in request.session:
             del request.session[USER_DELETE_TOKEN_PREFIX]
-            request.session.modified = True  
+            request.session.modified = True
 
 class RobotsView(View):
     http_method_names = ['get']
