@@ -6,10 +6,12 @@ on:
   pull_request:
     branches: [ "main" ]
 
+permissions:
+  pull-requests: write # allow posting comments on PRs by actions
 jobs:
   unittests:
     runs-on: ubuntu-24.04
-    
+
     strategy:
       max-parallel: 4
       matrix:
@@ -57,9 +59,25 @@ jobs:
       run: |
         python manage.py loaddata fixtures/test_data.json
 
+    - name: Run deploy checks
+      run: |
+        python -Wa manage.py check --deploy
+
     - name: Run Tests
       run: |
-        python -Wa manage.py test tests
+        coverage run --source='publications' --omit='*/migrations/**' manage.py test tests
+
+    - name: Check coverage and save it to files
+      run: |
+        coverage html
+        coverage xml
+        coverage report --show-missing --fail-under=70
+
+    #- name: Post code coverage
+    #  uses: orgoro/coverage@v3.2
+    #  with:
+    #      coverageFile: coverage.xml
+    #      token: ${{ secrets.GITHUB_TOKEN }}
 
   uitests:
     # disable until UI tests are fixed, see https://github.com/GeoinformationSystems/optimap/issues/142

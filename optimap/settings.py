@@ -80,6 +80,17 @@ REST_FRAMEWORK = {
 	'PAGE_SIZE': 999,
 }
 
+# Database
+# https://docs.djangoproject.com/en/4.0/ref/settings/#databases
+# https://pypi.org/project/dj-database-url/
+DATABASES = {
+    'default': dj_database_url.config( # this uses DATABASE_URL environment variable
+        # value must be URL-encoded: postgres://user:p%23ssword!@localhost/foobar
+        default='postgis://optimap:optimap@localhost:5432/optimap',
+        conn_max_age=600
+        )
+}
+
 # https://github.com/tfranzel/drf-spectacular
 SPECTACULAR_SETTINGS = {
     'TITLE': 'OPTIMAP API',
@@ -239,17 +250,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'optimap.wsgi.application'
 
-# Database
-# https://docs.djangoproject.com/en/4.0/ref/settings/#databases
-# https://pypi.org/project/dj-database-url/
-DATABASES = {
-    'default': dj_database_url.config( # this uses DATABASE_URL environment variable
-        # value must be URL-encoded: postgres://user:p%23ssword!@localhost/foobar
-        default='postgis://optimap:optimap@localhost:5432/optimap',
-        conn_max_age=600
-        )
-}
-
 # Internationalization
 # https://docs.djangoproject.com/en/4.0/topics/i18n/
 
@@ -282,8 +282,7 @@ LOGGING = {
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
-            'style': '{',
+            'format': "%(levelname)-9s %(asctime)s | %(module)-12s | %(message)s",
         },
         'simple': {
             'format': '{levelname} {message}',
@@ -301,9 +300,8 @@ LOGGING = {
     'handlers': {
         'console': {
             'level': 'DEBUG',
-            'filters': ['require_debug_true'],
             'class': 'logging.StreamHandler',
-            'formatter': 'simple'
+            'formatter': 'verbose'
         },
         'mail_admins': {
             'level': 'WARNING',
@@ -315,17 +313,17 @@ LOGGING = {
     'loggers': {
         'django': {
             'handlers': ['console', 'mail_admins'],
-            'level': 'INFO',
+            'level': env('DJANGO_LOGGING_LEVEL', default='INFO'),
         },
         'publications': {
             'handlers': ['console', 'mail_admins'],
-            'level': env('OPTIMAP_LOGGING_CONSOLE_LEVEL', default='INFO'),
+            'level': env('OPTIMAP_LOGGING_LEVEL', default='INFO'),
         },
         'django.request': {
             'handlers': ['mail_admins'],
             'level': 'WARNING',
             'propagate': False,
-        }
+        },
     }
 }
 
