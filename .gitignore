@@ -141,3 +141,7 @@ tests-ui/screenshots/
 *.docx#
 
 publications/static/OPTIMAP_Data-Privacy-Concept.docx
+
+certbot/conf/
+
+certbot/www/
