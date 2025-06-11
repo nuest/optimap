@@ -21,6 +21,7 @@ urlpatterns = [
     path('feed/georss/', GeoFeed(feed_type_variant="georss"), name='georss_feed'),
     path('feed/w3cgeo/', GeoFeed(feed_type_variant="w3cgeo"), name='w3cgeo_feed'),
     path("about/", views.about, name="about"),
+    path("accessibility/", views.accessibility, name="accessibility"),
     path("addsubscriptions/", views.add_subscriptions, name="addsubscriptions"),
     path("api", lambda request: redirect('/api/v1/', permanent=False), name="api"),
     path("api/", lambda request: redirect('/api/v1/', permanent=False)),
