@@ -133,6 +133,8 @@ def main(request):
 def about(request):
     return render(request, 'about.html')
 
+def accessibility(request):
+    return render(request, 'accessibility.html')
 
 def loginres(request):
     email = request.POST.get('email', False)
