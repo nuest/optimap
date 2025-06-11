@@ -356,7 +356,8 @@ The **logos** and favicon are in the repository in the folder [`publications/sta
 
 ## Deploy
 
-~~Deploy using `docker-compose` or see [`fly.io.md`](fly.io.md) for notes on deploying to Fly.io.~~
+The app is deployed in the TUD Enterprise Cloud.
+HTTPS certificate is retrieved via `certbot`, see `docker-compose.deploy.yml` for the configuration and documentation links.
 
 ## Operation
 
