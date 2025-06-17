@@ -65,7 +65,7 @@ class EmailChangeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['email']
+        fields = ["email"]
 
     def validate_email(self, value):
         """Ensure the new email is not already in use."""

@@ -1,14 +1,19 @@
+import logging
+
+from django.contrib.auth.models import AbstractUser, Group, Permission
 from django.contrib.gis.db import models
 from django.contrib.postgres.fields import ArrayField
+from django.conf import settings
 from django_currentuser.db.models import CurrentUserField
 from django_q.models import Schedule
 from django.utils.timezone import now
 from django.contrib.auth.models import AbstractUser, Group, Permission
 from import_export import fields, resources
 from import_export.widgets import ForeignKeyWidget
-from django.conf import settings
+from django.core.exceptions import ValidationError
+from stdnum.issn import is_valid as is_valid_issn
+from django.contrib.gis.db import models as gis_models 
 
-import logging
 logger = logging.getLogger(__name__)
 
 STATUS_CHOICES = (
