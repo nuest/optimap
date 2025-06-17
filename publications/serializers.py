@@ -25,12 +25,14 @@ class SourceSerializer(serializers.ModelSerializer):
         ]
 
 
+
 class PublicationSerializer(GeoFeatureModelSerializer):
     source_details = SourceSerializer(source="source", read_only=True)
 
     class Meta:
         model = Publication
         geo_field = "geometry"
+        auto_bbox = True
         fields = [
             "id",
             "title",
@@ -42,10 +44,11 @@ class PublicationSerializer(GeoFeatureModelSerializer):
             "timeperiod_enddate",
             "source_details",
         ]
-        auto_bbox = True
 
 
-class SubscriptionSerializer(serializers.ModelSerializer):
+
+
+class SubscriptionSerializer(GeoFeatureModelSerializer):
     class Meta:
         model = Subscription
         fields = (
@@ -59,8 +62,11 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             "subscribed",
         )
 
-        
-class EmailChangeSerializer(serializers.ModelSerializer):  
+        geo_field = "region"
+        auto_bbox = True
+
+
+class EmailChangeSerializer(serializers.ModelSerializer):
     """Handles email change requests."""
 
     class Meta:
@@ -77,4 +83,4 @@ class EmailChangeSerializer(serializers.ModelSerializer):
 class UserSerializer(drf_serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ["id", "username", "email"] 
+        fields = ["id", "username", "email"]

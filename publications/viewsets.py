@@ -34,8 +34,7 @@ class SubscriptionViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticatedOrReadOnly]
 
     def get_queryset(self):
-        user = self.request.user
-        return Subscription.objects.filter(user=user)
+        return Subscription.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
