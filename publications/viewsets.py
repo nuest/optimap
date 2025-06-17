@@ -1,13 +1,13 @@
 """publications API views."""
 from rest_framework import viewsets
 from rest_framework_gis import filters
-from .models import Publication, Journal, Subscription
-from .serializers import PublicationSerializer, JournalSerializer, SubscriptionSerializer
+from .models import Publication, Source, Subscription
+from .serializers import PublicationSerializer, SourceSerializer, SubscriptionSerializer
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 
-class JournalViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Journal.objects.all()
-    serializer_class = JournalSerializer
+class SourceViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Source.objects.all()
+    serializer_class = SourceSerializer
     permission_classes = [IsAuthenticatedOrReadOnly]
 
 class PublicationViewSet(viewsets.ReadOnlyModelViewSet):
@@ -18,11 +18,10 @@ class PublicationViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
-        journal_id = self.request.query_params.get("journal_id")
-        if journal_id:
-            qs = qs.filter(source__id=journal_id)
+        source_id = self.request.query_params.get("source_id")
+        if source_id:
+            qs = qs.filter(source__id=source_id)
         return qs
-
 
 class SubscriptionViewSet(viewsets.ModelViewSet):
     """

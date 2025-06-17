@@ -1,17 +1,18 @@
 """publications serializers."""
 
-from rest_framework_gis import serializers
+from rest_framework import serializers
+from rest_framework_gis.serializers import GeoFeatureModelSerializer
 from rest_framework import serializers as drf_serializers
-from .models import Publication, Subscription, Journal
+from .models import Publication, Subscription, Source
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
-class JournalSerializer(drf_serializers.ModelSerializer):
-    """Serializer for Journal model."""
+class SourceSerializer(serializers.ModelSerializer):
+    works_api_url = serializers.CharField(read_only=True)
 
     class Meta:
-        model = Journal
+        model = Source
         fields = [
             "id",
             "name",
@@ -23,39 +24,41 @@ class JournalSerializer(drf_serializers.ModelSerializer):
             "works_api_url",
         ]
 
-class PublicationSerializer(serializers.GeoFeatureModelSerializer):
-    """publication GeoJSON serializer."""
-    source_details = JournalSerializer(source="source", read_only=True)
+
+class PublicationSerializer(GeoFeatureModelSerializer):
+    source_details = SourceSerializer(source="source", read_only=True)
 
     class Meta:
         model = Publication
-        fields = (
+        geo_field = "geometry"
+        fields = [
             "id",
             "title",
             "abstract",
             "publicationDate",
-            "url",
             "doi",
-            "creationDate",
-            "lastUpdate",
+            "url",
             "timeperiod_startdate",
             "timeperiod_enddate",
-            "source",
-            "source_details",       
-            "geometry",
-            "provenance",
-        )
-        geo_field = "geometry"
-        auto_bbox = True      
-       
-class SubscriptionSerializer(serializers.GeoFeatureModelSerializer):
-    """Subscription GeoJSON serializer."""
+            "source_details",
+        ]
+        auto_bbox = True
 
+
+class SubscriptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Subscription
-        fields = ("search_term","timeperiod_startdate","timeperiod_enddate","user")
-        geo_field = "region"
-        auto_bbox = True
+        fields = (
+            "id",
+            "user",
+            "name",
+            "search_term",
+            "timeperiod_startdate",
+            "timeperiod_enddate",
+            "region",
+            "subscribed",
+        )
+
         
 class EmailChangeSerializer(serializers.ModelSerializer):  
     """Handles email change requests."""

@@ -2,46 +2,44 @@ import json
 from django.test import TestCase
 from rest_framework.test import APIClient
 from rest_framework import status
-from publications.models import Journal, Publication
+from publications.models import Source, Publication
 
-class JournalAPITest(TestCase):
+class SourceAPITest(TestCase):
     """
-    Tests for the Journal endpoints:
-      - GET /api/v1/journals/
-      - GET /api/v1/journals/{pk}/
+    Tests for the source endpoints:
+      - GET /api/v1/sources/
+      - GET /api/v1/sources/{pk}/
     """
 
     def setUp(self):
         self.client = APIClient()
 
-        # 1. Fully populated Journal
-        Journal.objects.create(
-            name="Test Journal A",
+        # 1. Fully populated source (works_api_url is now a property, not a field)
+        self.srcA = Source.objects.create(
+            name="Test source A",
             issn_l="1234-5678",
             openalex_id="https://openalex.org/S012345678",
             openalex_url="https://openalex.org/S012345678",
             publisher_name="Test Publisher A",
             works_count=42,
-            works_api_url="https://api.openalex.org/works?filter=primary_location.source.id:S012345678"
         )
 
-        # 2. Journal missing optional fields
-        Journal.objects.create(
-            name="No ISSN Journal",
+        # 2. Source missing optional fields
+        self.srcB = Source.objects.create(
+            name="No ISSN source",
             issn_l=None,
             openalex_id=None,
             openalex_url=None,
             publisher_name=None,
             works_count=None,
-            works_api_url=None
         )
 
-    def test_list_journals(self):
+    def test_list_sources(self):
         """
-        GET /api/v1/journals/ should return at least two journals,
+        GET /api/v1/sources/ should return at least two sources,
         and each result must include the eight expected fields.
         """
-        url = "/api/v1/journals/"
+        url = "/api/v1/sources/"
         response = self.client.get(url, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -49,18 +47,18 @@ class JournalAPITest(TestCase):
 
         # Unwrap pagination if present
         if isinstance(data, dict) and "results" in data:
-            journals_list = data["results"]
+            sources_list = data["results"]
         else:
-            journals_list = data
+            sources_list = data
 
-        # We expect at least 2 journals
-        self.assertGreaterEqual(len(journals_list), 2)
-        names = {j["name"] for j in journals_list}
-        self.assertIn("Test Journal A", names)
-        self.assertIn("No ISSN Journal", names)
+        # We expect at least 2 sources
+        self.assertGreaterEqual(len(sources_list), 2)
+        names = {j["name"] for j in sources_list}
+        self.assertIn("Test source A", names)
+        self.assertIn("No ISSN source", names)
 
-        # Verify all eight fields for the populated journal
-        populated = next(x for x in journals_list if x["name"] == "Test Journal A")
+        # Verify all eight fields for the populated source
+        populated = next(x for x in sources_list if x["name"] == "Test source A")
         for key in [
             "id",
             "name",
@@ -73,57 +71,56 @@ class JournalAPITest(TestCase):
         ]:
             self.assertIn(key, populated)
 
-        # Verify the second journal has None (null) for optional fields
-        no_issn = next(x for x in journals_list if x["name"] == "No ISSN Journal")
+        # Verify the second source has None (null) for optional fields
+        no_issn = next(x for x in sources_list if x["name"] == "No ISSN source")
         self.assertIsNone(no_issn["issn_l"])
         self.assertIsNone(no_issn["openalex_id"])
         self.assertIsNone(no_issn["publisher_name"])
         self.assertIsNone(no_issn["works_count"])
         self.assertIsNone(no_issn["works_api_url"])
 
-    def test_retrieve_journal_details(self):
+    def test_retrieve_source_details(self):
         """
-        GET /api/v1/journals/{pk}/ should return the correct fields for that journal.
+        GET /api/v1/sources/{pk}/ should return the correct fields for that source.
         """
-        journal = Journal.objects.get(name="Test Journal A")
-        url = f"/api/v1/journals/{journal.pk}/"
+        src = Source.objects.get(name="Test source A")
+        url = f"/api/v1/sources/{src.pk}/"
         response = self.client.get(url, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         jdata = response.json()
-        self.assertEqual(jdata["id"], journal.pk)
-        self.assertEqual(jdata["name"], journal.name)
-        self.assertEqual(jdata["issn_l"], journal.issn_l)
-        self.assertEqual(jdata["openalex_id"], journal.openalex_id)
-        self.assertEqual(jdata["openalex_url"], journal.openalex_url)
-        self.assertEqual(jdata["publisher_name"], journal.publisher_name)
-        self.assertEqual(jdata["works_count"], journal.works_count)
-        self.assertEqual(jdata["works_api_url"], journal.works_api_url)
+        self.assertEqual(jdata["id"], src.pk)
+        self.assertEqual(jdata["name"], src.name)
+        self.assertEqual(jdata["issn_l"], src.issn_l)
+        self.assertEqual(jdata["openalex_id"], src.openalex_id)
+        self.assertEqual(jdata["openalex_url"], src.openalex_url)
+        self.assertEqual(jdata["publisher_name"], src.publisher_name)
+        self.assertEqual(jdata["works_count"], src.works_count)
+        self.assertEqual(jdata["works_api_url"], src.works_api_url)
 
 
 class PublicationAPITest(TestCase):
     """
     Tests for the Publication endpoints:
       - GET /api/v1/publications/
-      - Filtering by ?journal_id={pk}
+      - Filtering by ?source_id={pk}
       - Ensure nested 'source_details' appears with its fields.
     """
 
     def setUp(self):
         self.client = APIClient()
 
-        # 1. Create one Journal to attach to a Publication
-        journal = Journal.objects.create(
-            name="API Journal",
+        # 1. Create one source to attach to a Publication
+        self.src = Source.objects.create(
+            name="API source",
             issn_l="1111-2222",
             openalex_id="https://openalex.org/S011112222",
             openalex_url="https://openalex.org/S011112222",
             publisher_name="API Publisher",
             works_count=7,
-            works_api_url="https://api.openalex.org/works?filter=primary_location.source.id:S011112222"
         )
 
-        # 2. Create a published Publication linked to that Journal
+        # 2. Create a published Publication linked to that source
         Publication.objects.create(
             title="API Paper",
             abstract="Testing nested source_details serialization",
@@ -131,7 +128,7 @@ class PublicationAPITest(TestCase):
             doi="10.1000/testdoi",
             url="http://example.com/api-paper",
             geometry=None,  # No geometry for test convenience
-            source=journal,
+            source=self.src,
             timeperiod_startdate=["2020-01-01"],
             timeperiod_enddate=["2021-01-01"],
             provenance="Test provenance",
@@ -177,7 +174,7 @@ class PublicationAPITest(TestCase):
     def test_publication_includes_source_details(self):
         """
         GET /api/v1/publications/ should return ≥1 publication,
-        and each publication’s 'source_details' must include all eight journal fields.
+        and each publication’s 'source_details' must include all eight source fields.
         """
         url = "/api/v1/publications/"
         response = self.client.get(url, format="json")
@@ -205,24 +202,22 @@ class PublicationAPITest(TestCase):
         ]:
             self.assertIn(key, details)
 
-        # Compare against the Journal we created
-        journal = Journal.objects.get(name="API Journal")
-        self.assertEqual(details["id"], journal.pk)
-        self.assertEqual(details["name"], journal.name)
-        self.assertEqual(details["issn_l"], journal.issn_l)
-        self.assertEqual(details["openalex_id"], journal.openalex_id)
-        self.assertEqual(details["openalex_url"], journal.openalex_url)
-        self.assertEqual(details["publisher_name"], journal.publisher_name)
-        self.assertEqual(details["works_count"], journal.works_count)
-        self.assertEqual(details["works_api_url"], journal.works_api_url)
+        # Compare against the source we created
+        self.assertEqual(details["id"], self.src.pk)
+        self.assertEqual(details["name"], self.src.name)
+        self.assertEqual(details["issn_l"], self.src.issn_l)
+        self.assertEqual(details["openalex_id"], self.src.openalex_id)
+        self.assertEqual(details["openalex_url"], self.src.openalex_url)
+        self.assertEqual(details["publisher_name"], self.src.publisher_name)
+        self.assertEqual(details["works_count"], self.src.works_count)
+        self.assertEqual(details["works_api_url"], self.src.works_api_url)
 
-    def test_filter_publications_by_journal(self):
+    def test_filter_publications_by_source(self):
         """
-        GET /api/v1/publications/?journal_id=<pk> should return only those
+        GET /api/v1/publications/?source_id=<pk> should return only those
         publications whose source_details["id"] equals <pk>.
         """
-        journal = Journal.objects.get(name="API Journal")
-        url = f"/api/v1/publications/?journal_id={journal.pk}"
+        url = f"/api/v1/publications/?source_id={self.src.pk}"
         response = self.client.get(url, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -230,8 +225,8 @@ class PublicationAPITest(TestCase):
         pubs_list = self._unwrap_publications(data)
         self.assertGreaterEqual(len(pubs_list), 1)
 
-        # Each publication must have source_details["id"] == journal.pk
+        # Each publication must have source_details["id"] == source.pk
         for p in pubs_list:
             self.assertIn("source_details", p)
             self.assertIsInstance(p["source_details"], dict)
-            self.assertEqual(p["source_details"]["id"], journal.pk)
+            self.assertEqual(p["source_details"]["id"], self.src.pk)

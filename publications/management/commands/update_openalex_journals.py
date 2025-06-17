@@ -1,18 +1,16 @@
 # publications/management/commands/update_openalex_journals.py
 
 from django.core.management.base import BaseCommand
-from publications.models import Journal
+from django.db.models import Q
+from publications.models import Source
 import requests
 
-def fetch_openalex_for_issn(issn: str) -> dict | None:
-    """
-    Query OpenAlex for a given ISSN-L and return the JSON dict.
-    Follows 302 redirects if necessary.
-    """
+ISSN_ENDPOINT   = "https://api.openalex.org/sources/issn:{issn}"
+SEARCH_ENDPOINT = "https://api.openalex.org/sources"
+
+def fetch_by_issn(issn: str) -> dict | None:
     try:
-        # Initial request to /sources/issn:<ISSN>
-        resp = requests.get(f"https://api.openalex.org/sources/issn:{issn}", timeout=10)
-        # If OpenAlex returns a 302 redirect, follow it to the canonical URL
+        resp = requests.get(ISSN_ENDPOINT.format(issn=issn), timeout=10)
         if resp.status_code == 302 and "Location" in resp.headers:
             resp = requests.get(resp.headers["Location"], timeout=10)
         if resp.status_code == 200:
@@ -21,56 +19,86 @@ def fetch_openalex_for_issn(issn: str) -> dict | None:
         pass
     return None
 
+def fetch_by_name(name: str) -> dict | None:
+    try:
+        params = {"filter": f"display_name.search:{name}"}
+        resp = requests.get(SEARCH_ENDPOINT, params=params, timeout=10)
+        resp.raise_for_status()
+        results = resp.json().get("results", [])
+        return results[0] if results else None
+    except requests.RequestException:
+        pass
+    return None
+
 class Command(BaseCommand):
-    help = "Update Journal metadata (openalex_id, publisher_name, works_count, works_api_url, etc.) from OpenAlex."
+    help = (
+        "Update Source metadata from OpenAlex. "
+        "Works for ISSN-based journals and name-based preprints."
+    )
 
     def handle(self, *args, **options):
-        journals_qs = Journal.objects.exclude(issn_l__isnull=True)
-        total = journals_qs.count()
-        self.stdout.write(f"Found {total} journal(s) with ISSN-L.")
+        qs = Source.objects.filter(Q(issn_l__isnull=False) | Q(is_preprint=True))
+        self.stdout.write(f"Found {qs.count()} source(s) to update.\n")
 
-        for journal in journals_qs:
-            data = fetch_openalex_for_issn(journal.issn_l)
+        for src in qs:
+            lookup_key = src.issn_l or src.name
+            self.stdout.write(f"[{lookup_key}] querying OpenAlex…")
+
+            if src.issn_l:
+                data = fetch_by_issn(src.issn_l)
+            else:
+                data = fetch_by_name(src.name)
+
             if not data:
-                self.stdout.write(f"Skipped (no data): {journal.name}")
+                self.stderr.write(f"[{lookup_key}] skipped (no data)\n")
                 continue
+
+            host = data.get("host_organization") or {}
+            if not isinstance(host, dict):
+                host = {}
 
             changed = False
 
-            # 1. openalex_id & openalex_url
-            new_openalex = data.get("id")  # e.g., "https://openalex.org/S137773608"
-            if new_openalex and journal.openalex_id != new_openalex:
-                journal.openalex_id = new_openalex
-                journal.openalex_url = new_openalex  # mirror the same URL
-                changed = True
+            def safe_upd(field: str, new, fmt="{}"):
+                nonlocal changed
+                if not hasattr(src, field):
+                    return
+                old = getattr(src, field)
+                # treat empty strings or None as "no update"
+                if new is None or (isinstance(new, str) and not new.strip()):
+                    return
+                if new != old:
+                    setattr(src, field, new)
+                    self.stdout.write(f"  • {field}: {old!r} → {new!r}")
+                    changed = True
 
-            # 2. works_count & works_api_url
-            new_works_count = data.get("works_count")
-            if new_works_count is not None and journal.works_count != new_works_count:
-                journal.works_count = new_works_count
-                changed = True
+            # 1. OpenAlex core identifiers & counts
+            safe_upd("openalex_id", data.get("id"))
+            safe_upd("openalex_url", data.get("id"))
+            safe_upd("works_count", data.get("works_count"))
 
-            api_url = data.get("works_api_url")
-            if api_url and journal.works_api_url != api_url:
-                journal.works_api_url = api_url
-                changed = True
+            # 2. Titles & URLs
+            safe_upd("abbreviated_title", data.get("abbreviated_title"))
+            safe_upd("homepage_url", data.get("homepage_url"))
 
-            # 3. publisher_name: read from "host_organization.display_name"
-            host_org = data.get("host_organization", {})
-            new_publisher = None
-            if isinstance(host_org, dict):
-                new_publisher = host_org.get("display_name")
-            # Fallback: if still None, use data["display_name"] as proxy
-            if not new_publisher:
-                new_publisher = data.get("display_name")
-            if new_publisher and journal.publisher_name != new_publisher:
-                journal.publisher_name = new_publisher
-                changed = True
+            # 3. Publisher/display name
+            publisher = host.get("display_name") or data.get("display_name")
+            safe_upd("publisher_name", publisher)
+
+            # 4. Statistics & flags
+            safe_upd("cited_by_count", data.get("cited_by_count"))
+            safe_upd("apc_usd", data.get("apc_usd"))
+            safe_upd("country_code", data.get("country_code"))
+            safe_upd("is_oa", data.get("is_oa", False))
+            safe_upd("is_core", data.get("is_core", False))
+            safe_upd("is_in_doaj", data.get("is_in_doaj", False))
+            safe_upd("type", data.get("type"))
+            safe_upd("updated_date", data.get("updated_date"))
 
             if changed:
-                journal.save()
-                self.stdout.write(f"Updated: {journal.name} ({journal.issn_l})")
+                src.save()
+                self.stdout.write(f"[{lookup_key}] saved\n")
             else:
-                self.stdout.write(f"Skipped (unchanged): {journal.name}")
+                self.stdout.write(f"[{lookup_key}] nothing changed\n")
 
         self.stdout.write("Done updating OpenAlex metadata.")
