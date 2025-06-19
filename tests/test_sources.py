@@ -5,7 +5,7 @@ from django.core.exceptions import ValidationError
 from rest_framework.test import APIClient
 from rest_framework import status
 
-from publications.models import Journal
+from publications.models import 
 from stdnum.issn import is_valid as is_valid_issn
 
 
@@ -18,11 +18,11 @@ class JournalModelTest(TestCase):
     def test_issn_l_validator_rejects_invalid_issn(self):
         """full_clean() should raise ValidationError on an invalid ISSN-L."""
         invalid = "1234-5678"
-        j = Journal(display_name="Bad ISSN", issn_l=invalid)
+        j = Source(display_name="Bad ISSN", issn_l=invalid)
         with self.assertRaises(ValidationError):
             j.full_clean()
-    def test_list_journals_includes_geometry(self):
-        url = "/api/v1/journals/"
+    def test_list_sources_includes_geometry(self):
+        url = "/api/v1/sources/"
         resp = self.client.get(url)
         results = resp.json()["results"]
         # Should be either a list [lon, lat] or null
@@ -33,7 +33,7 @@ class JournalAPITest(TestCase):
     @classmethod
     def setUpTestData(cls):
         # two with ISSNs…
-        Journal.objects.create(
+        Source.objects.create(
             display_name="Nature",
             issn_l="0028-0836",
             issn_list=["0028-0836", "1476-4687"],
@@ -41,7 +41,7 @@ class JournalAPITest(TestCase):
             openalex_id="https://openalex.org/S137773608",
             articles=["W1", "W2"],
         )
-        Journal.objects.create(
+        Source.objects.create(
             display_name="Science",
             issn_l="0036-8075",
             issn_list=["0036-8075"],
@@ -49,8 +49,8 @@ class JournalAPITest(TestCase):
             openalex_id="https://openalex.org/S137774328",
             articles=["W3"],
         )
-        Journal.objects.create(
-            display_name="My Journal",
+        Source.objects.create(
+            display_name="My Source",
             issn_l=None,
             issn_list=[],
             publisher="Local Publisher",
@@ -61,14 +61,14 @@ class JournalAPITest(TestCase):
     def setUp(self):
         self.client = APIClient()
 
-    def test_list_journals(self):
-        """GET /api/v1/journals/ should list all journals with the right fields."""
+    def test_list_sources(self):
+        """GET /api/v1/sources/ should list all sources with the right fields."""
         # try named URL first...
         try:
-            url = reverse("journal-list")
+            url = reverse("source-list")
         except NoReverseMatch:
             # fallback to hard-coded path if reverse() fails
-            url = "/api/v1/journals/"
+            url = "/api/v1/sources/"
 
         resp = self.client.get(url)
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
@@ -78,7 +78,7 @@ class JournalAPITest(TestCase):
         results = data["results"]
         self.assertEqual(len(results), 3)
 
-        # Check fields of the first journal
+        # Check fields of the first source
         first = results[0]
         expected_fields = {
             "display_name",
@@ -91,7 +91,7 @@ class JournalAPITest(TestCase):
         self.assertEqual(set(first.keys()), expected_fields)
 
         # Check that the values match what we set up
-        noissn = next(j for j in results if j["display_name"] == "My Journal")
+        noissn = next(j for j in results if j["display_name"] == "My Source")
         self.assertIsNone(noissn["issn_l"])
         self.assertEqual(noissn["issn_list"], [])
         self.assertEqual(noissn["publisher"], "Local Publisher")

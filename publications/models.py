@@ -199,3 +199,4 @@ class Source(models.Model):
             minutes=self.harvest_interval_minutes,
             name=f"Harvest Source {self.id}",
         )
+Journal = Source  
