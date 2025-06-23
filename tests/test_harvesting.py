@@ -2,7 +2,7 @@ import os
 import django
 import time
 import responses
-from django.test import Client, TestCase
+from django.test import Client, TransactionTestCase
 from django.conf import settings
 from django.urls import reverse
 # bootstrap Django
@@ -16,7 +16,7 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 
 
-class SimpleTest(TestCase):
+class SimpleTest(TransactionTestCase):
     @classmethod
     @responses.activate
     def setUpClass(cls):
@@ -26,7 +26,7 @@ class SimpleTest(TestCase):
         Publication.objects.all().delete()
 
         # Prepare the two mock HTML article endpoints
-        base = os.path.join(os.getcwd(), 'tests', 'harvesting', 'source_1')
+        base = os.path.join(settings.BASE_DIR, 'tests', 'harvesting', 'source_1')
         oai_path = os.path.join(base, 'oai_dc.xml')
         art1_path = os.path.join(base, 'article_01.html')
         art2_path = os.path.join(base, 'article_02.html')

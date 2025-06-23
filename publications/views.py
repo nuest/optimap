@@ -116,15 +116,10 @@ def download_geopackage(request):
     """
     Returns the latest GeoPackage dump file.
     """
-    path = regenerate_geopackage_cache()
-    if not os.path.exists(path):
-        raise Http404('GeoPackage dump not found')
-    return FileResponse(
-        open(path, 'rb'),
-        content_type="application/geopackage+sqlite3",
-        as_attachment=True,
-        filename=Path(path).name
-    )
+    gpkg_path = regenerate_geopackage_cache()
+    if not gpkg_path or not os.path.exists(gpkg_path):
+        raise Http404("GeoPackage not available.")
+    return FileResponse(open(gpkg_path, 'rb'), as_attachment=True, filename=os.path.basename(gpkg_path))
 
 
 def main(request):

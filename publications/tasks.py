@@ -26,6 +26,7 @@ from django_q.models import Schedule
 from publications.models import Publication, HarvestingEvent, Source
 from .models import EmailLog, Subscription
 from django.contrib.auth import get_user_model
+from django.urls import reverse
 
 User = get_user_model()
 
@@ -74,30 +75,44 @@ def extract_timeperiod_from_html(soup: BeautifulSoup):
     return [None], [None]
 
 
-def parse_oai_xml_and_save_publications(content, event):
+def parse_oai_xml_and_save_publications(content: bytes, event: HarvestingEvent) -> tuple[int, int, int]:
+    """
+    Parse OAI-PMH XML, save Publication records linked to `event`,
+    and return counts: (added, spatial, temporal).
+    """
     try:
         dom = xml.dom.minidom.parseString(content)
     except Exception as e:
         logger.error("Error parsing XML: %s", e)
-        return
+        return 0, 0, 0
 
     for record in dom.getElementsByTagName("record"):
         try:
-            def get_text(tag):
-                nodes = record.getElementsByTagName(tag)
-                return (nodes[0].firstChild.nodeValue.strip()
-                        if nodes and nodes[0].firstChild else None)
+            def get_text(tag_name: str) -> str | None:
+                nodes = record.getElementsByTagName(tag_name)
+                return (
+                    nodes[0].firstChild.nodeValue.strip()
+                    if nodes and nodes[0].firstChild else None
+                )
 
-            ids = [n.firstChild.nodeValue.strip()
-                   for n in record.getElementsByTagName("dc:identifier")
-                   if n.firstChild]
+            ids = [
+                n.firstChild.nodeValue.strip()
+                for n in record.getElementsByTagName("dc:identifier")
+                if n.firstChild
+            ]
             http_ids = [u for u in ids if u.lower().startswith("http")]
-            identifier = next((u for u in http_ids if "/view/" in u), http_ids[:1] + [None])[0]
+            identifier = None
+            for u in http_ids:
+                if "/view/" in u:
+                    identifier = u
+                    break
+            if not identifier and http_ids:
+                identifier = http_ids[0]
 
-            title = get_text("dc:title")
-            abstract = get_text("dc:description")
+            title          = get_text("dc:title")
+            abstract       = get_text("dc:description")
             publisher_name = get_text("dc:publisher")
-            pub_date = get_text("dc:date")
+            pub_date       = get_text("dc:date")
 
             doi = None
             for u in ids:
@@ -106,20 +121,24 @@ def parse_oai_xml_and_save_publications(content, event):
                     doi = m.group(0)
                     break
 
-            if doi and Publication.objects.filter(doi=doi).exists(): continue
-            if identifier and Publication.objects.filter(url=identifier).exists(): continue
-            if not identifier or not identifier.startswith("http"): continue
+            if doi and Publication.objects.filter(doi=doi).exists():
+                continue
+            if identifier and Publication.objects.filter(url=identifier).exists():
+                continue
+            if not identifier or not identifier.startswith("http"):
+                continue
 
             geom = GeometryCollection()
-            period_start, period_end = [], []
+            ps_list: list[str] = []
+            pe_list: list[str] = []
             try:
                 resp = requests.get(identifier, timeout=10)
                 resp.raise_for_status()
                 soup = BeautifulSoup(resp.content, "html.parser")
                 g = extract_geometry_from_html(soup)
-                if g: geom = g
-                ps, pe = extract_timeperiod_from_html(soup)
-                period_start, period_end = ps, pe
+                if g:
+                    geom = g
+                ps_list, pe_list = extract_timeperiod_from_html(soup)
             except Exception:
                 pass
 
@@ -127,7 +146,7 @@ def parse_oai_xml_and_save_publications(content, event):
             if publisher_name:
                 src, _ = Source.objects.get_or_create(name=publisher_name)
 
-            pub = Publication(
+            Publication.objects.create(
                 title=title,
                 abstract=abstract,
                 publicationDate=pub_date,
@@ -135,19 +154,29 @@ def parse_oai_xml_and_save_publications(content, event):
                 doi=doi,
                 source=src,
                 geometry=geom,
-                timeperiod_startdate=period_start,
-                timeperiod_enddate=period_end,
+                timeperiod_startdate=ps_list,
+                timeperiod_enddate=pe_list,
                 job=event,
             )
-            pub.save()
         except Exception as e:
             logger.error("Error parsing record: %s", e)
             continue
 
+    added_count    = Publication.objects.filter(job=event).count()
+    spatial_count  = Publication.objects.filter(job=event).exclude(geometry__isnull=True).count()
+    temporal_count = Publication.objects.filter(job=event).exclude(timeperiod_startdate=[]).count()
+    return added_count, spatial_count, temporal_count
 
-def harvest_oai_endpoint(source_id, user=None):
-    src = Source.objects.get(id=source_id)
-
+def harvest_oai_endpoint(source_id: int, user=None) -> None:
+    """
+    Fetch OAI-PMH feed (HTTP or file://), create a HarvestingEvent,
+    parse & save publications, send summary email, and mark completion.
+    """
+    try:
+        src = Source.objects.get(pk=source_id)
+    except Source.DoesNotExist:
+        logger.error("Source with id %s not found", source_id)
+        return
     if src.url_field.startswith("file://"):
         path = src.url_field[7:]
         try:
@@ -170,9 +199,25 @@ def harvest_oai_endpoint(source_id, user=None):
         src.is_preprint = True
         src.save(update_fields=["is_preprint"])
 
-    event = HarvestingEvent.objects.create(source=src, status="in_progress")
-    parse_oai_xml_and_save_publications(content, event)
-    event.status = "completed"
+    event = HarvestingEvent.objects.create(
+        source=src,
+        user=user,
+        status="in_progress",
+    )
+    added, spatial, temporal = parse_oai_xml_and_save_publications(content, event)
+    if user:
+        subject = "Harvesting Completed"
+        body = (
+            f"Collection: {src.collection_name}\n"
+            f"Source URL: {src.url_field}\n"
+            f"Number of added articles: {added}\n"
+            f"Number of articles with spatial metadata: {spatial}\n"
+            f"Number of articles with temporal metadata: {temporal}\n"
+            f"Harvest started : {event.started_at:%Y-%m-%d}\n"
+        )
+        send_mail(subject, body, settings.EMAIL_HOST_USER, [user.email])
+
+    event.status       = "completed"
     event.completed_at = timezone.now()
     event.save()
 

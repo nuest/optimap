@@ -27,7 +27,7 @@ class SourceSerializer(serializers.ModelSerializer):
 
 
 class PublicationSerializer(GeoFeatureModelSerializer):
-    source_details = SourceSerializer(source="source", read_only=True)
+    source_details = serializers.SerializerMethodField()
 
     class Meta:
         model = Publication
@@ -45,8 +45,15 @@ class PublicationSerializer(GeoFeatureModelSerializer):
             "source_details",
         ]
 
-
-
+    def get_source_details(self, obj):
+        if not obj.source:
+            return {}
+        return {
+            "id": obj.source.id,
+            "name": obj.source.name,
+            "issn_l": obj.source.issn_l,
+            "openalex_url": obj.source.openalex_url,
+        }
 
 class SubscriptionSerializer(GeoFeatureModelSerializer):
     class Meta:

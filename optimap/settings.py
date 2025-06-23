@@ -37,6 +37,8 @@ SECRET_KEY = env('SECRET_KEY', default='django-insecure')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env('OPTIMAP_DEBUG', default=False)
 
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 ALLOWED_HOSTS = [i.strip('[]') for i in env('OPTIMAP_ALLOWED_HOST', default='*').split(',')]
 
 OPTIMAP_SUPERUSER_EMAILS = [i.strip('[]') for i in env('OPTIMAP_SUPERUSER_EMAILS', default='').split(',')]

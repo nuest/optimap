@@ -13,6 +13,7 @@ app_name = "optimap"
 
 urlpatterns = [
     path('', views.main, name="main"),
+    path("", include(("publications.api", "publications"), namespace="publications")),
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/schema/ui/',SpectacularRedocView.as_view(url_name='optimap:schema'),name='redoc'),
     path('download/geojson/', views.download_geojson, name='download_geojson'),

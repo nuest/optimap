@@ -1,10 +1,10 @@
 import json
-from django.test import TestCase
+from django.test import TransactionTestCase
 from rest_framework.test import APIClient
 from rest_framework import status
 from publications.models import Source, Publication
 
-class SourceAPITest(TestCase):
+class SourceAPITest(TransactionTestCase):
     """
     Tests for the source endpoints:
       - GET /api/v1/sources/
@@ -51,8 +51,8 @@ class SourceAPITest(TestCase):
         else:
             sources_list = data
 
-        # We expect at least 2 sources
-        self.assertGreaterEqual(len(sources_list), 2)
+        # We expect exactly 2 sources
+        self.assertEqual(len(sources_list), 2)
         names = {j["name"] for j in sources_list}
         self.assertIn("Test source A", names)
         self.assertIn("No ISSN source", names)
@@ -99,7 +99,7 @@ class SourceAPITest(TestCase):
         self.assertEqual(jdata["works_api_url"], src.works_api_url)
 
 
-class PublicationAPITest(TestCase):
+class PublicationAPITest(TransactionTestCase):
     """
     Tests for the Publication endpoints:
       - GET /api/v1/publications/
@@ -182,7 +182,7 @@ class PublicationAPITest(TestCase):
 
         data = response.json()
         pubs_list = self._unwrap_publications(data)
-        self.assertGreaterEqual(len(pubs_list), 1)
+        self.assertEqual(len(pubs_list), 1)
 
         pub_data = pubs_list[0]
         self.assertIn("source_details", pub_data)
@@ -223,7 +223,7 @@ class PublicationAPITest(TestCase):
 
         data = response.json()
         pubs_list = self._unwrap_publications(data)
-        self.assertGreaterEqual(len(pubs_list), 1)
+        self.assertEqual(len(pubs_list), 1)
 
         # Each publication must have source_details["id"] == source.pk
         for p in pubs_list:

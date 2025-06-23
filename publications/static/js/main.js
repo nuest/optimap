@@ -11,7 +11,9 @@ async function load_publications() {
 }
 
 // 2. Once the DOM is ready, initialize the map
-$(document).ready(initMap);
+$(document).ready(function() {
+  initMap();
+});
 
 // API URL and copyright attribution
 const publications_url = '/api/v1/publications/?limit=999999';
