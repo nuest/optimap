@@ -25,16 +25,6 @@
       >
         {{ region.name }}.geoatom
       </a>
-      <span>|</span>
-
-      {# W3C-Geo feed link #}
-      <a
-        href="{% url 'optimap:feed-w3cgeo-by-slug' region.name|slugify %}"
-        class="text-blue-600 hover:underline"
-        title="W3C-Geo feed for {{ region.name }}"
-      >
-        {{ region.name }}.w3cgeo
-      </a>
 
       <small class="text-gray-500">
         (updated {{ region.last_loaded|date:"Y-m-d H:i" }})

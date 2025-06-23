@@ -40,7 +40,6 @@ urlpatterns = [
     path("changeuser/", views.change_useremail, name="changeuser"),
     path("feeds/georss/<slug:geometry_slug>/",GeoFeedByGeometry(feed_type_variant="georss"),name="feed-georss-by-slug",),
     path("feeds/geoatom/<slug:geometry_slug>/", GeoFeedByGeometry(feed_type_variant="geoatom"), name="feed-geoatom-by-slug"),
-    path("feeds/w3cgeo/<slug:geometry_slug>/", GeoFeedByGeometry(feed_type_variant="w3cgeo"), name="feed-w3cgeo-by-slug"),
     path("feeds/", views.feeds_list, name="feeds_list"),
     path('download/geojson/', views.download_geojson, name='download_geojson'),
     path('download/geopackage/', views.download_geopackage, name='download_geopackage'),
