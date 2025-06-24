@@ -58,6 +58,7 @@ class Command(BaseCommand):
         with urllib.request.urlopen(OCEANS_WFS_URL) as resp, open(oceans_path, "wb") as out:
             shutil.copyfileobj(resp, out)
 
+        # DataSource does not support automatic closing, deleting object manually below, see https://docs.djangoproject.com/en/5.2/ref/contrib/gis/gdal/#datasource
         ds = DataSource(oceans_path)
         layer = ds[0]
 
