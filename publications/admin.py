@@ -8,6 +8,7 @@ from django_q.models import Schedule
 from django.utils.timezone import now
 from publications.models import CustomUser
 from publications.tasks import regenerate_geojson_cache
+from publications.tasks import regenerate_geopackage_cache
 from publications.views import generate_geopackage
 
 @admin.action(description="Mark selected publications as published")
@@ -118,12 +119,12 @@ def block_email_and_domain(modeladmin, request, queryset):
 def regenerate_all_exports(modeladmin, request, queryset):
     """
     Immediately rebuild both:
-      • the /tmp/optimap_cache/geojson_cache.json(.gz)
+      • the /tmp/optimap_cache/geojson_cache.json
       • the /tmp/optimap_cache/publications.gpkg
     """
     try:
         regenerate_geojson_cache()
-        generate_geopackage()
+        regenerate_geopackage_cache()
         messages.success(request, "GeoJSON & GeoPackage caches were regenerated.")
     except Exception as e:
         messages.error(request, f"Error during export regeneration: {e}")
