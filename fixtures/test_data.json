@@ -5,12 +5,10 @@
     "fields": {
       "name": "Volcanica",
       "issn_l": "2610-3540",
-      "openalex_id": null,
-      "openalex_url": null,
-      "publisher_name": null,
-      "works_count": null,
-      "homepage_url": null,
-      "abbreviated_title": null,
+      "openalex_id": "https://openalex.org/S26103540",
+      "openalex_url": "https://openalex.org/S26103540",
+      "publisher_name": "Volcanica Society",
+      "works_count": 12,
       "is_oa": false,
       "cited_by_count": null
     }

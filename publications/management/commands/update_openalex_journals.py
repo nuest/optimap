@@ -53,20 +53,18 @@ class Command(BaseCommand):
             # fetch metadata
             data = fetch_by_issn(src.issn_l) if src.issn_l else fetch_by_name(src.name)
             if not data:
-                self.stderr.write(f"[{key}] skipped (no data)\n")
+                logger.info("Skipped ISSN=%s: no OpenAlex data", src.issn_l)
                 continue
-
+            
             changed = False
             def safe_upd(field: str, new):
                 nonlocal changed
                 old = getattr(src, field, None)
                 if new and new != old:
-                    logger.info("Updating %s: %r → %r", field, old, new)
+                    logger.info("ISSN=%s: %s changed %r → %r", src.issn_l, field, old, new)
                     setattr(src, field, new)
                     changed = True
 
-            # core OpenAlex fields
-            safe_upd("openalex_id",    data.get("id"))
             safe_upd("openalex_url",   data.get("id"))
             safe_upd("works_count",    data.get("works_count"))
             # host_organization may be nested under "host_organization"

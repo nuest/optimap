@@ -20,15 +20,7 @@ class PublicationViewSet(viewsets.ReadOnlyModelViewSet):
     filter_backends = (filters.InBBoxFilter,)
     serializer_class = PublicationSerializer
     permission_classes = [IsAuthenticatedOrReadOnly]
-
-    def get_queryset(self):
-        qs = Publication.objects.all()
-        if self.action == "list":
-            qs = qs.filter(status="p")
-        src = self.request.query_params.get("source_id")
-        if src:
-            qs = qs.filter(source__id=src)
-        return qs
+    queryset = Publication.objects.filter(status="p").distinct()
 
 class SubscriptionViewSet(viewsets.ModelViewSet):
     """
