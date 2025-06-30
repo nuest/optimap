@@ -47,31 +47,33 @@ EMAIL_CONFIRMATION_TOKEN_PREFIX = "email_confirmation_"
 @require_GET
 def download_geojson(request):
     """
-    Returns the latest GeoJSON dump file, gzipped if the client accepts it.
+    Returns the latest GeoJSON dump file, gzipped if the client accepts it,
+    but always with Content-Type: application/json.
     """
     cache_dir = Path(tempfile.gettempdir()) / "optimap_cache"
     cache_dir.mkdir(exist_ok=True)
-
-    # regenerate and find latest geojson dump
-    path = regenerate_geojson_cache()
-    gzip_path = Path(str(path) + ".gz")
+    json_path = regenerate_geojson_cache()
+    gzip_path = Path(str(json_path) + ".gz")
     accept_enc = request.META.get('HTTP_ACCEPT_ENCODING', '')
 
     if 'gzip' in accept_enc and gzip_path.exists():
         response = FileResponse(
             open(gzip_path, 'rb'),
-            content_type="application/gzip",
+            content_type="application/json",
             as_attachment=True,
             filename=gzip_path.name
         )
         response['Content-Encoding'] = 'gzip'
+        response['Content-Disposition'] = f'attachment; filename="{gzip_path.name}"'
     else:
+        # Serve the plain JSON
         response = FileResponse(
-            open(path, 'rb'),
+            open(json_path, 'rb'),
             content_type="application/json",
             as_attachment=True,
-            filename=Path(path).name
+            filename=Path(json_path).name
         )
+        response['Content-Disposition'] = f'attachment; filename="{Path(json_path).name}"'
     return response
 
 
