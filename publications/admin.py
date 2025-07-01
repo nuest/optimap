@@ -7,6 +7,9 @@ from publications.tasks import harvest_oai_endpoint, schedule_subscription_email
 from django_q.models import Schedule
 from django.utils.timezone import now
 from publications.models import CustomUser
+from publications.tasks import regenerate_geojson_cache
+from publications.tasks import regenerate_geopackage_cache
+from publications.views import generate_geopackage
 
 @admin.action(description="Mark selected publications as published")
 def make_public(modeladmin, request, queryset):
@@ -111,6 +114,20 @@ def block_email_and_domain(modeladmin, request, queryset):
         BlockedDomain.objects.get_or_create(domain=domain)  
         user.delete()
     modeladmin.message_user(request, "Selected users have been deleted and their emails/domains blocked.")
+    
+@admin.action(description="Regenerate GeoJSON & GeoPackage now")
+def regenerate_all_exports(modeladmin, request, queryset):
+    """
+    Immediately rebuild both:
+      • the /tmp/optimap_cache/geojson_cache.json
+      • the /tmp/optimap_cache/publications.gpkg
+    """
+    try:
+        regenerate_geojson_cache()
+        regenerate_geopackage_cache()
+        messages.success(request, "GeoJSON & GeoPackage caches were regenerated.")
+    except Exception as e:
+        messages.error(request, f"Error during export regeneration: {e}")
 
 @admin.register(Publication)
 class PublicationAdmin(LeafletGeoAdmin, ImportExportModelAdmin):
@@ -118,7 +135,7 @@ class PublicationAdmin(LeafletGeoAdmin, ImportExportModelAdmin):
     list_display = ("title", "doi", "creationDate", "lastUpdate", "created_by", "updated_by", "status", "provenance", "source")
     search_fields = ("title", "doi", "abstract", "source")
     list_filter = ("status", "creationDate")
-    actions = [make_public, make_draft]
+    actions = [make_public, make_draft, regenerate_all_exports]
 
     fields = (
         "title", "doi", "status", "source", "abstract",
@@ -126,7 +143,8 @@ class PublicationAdmin(LeafletGeoAdmin, ImportExportModelAdmin):
         "created_by", "updated_by", "provenance"
     )
     readonly_fields = ("created_by", "updated_by")
-
+ 
+    
 @admin.register(Source)
 class SourceAdmin(admin.ModelAdmin):
     list_display = ("id", "url_field", "harvest_interval_minutes", "last_harvest", "collection_name", "tags")
