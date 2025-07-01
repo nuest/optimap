@@ -147,15 +147,11 @@ python manage.py runserver
 # Start the app with specific configurations for development
 OPTIMAP_CACHE=dummy OPTIMAP_DEBUG=True python manage.py runserver
 
-## Manually regenerating the GeoJSON / GeoPackage cache
-
-1. **Via Django-Q cluster**  
-   If you already have a Q cluster running (e.g. `python manage.py qcluster`), you can simply add the job to the schedule table (once) by running:    
-   python manage.py schedule_geojson
-
-2. **One‐off via the Django shell**
-    If you just want a “right‐now” rebuild (without waiting for the next 6-hour tick), drop into a one-liner:
-    python manage.py shell -c "from publications.tasks import regenerate_geojson_cache; regenerate_geojson_cache()"
+# Manually regenerating data export files (GeoJSON / GeoPackage cache)
+## Via Django-Q cluster: if you already have a Q cluster running (e.g. `python manage.py qcluster`), you can simply add the job to the schedule table (once) by running:
+python manage.py schedule_geojson
+## One‐off via the Django shell: if you just want a “right‐now” rebuild (without waiting for the next 6-hour tick), drop into a one-liner:
+python manage.py shell -c "from publications.tasks import regenerate_geojson_cache; regenerate_geojson_cache()"
 ```
 
 Now open a browser at <http://127.0.0.1:8000/>.
@@ -399,10 +395,6 @@ python manage.py qmonitorq
 
 python manage.py qinfo
 ```
-
-### Trigger creation of data export files
-
-TODO
 
 ## License
 
