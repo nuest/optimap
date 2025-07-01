@@ -17,6 +17,7 @@ User = get_user_model()
 
 @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
 class HarvestRegularMetadataTestCase(TransactionTestCase):
+    
     def setUp(self):
         Publication.objects.all().delete()
         HarvestingEvent.objects.all().delete()
@@ -57,6 +58,7 @@ class HarvestRegularMetadataTestCase(TransactionTestCase):
                 timeperiod_enddate=[],
                 geometry=None
             )
+            return 2, 0, 0  # Two publications added, no spatial or temporal metadata
 
         mock_parser.side_effect = fake_parser_func
 

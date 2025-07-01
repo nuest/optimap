@@ -45,11 +45,15 @@ class PublicationsApiTest(TransactionTestCase):
 
     def test_api_redirect(self):
         response = self.client.get('/api')
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.url, '/api/v1/')
+        self.assertEqual(response.status_code, 301)
+        self.assertEqual(response.url, '/api/')
 
         response = self.client.get('/api/')
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 301)
+        self.assertEqual(response.url, 'v1/')
+
+        response = self.client.get('/api/v1')
+        self.assertEqual(response.status_code, 301)
         self.assertEqual(response.url, '/api/v1/')
 
     def test_api_root(self):

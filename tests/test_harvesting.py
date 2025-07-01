@@ -15,17 +15,22 @@ from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
-
 class SimpleTest(TransactionTestCase):
-    @classmethod
+
     @responses.activate
-    def setUpClass(cls):
-        super().setUpClass()
+    def setUp(self):
+        self.client = Client()
+        # create a real user for tasks
+        self.user = User.objects.create_user(
+            username="testuser",
+            email="testuser@example.com",
+            password="password123"
+        )
 
         # Clear out any publications
         Publication.objects.all().delete()
 
-        # Prepare the two mock HTML article endpoints
+        # harvest some sample OAI data
         base = os.path.join(settings.BASE_DIR, 'tests', 'harvesting', 'source_1')
         oai_path = os.path.join(base, 'oai_dc.xml')
         art1_path = os.path.join(base, 'article_01.html')
@@ -46,24 +51,11 @@ class SimpleTest(TransactionTestCase):
 
             # run the parser against the OAI XML
             with open(oai_path) as o:
-                parse_oai_xml_and_save_publications(o.read(), event=None)
+                added_count, spatial_count, temporal_count = parse_oai_xml_and_save_publications(o.read(), event=None)
+                self.assertEqual([added_count, spatial_count, temporal_count], [2, 2, 2], "parse_oai_xml_and_save_publications should have added two publications")
 
             # mark them as published so the API will expose them
             Publication.objects.all().update(status="p")
-
-    @classmethod
-    def tearDownClass(cls):
-        Publication.objects.all().delete()
-        super().tearDownClass()
-
-    def setUp(self):
-        self.client = Client()
-        # create a real user for tasks
-        self.user = User.objects.create_user(
-            username="testuser",
-            email="testuser@example.com",
-            password="password123"
-        )
 
         # fetch IDs from the API to use in individual‐publication tests
         api = self.client.get('/api/v1/publications/').json()
@@ -132,17 +124,21 @@ class SimpleTest(TransactionTestCase):
             harvest_interval_minutes=60
         )
         # allow the save() hook to schedule
-        time.sleep(1)
+        time.sleep(2)
 
         sched = Schedule.objects.filter(name=f"Harvest Source {src.id}")
         self.assertTrue(sched.exists(), "Django-Q task not scheduled on save()")
 
-        # run it explicitly
-        harvest_oai_endpoint(src.id, self.user)
         count = Publication.objects.count()
-        self.assertGreater(count, 0, "harvest_oai_endpoint created no publications")
+        self.assertEqual(count, 2, "harvest_oai_endpoint created two publications")
 
-        # re-parse twice to check deduplication
+        # run it explicitly again for the second time
+        added, spatial, temporal = harvest_oai_endpoint(src.id, self.user)
+        count = Publication.objects.count()
+        self.assertEqual(count, 2, "harvest_oai_endpoint created no new publications")
+        self.assertEqual([added, spatial, temporal], [0, 0, 0], "harvest_oai_endpoint created no new publications")
+
+        # re-parse to check deduplication
         with open(oai_file) as f:
             xml = f.read()
         parse_oai_xml_and_save_publications(xml, event=None)

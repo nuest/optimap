@@ -35,7 +35,6 @@ User = get_user_model()
 BASE_URL = settings.BASE_URL
 DOI_REGEX = re.compile(r'10\.\d{4,9}/[-._;()/:A-Z0-9]+', re.IGNORECASE)
 CACHE_DIR = Path(tempfile.gettempdir()) / 'optimap_cache'
-_geolocator = Nominatim(user_agent="optimap-preprint-geocoder")
 
 
 def generate_data_dump_filename(extension: str) -> str:
@@ -75,8 +74,8 @@ def extract_timeperiod_from_html(soup: BeautifulSoup):
             parts = tag["content"].split("/")
             start = parts[0] if parts[0] else None
             end   = parts[1] if len(parts) > 1 and parts[1] else None
-            return ([start] if start else []), ([end]   if end   else [])    # If missing, return [None] for start and [None] for end
-    return [], []
+            return ([start] if start else [None]), ([end] if end else [None]) # If missing, return [None] for start and [None] for end
+    return [None], [None]
 
 def parse_oai_xml_and_save_publications(content: bytes, event: HarvestingEvent) -> tuple[int, int, int]:
     """
@@ -131,23 +130,28 @@ def parse_oai_xml_and_save_publications(content: bytes, event: HarvestingEvent) 
             if not identifier or not identifier.startswith("http"):
                 continue
 
-            geom = GeometryCollection()
-            ps_list: list[str] = []
-            pe_list: list[str] = []
-    # … earlier in parse_oai_xml_and_save_publications …
+            src = None
+            if publisher_name:
+                src, _ = Source.objects.get_or_create(name=publisher_name)
+
+            geom = None
+            ps_list = [None]
+            pe_list = [None]
+            
             try:
                 resp = requests.get(identifier, timeout=10)
                 resp.raise_for_status()
                 soup = BeautifulSoup(resp.content, "html.parser")
+
+                ps_list, pe_list = extract_timeperiod_from_html(soup)
+
                 g = extract_geometry_from_html(soup)
                 if g:
                     geom = g
             
                 if src and getattr(src, "is_preprint", False) and geom.empty:
                     try:
-                        loc = Nominatim(user_agent="optimap-tasks").geocode(
-                        src.homepage_url or src.url
-                    )
+                        loc = Nominatim(user_agent="optimap-tasks").geocode(src.homepage_url or src.url)
                         if loc:
                             geom = Point(loc.longitude, loc.latitude)
                     except Exception as e:
@@ -156,14 +160,13 @@ def parse_oai_xml_and_save_publications(content: bytes, event: HarvestingEvent) 
                             src.name if src else identifier,
                             e
                         )
-        
-                ps_list, pe_list = extract_timeperiod_from_html(soup)
-            except Exception:
+            except Exception as e:
+                logger.debug(
+                    "Retrieval and metadata extraction failed for %s: %s",
+                    src.name if src else identifier,
+                    e
+                )
                 pass
-
-            src = None
-            if publisher_name:
-                src, _ = Source.objects.get_or_create(name=publisher_name)
 
             Publication.objects.create(
                 title=title,
@@ -239,6 +242,8 @@ def harvest_oai_endpoint(source_id: int, user=None) -> None:
     event.status       = "completed"
     event.completed_at = timezone.now()
     event.save()
+
+    return added, spatial, temporal
 
 
 def send_monthly_email(trigger_source='manual', sent_by=None):
