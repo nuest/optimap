@@ -15,7 +15,6 @@ app_name = "optimap"
 urlpatterns = [
     path('', views.main, name="main"),
     path('admin/', admin.site.urls),
-    path("", include(("publications.urls", "optimap"), namespace="optimap")),
     path("api/v1/", include((publications_router.urls, "publications"), namespace="publications")),
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/schema/ui/',SpectacularRedocView.as_view(url_name='optimap:schema'),name='redoc'),
