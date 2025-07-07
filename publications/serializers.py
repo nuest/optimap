@@ -9,11 +9,9 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 
 class SourceSerializer(serializers.ModelSerializer):
-    works_api_url = serializers.CharField(read_only=True)
-
     class Meta:
         model = Source
-        fields = [
+        fields = (
             "id",
             "name",
             "issn_l",
@@ -22,7 +20,7 @@ class SourceSerializer(serializers.ModelSerializer):
             "publisher_name",
             "works_count",
             "works_api_url",
-        ]
+        )
 
 
 
@@ -46,14 +44,10 @@ class PublicationSerializer(GeoFeatureModelSerializer):
         ]
 
     def get_source_details(self, obj):
-        if not obj.source:
+        source = obj.source
+        if not source:
             return {}
-        return {
-            "id": obj.source.id,
-            "name": obj.source.name,
-            "issn_l": obj.source.issn_l,
-            "openalex_url": obj.source.openalex_url,
-        }
+        return SourceSerializer(source, context=self.context).data
 
 class SubscriptionSerializer(GeoFeatureModelSerializer):
     class Meta:

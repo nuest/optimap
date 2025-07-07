@@ -1,10 +1,10 @@
 import json
-from django.test import TransactionTestCase
+from django.test import TransactionTestCase, TestCase
 from rest_framework.test import APIClient
 from rest_framework import status
 from publications.models import Source, Publication
 
-class SourceAPITest(TransactionTestCase):
+class SourceAPITest(TestCase):
     """
     Tests for the source endpoints:
       - GET /api/v1/sources/
@@ -99,7 +99,7 @@ class SourceAPITest(TransactionTestCase):
         self.assertEqual(jdata["works_api_url"], src.works_api_url)
 
 
-class PublicationAPITest(TransactionTestCase):
+class PublicationAPITest(TestCase):
     """
     Tests for the Publication endpoints:
       - GET /api/v1/publications/
