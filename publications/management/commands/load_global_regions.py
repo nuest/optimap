@@ -46,7 +46,7 @@ class Command(BaseCommand):
                 defaults={
                     "geom":       geom,
                     "source_url": CONTINENTS_URL,
-                    "license":    "https://www.esri.com/en-us/legal/requirements/open-source-acknowledgements",
+                    "license":    "https://www.arcgis.com/sharing/rest/content/items/57c1ade4fa7c4e2384e6a23f2b3bd254/info/metadata/metadata.xml?format=default&output=html",
                 }
             )
             verb = "Created" if created else "Updated"

@@ -182,6 +182,12 @@ CACHES = {
     #}
 }
 
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+FIXTURE_DIRS = [
+    BASE_DIR / "fixtures",
+]
+
 SESSION_ENGINE = "django.contrib.sessions.backends.cached_db" # store session data in database, it's persistent and fast enough for us
 
 CACHE_MIDDLEWARE_ALIAS = env('OPTIMAP_CACHE', default='default')
