@@ -17,7 +17,7 @@ import os
 import environ
 import dj_database_url
 import re
-
+from pathlib import Path
 # .env file in the same directory as settings.py
 env = environ.Env()
 environ.Env.read_env()
