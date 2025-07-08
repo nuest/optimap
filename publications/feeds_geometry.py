@@ -1,8 +1,6 @@
 
 import logging
 import urllib.parse
-from django.http import JsonResponse
-from django.contrib.syndication.views import Feed
 from .feeds import GeoFeed
 from .models import GlobalRegion, Publication
 from django.conf import settings
@@ -34,14 +32,18 @@ class GeoFeedByGeometry(GeoFeed):
                 "GeoFeedByGeometry.items was called with None region")
             return []
 
-        prepared_geom = region.geom.prepared
+        # first select by bbox overlap, then filter by intersection
+        # to avoid expensive intersection checks on large datasets
         candidates = Publication.objects.filter(
             status="p",
             geometry__isnull=False,
             geometry__bboverlaps=region.geom,
         ).order_by("-creationDate")
 
-        return [pub for pub in candidates if prepared_geom.intersects(pub.geometry)][:10]
+        # use a prepared geometry for faster intersection checks
+        prepared_geom = region.geom.prepared
+
+        return [pub for pub in candidates if prepared_geom.intersects(pub.geometry)][:settings.FEED_MAX_ITEMS]
 
     def item_link(self, item):
         if item.url:
