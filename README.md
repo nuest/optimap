@@ -141,6 +141,9 @@ python manage.py collectstatic --noinput
 # If you need to run tasks (harvesting, data export) then start a cluster in a separate shell
 python manage.py qcluster
 
+# If you want to use the predefined feeds for continents and oceans we need to load the geometries for global regions
+python manage.py load_global_regions
+
 # Start the Django development server
 python manage.py runserver
 

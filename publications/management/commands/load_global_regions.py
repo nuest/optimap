@@ -28,11 +28,16 @@ class Command(BaseCommand):
     help = "Load 7 continents (Esri Hub) and 5 oceans (MarineRegions IHO) into GlobalRegion"
 
     def handle(self, *args, **options):
-        self.stdout.write("Downloading Esri World Continents…")
         continents_path = os.path.join(COMMAND_DIR, CONTINENTS_FILE)
-        with urllib.request.urlopen(CONTINENTS_URL) as resp, open(continents_path, "wb") as out:
-            shutil.copyfileobj(resp, out)
 
+        if os.path.exists(continents_path):
+            self.stdout.write(f"File {continents_path} already exists, not downloading data again - delete it to renew the global regions")
+        else:
+            self.stdout.write("Downloading Esri World Continents…")
+            with urllib.request.urlopen(CONTINENTS_URL) as resp, open(continents_path, "wb") as out:
+                shutil.copyfileobj(resp, out)
+
+        # DataSource does not support automatic closing, deleting object manually below, see https://docs.djangoproject.com/en/5.2/ref/contrib/gis/gdal/#datasource
         ds = DataSource(continents_path)
         layer = ds[0]
         for feat in layer:
@@ -53,10 +58,15 @@ class Command(BaseCommand):
             self.stdout.write(f"{verb} continent '{obj.name}'")
         del ds  # We cannot close the source but can only rely on the GC
 
-        self.stdout.write("Downloading MarineRegions IHO Sea Areas…")
         oceans_path = os.path.join(COMMAND_DIR, OCEANS_FILE)
-        with urllib.request.urlopen(OCEANS_WFS_URL) as resp, open(oceans_path, "wb") as out:
-            shutil.copyfileobj(resp, out)
+
+        if os.path.exists(oceans_path):
+            self.stdout.write(f"File {oceans_path} already exists, not downloading data again - delete it to renew the global regions")
+        else:
+            self.stdout.write("Downloading MarineRegions IHO Sea Areas…")
+
+            with urllib.request.urlopen(OCEANS_WFS_URL) as resp, open(oceans_path, "wb") as out:
+                shutil.copyfileobj(resp, out)
 
         # DataSource does not support automatic closing, deleting object manually below, see https://docs.djangoproject.com/en/5.2/ref/contrib/gis/gdal/#datasource
         ds = DataSource(oceans_path)
