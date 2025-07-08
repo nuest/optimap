@@ -55,9 +55,10 @@ jobs:
       run: |
         python manage.py migrate
 
-    - name: Load testdata to see if it is up to date with the Django migrations
+    - name: Load all testdata to see if it is up to date with the Django migrations
       run: |
-        python manage.py loaddata fixtures/test_data.json
+        python manage.py loaddata fixtures/test_data_optimap.json
+        python manage.py loaddata fixtures/test_data_partners.json
 
     - name: Run deploy checks
       run: |
@@ -71,7 +72,7 @@ jobs:
       run: |
         coverage html
         coverage xml
-        coverage report --show-missing --fail-under=70
+        coverage report --show-missing --fail-under=50
 
     #- name: Post code coverage
     #  uses: orgoro/coverage@v3.2

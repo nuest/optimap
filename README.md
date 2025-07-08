@@ -80,12 +80,10 @@ python manage.py dumpdata --exclude=auth --exclude=contenttypes | jq > fixtures/
 
 #### Loading Test Data
 
-To load the test data into your database, run:
+To load the test data into your database, run the following command choosing one of the existing fixtures:
 
 ```bash
-python manage.py loaddata fixtures/test_data.json
-python manage.py loaddata fixtures/test_data_global_feeds.json
-
+python manage.py loaddata fixtures/test_data_{optimap, partners, global_feeds}.json
 ```
 
 #### Adding New Test Data
@@ -148,6 +146,12 @@ python manage.py runserver
 
 # Start the app with specific configurations for development
 OPTIMAP_CACHE=dummy OPTIMAP_DEBUG=True python manage.py runserver
+
+# Manually regenerating data export files (GeoJSON / GeoPackage cache)
+## Via Django-Q cluster: if you already have a Q cluster running (e.g. `python manage.py qcluster`), you can simply add the job to the schedule table (once) by running:
+python manage.py schedule_geojson
+## One‐off via the Django shell: if you just want a “right‐now” rebuild (without waiting for the next 6-hour tick), drop into a one-liner:
+python manage.py shell -c "from publications.tasks import regenerate_geojson_cache; regenerate_geojson_cache()"
 ```
 
 Now open a browser at <http://127.0.0.1:8000/>.
@@ -391,10 +395,6 @@ python manage.py qmonitorq
 
 python manage.py qinfo
 ```
-
-### Trigger creation of data export files
-
-TODO
 
 ## License
 

@@ -49,14 +49,13 @@ EMAIL_CONFIRMATION_TOKEN_PREFIX = "email_confirmation_"
 @require_GET
 def download_geojson(request):
     """
-    Returns the latest GeoJSON dump file, gzipped if the client accepts it.
+    Returns the latest GeoJSON dump file, gzipped if the client accepts it,
+    but always with Content-Type: application/json.
     """
     cache_dir = Path(tempfile.gettempdir()) / "optimap_cache"
     cache_dir.mkdir(exist_ok=True)
-
-    # regenerate and find latest geojson dump
-    path = regenerate_geojson_cache()
-    gzip_path = Path(str(path) + ".gz")
+    json_path = regenerate_geojson_cache()
+    gzip_path = Path(str(json_path) + ".gz")
     accept_enc = request.META.get('HTTP_ACCEPT_ENCODING', '')
 
     if 'gzip' in accept_enc and gzip_path.exists():
@@ -67,13 +66,16 @@ def download_geojson(request):
             filename=gzip_path.name
         )
         response['Content-Encoding'] = 'gzip'
+        response['Content-Disposition'] = f'attachment; filename="{gzip_path.name}"'
     else:
+        # Serve the plain JSON
         response = FileResponse(
-            open(path, 'rb'),
+            open(json_path, 'rb'),
             content_type="application/json",
             as_attachment=True,
-            filename=Path(path).name
+            filename=Path(json_path).name
         )
+        response['Content-Disposition'] = f'attachment; filename="{Path(json_path).name}"'
     return response
 
 
@@ -88,7 +90,7 @@ def generate_geopackage():
     ds = driver.CreateDataSource(gpkg_path)
     srs = osr.SpatialReference()
     srs.ImportFromEPSG(4326)
-    layer = ds.CreateLayer("publications", srs, ogr.wkbUnknown)
+    layer = ds.CreateLayer("publications", srs, ogr.wkbGeometryCollection)
 
     for name in ("title", "abstract", "doi", "source"):
         field_defn = ogr.FieldDefn(name, ogr.OFTString)
@@ -101,7 +103,7 @@ def generate_geopackage():
         feat.SetField("title", pub.title or "")
         feat.SetField("abstract", pub.abstract or "")
         feat.SetField("doi", pub.doi or "")
-        feat.SetField("source", pub.source or "")
+        feat.SetField("source", pub.source.name if pub.source else "")
         if pub.geometry:
             wkb = pub.geometry.wkb
             geom = ogr.CreateGeometryFromWkb(wkb)
@@ -118,15 +120,10 @@ def download_geopackage(request):
     """
     Returns the latest GeoPackage dump file.
     """
-    path = regenerate_geopackage_cache()
-    if not os.path.exists(path):
-        raise Http404('GeoPackage dump not found')
-    return FileResponse(
-        open(path, 'rb'),
-        content_type="application/geopackage+sqlite3",
-        as_attachment=True,
-        filename=Path(path).name
-    )
+    gpkg_path = regenerate_geopackage_cache()
+    if not gpkg_path or not os.path.exists(gpkg_path):
+        raise Http404("GeoPackage not available.")
+    return FileResponse(open(gpkg_path, 'rb'), as_attachment=True, filename=os.path.basename(gpkg_path))
 
 
 def main(request):
