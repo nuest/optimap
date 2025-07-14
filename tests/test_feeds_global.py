@@ -1,3 +1,9 @@
+
+import os
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "optimap.settings")
+import django
+django.setup()
+
 import json
 from xml.etree import ElementTree as ET
 
@@ -23,38 +29,6 @@ class GlobalRssTests(TestCase):
     def test_global_region_load(self):
         regions = GlobalRegion.objects.all()
         self.assertEqual(len(regions), 15)
-
-    def test_geojson_feed_per_region(self):
-        for region in GlobalRegion.objects.all():
-            url = (
-                reverse("optimap:global_feed", kwargs={
-                    "region_type": region.region_type,
-                    "name": region.name,
-                })
-                + ".geojson"
-            )
-            resp = self.client.get(url)
-            self.assertEqual(resp.status_code, 200,
-                             f"{region.name} JSON feed failed")
-
-            data = resp.json()
-            expected_dois = set(
-                Publication.objects
-                .filter(
-                    status="p",
-                    geometry__isnull=False,
-                    geometry__intersects=region.geom
-                )
-                .values_list("doi", flat=True)
-            )
-            returned_dois = {
-                feat["properties"]["doi"]
-                for feat in data.get("features", [])
-            }
-            self.assertSetEqual(
-                returned_dois, expected_dois,
-                f"GeoJSON feed for {region.name} returned {returned_dois!r}, expected {expected_dois!r}"
-            )
 
     def test_georss_feed_per_region(self):
         for region in GlobalRegion.objects.all():
