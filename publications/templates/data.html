@@ -45,7 +45,7 @@ curl -X GET {{ site|addstr:"/api" }}/api/optimap/ | jq
           <a class="btn btn-primary btn-sm" href="{% url 'optimap:download_geojson' %}">
             Download GeoJSON
           </a>
-          (<a href="https://geojson.org/" target="_blank" class="ms-2 small">GeoJSON spec</a>)
+          &nbsp;(<a href="https://geojson.org/" target="_blank" class="ms-2 small">GeoJSON spec</a>)
         </div>
         <div class="small text-muted mt-1">
           File: {{ last_geojson }}{% if geojson_size %} &middot; Size: {{ geojson_size }}{% endif %}
