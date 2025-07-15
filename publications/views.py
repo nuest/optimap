@@ -389,7 +389,7 @@ def change_useremail(request):
         timeout=EMAIL_CONFIRMATION_TIMEOUT_SECONDS,
     )
     confirm_url = request.build_absolute_uri(
-        reverse("optimap:confirm-email-change", args=[token, email_new])
+        reverse("optimap:confirm_email_change", args=[token, email_new])
     )
     subject = 'Confirm Your Email Change'
     message = f"""Hello,

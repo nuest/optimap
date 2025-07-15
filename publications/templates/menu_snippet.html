@@ -16,7 +16,7 @@
     <span class="dropdown-item-text text-wrap">Want to stay <em>anonymous</em>? Use a public inbox like <a href="https://www.mailinator.com/">Mailinator</a> or check out our <a href="{% url 'optimap:privacy' %}">privacy information</a>.</span>
     <div class="dropdown-divider"></div>
     <li class="px-3 py-2">
-      <form class="form" method="POST" action="{% url 'optimap:loginres' %}">
+      <form class="form" method="POST" action="{% url 'optimap:login_response' %}">
         {% csrf_token %}
         <div class="form-group">
           <input
