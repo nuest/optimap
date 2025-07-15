@@ -25,6 +25,7 @@ services:
     #  - "8000:8000"
     depends_on:
       - db
+    restart: always
 
   djangoq:
     build: .
@@ -38,6 +39,7 @@ services:
     depends_on:
       - db
       - app
+    restart: always
 
   webserver:
     image: nginx:1.27-alpine
