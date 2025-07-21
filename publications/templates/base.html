@@ -21,7 +21,29 @@
     <script src="{% static 'js/jquery-3.4.1.slim.min.js' %}"></script>
     <script src="{% static 'js/bootstrap.min.js' %}"></script>
 
-    {% block head %}{% endblock %}
+    {% block head %} {{ block.super }}
+    <!-- RSS feed autodiscovery -->
+    <link
+      rel="alternate"
+      type="application/rss+xml"
+      title="OPTIMAP Geo RSS"
+      href="{% url 'optimap:georss_feed' %}"
+    />
+    <!-- Atom feed autodiscovery -->
+    <link
+      rel="alternate"
+      type="application/atom+xml"
+      title="OPTIMAP Geo Atom"
+      href="{% url 'optimap:geoatom_feed' %}"
+    />
+    <!-- JSON feed autodiscovery -->
+    <link
+      rel="alternate"
+      type="application/json"
+      title="OPTIMAP GeoJSON Feed"
+      href="{% url 'optimap:w3cgeo_feed' %}"
+    />
+    {% endblock %}
 
     <link rel="stylesheet" type="text/css" href="{% static 'css/main.css' %}" />
   </head>

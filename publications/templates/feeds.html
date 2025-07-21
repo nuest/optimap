@@ -1,59 +1,68 @@
-{% extends "base.html" %} {% block content %}
+{% extends "base.html" %}
+{% block title %}Feeds · {% endblock title %}
+
+{% block content %}
 <div class="container px-4 py-8 max-w-3xl text-wrap">
 
-  <h1 class="text-3xl mb-6 py-4">Predefined Feeds</h1>
+  <h1 class="text-3xl mb-6 py-4">Available Feeds</h1>
 
-  <p class="lead">Follow your favourite countinent or ocean with these predefined feeds.</p>
+  {# --- Site-wide feeds --- #}
+  {% if global_feeds %}
+    <h2 class="text-2xl mb-4">All-site feeds</h2>
+    <ul class="list-disc list-inside mb-8">
+      {% for feed in global_feeds %}
+        <li>
+          <a href="{{ feed.url }}" class="text-blue-600 hover:underline">
+            {{ feed.title }}
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
 
-
-  <ul class="list-disc list-inside space-y-2">
+  {# --- Region-by-region feeds --- #}
+  <h2 class="text-2xl mb-4">Region-by-region feeds</h2>
+  <ul class="list-disc list-inside space-y-2 mb-8">
     {% for region in regions %}
-    <li class="flex flex-wrap items-center space-x-2">
-      <strong>{{ region.name }}</strong> ({{ region.get_region_type_display }}):
+      <li class="flex flex-wrap items-center space-x-2">
+        <strong>{{ region.name }}</strong>
+        <span>({{ region.get_region_type_display }})</span>:
 
-      {# GeoRSS feed link #}
-      <a
-        href="{% url 'optimap:feed-georss-by-slug' region.name|slugify %}"
-        class="text-blue-600 hover:underline"
-        title="GeoRSS feed for {{ region.name }}"
-      >
-        GeoRSS
-      </a>
-      <span>|</span>
+        <a href="{% url 'optimap:feed-georss-by-slug' region.name|slugify %}"
+           class="text-blue-600 hover:underline"
+           title="GeoRSS for {{ region.name }}">
+          GeoRSS
+        </a>
+        <span>|</span>
 
-      {# Atom feed link #}
-      <a
-        href="{% url 'optimap:feed-geoatom-by-slug' region.name|slugify %}"
-        class="text-blue-600 hover:underline"
-        title="Atom feed for {{ region.name }}"
-      >
-        GeoAtom
-      </a>
+        <a href="{{% url 'optimap:feed-geoatom-by-slug' region.name|slugify %}"
+           class="text-blue-600 hover:underline"
+           title="Atom for {{ region.name }}">
+          GeoAtom
+        </a>
 
-      <small class="text-gray-500">
-        (updated {{ region.last_loaded|date:"Y-m-d H:i" }})
-      </small>
-    </li>
+        <small class="text-gray-500">
+          (updated {{ region.last_loaded|date:"Y-m-d H:i" }})
+        </small>
+      </li>
     {% endfor %}
   </ul>
 
+  {# --- Sources & Licenses --- #}
   <strong class="font-semibold mt-8 mb-4">Sources &amp; Licenses</strong>
-
   <ul class="list-disc list-inside space-y-2 text-sm text-gray-700">
     {% for region in regions %}
-    <li class="flex items-center space-x-2">
-      <span class="flex-shrink-0"></span>
-      <a
-        href="{{ region.source_url }}"
-        title="Source for geospatial extent of {{ region.name }}"
-        target="_blank"
-        class="flex-1 min-w-0 truncate text-blue-600 hover:underline"
-      >
-        {{ region.name }}
-      </a>
-      <span class="flex-shrink-0">(<a href="{{ region.license }}">license URL</a>)</span>
-    </li>
+      <li class="flex items-center space-x-2">
+        <a href="{{ region.source_url }}"
+           class="flex-1 min-w-0 truncate text-blue-600 hover:underline"
+           target="_blank"
+           title="Source for {{ region.name }}">
+          {{ region.name }}
+        </a>
+        <span>(<a href="{{ region.license }}">license</a>)</span>
+      </li>
     {% endfor %}
   </ul>
+
 </div>
-{% endblock %}
+{% endblock content %}
