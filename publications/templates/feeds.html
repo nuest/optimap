@@ -1,14 +1,14 @@
 {% extends "base.html" %}
-{% block title %}Feeds · {% endblock title %}
+{% block title %}Feeds | {% endblock title %}
 
 {% block content %}
 <div class="container px-4 py-8 max-w-3xl text-wrap">
 
-  <h1 class="text-3xl mb-6 py-4">Available Feeds</h1>
+  <h1 class="text-3xl mb-6 py-4">OPTIMAP feeds</h1>
 
-  {# --- Site-wide feeds --- #}
   {% if global_feeds %}
-    <h2 class="text-2xl mb-4">All-site feeds</h2>
+    <h2 class="text-2xl mb-4">General feeds</h2>
+    <p>Subscribe to research works from all sources, time periods, and regions.</p>
     <ul class="list-disc list-inside mb-8">
       {% for feed in global_feeds %}
         <li>
@@ -20,46 +20,37 @@
     </ul>
   {% endif %}
 
-  {# --- Region-by-region feeds --- #}
-  <h2 class="text-2xl mb-4">Region-by-region feeds</h2>
+  <h2 class="text-2xl mb-4">Global region feeds</h2>
+  <p>Subscribe to research works from all sources and time periods for selected regions.</p>
   <ul class="list-disc list-inside space-y-2 mb-8">
     {% for region in regions %}
       <li class="flex flex-wrap items-center space-x-2">
         <strong>{{ region.name }}</strong>
-        <span>({{ region.get_region_type_display }})</span>:
+        <span>({{ region.get_region_type_display }})</span>:<br>
 
         <a href="{% url 'optimap:feed-georss-by-slug' region.name|slugify %}"
            class="text-blue-600 hover:underline"
-           title="GeoRSS for {{ region.name }}">
-          GeoRSS
-        </a>
+           title="GeoRSS for {{ region.name }}">GeoRSS</a>
         <span>|</span>
 
         <a href="{{% url 'optimap:feed-geoatom-by-slug' region.name|slugify %}"
            class="text-blue-600 hover:underline"
-           title="Atom for {{ region.name }}">
-          GeoAtom
-        </a>
+           title="Atom for {{ region.name }}">GeoAtom</a>
 
-        <small class="text-gray-500">
-          (updated {{ region.last_loaded|date:"Y-m-d H:i" }})
-        </small>
+        <small class="text-gray-500">(updated {{ region.last_loaded|date:"Y-m-d H:i" }})</small>
       </li>
     {% endfor %}
   </ul>
 
-  {# --- Sources & Licenses --- #}
-  <strong class="font-semibold mt-8 mb-4">Sources &amp; Licenses</strong>
-  <ul class="list-disc list-inside space-y-2 text-sm text-gray-700">
+  <span class="mt-8 mb-4">Sources &amp; licenses for region data:</span>
+  <ul class="list-inline text-sm text-gray-700">
     {% for region in regions %}
-      <li class="flex items-center space-x-2">
+      <li class="list-inline-item flex mr-0">
         <a href="{{ region.source_url }}"
            class="flex-1 min-w-0 truncate text-blue-600 hover:underline"
            target="_blank"
-           title="Source for {{ region.name }}">
-          {{ region.name }}
-        </a>
-        <span>(<a href="{{ region.license }}">license</a>)</span>
+           title="Source for {{ region.name }}">{{ region.name|safe }}</a>&nbsp;<span>(<a href="{{ region.license }}">license</a>)</span>
+        {% if not forloop.last %}, {% endif %}
       </li>
     {% endfor %}
   </ul>
