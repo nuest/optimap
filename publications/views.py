@@ -374,14 +374,25 @@ def change_useremail(request):
                 'text': 'You attempted to change your email to an address that is blocked. Please contact support for assistance.'
             }
         })
-        messages.error(request, "Invalid email change request.")
-        return render(request, 'changeuser.html')
     if not email_new or email_new == email_old:
         messages.error(request, "Invalid email change request.")
-        return render(request, 'changeuser.html')
+        return render(request, "error.html", {
+            'error': {
+                'class': 'danger',
+                'title': 'Invalid Email Change!',
+                'text': 'You attempted to change your email to an address that is invalid. Please enter a valid email address that is different from the current one.'
+            }
+        })
     if User.objects.filter(email=email_new).exists():
         messages.error(request, "This email is already in use.")
-        return render(request, 'changeuser.html')
+        return render(request, "error.html", {
+            'error': {
+                'class': 'danger',
+                'title': 'Email Already In Use!',
+                'text': 'You attempted to change your email to an address that is already in use.'
+            }
+        })
+
     token = secrets.token_urlsafe(32)
     cache.set(
         f"{EMAIL_CONFIRMATION_TOKEN_PREFIX}_{email_new}",
