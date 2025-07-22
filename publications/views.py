@@ -527,7 +527,7 @@ def feeds(request):
     global_feeds = [
         { "title": "Geo RSS",     "url": reverse("optimap:georss_feed")   },
         { "title": "Geo Atom",    "url": reverse("optimap:geoatom_feed")  },
-        { "title": "W3C Geo", "url": reverse("optimap:w3cgeo_feed")   },
+        { "title": "W3C Geo",     "url": reverse("optimap:<3cgeo_feed")   },
     ]
 
     regions = GlobalRegion.objects.all().order_by("region_type", "name")
