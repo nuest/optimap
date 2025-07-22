@@ -380,7 +380,7 @@ def change_useremail(request):
             'error': {
                 'class': 'danger',
                 'title': 'Invalid Email Change!',
-                'text': 'You attempted to change your email to an address that is invalid. Please enter a valid email address.'
+                'text': 'You attempted to change your email to an address that is invalid. Please enter a valid email address that is different from the current one.'
             }
         })
     if User.objects.filter(email=email_new).exists():
