@@ -10,6 +10,7 @@ from .feeds_geometry import GeoFeedByGeometry
 
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView
 from publications.api  import router as publications_router
+from publications.api  import router as publications_router
 
 
 app_name = "optimap"
@@ -47,10 +48,10 @@ urlpatterns = [
     path("subscriptions/", views.user_subscriptions, name="subscriptions"),
     path("unsubscribe/", views.unsubscribe, name="unsubscribe"),
     path("usersettings/", views.user_settings, name="usersettings"),
+    path("feeds/", views.feeds, name="feeds"),
     path("feeds/georss/<slug:geometry_slug>/",
          GeoFeedByGeometry(feed_type_variant="georss"), name="feed-georss-by-slug",),
     path("feeds/geoatom/<slug:geometry_slug>/",
          GeoFeedByGeometry(feed_type_variant="geoatom"), name="feed-geoatom-by-slug"),
-    path("feeds/", views.feeds_list, name="feeds_list"),
 
 ]
