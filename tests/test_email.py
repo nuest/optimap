@@ -3,6 +3,7 @@ import os
 
 from django.test import TestCase, override_settings
 from django.core import mail
+from django.conf import settings
 from publications.tasks import send_monthly_email
 from publications.models import EmailLog, Publication, UserProfile
 from django.utils.timezone import now
@@ -14,7 +15,11 @@ User = get_user_model()
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "optimap.settings")
 django.setup()
 
-@override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+# Force in-memory email + a stable BASE_URL for permalink assertions
+@override_settings(
+    EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+    BASE_URL='http://testserver'
+)
 class EmailIntegrationTest(TestCase):
     def setUp(self):
         """Setup test data before each test"""
@@ -30,8 +35,7 @@ class EmailIntegrationTest(TestCase):
         self.user_profile.save()
 
     def test_send_monthly_email_with_publications(self):
-        """Test if the monthly email is sent when publications exist"""
-        # create one publication with a DOI
+        """Sends email and includes site-local permalink when DOI exists."""
         last_month = now().replace(day=1) - timedelta(days=1)
         publication = Publication.objects.create(
             title="Point Test",
@@ -46,17 +50,17 @@ class EmailIntegrationTest(TestCase):
         Publication.objects.filter(id=publication.id).update(creationDate=last_month)
         publication.refresh_from_db()
 
-        # no emails before sending
         self.assertEqual(len(mail.outbox), 0)
 
-        # send and assert
         send_monthly_email(sent_by=self.user)
         self.assertEqual(len(mail.outbox), 1)
         sent_email = mail.outbox[0]
 
-        # title and DOI-based link should both appear
+        # Title present
         self.assertIn(publication.title, sent_email.body)
-        expected_link = f"https://doi.org/{publication.doi}"
+
+        # Expect site-local permalink (NOT doi.org)
+        expected_link = f"{settings.BASE_URL.rstrip('/')}/article/{publication.doi}"
         self.assertIn(expected_link, sent_email.body)
 
         # recipient and log correctness
@@ -66,7 +70,7 @@ class EmailIntegrationTest(TestCase):
         self.assertEqual(email_log.sent_by, self.user)
 
     def test_send_monthly_email_fallback_to_url_when_no_doi(self):
-        """Test monthly email falls back to publication.url when no DOI"""
+        """Falls back to publication.url when no DOI."""
         last_month = now().replace(day=1) - timedelta(days=1)
         pub = Publication.objects.create(
             title="No DOI Paper",
@@ -84,6 +88,6 @@ class EmailIntegrationTest(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         body = mail.outbox[0].body
 
-        # should include URL fallback instead of DOI
+        # should include URL fallback instead of permalink
         self.assertIn(pub.title, body)
         self.assertIn(pub.url, body)

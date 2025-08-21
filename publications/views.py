@@ -536,6 +536,23 @@ class RobotsView(View):
         )
         return response
 
+def article_landing(request, doi):
+    # match DOI case-insensitively
+    pub = Publication.objects.filter(doi__iexact=doi).first()
+    if not pub:
+        raise Http404("Article not found.")
+
+    geom_geojson = None
+    if pub.geometry:
+        # pub.geometry.geojson is a JSON string; pass as-safe to template
+        geom_geojson = pub.geometry.geojson
+
+    return render(request, "article_landing.html", {
+        "pub": pub,
+        "geom_geojson": geom_geojson,
+        "report_email": "login@optimap.science",
+    })
+
 def feeds_list(request):
     regions = GlobalRegion.objects.all().order_by("region_type", "name")
     return render(request,
