@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# Avoid database not being ready
+sleep 3
+
 # Collect static files
 echo "OPTIMAP ENTRYPOINT | Collect static files"
 python manage.py collectstatic --noinput
