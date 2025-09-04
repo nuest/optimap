@@ -1,43 +1,80 @@
-{% extends "base.html" %} {# or "main.html" if that's your layout #}
-
-{% block title %}{{ pub.title }} — OPTIMAP{% endblock %}
+{% extends "base.html" %}
+{% load static %}
 
 {% block content %}
-  <h1 class="page-title">{{ pub.title }}</h1>
 
-  <section class="meta">
-    {% if pub.doi %}<div><strong>DOI:</strong> <a href="https://doi.org/{{ pub.doi }}">https://doi.org/{{ pub.doi }}</a></div>{% endif %}
-    {% if pub.url %}<div><strong>Original URL:</strong> <a href="{{ pub.url }}">{{ pub.url }}</a></div>{% endif %}
-    {% if pub.publicationDate %}<div><strong>Publication date:</strong> {{ pub.publicationDate }}</div>{% endif %}
-    {% if pub.source %}<div><strong>Source:</strong> {{ pub.source.name }}</div>{% endif %}
-  </section>
+<style>
+  /* More separation between top logo bar and headline */
+  h1.page-title {
+    margin-top: 2rem;   /* increase top margin */
+    margin-bottom: .5rem;
+  }
+  .muted { color: #666; font-size: .92rem; }
+  .meta {
+    margin: 1rem 0 1.5rem;   /* add more vertical spacing around authors/time period */
+  }
+  #mini-map {
+    height: 280px;
+    border-radius: 8px;
+    margin: 1.5rem 0;
+  }
+</style>
 
-  {% if pub.abstract %}
-    <h2>Abstract</h2>
-    <p>{{ pub.abstract }}</p>
+<h1 class="page-title">{{ pub.title }}</h1>
+
+<div class="meta muted">
+  {% if authors_list %}
+    <strong>Authors:</strong> {{ authors_list|join:", " }} ·
   {% endif %}
-
-  {% if pub.geometry %}
-    <h2>Location</h2>
-    <div id="map" style="height:360px;border-radius:12px;margin:1rem 0;"></div>
+  {% if timeperiod_label %}
+    <strong>Time period:</strong> {{ timeperiod_label }} ·
   {% endif %}
+  {% if pub.doi %}<strong>DOI:</strong> {{ pub.doi }} ·{% endif %}
+  {% if pub.publicationDate %}<strong>Published:</strong> {{ pub.publicationDate }} ·{% endif %}
+  {% if pub.source %}<strong>Source:</strong> {{ pub.source.name }}{% endif %}
+</div>
 
-  <p class="text-muted" style="margin-top:1rem;">
-    If you notice incorrect information on this page, please email
-    <a href="mailto:login@optimap.science">login@optimap.science</a>.
-  </p>
+{% if pub.abstract %}
+  <p>{{ pub.abstract }}</p>
+{% endif %}
 
-  {% if pub.geometry %}
-    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
-    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-    <script>
-      (function() {
-        const map = L.map('map');
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-          { attribution: '&copy; OpenStreetMap' }).addTo(map);
-        const layer = L.geoJSON(JSON.parse('{{ pub.geometry.geojson|safe }}')).addTo(map);
-        try { map.fitBounds(layer.getBounds(), { padding: [20,20] }); } catch (e) { map.setView([0,0], 2); }
-      })();
-    </script>
-  {% endif %}
+{% if feature_json %}
+  <!-- Leaflet assets included here -->
+  <link rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin="">
+  <div id="mini-map"></div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+          crossorigin=""></script>
+  <script>
+    const publicationFeature = {{ feature_json|safe }};
+    const map = L.map('mini-map', { scrollWheelZoom: false });
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    const layer = L.geoJSON(publicationFeature, {
+      pointToLayer: (feat, latlng) => L.circleMarker(latlng, { radius: 6 })
+    }).addTo(map);
+
+    const bounds = layer.getBounds ? layer.getBounds() : null;
+    if (bounds && bounds.isValid && bounds.isValid()) {
+      map.fitBounds(bounds.pad(0.2));
+    } else if (publicationFeature.geometry && publicationFeature.geometry.type === "Point") {
+      const c = publicationFeature.geometry.coordinates; // [lng, lat]
+      map.setView([c[1], c[0]], 10);
+    } else {
+      map.setView([0, 0], 2);
+    }
+  </script>
+{% endif %}
+
+<p class="muted">
+  Found an error? Please report to <a href="mailto:login@optimap.science">login@optimap.science</a>.
+</p>
+
 {% endblock %}

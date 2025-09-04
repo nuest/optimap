@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>All Article Links</title></head>
+<body>
+  <h2>All Article Links</h2>
+  <ul>
+    {% for item in links %}
+      <li><a href="{{ item.href }}" target="_blank" rel="noopener">{{ item.title }}</a></li>
+    {% empty %}
+      <li>No publications found.</li>
+    {% endfor %}
+  </ul>
+</body>
+</html>
+{% endblock %}

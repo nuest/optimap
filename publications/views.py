@@ -34,6 +34,8 @@ from publications.tasks import regenerate_geojson_cache, regenerate_geopackage_c
 from osgeo import ogr, osr
 ogr.UseExceptions()
 import humanize
+import json
+
 
 LOGIN_TOKEN_LENGTH  = 32
 LOGIN_TOKEN_TIMEOUT_SECONDS = 10 * 60
@@ -536,22 +538,100 @@ class RobotsView(View):
         )
         return response
 
+def _format_timeperiod(pub):
+    """
+    Publication stores timeperiod as arrays of strings.
+    We show the first start/end if present, in a compact human form.
+    """
+    s_list = (pub.timeperiod_startdate or [])
+    e_list = (pub.timeperiod_enddate   or [])
+    s = s_list[0] if s_list else None
+    e = e_list[0] if e_list else None
+
+    if s and e:
+        return f"{s} – {e}"
+    if s:
+        return f"from {s}"
+    if e:
+        return f"until {e}"
+    return None
+
+
+def _normalize_authors(pub):
+    """
+    Try a few common attribute names. Accepts string (split on , or ;) or list/tuple.
+    Returns list[str] or None.
+    """
+    candidates = (
+        getattr(pub, "authors", None),
+        getattr(pub, "author", None),
+        getattr(pub, "creators", None),
+        getattr(pub, "creator", None),
+    )
+    raw = next((c for c in candidates if c), None)
+    if not raw:
+        return None
+    if isinstance(raw, str):
+        items = [x.strip() for x in re.split(r"[;,]", raw) if x.strip()]
+        return items or None
+    if isinstance(raw, (list, tuple)):
+        items = [str(x).strip() for x in raw if str(x).strip()]
+        return items or None
+    return None
+
+def article_links_list(request):
+    """
+    Public page that lists a link for every publication:
+    - DOI present  -> /article/<doi> (site-local landing page)
+    - no DOI       -> fall back to Publication.url (external/original)
+    """
+    pubs = Publication.objects.all().order_by("-creationDate", "-id")
+    links = []
+    for pub in pubs:
+        if pub.doi:
+            links.append({"title": pub.title, "href": reverse("optimap:article-landing", args=[pub.doi])})
+        elif pub.url:
+            links.append({"title": pub.title, "href": pub.url})
+    return render(request, "article_links_list.html", {"links": links})
+
+
 def article_landing(request, doi):
-    # match DOI case-insensitively
-    pub = Publication.objects.filter(doi__iexact=doi).first()
-    if not pub:
-        raise Http404("Article not found.")
+    """
+    Landing page for a publication with a DOI.
+    Embeds a small Leaflet map when geometry is available.
+    """
+    pub = get_object_or_404(Publication, doi=doi)
 
-    geom_geojson = None
-    if pub.geometry:
-        # pub.geometry.geojson is a JSON string; pass as-safe to template
-        geom_geojson = pub.geometry.geojson
+    feature_json = None
+    if pub.geometry and not pub.geometry.empty:
+        feature = {
+            "type": "Feature",
+            "geometry": json.loads(pub.geometry.geojson),
+            "properties": {"title": pub.title, "doi": pub.doi},
+        }
+        feature_json = json.dumps(feature)
 
-    return render(request, "article_landing.html", {
-        "pub": pub,
-        "geom_geojson": geom_geojson,
-        "report_email": "login@optimap.science",
-    })
+    # Optional helpers for time period / authors if you added them earlier:
+    def _fmt_period(p):
+        s = (p.timeperiod_startdate or [])[:1]
+        e = (p.timeperiod_enddate   or [])[:1]
+        s0 = s[0] if s else None
+        e0 = e[0] if e else None
+        if s0 and e0: return f"{s0} – {e0}"
+        if s0: return f"from {s0}"
+        if e0: return f"until {e0}"
+        return None
+
+    return render(
+        request,
+        # use the actual path/name of your template; adjust if yours differs
+        "article_landing.html",
+        {
+            "pub": pub,
+            "feature_json": feature_json,
+            "timeperiod_label": _fmt_period(pub),
+        },
+    )
 
 def feeds_list(request):
     regions = GlobalRegion.objects.all().order_by("region_type", "name")
