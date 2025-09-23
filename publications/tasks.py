@@ -97,21 +97,34 @@ def extract_timeperiod_from_html(soup: BeautifulSoup):
 
 def parse_oai_xml_and_save_publications(content, event: HarvestingEvent):
     source = event.source
+    logger.info("Starting OAI-PMH parsing for source: %s", source.name)
     parsed = urlsplit(source.url_field)
+
     if content:
+        logger.debug("Parsing XML content from response")
         dom = minidom.parseString(content)
         records = dom.documentElement.getElementsByTagName("record")
+        logger.info("Found %d records in XML response", len(records))
     else:
         base = urlunsplit((parsed.scheme, parsed.netloc, parsed.path, "", ""))
+        logger.debug("Using Scythe harvester for base URL: %s", base)
         with Scythe(base) as harvester:
             records = harvester.list_records(metadata_prefix="oai_dc")
+        logger.info("Retrieved records using Scythe harvester")
 
     if not records:
         logger.warning("No articles found in OAI-PMH response!")
         return
 
+    processed_count = 0
+    saved_count = 0
+
     for rec in records:
         try:
+            processed_count += 1
+            if processed_count % 10 == 0:
+                logger.debug("Processing record %d of %d", processed_count, len(records) if hasattr(records, '__len__') else '?')
+
             if hasattr(rec, "metadata"):
                 identifiers = rec.metadata.get("identifier", []) + rec.metadata.get("relation", [])
                 get_field = lambda k: rec.metadata.get(k, [""])[0]
@@ -137,43 +150,83 @@ def parse_oai_xml_and_save_publications(content, event: HarvestingEvent):
             journal_value  = get_field("publisher")   or get_field("dc:publisher")
             date_value     = get_field("date")        or get_field("dc:date")
 
-            # extract DOI
+            logger.debug("Processing publication: %s", title_value[:50] if title_value else 'No title')
+
+            # extract DOI and ISSN
             doi_text = None
+            issn_text = None
             for u in identifiers:
                 if u and (m := DOI_REGEX.search(u)):
                     doi_text = m.group(0)
                     break
 
+            # Try to extract ISSN from various fields
+            issn_candidates = []
+            issn_candidates.extend(identifiers)  # Check identifiers
+            issn_candidates.append(get_field("source") or get_field("dc:source"))  # Check source field
+            issn_candidates.append(get_field("relation") or get_field("dc:relation"))  # Check relation field
+
+            for candidate in issn_candidates:
+                if candidate and len(candidate.replace('-', '')) == 8 and candidate.replace('-', '').isdigit():
+                    issn_text = candidate
+                    break
+
             # skip duplicates
             if doi_text and Publication.objects.filter(doi=doi_text).exists():
-                logger.info("Skipping duplicate (DOI): %s", doi_text)
+                logger.debug("Skipping duplicate (DOI): %s", doi_text)
                 continue
             if identifier_value and Publication.objects.filter(url=identifier_value).exists():
-                logger.info("Skipping duplicate (URL): %s", identifier_value)
+                logger.debug("Skipping duplicate (URL): %s", identifier_value)
                 continue
             if not identifier_value or not identifier_value.startswith("http"):
-                logger.warning("Skipping invalid URL: %s", identifier_value)
+                logger.debug("Skipping invalid URL: %s", identifier_value)
                 continue
 
             # ensure a Source instance for publication.source
-            if journal_value:
-                src_obj, _ = Source.objects.get_or_create(name=journal_value)
-            else:
-                src_obj = source
+            src_obj = source  # Default fallback
+
+            if issn_text:
+                # First try to match by ISSN
+                try:
+                    src_obj = Source.objects.get(issn_l=issn_text)
+                    logger.debug("Matched source by ISSN %s: %s", issn_text, src_obj.name)
+                except Source.DoesNotExist:
+                    # Create new source with ISSN if not found
+                    if journal_value:
+                        src_obj, created = Source.objects.get_or_create(
+                            issn_l=issn_text,
+                            defaults={'name': journal_value}
+                        )
+                        if created:
+                            logger.debug("Created new source with ISSN %s: %s", issn_text, journal_value)
+                    else:
+                        src_obj, created = Source.objects.get_or_create(
+                            issn_l=issn_text,
+                            defaults={'name': f'Unknown Journal (ISSN: {issn_text})'}
+                        )
+                        if created:
+                            logger.debug("Created new source with ISSN %s", issn_text)
+            elif journal_value:
+                # Fall back to journal name matching
+                src_obj, created = Source.objects.get_or_create(name=journal_value)
+                if created:
+                    logger.debug("Created new source by name: %s", journal_value)
 
             geom_obj = GeometryCollection()
             period_start, period_end = [], []
             try:
+                logger.debug("Fetching HTML content for geometry extraction: %s", identifier_value)
                 resp = requests.get(identifier_value, timeout=10)
                 resp.raise_for_status()
                 soup = BeautifulSoup(resp.content, "html.parser")
                 if extracted := extract_geometry_from_html(soup):
                     geom_obj = extracted
+                    logger.debug("Extracted geometry from HTML for: %s", identifier_value)
                 ts, te = extract_timeperiod_from_html(soup)
                 if ts: period_start = ts
                 if te: period_end   = te
             except Exception as fetch_err:
-                logger.error("Error fetching HTML for %s: %s", identifier_value, fetch_err)
+                logger.debug("Error fetching HTML for %s: %s", identifier_value, fetch_err)
 
             # finally, save the publication
             pub = Publication.objects.create(
@@ -189,11 +242,15 @@ def parse_oai_xml_and_save_publications(content, event: HarvestingEvent):
                 timeperiod_enddate   = period_end,
                 job                  = event,
             )
-            logger.info("Saved publication id=%s for %s", pub.id, identifier_value)
+            saved_count += 1
+            logger.info("Saved publication id=%s: %s", pub.id, title_value[:80] if title_value else 'No title')
 
         except Exception as e:
-            logger.error("Error parsing record: %s", e)
+            logger.error("Error parsing record %d: %s", processed_count, e)
             continue
+
+    logger.info("OAI-PMH parsing completed for source %s: processed %d records, saved %d publications",
+                source.name, processed_count, saved_count)
 def harvest_oai_endpoint(source_id, user=None):
     source = Source.objects.get(id=source_id)
     event  = HarvestingEvent.objects.create(source=source, status="in_progress")
@@ -241,15 +298,31 @@ def harvest_oai_endpoint(source_id, user=None):
         event.completed_at = timezone.now()
         event.save()
 
+        # Send failure notification email to user
         if user and user.email:
-            send_mail(
-                "OPTIMAP Harvesting Failed",
-                "Harvesting failed for source %s: %s".format(source.url_field, str(e))
-                settings.EMAIL_HOST_USER,
-                [user.email],
-                fail_silently=False,
+            failure_subject = f"Harvesting Failed for {source.collection_name or source.name}"
+            failure_message = (
+                f"Unfortunately, the harvesting job failed for the following source:\n\n"
+                f"Source: {source.name}\n"
+                f"URL: {source.url_field}\n"
+                f"Collection: {source.collection_name or 'N/A'}\n"
+                f"Job started at: {event.started_at.strftime('%Y-%m-%d %H:%M:%S')}\n"
+                f"Job failed at: {event.completed_at.strftime('%Y-%m-%d %H:%M:%S')}\n"
+                f"Error details: {str(e)}\n\n"
+                f"Please check the source configuration and try again, or contact support if the issue persists."
             )
-        
+            try:
+                send_mail(
+                    failure_subject,
+                    failure_message,
+                    settings.EMAIL_HOST_USER,
+                    [user.email],
+                    fail_silently=False,
+                )
+                logger.info("Failure notification email sent to %s", user.email)
+            except Exception as email_error:
+                logger.error("Failed to send failure notification email: %s", str(email_error))
+
         return None, None, None
 
 

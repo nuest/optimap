@@ -57,7 +57,6 @@ class SimpleTest(TestCase):
             password="password123"
         )
         self.client = Client()
-        self.client.force_login(self.user)
 
         results = self.client.get('/api/v1/publications/').json()['results']
         features = results.get('features', [])
@@ -130,3 +129,90 @@ class SimpleTest(TestCase):
         self.assertEqual(publications.count(), 2, "Expected exactly 2 unique publications")
         titles = [p.title for p in publications]
         self.assertEqual(len(titles), len(set(titles)), "Duplicate titles found")
+
+    def test_invalid_xml_input(self):
+        src = Source.objects.create(
+            url_field="http://example.org/invalid",
+            harvest_interval_minutes=60
+        )
+        event = HarvestingEvent.objects.create(source=src, status="in_progress")
+
+        invalid_xml = b'<invalid>malformed xml without proper closing'
+        initial_count = Publication.objects.count()
+
+        parse_oai_xml_and_save_publications(invalid_xml, event)
+
+        self.assertEqual(Publication.objects.count(), initial_count)
+
+    def test_empty_xml_input(self):
+        """Test harvesting with empty XML input"""
+        src = Source.objects.create(
+            url_field="http://example.org/empty",
+            harvest_interval_minutes=60
+        )
+        event = HarvestingEvent.objects.create(source=src, status="in_progress")
+
+        empty_xml = b''
+        initial_count = Publication.objects.count()
+
+        parse_oai_xml_and_save_publications(empty_xml, event)
+
+        self.assertEqual(Publication.objects.count(), initial_count)
+
+    def test_xml_with_no_records(self):
+        """Test harvesting with valid XML but no record elements"""
+        src = Source.objects.create(
+            url_field="http://example.org/norecords",
+            harvest_interval_minutes=60
+        )
+        event = HarvestingEvent.objects.create(source=src, status="in_progress")
+
+        no_records_xml = b'''<?xml version="1.0" encoding="UTF-8"?>
+        <OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/">
+            <responseDate>2024-01-01T00:00:00Z</responseDate>
+            <request verb="ListRecords">http://example.org/oai</request>
+            <ListRecords>
+                <!-- No record elements -->
+            </ListRecords>
+        </OAI-PMH>'''
+
+        initial_count = Publication.objects.count()
+
+        parse_oai_xml_and_save_publications(no_records_xml, event)
+
+        self.assertEqual(Publication.objects.count(), initial_count)
+
+    def test_xml_with_invalid_record_data(self):
+        src = Source.objects.create(
+            url_field="http://example.org/invaliddata",
+            harvest_interval_minutes=60
+        )
+        event = HarvestingEvent.objects.create(source=src, status="in_progress")
+
+        # XML with record but missing required fields
+        invalid_data_xml = b'''<?xml version="1.0" encoding="UTF-8"?>
+        <OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/">
+            <responseDate>2024-01-01T00:00:00Z</responseDate>
+            <request verb="ListRecords">http://example.org/oai</request>
+            <ListRecords>
+                <record>
+                    <header>
+                        <identifier>oai:example.org:123</identifier>
+                        <datestamp>2024-01-01</datestamp>
+                    </header>
+                    <metadata>
+                        <oai_dc:dc xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/"
+                                   xmlns:dc="http://purl.org/dc/elements/1.1/">
+                            <!-- Missing title and identifier -->
+                            <dc:description>Some description</dc:description>
+                        </oai_dc:dc>
+                    </metadata>
+                </record>
+            </ListRecords>
+        </OAI-PMH>'''
+
+        initial_count = Publication.objects.count()
+
+        parse_oai_xml_and_save_publications(invalid_data_xml, event)
+
+        self.assertEqual(Publication.objects.count(), initial_count)
