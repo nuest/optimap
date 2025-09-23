@@ -128,6 +128,23 @@ def download_geopackage(request):
 def main(request):
     return render(request, "main.html")
 
+def locate(request):
+    # Get publications that are harvested but have no geometry
+    publications_query = Publication.objects.filter(
+        status='h',  # Harvested status
+        geometry__isnull=True  # No geometry data
+    ).order_by('-creationDate')
+
+    total_count = publications_query.count()
+    # Limit to first 20 for performance (no pagination)
+    publications_without_geo = publications_query[:20]
+
+    context = {
+        'publications': publications_without_geo,
+        'total_count': total_count,
+    }
+    return render(request, 'locate.html', context)
+
 def about(request):
     return render(request, 'about.html')
 
