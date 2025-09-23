@@ -25,6 +25,7 @@ from django.conf import settings
 from django.core.serializers import serialize
 from django.core.mail import send_mail, EmailMessage
 from django.utils import timezone
+from django.db import transaction
 from django.contrib.gis.geos import GEOSGeometry, GeometryCollection
 from django_q.tasks import schedule
 from django_q.models import Schedule
@@ -95,12 +96,12 @@ def extract_timeperiod_from_html(soup: BeautifulSoup):
             return ([start] if start else [None]), ([end] if end else [None]) # If missing, return [None] for start and [None] for end
 
 
-def parse_oai_xml_and_save_publications(content, event: HarvestingEvent):
+def parse_oai_xml_and_save_publications(content, event: HarvestingEvent, max_records=None):
     source = event.source
     logger.info("Starting OAI-PMH parsing for source: %s", source.name)
     parsed = urlsplit(source.url_field)
 
-    if content:
+    if content and len(content.strip()) > 0:
         logger.debug("Parsing XML content from response")
         try:
             dom = minidom.parseString(content)
@@ -111,15 +112,19 @@ def parse_oai_xml_and_save_publications(content, event: HarvestingEvent):
             logger.warning("No articles found in OAI-PMH response!")
             return
     else:
-        base = urlunsplit((parsed.scheme, parsed.netloc, parsed.path, "", ""))
-        logger.debug("Using Scythe harvester for base URL: %s", base)
-        with Scythe(base) as harvester:
-            records = harvester.list_records(metadata_prefix="oai_dc")
-        logger.info("Retrieved records using Scythe harvester")
+        logger.warning("Empty or no content provided - cannot harvest")
+        return
 
     if not records:
         logger.warning("No articles found in OAI-PMH response!")
         return
+
+    if max_records and hasattr(records, '__len__'):
+        records = records[:max_records]
+        logger.info("Limited to first %d records", max_records)
+    elif max_records:
+        records = list(records)[:max_records]
+        logger.info("Limited to first %d records", max_records)
 
     processed_count = 0
     saved_count = 0
@@ -233,22 +238,26 @@ def parse_oai_xml_and_save_publications(content, event: HarvestingEvent):
             except Exception as fetch_err:
                 logger.debug("Error fetching HTML for %s: %s", identifier_value, fetch_err)
 
-            # finally, save the publication
-            pub = Publication.objects.create(
-                title                = title_value,
-                abstract             = abstract_text,
-                publicationDate      = date_value,
-                url                  = identifier_value,
-                doi                  = doi_text,
-                source               = src_obj,
-                status               = "p",
-                geometry             = geom_obj,
-                timeperiod_startdate = period_start,
-                timeperiod_enddate   = period_end,
-                job                  = event,
-            )
-            saved_count += 1
-            logger.info("Saved publication id=%s: %s", pub.id, title_value[:80] if title_value else 'No title')
+            try:
+                with transaction.atomic():
+                    pub = Publication.objects.create(
+                        title                = title_value,
+                        abstract             = abstract_text,
+                        publicationDate      = date_value,
+                        url                  = identifier_value,
+                        doi                  = doi_text,
+                        source               = src_obj,
+                        status               = "p",
+                        geometry             = geom_obj,
+                        timeperiod_startdate = period_start,
+                        timeperiod_enddate   = period_end,
+                        job                  = event,
+                    )
+                    saved_count += 1
+                    logger.info("Saved publication id=%s: %s", pub.id, title_value[:80] if title_value else 'No title')
+            except Exception as save_err:
+                logger.error("Failed to save publication '%s': %s", title_value[:80] if title_value else 'No title', save_err)
+                continue
 
         except Exception as e:
             logger.error("Error parsing record %d: %s", processed_count, e)
@@ -256,15 +265,22 @@ def parse_oai_xml_and_save_publications(content, event: HarvestingEvent):
 
     logger.info("OAI-PMH parsing completed for source %s: processed %d records, saved %d publications",
                 source.name, processed_count, saved_count)
-def harvest_oai_endpoint(source_id, user=None):
+def harvest_oai_endpoint(source_id, user=None, max_records=None):
     source = Source.objects.get(id=source_id)
     event  = HarvestingEvent.objects.create(source=source, status="in_progress")
 
     try:
-        response = requests.get(source.url_field)
+        # Construct proper OAI-PMH URL
+        if '?' not in source.url_field:
+            oai_url = f"{source.url_field}?verb=ListRecords&metadataPrefix=oai_dc"
+        else:
+            oai_url = source.url_field
+
+        logger.info("Fetching from OAI-PMH URL: %s", oai_url)
+        response = requests.get(oai_url)
         response.raise_for_status()
 
-        parse_oai_xml_and_save_publications(response.content, event)
+        parse_oai_xml_and_save_publications(response.content, event, max_records=max_records)
 
         event.status      = "completed"
         event.completed_at = timezone.now()

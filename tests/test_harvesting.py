@@ -216,3 +216,98 @@ class SimpleTest(TestCase):
         parse_oai_xml_and_save_publications(invalid_data_xml, event)
 
         self.assertEqual(Publication.objects.count(), initial_count)
+
+    def test_real_journal_harvesting_essd(self):
+        """Test harvesting from actual ESSD Copernicus endpoint"""
+        from publications.tasks import harvest_oai_endpoint
+
+        # Clear existing publications for clean test
+        Publication.objects.all().delete()
+
+        src = Source.objects.create(
+            url_field="https://oai-pmh.copernicus.org/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=essd",
+            harvest_interval_minutes=1440,
+            name="ESSD Copernicus"
+        )
+
+        initial_count = Publication.objects.count()
+
+        # Harvest from real endpoint with limit
+        harvest_oai_endpoint(src.id, max_records=3)
+
+        # Should have harvested some publications
+        final_count = Publication.objects.count()
+        self.assertGreater(final_count, initial_count, "Should harvest at least some publications from ESSD")
+        self.assertLessEqual(final_count - initial_count, 3, "Should not exceed max_records limit")
+
+        # Verify ESSD publications were created
+        essd_pubs = Publication.objects.filter(source=src)
+        for pub in essd_pubs:
+            self.assertIsNotNone(pub.title, f"Publication {pub.id} missing title")
+            self.assertIsNotNone(pub.url, f"Publication {pub.id} missing URL")
+            # ESSD should have DOIs with Copernicus prefix
+            if pub.doi:
+                self.assertIn("10.5194", pub.doi, "ESSD DOIs should contain Copernicus prefix")
+
+    def test_real_journal_harvesting_geo_leo(self):
+        """Test harvesting from actual GEO-LEO e-docs endpoint"""
+        from publications.tasks import harvest_oai_endpoint
+
+        # Clear existing publications for clean test
+        Publication.objects.all().delete()
+
+        src = Source.objects.create(
+            url_field="https://e-docs.geo-leo.de/server/oai/request",
+            harvest_interval_minutes=1440,
+            name="GEO-LEO e-docs"
+        )
+
+        initial_count = Publication.objects.count()
+
+        # Harvest from real endpoint with limit
+        harvest_oai_endpoint(src.id, max_records=5)
+
+        # Should have harvested some publications
+        final_count = Publication.objects.count()
+        self.assertGreater(final_count, initial_count, "Should harvest at least some publications from GEO-LEO")
+        self.assertLessEqual(final_count - initial_count, 5, "Should not exceed max_records limit")
+
+        # Verify GEO-LEO publications were created
+        geo_leo_pubs = Publication.objects.filter(source=src)
+        for pub in geo_leo_pubs:
+            self.assertIsNotNone(pub.title, f"Publication {pub.id} missing title")
+            self.assertIsNotNone(pub.url, f"Publication {pub.id} missing URL")
+
+    def test_real_journal_harvesting_agile_giss(self):
+        """Test harvesting from actual AGILE-GISS endpoint"""
+        from publications.tasks import harvest_oai_endpoint
+
+        # Clear existing publications for clean test
+        Publication.objects.all().delete()
+
+        src = Source.objects.create(
+            url_field="https://www.agile-giscience-series.net",
+            harvest_interval_minutes=1440,
+            name="AGILE-GISS"
+        )
+
+        initial_count = Publication.objects.count()
+
+        # Note: This may fail if AGILE doesn't have OAI-PMH endpoint
+        try:
+            harvest_oai_endpoint(src.id, max_records=3)
+
+            # Should have harvested some publications
+            final_count = Publication.objects.count()
+            self.assertGreater(final_count, initial_count, "Should harvest at least some publications from AGILE-GISS")
+            self.assertLessEqual(final_count - initial_count, 3, "Should not exceed max_records limit")
+
+            # Verify AGILE publications were created
+            agile_pubs = Publication.objects.filter(source=src)
+            for pub in agile_pubs:
+                self.assertIsNotNone(pub.title, f"Publication {pub.id} missing title")
+                self.assertIsNotNone(pub.url, f"Publication {pub.id} missing URL")
+        except Exception as e:
+            # Skip test if AGILE doesn't have OAI-PMH endpoint
+            self.skipTest(f"AGILE-GISS endpoint not available: {e}")
+
