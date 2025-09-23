@@ -298,6 +298,10 @@ def harvest_oai_endpoint(source_id, user=None, max_records=None):
     source = Source.objects.get(id=source_id)
     event  = HarvestingEvent.objects.create(source=source, status="in_progress")
 
+    new_count = None
+    spatial_count = None
+    temporal_count = None
+
     try:
         # Construct proper OAI-PMH URL
         if '?' not in source.url_field:
@@ -340,8 +344,7 @@ def harvest_oai_endpoint(source_id, user=None, max_records=None):
                 [user.email],
                 fail_silently=False,
             )
-        
-        return new_count, spatial_count, temporal_count
+    
     except Exception as e:
         logger.error("Harvesting failed for source %s: %s", source.url_field, str(e))
         event.status = "failed"
@@ -373,8 +376,7 @@ def harvest_oai_endpoint(source_id, user=None, max_records=None):
             except Exception as email_error:
                 logger.error("Failed to send failure notification email: %s", str(email_error))
 
-    # If we reach here, harvesting failed
-    return None, None, None
+    return new_count, spatial_count, temporal_count
 
 def send_monthly_email(trigger_source="manual", sent_by=None):
     """
