@@ -102,9 +102,14 @@ def parse_oai_xml_and_save_publications(content, event: HarvestingEvent):
 
     if content:
         logger.debug("Parsing XML content from response")
-        dom = minidom.parseString(content)
-        records = dom.documentElement.getElementsByTagName("record")
-        logger.info("Found %d records in XML response", len(records))
+        try:
+            dom = minidom.parseString(content)
+            records = dom.documentElement.getElementsByTagName("record")
+            logger.info("Found %d records in XML response", len(records))
+        except Exception as e:
+            logger.error("Failed to parse XML content: %s", str(e))
+            logger.warning("No articles found in OAI-PMH response!")
+            return
     else:
         base = urlunsplit((parsed.scheme, parsed.netloc, parsed.path, "", ""))
         logger.debug("Using Scythe harvester for base URL: %s", base)
