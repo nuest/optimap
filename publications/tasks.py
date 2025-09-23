@@ -55,6 +55,34 @@ def _get_article_link(pub):
         return f"{base}/work/{pub.doi}"
     return pub.url
     
+
+def parse_publication_date(date_string):
+    if not date_string:
+        return None
+
+    date_string = date_string.strip()
+
+    # Already in correct format
+    if re.match(r'^\d{4}-\d{2}-\d{2}$', date_string):
+        return date_string
+
+    # YYYY-MM format - add day
+    if re.match(r'^\d{4}-\d{2}$', date_string):
+        return f"{date_string}-01"
+
+    # YYYY format - add month and day
+    if re.match(r'^\d{4}$', date_string):
+        return f"{date_string}-01-01"
+
+    # Try to extract year from other formats
+    year_match = re.search(r'\b(\d{4})\b', date_string)
+    if year_match:
+        return f"{year_match.group(1)}-01-01"
+
+    logger.warning("Could not parse date format: %s", date_string)
+    return None
+
+
 def generate_data_dump_filename(extension: str) -> str:
     ts = datetime.now(dt_timezone.utc).strftime("%Y%m%dT%H%M%S")
     return f"optimap_data_dump_{ts}.{extension}"
@@ -158,7 +186,8 @@ def parse_oai_xml_and_save_publications(content, event: HarvestingEvent, max_rec
             title_value    = get_field("title")       or get_field("dc:title")
             abstract_text  = get_field("description") or get_field("dc:description")
             journal_value  = get_field("publisher")   or get_field("dc:publisher")
-            date_value     = get_field("date")        or get_field("dc:date")
+            raw_date_value = get_field("date")        or get_field("dc:date")
+            date_value     = parse_publication_date(raw_date_value)
 
             logger.debug("Processing publication: %s", title_value[:50] if title_value else 'No title')
 
@@ -247,7 +276,7 @@ def parse_oai_xml_and_save_publications(content, event: HarvestingEvent, max_rec
                         url                  = identifier_value,
                         doi                  = doi_text,
                         source               = src_obj,
-                        status               = "p",
+                        status               = "h",
                         geometry             = geom_obj,
                         timeperiod_startdate = period_start,
                         timeperiod_enddate   = period_end,
@@ -344,8 +373,8 @@ def harvest_oai_endpoint(source_id, user=None, max_records=None):
             except Exception as email_error:
                 logger.error("Failed to send failure notification email: %s", str(email_error))
 
-        return None, None, None
-
+    # If we reach here, harvesting failed
+    return None, None, None
 
 def send_monthly_email(trigger_source="manual", sent_by=None):
     """
