@@ -35,6 +35,7 @@ from osgeo import ogr, osr
 ogr.UseExceptions()
 import humanize
 import json
+import re
 
 
 LOGIN_TOKEN_LENGTH  = 32
@@ -136,6 +137,12 @@ def about(request):
 
 def accessibility(request):
     return render(request, 'accessibility.html')
+
+
+def feeds_list(request):
+    """Display available predefined feeds grouped by global regions."""
+    regions = GlobalRegion.objects.all().order_by("name")
+    return render(request, "feeds.html", {"regions": regions})
 
 def loginres(request):
     email = request.POST.get('email', False)
@@ -579,6 +586,7 @@ def _normalize_authors(pub):
         return items or None
     return None
 
+
 def article_links_list(request):
     """
     Public page that lists a link for every publication:
@@ -611,30 +619,10 @@ def article_landing(request, doi):
         }
         feature_json = json.dumps(feature)
 
-    # Optional helpers for time period / authors if you added them earlier:
-    def _fmt_period(p):
-        s = (p.timeperiod_startdate or [])[:1]
-        e = (p.timeperiod_enddate   or [])[:1]
-        s0 = s[0] if s else None
-        e0 = e[0] if e else None
-        if s0 and e0: return f"{s0} – {e0}"
-        if s0: return f"from {s0}"
-        if e0: return f"until {e0}"
-        return None
-
-    return render(
-        request,
-        # use the actual path/name of your template; adjust if yours differs
-        "article_landing.html",
-        {
-            "pub": pub,
-            "feature_json": feature_json,
-            "timeperiod_label": _fmt_period(pub),
-        },
-    )
-
-def feeds_list(request):
-    regions = GlobalRegion.objects.all().order_by("region_type", "name")
-    return render(request,
-                  "feeds.html",
-                  {"regions": regions})
+    context = {
+        "pub": pub,
+        "feature_json": feature_json,
+        "timeperiod_label": _format_timeperiod(pub),
+        "authors_list": _normalize_authors(pub),
+    }
+    return render(request, "article_landing.html", context)

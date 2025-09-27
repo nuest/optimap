@@ -259,7 +259,7 @@ def send_monthly_email(trigger_source="manual", sent_by=None):
     Rules:
       - One email per distinct recipient with a non-empty address.
       - Link for each publication:
-          * if DOI present  -> https://doi.org/<doi>
+          * if DOI present  -> prefer OPTIMAP permalink, fallback to https://doi.org/<doi>
           * else            -> fallback to Publication.url (may be empty)
       - Log success/failure to EmailLog.
       - Respect settings.EMAIL_SEND_DELAY if present.
@@ -287,8 +287,17 @@ def send_monthly_email(trigger_source="manual", sent_by=None):
 
     # Build message
     def link_for(pub):
-        # Per supervisor note: prefer DOI permalink; otherwise fallback to stored URL.
-        return f"https://doi.org/{pub.doi}" if pub.doi else (pub.url or "")
+        """Prefer internal permalink for DOI entries, fall back gracefully."""
+        if pub.doi:
+            try:
+                permalink = pub.permalink()
+            except TypeError:
+                # In case permalink was overwritten with a property-like value
+                permalink = pub.permalink if hasattr(pub, "permalink") else None
+            if permalink:
+                return permalink
+            return f"https://doi.org/{pub.doi}"
+        return pub.url or ""
 
     lines = [f"- {pub.title}: {link_for(pub)}" for pub in new_manuscripts]
     content = "Here are the new manuscripts:\n" + "\n".join(lines)
