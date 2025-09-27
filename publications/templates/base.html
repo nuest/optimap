@@ -2,6 +2,7 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
+    {% block head %}
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
@@ -21,7 +22,30 @@
     <script src="{% static 'js/jquery-3.4.1.slim.min.js' %}"></script>
     <script src="{% static 'js/bootstrap.min.js' %}"></script>
 
-    {% block head %}{% endblock %}
+    {{ block.super }}
+    
+    <!-- RSS feed autodiscovery -->
+    <link
+      rel="alternate"
+      type="application/rss+xml"
+      title="OPTIMAP Geo RSS"
+      href="{% url 'optimap:georss_feed' %}"
+    />
+    <!-- Atom feed autodiscovery -->
+    <link
+      rel="alternate"
+      type="application/atom+xml"
+      title="OPTIMAP Geo Atom"
+      href="{% url 'optimap:geoatom_feed' %}"
+    />
+    <!-- JSON feed autodiscovery -->
+    <link
+      rel="alternate"
+      type="application/xml"
+      title="OPTIMAP W3C Geo Feed"
+      href="{% url 'optimap:w3cgeo_feed' %}"
+    />
+    {% endblock head %}
 
     <link rel="stylesheet" type="text/css" href="{% static 'css/main.css' %}" />
   </head>

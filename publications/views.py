@@ -14,21 +14,17 @@ from django.contrib import messages
 from django.views.decorators.cache import never_cache
 from django.urls import reverse
 import uuid
-from django.contrib.gis.serializers import geojson
-from django.http import JsonResponse
-from django.utils import timezone
-from django.utils.timezone import now, get_default_timezone
+from django.utils.timezone import get_default_timezone
 from datetime import datetime
 import imaplib
 import time
 from math import floor
 from urllib.parse import unquote
 from django.conf import settings
-from django.core.serializers import serialize
 from publications.models import BlockedEmail, BlockedDomain, Subscription, UserProfile, Publication, GlobalRegion 
 from django.contrib.auth import get_user_model
 User = get_user_model()
-import tempfile, os, glob
+import tempfile, os
 from pathlib import Path
 from publications.tasks import regenerate_geojson_cache, regenerate_geopackage_cache
 from osgeo import ogr, osr
@@ -383,14 +379,25 @@ def change_useremail(request):
                 'text': 'You attempted to change your email to an address that is blocked. Please contact support for assistance.'
             }
         })
-        messages.error(request, "Invalid email change request.")
-        return render(request, 'changeuser.html')
     if not email_new or email_new == email_old:
         messages.error(request, "Invalid email change request.")
-        return render(request, 'changeuser.html')
+        return render(request, "error.html", {
+            'error': {
+                'class': 'danger',
+                'title': 'Invalid Email Change!',
+                'text': 'You attempted to change your email to an address that is invalid. Please enter a valid email address that is different from the current one.'
+            }
+        })
     if User.objects.filter(email=email_new).exists():
         messages.error(request, "This email is already in use.")
-        return render(request, 'changeuser.html')
+        return render(request, "error.html", {
+            'error': {
+                'class': 'danger',
+                'title': 'Email Already In Use!',
+                'text': 'You attempted to change your email to an address that is already in use.'
+            }
+        })
+
     token = secrets.token_urlsafe(32)
     cache.set(
         f"{EMAIL_CONFIRMATION_TOKEN_PREFIX}_{email_new}",
@@ -535,6 +542,20 @@ def finalize_account_deletion(request):
         if USER_DELETE_TOKEN_PREFIX in request.session:
             del request.session[USER_DELETE_TOKEN_PREFIX]
             request.session.modified = True
+
+def feeds(request):
+    global_feeds = [
+        { "title": "Geo RSS",     "url": reverse("optimap:georss_feed")   },
+        { "title": "Geo Atom",    "url": reverse("optimap:geoatom_feed")  },
+        { "title": "W3C Geo",     "url": reverse("optimap:w3cgeo_feed")   },
+    ]
+
+    regions = GlobalRegion.objects.all().order_by("region_type", "name")
+
+    return render(request, "feeds.html", {
+        "global_feeds": global_feeds,
+        "regions": regions,
+    })
 
 class RobotsView(View):
     http_method_names = ['get']
