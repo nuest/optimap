@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(python manage.py shell:*)",
+      "Bash(source:*)",
+      "Bash(python:*)",
+      "Read(//home/daniel/git/geoextent/geoextent/lib/**)",
+      "Read(//home/daniel/git/geoextent/**)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
