@@ -54,7 +54,6 @@ FEED_CACHE_HOURS = int(os.getenv("OPTIMAP_FEED_CACHE_HOURS", 24))
 
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
-    "sesame.backends.ModelBackend",
 ]
 
 # Login/Logout URLs for @login_required decorator
@@ -256,7 +255,6 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.sites.middleware.CurrentSiteMiddleware",
-    "sesame.middleware.AuthenticationMiddleware",
     "django_currentuser.middleware.ThreadLocalUserMiddleware",
     "django.middleware.gzip.GZipMiddleware",
 
