@@ -51,7 +51,6 @@ DATA_DUMP_RETENTION = int(os.getenv("OPTIMAP_DATA_DUMP_RETENTION", 3))
 
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
-    "sesame.backends.ModelBackend",
 ]
 
 INSTALLED_APPS = [
@@ -231,7 +230,6 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.sites.middleware.CurrentSiteMiddleware",
-    "sesame.middleware.AuthenticationMiddleware",
     "django_currentuser.middleware.ThreadLocalUserMiddleware",
     "django.middleware.gzip.GZipMiddleware",
 
