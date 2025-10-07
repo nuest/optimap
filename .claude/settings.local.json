@@ -6,7 +6,13 @@
       "Bash(source:*)",
       "Bash(python:*)",
       "Read(//home/daniel/git/geoextent/geoextent/lib/**)",
-      "Read(//home/daniel/git/geoextent/**)"
+      "Read(//home/daniel/git/geoextent/**)",
+      "Bash(docker compose run:*)",
+      "Bash(docker compose exec:*)",
+      "Bash(docker compose:*)",
+      "Bash(OPTIMAP_LOGGING_LEVEL=WARNING python manage.py test tests.test_geoextent)",
+      "Bash(OPTIMAP_LOGGING_LEVEL=WARNING python manage.py test tests.test_geoextent.GeoextentRemoteGetTest)",
+      "Bash(geoextent:*)"
     ],
     "deny": [],
     "ask": []
