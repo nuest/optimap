@@ -160,6 +160,7 @@ python manage.py test                        # Run all tests
 python manage.py test tests                  # Run unit tests only
 python manage.py test tests-ui               # Run UI tests only
 python manage.py test tests.test_geo_data    # Run specific test module
+python manage.py test tests.test_geoextent   # Run geoextent API integration tests
 python -Wa manage.py test                    # Show deprecation warnings
 ```
 
@@ -293,35 +294,74 @@ optimap/
 
 ### Geoextent API Endpoints
 
+#### Public API - No authentication required
+
+All geoextent endpoints return valid GeoJSON FeatureCollections by default, matching the geoextent CLI output format.
+
 - `/api/v1/geoextent/extract/` - Extract spatial/temporal extent from uploaded file
-  - POST with multipart/form-data
+  - Method: POST with multipart/form-data
   - Parameters: file, bbox, tbox, convex_hull, response_format, placename, gazetteer
-  - Returns: spatial_extent, temporal_extent, placename (optional), metadata
+  - Returns: GeoJSON FeatureCollection with `geoextent_extraction` metadata
 
 - `/api/v1/geoextent/extract-remote/` - Extract extent from remote repositories
-  - POST with JSON body
+  - Methods: GET or POST (same URL)
+  - POST: JSON body with `identifiers` array
+  - GET: URL parameters with comma-separated `identifiers`
   - Supports: Zenodo, PANGAEA, OSF, Figshare, Dryad, GFZ Data Services, Dataverse
-  - Parameters: identifiers[] (DOI/URL array), bbox, tbox, convex_hull, response_format, placename, gazetteer, combine_extents, size_limit_mb
+  - Parameters: identifiers, bbox, tbox, convex_hull, response_format, placename, gazetteer, file_limit, size_limit_mb
   - Uses geoextent's native multi-identifier support with automatic extent merging
   - Parallel downloads controlled by `GEOEXTENT_DOWNLOAD_WORKERS` setting
+  - Example GET: `/api/v1/geoextent/extract-remote/?identifiers=10.5281/zenodo.4593540&bbox=true&tbox=true`
+  - Example POST: `{"identifiers": ["10.5281/zenodo.4593540"], "bbox": true, "tbox": true}`
 
 - `/api/v1/geoextent/extract-batch/` - Batch processing of multiple files
-  - POST with multipart/form-data (multiple files)
-  - Parameters: files[], bbox, tbox, convex_hull, combine_extents, response_format, placename, gazetteer, size_limit_mb
+  - Method: POST with multipart/form-data (multiple files)
+  - Parameters: files[], bbox, tbox, convex_hull, response_format, placename, gazetteer, size_limit_mb
   - Uses geoextent's `fromDirectory` for native extent combination
-  - Returns: combined_extent (if requested) and individual_results for each file
+  - Returns: GeoJSON FeatureCollection with combined extent and individual features
 
 **Response Formats** (`response_format` parameter):
 
-- `structured` (default) - Structured API response with spatial_extent, temporal_extent, placename, metadata
-- `raw` - Raw geoextent library output (includes all internal fields)
-- `geojson` - GeoJSON Feature format with geometry and properties
-- `wkt` - WKT (Well-Known Text) string representation with CRS
-- `wkb` - WKB (Well-Known Binary) hex string representation with CRS
+- `geojson` (default) - Valid GeoJSON FeatureCollection matching CLI output
+  - Structure: `{"type": "FeatureCollection", "features": [...], "geoextent_extraction": {...}}`
+  - Temporal extent in feature properties as `tbox` (not `temporal_extent`)
+- `wkt` - WKT (Well-Known Text) string with metadata
+  - Structure: `{"wkt": "POLYGON(...)", "crs": "EPSG:4326", "tbox": [...], "geoextent_extraction": {...}}`
+- `wkb` - WKB (Well-Known Binary) hex string with metadata
+  - Structure: `{"wkb": "0103...", "crs": "EPSG:4326", "tbox": [...], "geoextent_extraction": {...}}`
 
-Supported input formats: GeoJSON, GeoTIFF, Shapefile, GeoPackage, KML, GML, GPX, FlatGeobuf, CSV (with lat/lon)
+See [docs/geoextent_response_formats.md](docs/geoextent_response_formats.md) for detailed examples.
 
-Gazetteers available: Nominatim (default), GeoNames (requires username), Photon
+**Metadata Structure** (`geoextent_extraction`):
+
+Property names match geoextent CLI output to avoid confusion:
+
+- `version` - Geoextent library version
+- `inputs` - List of input identifiers/filenames
+- `statistics.files_processed` - Number of files processed
+- `statistics.files_with_extent` - Number of files with valid extent
+- `statistics.total_size` - Total size (e.g., "2.71 MiB")
+- `format` - Source format (e.g., "remote", "geojson")
+- `crs` - Coordinate reference system
+- `extent_type` - "bounding_box" or "convex_hull"
+
+**HTTP Status Codes:**
+
+- `200 OK` - Successful extraction
+- `400 Bad Request` - Invalid parameters
+- `413 Request Entity Too Large` - File too large
+- `500 Internal Server Error` - Processing error
+
+Error responses: `{"error": "message"}` (no `success: false` property)
+
+**Supported Input Formats:**
+GeoJSON, GeoTIFF, Shapefile, GeoPackage, KML, GML, GPX, FlatGeobuf, CSV (with lat/lon)
+
+**Gazetteers:** Nominatim (default), GeoNames (requires username), Photon
+
+**Known Issues:**
+
+- **Coordinate order bug in geoextent.fromRemote()**: The geoextent library's `fromRemote()` function returns bounding boxes in `[minLat, minLon, maxLat, maxLon]` format instead of the GeoJSON standard `[minLon, minLat, maxLon, maxLat]`. This affects remote extractions only (not file uploads). This needs to be fixed upstream in the geoextent library. Until fixed, remote extraction coordinates will be in the wrong order.
 
 ## Version Management
 
