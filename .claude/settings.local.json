@@ -12,7 +12,10 @@
       "Bash(docker compose:*)",
       "Bash(OPTIMAP_LOGGING_LEVEL=WARNING python manage.py test tests.test_geoextent)",
       "Bash(OPTIMAP_LOGGING_LEVEL=WARNING python manage.py test tests.test_geoextent.GeoextentRemoteGetTest)",
-      "Bash(geoextent:*)"
+      "Bash(geoextent:*)",
+      "Bash(curl:*)",
+      "Bash(python3:*)",
+      "Read(//home/daniel/.cache/**)"
     ],
     "deny": [],
     "ask": []
