@@ -6,6 +6,7 @@ import os
 import shutil
 import tempfile
 import uuid
+import zipfile
 from pathlib import Path
 
 from rest_framework import viewsets, status
@@ -116,6 +117,15 @@ class GeoextentViewSet(viewsets.ViewSet):
         Geoextent returns the extent information directly.
         """
         try:
+            # Check if result is None or empty
+            if result is None:
+                logger.error("Geoextent returned None - no valid spatial data found")
+                return None
+
+            if not isinstance(result, dict):
+                logger.error(f"Geoextent returned unexpected type: {type(result)}")
+                return None
+
             response = {
                 'success': True,
             }
@@ -131,6 +141,10 @@ class GeoextentViewSet(viewsets.ViewSet):
             # Add placename if present (geoextent extracts this)
             if 'placename' in result and result['placename']:
                 response['placename'] = result['placename']
+
+            # Add external metadata if present (from CrossRef/DataCite)
+            if 'external_metadata' in result and result['external_metadata']:
+                response['external_metadata'] = result['external_metadata']
 
             # Add metadata
             response['metadata'] = {}
@@ -192,7 +206,7 @@ class GeoextentViewSet(viewsets.ViewSet):
         Format the response based on the requested format.
 
         Args:
-            geoextent_result: Raw result from geoextent
+            geoextent_result: Raw result from geoextent (dict with bbox, tbox, etc.)
             structured_result: Processed structured result from _process_geoextent_result
             response_format: One of 'geojson', 'wkt', 'wkb'
             identifiers: List of input identifiers (for metadata)
@@ -200,8 +214,30 @@ class GeoextentViewSet(viewsets.ViewSet):
         Returns:
             Formatted response based on response_format
         """
-        if response_format in ['geojson', 'wkt', 'wkb']:
-            # Convert bbox to geometric format
+        if response_format == 'geojson':
+            # Use geoextent's format_extent_output to create proper GeoJSON
+            # This ensures we match CLI output exactly and don't need to manually
+            # reconstruct GeoJSON from bbox
+            import geoextent.lib.helpfunctions as hf
+
+            # Build extraction metadata for geoextent's formatter
+            extraction_metadata = self._build_geoextent_extraction_metadata(
+                geoextent_result,
+                identifiers=identifiers
+            )
+
+            # Use geoextent's official formatter to create GeoJSON FeatureCollection
+            # This handles bbox, convex_hull, tbox, placename, external_metadata automatically
+            formatted_output = hf.format_extent_output(
+                geoextent_result,
+                output_format='geojson',
+                extraction_metadata=extraction_metadata
+            )
+
+            return formatted_output
+
+        elif response_format in ['wkt', 'wkb']:
+            # For WKT/WKB, we need to convert bbox to geometry
             if not structured_result.get('spatial_extent'):
                 return {
                     'success': False,
@@ -234,59 +270,31 @@ class GeoextentViewSet(viewsets.ViewSet):
                     'error': f'Cannot convert bbox format {bbox} to {response_format}'
                 }
 
-            # Format the geometry based on requested format
-            if response_format == 'geojson':
-                # Return GeoJSON FeatureCollection matching CLI output format
-                properties = {}
+            # Build geoextent_extraction metadata
+            geoextent_extraction = self._build_geoextent_extraction_metadata(
+                geoextent_result,
+                identifiers=identifiers
+            )
 
-                # Add tbox to properties if present (matching CLI output)
-                if structured_result.get('temporal_extent'):
-                    properties['tbox'] = structured_result['temporal_extent']
+            # Create result with geometry in requested format
+            if response_format == 'wkt':
+                result = {'wkt': geom.wkt}
+            else:  # wkb
+                result = {'wkb': geom.wkb.hex()}
 
-                feature = {
-                    'type': 'Feature',
-                    'geometry': json.loads(geom.geojson),
-                    'properties': properties
-                }
+            # Add common fields
+            result['crs'] = 'EPSG:4326'
+            result['geoextent_extraction'] = geoextent_extraction
 
-                # Build geoextent_extraction metadata
-                geoextent_extraction = self._build_geoextent_extraction_metadata(
-                    geoextent_result,
-                    identifiers=identifiers
-                )
+            # Add tbox if present (using same property name as CLI)
+            if structured_result.get('temporal_extent'):
+                result['tbox'] = structured_result['temporal_extent']
+            if structured_result.get('placename'):
+                result['placename'] = structured_result['placename']
+            if structured_result.get('external_metadata'):
+                result['external_metadata'] = structured_result['external_metadata']
 
-                result = {
-                    'type': 'FeatureCollection',
-                    'features': [feature],
-                    'geoextent_extraction': geoextent_extraction
-                }
-
-                return result
-
-            elif response_format in ['wkt', 'wkb']:
-                # Build geoextent_extraction metadata
-                geoextent_extraction = self._build_geoextent_extraction_metadata(
-                    geoextent_result,
-                    identifiers=identifiers
-                )
-
-                # Create result with geometry in requested format
-                if response_format == 'wkt':
-                    result = {'wkt': geom.wkt}
-                else:  # wkb
-                    result = {'wkb': geom.wkb.hex()}
-
-                # Add common fields
-                result['crs'] = 'EPSG:4326'
-                result['geoextent_extraction'] = geoextent_extraction
-
-                # Add tbox if present (using same property name as CLI)
-                if structured_result.get('temporal_extent'):
-                    result['tbox'] = structured_result['temporal_extent']
-                if structured_result.get('placename'):
-                    result['placename'] = structured_result['placename']
-
-                return result
+            return result
 
         # Default fallback
         return structured_result
@@ -328,19 +336,49 @@ class GeoextentViewSet(viewsets.ViewSet):
             # Save uploaded file
             temp_path = self._save_uploaded_file(uploaded_file)
 
-            # Call geoextent once with all parameters
-            # placename parameter: None, 'nominatim', 'geonames', or 'photon'
-            geoextent_result = geoextent.fromFile(
-                temp_path,
-                bbox=bbox,
-                tbox=tbox,
-                convex_hull=convex_hull,
-                placename=gazetteer if placename else None,
-                show_progress=False,  # Disable progress bar in API
-            )
+            # Check if the file is a ZIP archive
+            is_zip = zipfile.is_zipfile(temp_path)
+            temp_dir = None
+
+            if is_zip:
+                # Extract ZIP to temporary directory and process with fromDirectory
+                temp_dir = tempfile.mkdtemp(prefix='geoextent_zip_')
+                logger.info(f"Extracting ZIP file to: {temp_dir}")
+
+                with zipfile.ZipFile(temp_path, 'r') as zip_ref:
+                    zip_ref.extractall(temp_dir)
+
+                # Call geoextent.fromDirectory on extracted contents
+                geoextent_result = geoextent.fromDirectory(
+                    temp_dir,
+                    bbox=bbox,
+                    tbox=tbox,
+                    convex_hull=convex_hull,
+                    placename=gazetteer if placename else None,
+                    show_progress=False,  # Disable progress bar in API
+                    recursive=True,  # Process subdirectories in ZIP
+                )
+            else:
+                # Call geoextent once with all parameters
+                # placename parameter: None, 'nominatim', 'geonames', or 'photon'
+                geoextent_result = geoextent.fromFile(
+                    temp_path,
+                    bbox=bbox,
+                    tbox=tbox,
+                    convex_hull=convex_hull,
+                    placename=gazetteer if placename else None,
+                    show_progress=False,  # Disable progress bar in API
+                )
 
             # Process result to structured format
             structured_result = self._process_geoextent_result(geoextent_result)
+
+            # Check if processing failed
+            if structured_result is None:
+                return Response({
+                    'error': f'Could not extract spatial extent from "{uploaded_file.name}". The file may not contain valid spatial data or may be in an unsupported format.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
             structured_result['filename'] = uploaded_file.name
 
             # Format response based on requested format
@@ -367,6 +405,13 @@ class GeoextentViewSet(viewsets.ViewSet):
             # Cleanup temp file
             if temp_path:
                 self._cleanup_temp_file(temp_path)
+            # Cleanup temp directory if ZIP was extracted
+            if 'temp_dir' in locals() and temp_dir and os.path.exists(temp_dir):
+                try:
+                    shutil.rmtree(temp_dir)
+                    logger.info(f"Cleaned up temp directory: {temp_dir}")
+                except Exception as e:
+                    logger.warning(f"Failed to cleanup temp directory {temp_dir}: {e}")
 
     @action(detail=False, methods=['get', 'post'], url_path='extract-remote')
     def extract_remote(self, request):
@@ -394,6 +439,8 @@ class GeoextentViewSet(viewsets.ViewSet):
         gazetteer = serializer.validated_data['gazetteer']
         file_limit = serializer.validated_data['file_limit']
         size_limit_mb = serializer.validated_data['size_limit_mb']
+        external_metadata = serializer.validated_data['external_metadata']
+        external_metadata_method = serializer.validated_data['external_metadata_method']
 
         try:
             workers = settings.GEOEXTENT_DOWNLOAD_WORKERS
@@ -414,11 +461,20 @@ class GeoextentViewSet(viewsets.ViewSet):
                 max_download_size=f"{size_limit_mb}MB" if size_limit_mb else None,
                 show_progress=False,  # Disable progress bar in API
                 download_skip_nogeo=True,  # Skip non-geospatial files
+                ext_metadata=external_metadata,
+                ext_metadata_method=external_metadata_method,
             )
 
             # For single identifier, geoextent returns simple format
             if len(identifiers) == 1:
                 structured_result = self._process_geoextent_result(geoextent_result)
+
+                # Check if processing failed
+                if structured_result is None:
+                    return Response({
+                        'error': f'Could not extract spatial extent from "{identifiers[0]}". The resource may not contain valid spatial data or may be inaccessible.'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
                 structured_result['identifier'] = identifiers[0]
                 formatted_result = self._format_response(
                     geoextent_result,
@@ -572,11 +628,31 @@ class GeoextentViewSet(viewsets.ViewSet):
             # Process combined result
             combined_structured = self._process_geoextent_result(geoextent_result)
 
+            # Check if processing failed for combined result
+            if combined_structured is None:
+                filenames = ', '.join([f.name for f in files])
+                return Response({
+                    'success': False,
+                    'error': f'Could not extract spatial extent from the uploaded files: {filenames}',
+                    'details': 'The files may not contain valid spatial data or may be in unsupported formats.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
             # Process individual file results from details
             individual_results = []
             if 'details' in geoextent_result:
                 for filename, file_result in geoextent_result['details'].items():
                     structured_result = self._process_geoextent_result(file_result)
+
+                    # Skip files that failed processing
+                    if structured_result is None:
+                        logger.warning(f"Could not extract extent from {filename}")
+                        individual_results.append({
+                            'filename': filename,
+                            'error': 'Could not extract spatial extent',
+                            'details': 'The file may not contain valid spatial data or may be in an unsupported format.'
+                        })
+                        continue
+
                     structured_result['filename'] = filename
 
                     # Format based on response_format

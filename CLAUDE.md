@@ -291,6 +291,7 @@ optimap/
 - `/download/geopackage/` - Download as GeoPackage
 - `/feed/georss/` - Global GeoRSS feed
 - `/feeds/georss/<slug>/` - Region-filtered GeoRSS feed
+- `/geoextent/` - Geoextent extraction web UI (interactive tool for file upload and remote resource extraction)
 
 ### Geoextent API Endpoints
 
@@ -362,6 +363,51 @@ GeoJSON, GeoTIFF, Shapefile, GeoPackage, KML, GML, GPX, FlatGeobuf, CSV (with la
 **Known Issues:**
 
 - **Coordinate order bug in geoextent.fromRemote()**: The geoextent library's `fromRemote()` function returns bounding boxes in `[minLat, minLon, maxLat, maxLon]` format instead of the GeoJSON standard `[minLon, minLat, maxLon, maxLat]`. This affects remote extractions only (not file uploads). This needs to be fixed upstream in the geoextent library. Until fixed, remote extraction coordinates will be in the wrong order.
+
+### Geoextent Web UI
+
+Interactive web interface at [/geoextent](publications/templates/geoextent.html) for extracting geospatial/temporal extents from data files.
+
+**Features:**
+
+- File upload (single or batch) with size validation
+- Remote resource extraction via DOI/URL (comma-separated)
+- Interactive Leaflet map preview with clickable features
+- Parameter customization (bbox, tbox, convex_hull, placename, gazetteer)
+- Response format selection (GeoJSON, WKT, WKB)
+- Download results in selected format
+- Client-side file size validation against server limits
+- Error handling with informative messages
+- Documentation section with supported formats and providers
+- Use *sentence case* for all headlines and fields
+
+**Implementation:**
+
+- View: [publications/views.py](publications/views.py) - `geoextent()` function
+  - Uses `geoextent.lib.features.get_supported_features()` to dynamically load supported formats and providers
+  - No hardcoded format lists - always reflects current geoextent capabilities
+- Template: [publications/templates/geoextent.html](publications/templates/geoextent.html)
+  - Uses Fetch API for AJAX requests (jQuery slim doesn't include $.ajax)
+  - Interactive file management with add/remove functionality
+  - Multiple file selection from different locations
+  - CSRF token handling for secure POST requests
+- Uses existing jQuery (slim) and Bootstrap (no additional libraries)
+- Map integration via existing Leaflet setup
+- API calls to `/api/v1/geoextent/` endpoints
+- UI tests: [tests-ui/test_geoextent.py](tests-ui/test_geoextent.py)
+
+**Configuration:**
+
+Size limits passed from Django settings:
+
+- `GEOEXTENT_MAX_FILE_SIZE_MB` - Single file upload limit
+- `GEOEXTENT_MAX_BATCH_SIZE_MB` - Total batch upload limit
+- `GEOEXTENT_MAX_DOWNLOAD_SIZE_MB` - Remote resource download limit
+
+**Navigation:**
+
+- Footer link added to [publications/templates/footer.html](publications/templates/footer.html)
+- URL route: `path("geoextent/", views.geoextent, name="geoextent")` in [publications/urls.py](publications/urls.py)
 
 ## Version Management
 

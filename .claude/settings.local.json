@@ -35,6 +35,10 @@
       "Bash(python3:*)",
       "Bash(pkill:*)",
       "Bash(wget:*)"
+      "Bash(geoextent:*)",
+      "Bash(curl:*)",
+      "Bash(python3:*)",
+      "Read(//home/daniel/.cache/**)"
     ],
     "deny": [],
     "ask": []

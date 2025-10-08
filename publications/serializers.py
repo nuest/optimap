@@ -123,6 +123,15 @@ class GeoextentBaseSerializer(serializers.Serializer):
         choices=GAZETTEER_CHOICES,
         default=GAZETTEER_DEFAULT
     )
+    external_metadata = serializers.BooleanField(
+        default=True,
+        help_text="Retrieve external metadata from CrossRef/DataCite for DOIs (only applies to remote resources)"
+    )
+    external_metadata_method = serializers.ChoiceField(
+        choices=['auto', 'all', 'crossref', 'datacite'],
+        default='auto',
+        help_text="Method for retrieving metadata: 'auto' (default), 'all', 'crossref', or 'datacite'"
+    )
 
     def validate_gazetteer(self, value):
         """Only validate gazetteer if placename is requested."""

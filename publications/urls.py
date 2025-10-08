@@ -90,5 +90,6 @@ urlpatterns = [
     path("feeds/geoatom/<slug:geometry_slug>/",
          GeoFeedByGeometry(feed_type_variant="geoatom"), name="feed-geoatom-by-slug"),
     path('contribute/', views.contribute, name="contribute"),
+    path("geoextent/", views.geoextent, name="geoextent"),
 
 ]
