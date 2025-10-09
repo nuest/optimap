@@ -9,6 +9,7 @@ from django_q.models import Schedule
 from django.utils.timezone import now
 from django.contrib.auth.models import AbstractUser, Group, Permission
 from import_export import fields, resources
+from django.urls import reverse
 from import_export.widgets import ForeignKeyWidget
 from django.core.exceptions import ValidationError
 from stdnum.issn import is_valid as is_valid_issn
@@ -23,6 +24,11 @@ STATUS_CHOICES = (
     ("w", "Withdrawn"),
     ("h", "Harvested"),
 )
+
+EMAIL_STATUS_CHOICES = [
+    ("success", "Success"),
+    ("failed", "Failed"),
+]
 
 class CustomUser(AbstractUser):
     groups = models.ManyToManyField(Group, related_name="publications_users", blank=True)
@@ -53,7 +59,7 @@ class Publication(models.Model):
         verbose_name='Publication geometry/ies', srid=4326, null=True, blank=True
     )
     timeperiod_startdate = ArrayField(models.CharField(max_length=1024, null=True), null=True, blank=True)
-    timeperiod_enddate = ArrayField(models.CharField(max_length=1024, null=True), null=True, blank=True)
+    timeperiod_enddate   = ArrayField(models.CharField(max_length=1024, null=True), null=True, blank=True)
     job = models.ForeignKey(
         'HarvestingEvent', on_delete=models.CASCADE, related_name='publications', null=True, blank=True
     )
@@ -61,11 +67,22 @@ class Publication(models.Model):
     class Meta:
         ordering = ['-id']
         constraints = [
-            models.UniqueConstraint(fields=['doi', 'url'], name='unique_publication_entry')
+            models.UniqueConstraint(fields=['doi', 'url'], name='unique_publication_entry'),
         ]
 
     def __str__(self):
         return self.title
+
+    def permalink(self) -> str | None:
+        """
+        Return the absolute OPTIMAP permalink (/work/<doi>) if a DOI exists; otherwise None.
+        """
+        if not getattr(self, "doi", None):
+            return None
+        base = settings.BASE_URL.rstrip("/")
+        rel = reverse("optimap:article-landing", args=[self.doi])
+        return f"{base}{rel}"
+    permalink.short_description = "Permalink"
 
 class Subscription(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="subscriptions", null=True, blank=True)

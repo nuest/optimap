@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block navbar %}
+<ul class="nav navbar-nav">
+  {% if request.user.is_authenticated %}
+    {% include "authenticated_menu_snippet.html" %}
+  {% else %}
+    {% include "menu_snippet.html" %}
+  {% endif %}
+</ul>
+{% endblock %}
+
+{% block content %}
+  <div class="container py-5 works-page">
+    <h2>All Article Links</h2>
+    <ul>
+      {% for item in links %}
+        <li><a href="{{ item.href }}" target="_blank" rel="noopener">{{ item.title }}</a></li>
+      {% empty %}
+        <li>No publications found.</li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endblock %}

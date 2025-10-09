@@ -229,6 +229,9 @@ python -m smtpd -c DebuggingServer -n localhost:5587
 OPTIMAP_EMAIL_HOST=localhost
 OPTIMAP_EMAIL_PORT=5587
 ```
+### Accessing list of article links
+
+Visit the URL - http://127.0.0.1:8000/articles/links/
 
 ### Create Superusers/Admin
 

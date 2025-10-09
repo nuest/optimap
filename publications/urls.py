@@ -7,7 +7,8 @@ from publications import views
 from .feeds import GeoFeed
 from django.views.generic import RedirectView
 from .feeds_geometry import GeoFeedByGeometry
-
+from django.urls import path
+from . import views 
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView
 from publications.api  import router as publications_router
 from publications.api  import router as publications_router
@@ -23,6 +24,8 @@ urlpatterns = [
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/schema/ui/', SpectacularRedocView.as_view(url_name='optimap:schema'), name='redoc'),
     path('download/geojson/', views.download_geojson, name='download_geojson'),
+    path("works/", views.works_list, name="works-list"),
+    path("work/<path:doi>/", views.work_landing, name="article-landing"),
     path('download/geopackage/', views.download_geopackage, name='download_geopackage'),
     path('favicon.ico', lambda request: redirect('static/favicon.ico', permanent=True)),
     path('feed/', RedirectView.as_view(pattern_name='optimap:georss_feed', permanent=True)),
