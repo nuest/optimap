@@ -40,7 +40,7 @@ def _get_article_link(pub):
     """Prefer our site permalink if DOI exists, else fallback to original URL."""
     if getattr(pub, "doi", None):
         base = settings.BASE_URL.rstrip("/")
-        return f"{base}/article/{pub.doi}"
+        return f"{base}/work/{pub.doi}"
     return pub.url
     
 def generate_data_dump_filename(extension: str) -> str:
@@ -301,7 +301,7 @@ def send_monthly_email(trigger_source="manual", sent_by=None):
 
     lines = [f"- {pub.title}: {link_for(pub)}" for pub in new_manuscripts]
     content = "Here are the new manuscripts:\n" + "\n".join(lines)
-    subject = "📚 New Manuscripts This Month"
+    subject = "📚 New manuscripts on OPTIMAP"
 
     # Optional throttle between emails
     delay_seconds = getattr(settings, "EMAIL_SEND_DELAY", 0)

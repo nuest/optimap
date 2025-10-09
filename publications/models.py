@@ -75,7 +75,7 @@ class Publication(models.Model):
 
     def permalink(self) -> str | None:
         """
-        Return the absolute OPTIMAP permalink (/article/<doi>) if a DOI exists; otherwise None.
+        Return the absolute OPTIMAP permalink (/work/<doi>) if a DOI exists; otherwise None.
         """
         if not getattr(self, "doi", None):
             return None

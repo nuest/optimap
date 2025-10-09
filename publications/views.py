@@ -611,7 +611,7 @@ def _normalize_authors(pub):
 def works_list(request):
     """
     Public page that lists a link for every work:
-    - DOI present  -> /article/<doi> (site-local landing page)
+    - DOI present  -> /work/<doi> (site-local landing page)
     - no DOI       -> fall back to Publication.url (external/original)
     """
     pubs = Publication.objects.all().order_by("-creationDate", "-id")

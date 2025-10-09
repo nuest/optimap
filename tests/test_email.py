@@ -60,7 +60,7 @@ class EmailIntegrationTest(TestCase):
         self.assertIn(publication.title, sent_email.body)
 
         # Expect site-local permalink (NOT doi.org)
-        expected_link = f"{settings.BASE_URL.rstrip('/')}/article/{publication.doi}"
+        expected_link = f"{settings.BASE_URL.rstrip('/')}/work/{publication.doi}/"
         self.assertIn(expected_link, sent_email.body)
 
         # recipient and log correctness

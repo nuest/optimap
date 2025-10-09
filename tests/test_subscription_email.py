@@ -48,7 +48,7 @@ class SubscriptionEmailTest(TestCase):
         self.assertIn("Unsubscribe", body)  # casing differs in the template block, keep “U” here
 
         # Expect site-local permalink (NOT doi.org)
-        expected_link = f"{settings.BASE_URL.rstrip('/')}/article/{pub.doi}"
+        expected_link = f"{settings.BASE_URL.rstrip('/')}/work/{pub.doi}"
         self.assertIn(expected_link, body)
 
         # log entry
