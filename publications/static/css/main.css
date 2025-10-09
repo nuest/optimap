@@ -181,3 +181,75 @@ main {
   word-wrap: break-word;
   overflow-wrap: break-word;
 }
+
+/* Work landing page styles */
+h1.page-title {
+  margin-top: 2rem;
+  margin-bottom: .5rem;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+.muted {
+  color: #666;
+  font-size: .92rem;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.meta {
+  margin: 1rem 0 1.5rem;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.meta a {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-all;
+}
+
+#mini-map {
+  height: 280px;
+  border-radius: 8px;
+  margin: 1.5rem 0;
+}
+
+/* Custom zoom to all features button */
+.leaflet-control-zoom-all {
+  background-color: white;
+  border: 2px solid rgba(0,0,0,0.2);
+  border-radius: 4px;
+  width: 26px;
+  height: 26px;
+  line-height: 26px;
+  text-align: center;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.leaflet-control-zoom-all:hover {
+  background-color: #f4f4f4;
+}
+
+/* Works page styles */
+.works-page h2 {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+.works-page ul li {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+/* General text wrapping for paragraphs in content pages */
+.work-landing-page p {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}

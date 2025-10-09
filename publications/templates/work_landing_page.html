@@ -14,23 +14,7 @@
 {% endblock %}
 
 {% block content %}
-
-<style>
-  /* More separation between top logo bar and headline */
-  h1.page-title {
-    margin-top: 2rem;   /* increase top margin */
-    margin-bottom: .5rem;
-  }
-  .muted { color: #666; font-size: .92rem; }
-  .meta {
-    margin: 1rem 0 1.5rem;   /* add more vertical spacing around authors/time period */
-  }
-  #mini-map {
-    height: 280px;
-    border-radius: 8px;
-    margin: 1.5rem 0;
-  }
-</style>
+<div class="work-landing-page">
 
 <h1 class="page-title">{{ pub.title }}</h1>
 
@@ -41,9 +25,16 @@
   {% if timeperiod_label %}
     <strong>Time period:</strong> {{ timeperiod_label }} ·
   {% endif %}
-  {% if pub.doi %}<strong>DOI:</strong> {{ pub.doi }} ·{% endif %}
+  {% if pub.doi %}<strong>DOI:</strong> <a href="https://doi.org/{{ pub.doi }}" target="_blank" rel="noopener">{{ pub.doi }}</a> ·{% endif %}
   {% if pub.publicationDate %}<strong>Published:</strong> {{ pub.publicationDate }} ·{% endif %}
-  {% if pub.source %}<strong>Source:</strong> {{ pub.source.name }}{% endif %}
+  {% if pub.source %}
+    <strong>Source:</strong>
+    {% if pub.source.homepage_url %}
+      <a href="{{ pub.source.homepage_url }}" target="_blank" rel="noopener">{{ pub.source.name }}</a>
+    {% else %}
+      {{ pub.source.name }}
+    {% endif %}
+  {% endif %}
 </div>
 
 {% if pub.abstract %}
@@ -56,13 +47,26 @@
         href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
         crossorigin="">
+  <!-- Leaflet Fullscreen plugin -->
+  <link rel="stylesheet"
+        href="https://unpkg.com/leaflet.fullscreen@3.0.2/Control.FullScreen.css"
+        crossorigin="">
   <div id="mini-map"></div>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
           crossorigin=""></script>
+  <!-- Leaflet Fullscreen plugin -->
+  <script src="https://unpkg.com/leaflet.fullscreen@3.0.2/Control.FullScreen.js"
+          crossorigin=""></script>
   <script>
     const publicationFeature = {{ feature_json|safe }};
-    const map = L.map('mini-map', { scrollWheelZoom: false });
+    const map = L.map('mini-map', {
+      scrollWheelZoom: true,
+      fullscreenControl: true,
+      fullscreenControlOptions: {
+        position: 'topleft'
+      }
+    });
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
@@ -82,11 +86,42 @@
     } else {
       map.setView([0, 0], 2);
     }
+
+    // Add custom "Zoom to All Features" button
+    L.Control.ZoomAll = L.Control.extend({
+      onAdd: function(map) {
+        const btn = L.DomUtil.create('div', 'leaflet-control-zoom-all leaflet-bar leaflet-control');
+        btn.innerHTML = '⌖';
+        btn.title = 'Zoom to all features';
+
+        L.DomEvent.on(btn, 'click', function(e) {
+          L.DomEvent.stopPropagation(e);
+          L.DomEvent.preventDefault(e);
+
+          if (bounds && bounds.isValid && bounds.isValid()) {
+            map.fitBounds(bounds.pad(0.2));
+          } else if (publicationFeature.geometry && publicationFeature.geometry.type === "Point") {
+            const c = publicationFeature.geometry.coordinates;
+            map.setView([c[1], c[0]], 10);
+          }
+        });
+
+        return btn;
+      }
+    });
+
+    // Add the zoom to all button to the map
+    new L.Control.ZoomAll({ position: 'topleft' }).addTo(map);
   </script>
 {% endif %}
+
+<p class="muted">
+  <a href="/api/v1/publications/{{ pub.id }}/" target="_blank" rel="noopener">View raw JSON from API</a>
+</p>
 
 <p class="muted">
   Found an error? Please report to <a href="mailto:login@optimap.science">login@optimap.science</a>.
 </p>
 
+</div>
 {% endblock %}
