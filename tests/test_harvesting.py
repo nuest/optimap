@@ -10,7 +10,7 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'optimap.settings')
 django.setup()
 
 from publications.models import Publication, Source, HarvestingEvent, Schedule
-from publications.tasks import parse_oai_xml_and_save_publications
+from publications.tasks import parse_oai_xml_and_save_publications, harvest_oai_endpoint
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -309,4 +309,234 @@ class SimpleTest(TestCase):
         except Exception as e:
             # Skip test if AGILE doesn't have OAI-PMH endpoint
             self.skipTest(f"AGILE-GISS endpoint not available: {e}")
+
+
+class HarvestingErrorTests(TestCase):
+    """
+    Test cases for error handling during harvesting.
+
+    These tests verify that the harvesting system properly handles:
+    - Malformed XML
+    - Empty responses
+    - Missing required metadata
+    - Invalid XML structure
+    - Network/HTTP errors
+    """
+
+    def setUp(self):
+        """Set up test sources and events."""
+        Publication.objects.all().delete()
+        self.source = Source.objects.create(
+            url_field="http://example.com/oai",
+            harvest_interval_minutes=60,
+            name="Error Test Source"
+        )
+
+    def test_malformed_xml(self):
+        """Test that malformed XML is handled gracefully."""
+        event = HarvestingEvent.objects.create(
+            source=self.source,
+            status="in_progress"
+        )
+
+        malformed_xml_path = BASE_TEST_DIR / 'harvesting' / 'error_cases' / 'malformed_xml.xml'
+        xml_bytes = malformed_xml_path.read_bytes()
+
+        # Should not raise exception, but should log error
+        parse_oai_xml_and_save_publications(xml_bytes, event)
+
+        # No publications should be created from malformed XML
+        pub_count = Publication.objects.filter(job=event).count()
+        self.assertEqual(pub_count, 0, "Malformed XML should not create publications")
+
+    def test_empty_response(self):
+        """Test that empty OAI-PMH response (no records) is handled."""
+        event = HarvestingEvent.objects.create(
+            source=self.source,
+            status="in_progress"
+        )
+
+        empty_xml_path = BASE_TEST_DIR / 'harvesting' / 'error_cases' / 'empty_response.xml'
+        xml_bytes = empty_xml_path.read_bytes()
+
+        # Should not raise exception
+        parse_oai_xml_and_save_publications(xml_bytes, event)
+
+        # No publications should be created from empty response
+        pub_count = Publication.objects.filter(job=event).count()
+        self.assertEqual(pub_count, 0, "Empty response should create zero publications")
+
+    def test_invalid_xml_structure(self):
+        """Test that non-OAI-PMH XML structure is handled."""
+        event = HarvestingEvent.objects.create(
+            source=self.source,
+            status="in_progress"
+        )
+
+        invalid_xml_path = BASE_TEST_DIR / 'harvesting' / 'error_cases' / 'invalid_xml_structure.xml'
+        xml_bytes = invalid_xml_path.read_bytes()
+
+        # Should not raise exception
+        parse_oai_xml_and_save_publications(xml_bytes, event)
+
+        # No publications should be created from invalid structure
+        pub_count = Publication.objects.filter(job=event).count()
+        self.assertEqual(pub_count, 0, "Invalid XML structure should create zero publications")
+
+    def test_missing_required_metadata(self):
+        """Test that records with missing required fields are handled."""
+        event = HarvestingEvent.objects.create(
+            source=self.source,
+            status="in_progress"
+        )
+
+        missing_metadata_path = BASE_TEST_DIR / 'harvesting' / 'error_cases' / 'missing_metadata.xml'
+        xml_bytes = missing_metadata_path.read_bytes()
+
+        # Should not raise exception - may create some publications
+        parse_oai_xml_and_save_publications(xml_bytes, event)
+
+        # Check what was created
+        pubs = Publication.objects.filter(job=event)
+
+        # At least one record (the one with title) should be created
+        self.assertGreaterEqual(pubs.count(), 1, "Should create publications even with minimal metadata")
+
+        # Check that publications were created despite missing fields
+        for pub in pubs:
+            # Title might be None for some records
+            if pub.title:
+                self.assertIsInstance(pub.title, str)
+
+    def test_empty_content(self):
+        """Test that empty/None content is handled."""
+        event = HarvestingEvent.objects.create(
+            source=self.source,
+            status="in_progress"
+        )
+
+        # Test with empty bytes
+        parse_oai_xml_and_save_publications(b"", event)
+        pub_count = Publication.objects.filter(job=event).count()
+        self.assertEqual(pub_count, 0, "Empty content should create zero publications")
+
+        # Test with whitespace only
+        parse_oai_xml_and_save_publications(b"   \n\t  ", event)
+        pub_count = Publication.objects.filter(job=event).count()
+        self.assertEqual(pub_count, 0, "Whitespace-only content should create zero publications")
+
+    @responses.activate
+    def test_http_404_error(self):
+        """Test that HTTP 404 errors are handled properly."""
+        # Mock a 404 response
+        responses.add(
+            responses.GET,
+            'http://example.com/oai-404',
+            status=404,
+            body='Not Found'
+        )
+
+        source = Source.objects.create(
+            url_field="http://example.com/oai-404",
+            harvest_interval_minutes=60
+        )
+
+        # harvest_oai_endpoint should handle the error
+        harvest_oai_endpoint(source.id)
+
+        # Check that event was marked as failed
+        event = HarvestingEvent.objects.filter(source=source).latest('started_at')
+        self.assertEqual(event.status, 'failed', "Event should be marked as failed for 404 error")
+
+    @responses.activate
+    def test_http_500_error(self):
+        """Test that HTTP 500 errors are handled properly."""
+        # Mock a 500 response
+        responses.add(
+            responses.GET,
+            'http://example.com/oai-500',
+            status=500,
+            body='Internal Server Error'
+        )
+
+        source = Source.objects.create(
+            url_field="http://example.com/oai-500",
+            harvest_interval_minutes=60
+        )
+
+        # harvest_oai_endpoint should handle the error
+        harvest_oai_endpoint(source.id)
+
+        # Check that event was marked as failed
+        event = HarvestingEvent.objects.filter(source=source).latest('started_at')
+        self.assertEqual(event.status, 'failed', "Event should be marked as failed for 500 error")
+
+    @responses.activate
+    def test_network_timeout(self):
+        """Test that network timeouts are handled properly."""
+        from requests.exceptions import Timeout
+
+        # Mock a timeout
+        responses.add(
+            responses.GET,
+            'http://example.com/oai-timeout',
+            body=Timeout('Connection timeout')
+        )
+
+        source = Source.objects.create(
+            url_field="http://example.com/oai-timeout",
+            harvest_interval_minutes=60
+        )
+
+        # harvest_oai_endpoint should handle the timeout
+        harvest_oai_endpoint(source.id)
+
+        # Check that event was marked as failed
+        event = HarvestingEvent.objects.filter(source=source).latest('started_at')
+        self.assertEqual(event.status, 'failed', "Event should be marked as failed for timeout")
+
+    @responses.activate
+    def test_invalid_xml_in_http_response(self):
+        """Test that invalid XML in HTTP response is handled."""
+        # Mock response with invalid XML
+        responses.add(
+            responses.GET,
+            'http://example.com/oai-invalid',
+            status=200,
+            body='This is not XML at all',
+            content_type='text/xml'
+        )
+
+        source = Source.objects.create(
+            url_field="http://example.com/oai-invalid",
+            harvest_interval_minutes=60
+        )
+
+        # Should complete but create no publications
+        harvest_oai_endpoint(source.id)
+
+        event = HarvestingEvent.objects.filter(source=source).latest('started_at')
+        # Should complete (not fail) but create no publications
+        self.assertEqual(event.status, 'completed', "Event should complete even with invalid XML")
+
+        pub_count = Publication.objects.filter(job=event).count()
+        self.assertEqual(pub_count, 0, "Invalid XML should create zero publications")
+
+    def test_max_records_limit_with_errors(self):
+        """Test that max_records works even when some records cause errors."""
+        event = HarvestingEvent.objects.create(
+            source=self.source,
+            status="in_progress"
+        )
+
+        # Use the missing metadata file which has 2 records, one problematic
+        missing_metadata_path = BASE_TEST_DIR / 'harvesting' / 'error_cases' / 'missing_metadata.xml'
+        xml_bytes = missing_metadata_path.read_bytes()
+
+        # Limit to 1 record
+        parse_oai_xml_and_save_publications(xml_bytes, event, max_records=1)
+
+        # Should process only 1 record
+        pub_count = Publication.objects.filter(job=event).count()
+        self.assertLessEqual(pub_count, 1, "Should respect max_records limit even with errors")
 

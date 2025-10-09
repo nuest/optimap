@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/">
+    <responseDate>2022-07-04T15:37:56Z</responseDate>
+    <request verb="ListRecords" metadataPrefix="oai_dc">http://localhost:8330/index.php/opti-geo/oai</request>
+    <ListRecords>
+        <record>
+            <header>
+                <identifier>oai:ojs2.localhost:8330:article/1</identifier>
+                <datestamp>2022-07-01T12:59:33Z</datestamp>
+            </header>
+            <metadata>
+                <oai_dc:dc xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/"
+                    xmlns:dc="http://purl.org/dc/elements/1.1/">
+                    <!-- Missing required title -->
+                    <dc:identifier>http://example.com/article/1</dc:identifier>
+                    <dc:description>A publication with no title</dc:description>
+                    <dc:date>2022-07-01</dc:date>
+                </oai_dc:dc>
+            </metadata>
+        </record>
+        <record>
+            <header>
+                <identifier>oai:ojs2.localhost:8330:article/2</identifier>
+                <datestamp>2022-07-01T12:59:33Z</datestamp>
+            </header>
+            <metadata>
+                <oai_dc:dc xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/"
+                    xmlns:dc="http://purl.org/dc/elements/1.1/">
+                    <dc:title>Record with minimal metadata</dc:title>
+                    <dc:identifier>http://example.com/article/2</dc:identifier>
+                    <!-- Missing date, description, etc -->
+                </oai_dc:dc>
+            </metadata>
+        </record>
+    </ListRecords>
+</OAI-PMH>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/">
+    <responseDate>2022-07-04T15:37:56Z</responseDate>
+    <request verb="ListRecords" metadataPrefix="oai_dc">http://localhost:8330/index.php/opti-geo/oai</request>
+    <ListRecords>
+        <!-- No records -->
+    </ListRecords>
+</OAI-PMH>
