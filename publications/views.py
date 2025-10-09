@@ -608,9 +608,9 @@ def _normalize_authors(pub):
     return None
 
 
-def article_links_list(request):
+def works_list(request):
     """
-    Public page that lists a link for every publication:
+    Public page that lists a link for every work:
     - DOI present  -> /article/<doi> (site-local landing page)
     - no DOI       -> fall back to Publication.url (external/original)
     """
@@ -621,10 +621,10 @@ def article_links_list(request):
             links.append({"title": pub.title, "href": reverse("optimap:article-landing", args=[pub.doi])})
         elif pub.url:
             links.append({"title": pub.title, "href": pub.url})
-    return render(request, "article_links_list.html", {"links": links})
+    return render(request, "works.html", {"links": links})
 
 
-def article_landing(request, doi):
+def work_landing(request, doi):
     """
     Landing page for a publication with a DOI.
     Embeds a small Leaflet map when geometry is available.
@@ -646,4 +646,4 @@ def article_landing(request, doi):
         "timeperiod_label": _format_timeperiod(pub),
         "authors_list": _normalize_authors(pub),
     }
-    return render(request, "article_landing.html", context)
+    return render(request, "work_landing_page.html", context)

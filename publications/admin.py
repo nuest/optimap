@@ -169,8 +169,9 @@ class PublicationAdmin(LeafletGeoAdmin, ImportExportModelAdmin):
         if len(rows) == 1:
             self.message_user(request, "No items with DOI in selection.", level=messages.WARNING)
             return
-        esc = lambda v: f"\"{(v or '').replace('\"','\"\"')}\""
-        csv = "\n".join(",".join(map(esc, r)) for r in rows)
+        #esc = lambda v: f"\"{(v or '').replace('\"','\"\"')}\""
+        escape_row = lambda v: '"{}"'.format((v or '').replace('"', '""'))
+        csv = "\n".join(",".join(map(escape_row, r)) for r in rows)
         resp = HttpResponse(csv, content_type="text/csv; charset=utf-8")
         resp["Content-Disposition"] = 'attachment; filename="publication_permalinks.csv"'
         return resp
