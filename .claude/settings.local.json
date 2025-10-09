@@ -3,7 +3,9 @@
     "allow": [
       "Bash(tee:*)",
       "Bash(git checkout:*)",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "Bash(gh issue view:*)",
+      "Bash(pytest:*)"
     ],
     "deny": [],
     "ask": []

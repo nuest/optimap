@@ -265,6 +265,10 @@ UI tests are based on [Helium](https://github.com/mherrmann/selenium-python-heli
 pip install -r requirements-dev.txt
 ```
 
+#### Unit Tests
+
+Run all unit tests:
+
 ```bash
 python manage.py test tests
 
@@ -274,6 +278,41 @@ python -Wa manage.py test
 # configure logging level for cleaner test progress output
 OPTIMAP_LOGGING_LEVEL=WARNING python manage.py test tests
 ```
+
+#### Integration Tests (Real Harvesting)
+
+Integration tests that harvest from live OAI-PMH endpoints are disabled by default to avoid network dependencies and slow test execution. These tests verify harvesting from real journal sources.
+
+Run all integration tests:
+
+```bash
+# Enable real harvesting tests
+SKIP_REAL_HARVESTING=0 python manage.py test tests.test_real_harvesting
+```
+
+Run a specific journal test:
+
+```bash
+# Test ESSD harvesting
+SKIP_REAL_HARVESTING=0 python manage.py test tests.test_real_harvesting.RealHarvestingTest.test_harvest_essd
+
+# Test GEO-LEO harvesting
+SKIP_REAL_HARVESTING=0 python manage.py test tests.test_real_harvesting.RealHarvestingTest.test_harvest_geo_leo
+```
+
+Show skipped tests (these are skipped by default):
+
+```bash
+# Run with verbose output to see skip reasons
+python manage.py test tests.test_real_harvesting -v 2
+```
+
+**Supported journals**:
+
+- Earth System Science Data (ESSD) - [Issue #59](https://github.com/GeoinformationSystems/optimap/issues/59)
+- AGILE-GISS - [Issue #60](https://github.com/GeoinformationSystems/optimap/issues/60)
+- GEO-LEO e-docs - [Issue #13](https://github.com/GeoinformationSystems/optimap/issues/13)
+- ESS Open Archive (EssOAr) - [Issue #99](https://github.com/GeoinformationSystems/optimap/issues/99) _(endpoint needs confirmation)_
 
 ### Run UI tests
 
