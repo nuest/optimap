@@ -41,12 +41,12 @@ class HarvestRegularMetadataTestCase(TestCase):
         fake_response.content = b"<OAI-PMH><ListRecords></ListRecords></OAI-PMH>"
         mock_get.return_value = fake_response
 
-        def fake_parser_func(content, event):
+        def fake_parser_func(content, event, max_records=None):
             Publication.objects.create(
                 title="Test Publication 1",
                 doi="10.1000/1",
                 job=event,
-                timeperiod_startdate=[], 
+                timeperiod_startdate=[],
                 timeperiod_enddate=[],
                 geometry=None
             )
@@ -54,7 +54,7 @@ class HarvestRegularMetadataTestCase(TestCase):
                 title="Test Publication 2",
                 doi="10.1000/2",
                 job=event,
-                timeperiod_startdate=[], 
+                timeperiod_startdate=[],
                 timeperiod_enddate=[],
                 geometry=None
             )

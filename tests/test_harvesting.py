@@ -18,7 +18,6 @@ BASE_TEST_DIR = Path(__file__).resolve().parent
 
 class SimpleTest(TestCase):
 
-    @classmethod
     @responses.activate
     def setUp(self):
         super().setUp()

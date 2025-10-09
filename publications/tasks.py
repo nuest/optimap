@@ -1,4 +1,4 @@
-mport logging
+import logging
 import os
 import gzip
 import glob
@@ -120,8 +120,8 @@ def extract_timeperiod_from_html(soup: BeautifulSoup):
             parts = tag["content"].split("/")
             end   = parts[1] if len(parts) > 1 and parts[1] else None
             start = parts[0] if parts[0] else None
-    return [None], [None]
             return ([start] if start else [None]), ([end] if end else [None]) # If missing, return [None] for start and [None] for end
+    return [None], [None]
 
 
 def parse_oai_xml_and_save_publications(content, event: HarvestingEvent, max_records=None):
@@ -577,8 +577,7 @@ def convert_geojson_to_geopackage(geojson_path):
         return None
 
 
-def regenerate_geopackage_cache():    return new_count, spatial_count, temporal_count
-
+def regenerate_geopackage_cache():
     geojson_path = regenerate_geojson_cache()
     cache_dir = Path(geojson_path).parent
     gpkg_path = convert_geojson_to_geopackage(geojson_path)
