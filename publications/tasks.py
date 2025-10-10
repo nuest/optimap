@@ -48,6 +48,33 @@ BASE_URL = settings.BASE_URL
 DOI_REGEX = re.compile(r'10\.\d{4,9}/[-._;()/:A-Z0-9]+', re.IGNORECASE)
 CACHE_DIR = Path(tempfile.gettempdir()) / 'optimap_cache'
 
+
+def get_or_create_admin_command_user():
+    """
+    Get or create a dedicated user for Django admin command operations.
+    This user is used as the creator for harvested publications.
+
+    Returns:
+        User: The Django Admin Command user instance
+    """
+    username = 'django_admin_command'
+    email = 'django_admin_command@system.local'
+
+    user, created = User.objects.get_or_create(
+        username=username,
+        defaults={
+            'email': email,
+            'is_active': False,  # System user, not for login
+            'is_staff': False,
+        }
+    )
+
+    if created:
+        logger.info("Created system user: %s", username)
+
+    return user
+
+
 def _get_article_link(pub):
     """Prefer our site permalink if DOI exists, else fallback to original URL."""
     if getattr(pub, "doi", None):
@@ -273,6 +300,17 @@ def parse_oai_xml_and_save_publications(content, event: HarvestingEvent, max_rec
 
             try:
                 with transaction.atomic():
+                    # Get system user for harvested publications
+                    admin_user = get_or_create_admin_command_user()
+
+                    # Build provenance string
+                    harvest_timestamp = timezone.now().isoformat()
+                    provenance = (
+                        f"Harvested via OAI-PMH from {source.name} "
+                        f"(URL: {source.url_field}) on {harvest_timestamp}. "
+                        f"HarvestingEvent ID: {event.id}."
+                    )
+
                     pub = Publication.objects.create(
                         title                = title_value,
                         abstract             = abstract_text,
@@ -285,6 +323,8 @@ def parse_oai_xml_and_save_publications(content, event: HarvestingEvent, max_rec
                         timeperiod_startdate = period_start,
                         timeperiod_enddate   = period_end,
                         job                  = event,
+                        provenance           = provenance,
+                        created_by           = admin_user,
                     )
                     saved_count += 1
                     logger.info("Saved publication id=%s: %s", pub.id, title_value[:80] if title_value else 'No title')
@@ -697,6 +737,17 @@ def parse_rss_feed_and_save_publications(feed_url, event: 'HarvestingEvent', max
                     logger.debug("Publication already exists: %s", title[:50])
                     continue
 
+                # Get system user for harvested publications
+                admin_user = get_or_create_admin_command_user()
+
+                # Build provenance string
+                harvest_timestamp = timezone.now().isoformat()
+                provenance = (
+                    f"Harvested via RSS/Atom feed from {source.name} "
+                    f"(URL: {feed_url}) on {harvest_timestamp}. "
+                    f"HarvestingEvent ID: {event.id}."
+                )
+
                 # Create publication
                 pub = Publication(
                     title=title,
@@ -709,6 +760,8 @@ def parse_rss_feed_and_save_publications(feed_url, event: 'HarvestingEvent', max
                     timeperiod_startdate=[],
                     timeperiod_enddate=[],
                     geometry=GeometryCollection(),  # No spatial data from RSS typically
+                    provenance=provenance,
+                    created_by=admin_user,
                 )
 
                 pub.save()

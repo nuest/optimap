@@ -129,10 +129,16 @@ def main(request):
     return render(request, "main.html")
 
 def locate(request):
+    from django.contrib.gis.geos import GeometryCollection
+    from django.db.models import Q
+
     # Get publications that are harvested but have no geometry
+    # Include both NULL geometries and empty GeometryCollections
     publications_query = Publication.objects.filter(
         status='h',  # Harvested status
-        geometry__isnull=True  # No geometry data
+    ).filter(
+        Q(geometry__isnull=True) |  # NULL geometry
+        Q(geometry__isempty=True)    # Empty GeometryCollection
     ).order_by('-creationDate')
 
     total_count = publications_query.count()
