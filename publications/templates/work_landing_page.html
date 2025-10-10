@@ -18,6 +18,24 @@
 
 <h1 class="page-title">{{ pub.title }}</h1>
 
+{% if is_admin and status_display %}
+  <div class="alert alert-warning">
+    <strong>Admin view:</strong> This publication has status <span class="badge
+      {% if pub.status == 'p' %}badge-success
+      {% elif pub.status == 'd' %}badge-secondary
+      {% elif pub.status == 't' %}badge-warning
+      {% elif pub.status == 'w' %}badge-danger
+      {% elif pub.status == 'h' %}badge-info
+      {% endif %}">{{ status_display }}</span>
+    {% if pub.status != 'p' %}
+      and is not visible to the public.
+    {% endif %}
+    <a href="/admin/publications/publication/{{ pub.id }}/change/" class="btn btn-sm btn-primary float-right" target="_blank" rel="noopener">
+      Edit in Admin
+    </a>
+  </div>
+{% endif %}
+
 <div class="meta muted">
   {% if authors_list %}
     <strong>Authors:</strong> {{ authors_list|join:", " }} ·

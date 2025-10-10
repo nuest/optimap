@@ -12,9 +12,25 @@
 {% block content %}
   <div class="container py-5 works-page">
     <h2>All Article Links</h2>
+    {% if is_admin %}
+      <p class="alert alert-info">
+        <strong>Admin view:</strong> You can see all publications regardless of status. Status labels are shown next to each entry.
+      </p>
+    {% endif %}
     <ul>
       {% for item in links %}
-        <li><a href="{{ item.href }}" target="_blank" rel="noopener">{{ item.title }}</a></li>
+        <li>
+          <a href="{{ item.href }}" target="_blank" rel="noopener">{{ item.title }}</a>
+          {% if is_admin and item.status %}
+            <span class="badge
+              {% if item.status_code == 'p' %}badge-success
+              {% elif item.status_code == 'd' %}badge-secondary
+              {% elif item.status_code == 't' %}badge-warning
+              {% elif item.status_code == 'w' %}badge-danger
+              {% elif item.status_code == 'h' %}badge-info
+              {% endif %}">{{ item.status }}</span>
+          {% endif %}
+        </li>
       {% empty %}
         <li>No publications found.</li>
       {% endfor %}
