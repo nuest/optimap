@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+         xmlns:prism="http://prismstandard.org/namespaces/basic/2.0/"
+         xmlns:dc="http://purl.org/dc/elements/1.1/"
+         xmlns:content="http://purl.org/rss/1.0/modules/content/"
+         xmlns="http://purl.org/rss/1.0/">
+    <channel rdf:about="http://feeds.example.com/test/rss">
+        <title>Test RSS Feed</title>
+        <description>Test RSS feed for OPTIMAP harvesting</description>
+        <link>http://feeds.example.com/test/rss</link>
+        <dc:publisher>Test Publisher</dc:publisher>
+        <dc:language>en</dc:language>
+    </channel>
+
+    <item rdf:about="https://www.example.com/articles/test-article-1">
+        <title><![CDATA[Test Article One: Data Repository]]></title>
+        <link>https://www.example.com/articles/test-article-1</link>
+        <content:encoded>
+            <![CDATA[<p>Test Journal, Published online: 01 October 2025; <a href="https://www.example.com/articles/test-article-1">doi:10.1234/test-001</a></p>Test Article One: Data Repository]]>
+        </content:encoded>
+        <dc:title><![CDATA[Test Article One: Data Repository]]></dc:title>
+        <dc:creator>John Doe</dc:creator><dc:creator>Jane Smith</dc:creator>
+        <dc:identifier>doi:10.1234/test-001</dc:identifier>
+        <dc:source>Test Journal, Published online: 2025-10-01; | doi:10.1234/test-001</dc:source>
+        <dc:date>2025-10-01</dc:date>
+        <prism:publicationName>Test Journal</prism:publicationName>
+        <prism:doi>10.1234/test-001</prism:doi>
+        <prism:url>https://www.example.com/articles/test-article-1</prism:url>
+    </item>
+
+    <item rdf:about="https://www.example.com/articles/test-article-2">
+        <title><![CDATA[Test Article Two: Analysis Methods]]></title>
+        <link>https://www.example.com/articles/test-article-2</link>
+        <content:encoded>
+            <![CDATA[<p>Test Journal, Published online: 02 October 2025; <a href="https://www.example.com/articles/test-article-2">doi:10.1234/test-002</a></p>Test Article Two: Analysis Methods]]>
+        </content:encoded>
+        <dc:title><![CDATA[Test Article Two: Analysis Methods]]></dc:title>
+        <dc:creator>Alice Brown</dc:creator><dc:creator>Bob Wilson</dc:creator>
+        <dc:identifier>doi:10.1234/test-002</dc:identifier>
+        <dc:source>Test Journal, Published online: 2025-10-02; | doi:10.1234/test-002</dc:source>
+        <dc:date>2025-10-02</dc:date>
+        <prism:publicationName>Test Journal</prism:publicationName>
+        <prism:doi>10.1234/test-002</prism:doi>
+        <prism:url>https://www.example.com/articles/test-article-2</prism:url>
+    </item>
+</rdf:RDF>

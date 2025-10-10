@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/">
+    <responseDate>2022-07-04T15:37:56Z</responseDate>
+    <request verb="ListRecords" metadataPrefix="oai_dc">http://localhost:8330/index.php/opti-geo/oai</request>
+    <ListRecords>
+        <record>
+            <header>
+                <identifier>oai:ojs2.localhost:8330:article/1</identifier>
+                <datestamp>2022-07-01T12:59:33Z</datestamp>
+            </header>
+            <metadata>
+                <oai_dc:dc xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/">
+                    <dc:title>Malformed Record</dc:title>
+                    <!-- Missing closing tag for dc:title -->
+                </oai_dc:dc>
+            </metadata>
+        <!-- Missing closing tag for record -->
+    </ListRecords>
+<!-- Missing closing tag for OAI-PMH -->

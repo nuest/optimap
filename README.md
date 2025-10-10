@@ -144,6 +144,11 @@ python manage.py qcluster
 # If you want to use the predefined feeds for continents and oceans we need to load the geometries for global regions
 python manage.py load_global_regions
 
+# Harvest publications from real OAI-PMH journal sources
+python manage.py harvest_journals --list  # List available journals
+python manage.py harvest_journals --all --max-records 20  # Harvest all journals (limited to 20 records each)
+python manage.py harvest_journals --journal essd --journal geo-leo  # Harvest specific journals
+
 # Start the Django development server
 python manage.py runserver
 
@@ -233,6 +238,66 @@ OPTIMAP_EMAIL_PORT=5587
 
 Visit the URL - http://127.0.0.1:8000/articles/links/
 
+### Harvest Publications from Real Journals
+
+The `harvest_journals` management command allows you to harvest publications from real OAI-PMH journal sources directly into your database. This is useful for:
+
+- Populating your database with real data for testing and development
+- Testing harvesting functionality against live endpoints
+- Initial data loading for production deployment
+
+**List available journals**:
+
+```bash
+python manage.py harvest_journals --list
+```
+
+**Harvest all configured journals** (with record limit):
+
+```bash
+python manage.py harvest_journals --all --max-records 50
+```
+
+**Harvest specific journals**:
+
+```bash
+# Single journal
+python manage.py harvest_journals --journal essd --max-records 100
+
+# Multiple journals
+python manage.py harvest_journals --journal essd --journal geo-leo --journal agile-giss
+```
+
+**Create source entries automatically**:
+
+```bash
+python manage.py harvest_journals --journal essd --create-sources
+```
+
+**Associate with specific user**:
+
+```bash
+python manage.py harvest_journals --all --user-email admin@optimap.science
+```
+
+**Currently configured journals**:
+
+- `essd` - Earth System Science Data (OAI-PMH) ([Issue #59](https://github.com/GeoinformationSystems/optimap/issues/59))
+- `agile-giss` - AGILE-GISS conference series (OAI-PMH) ([Issue #60](https://github.com/GeoinformationSystems/optimap/issues/60))
+- `geo-leo` - GEO-LEO e-docs repository (OAI-PMH) ([Issue #13](https://github.com/GeoinformationSystems/optimap/issues/13))
+- `scientific-data` - Scientific Data (RSS/Atom) ([Issue #58](https://github.com/GeoinformationSystems/optimap/issues/58))
+
+The command supports both OAI-PMH and RSS/Atom feeds, automatically detecting the feed type for each journal.
+
+The command provides detailed progress reporting including:
+
+- Number of publications harvested
+- Harvesting duration
+- Spatial and temporal metadata statistics
+- Success/failure status for each journal
+
+When the command runs mutiple times, it will only add new publications that are not already in the database as part of the regular harvesting process.
+
 ### Create Superusers/Admin
 
 Superusers or administrators can be created using the `createsuperuser` command. This user will have access to the Django admin interface.
@@ -265,6 +330,10 @@ UI tests are based on [Helium](https://github.com/mherrmann/selenium-python-heli
 pip install -r requirements-dev.txt
 ```
 
+#### Unit Tests
+
+Run all unit tests:
+
 ```bash
 python manage.py test tests
 
@@ -274,6 +343,41 @@ python -Wa manage.py test
 # configure logging level for cleaner test progress output
 OPTIMAP_LOGGING_LEVEL=WARNING python manage.py test tests
 ```
+
+#### Integration Tests (Real Harvesting)
+
+Integration tests that harvest from live OAI-PMH endpoints are disabled by default to avoid network dependencies and slow test execution. These tests verify harvesting from real journal sources.
+
+Run all integration tests:
+
+```bash
+# Enable real harvesting tests
+SKIP_REAL_HARVESTING=0 python manage.py test tests.test_real_harvesting
+```
+
+Run a specific journal test:
+
+```bash
+# Test ESSD harvesting
+SKIP_REAL_HARVESTING=0 python manage.py test tests.test_real_harvesting.RealHarvestingTest.test_harvest_essd
+
+# Test GEO-LEO harvesting
+SKIP_REAL_HARVESTING=0 python manage.py test tests.test_real_harvesting.RealHarvestingTest.test_harvest_geo_leo
+```
+
+Show skipped tests (these are skipped by default):
+
+```bash
+# Run with verbose output to see skip reasons
+python manage.py test tests.test_real_harvesting -v 2
+```
+
+**Supported journals**:
+
+- Earth System Science Data (ESSD) - [Issue #59](https://github.com/GeoinformationSystems/optimap/issues/59)
+- AGILE-GISS - [Issue #60](https://github.com/GeoinformationSystems/optimap/issues/60)
+- GEO-LEO e-docs - [Issue #13](https://github.com/GeoinformationSystems/optimap/issues/13)
+- ESS Open Archive (EssOAr) - [Issue #99](https://github.com/GeoinformationSystems/optimap/issues/99) _(endpoint needs confirmation)_
 
 ### Run UI tests
 

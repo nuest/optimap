@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tee:*)",
+      "Bash(git checkout:*)",
+      "Bash(pip install:*)",
+      "Bash(gh issue view:*)",
+      "Bash(pytest:*)",
+      "Bash(pip search:*)",
+      "Bash(psql:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
