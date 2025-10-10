@@ -282,9 +282,12 @@ python manage.py harvest_journals --all --user-email admin@optimap.science
 
 **Currently configured journals**:
 
-- `essd` - Earth System Science Data ([Issue #59](https://github.com/GeoinformationSystems/optimap/issues/59))
-- `agile-giss` - AGILE-GISS conference series ([Issue #60](https://github.com/GeoinformationSystems/optimap/issues/60))
-- `geo-leo` - GEO-LEO e-docs repository ([Issue #13](https://github.com/GeoinformationSystems/optimap/issues/13))
+- `essd` - Earth System Science Data (OAI-PMH) ([Issue #59](https://github.com/GeoinformationSystems/optimap/issues/59))
+- `agile-giss` - AGILE-GISS conference series (OAI-PMH) ([Issue #60](https://github.com/GeoinformationSystems/optimap/issues/60))
+- `geo-leo` - GEO-LEO e-docs repository (OAI-PMH) ([Issue #13](https://github.com/GeoinformationSystems/optimap/issues/13))
+- `scientific-data` - Scientific Data (RSS/Atom) ([Issue #58](https://github.com/GeoinformationSystems/optimap/issues/58))
+
+The command supports both OAI-PMH and RSS/Atom feeds, automatically detecting the feed type for each journal.
 
 The command provides detailed progress reporting including:
 

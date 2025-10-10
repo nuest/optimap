@@ -17,12 +17,12 @@ from django.core.management.base import BaseCommand, CommandError
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from publications.models import Source, HarvestingEvent, Publication
-from publications.tasks import harvest_oai_endpoint
+from publications.tasks import harvest_oai_endpoint, harvest_rss_endpoint
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
-# Journal configurations with OAI-PMH endpoints
+# Journal configurations with OAI-PMH and RSS/Atom endpoints
 JOURNAL_CONFIGS = {
     'essd': {
         'name': 'Earth System Science Data',
@@ -30,8 +30,7 @@ JOURNAL_CONFIGS = {
         'collection_name': 'ESSD',
         'homepage_url': 'https://essd.copernicus.org/',
         'publisher_name': 'Copernicus Publications',
-        'is_oa': True,
-        'issue': 59,
+        'feed_type': 'oai-pmh',
     },
     'agile-giss': {
         'name': 'AGILE-GISS',
@@ -39,8 +38,7 @@ JOURNAL_CONFIGS = {
         'collection_name': 'AGILE-GISS',
         'homepage_url': 'https://www.agile-giscience-series.net/',
         'publisher_name': 'Copernicus Publications',
-        'is_oa': True,
-        'issue': 60,
+        'feed_type': 'oai-pmh',
     },
     'geo-leo': {
         'name': 'GEO-LEO e-docs',
@@ -48,8 +46,15 @@ JOURNAL_CONFIGS = {
         'collection_name': 'GEO-LEO',
         'homepage_url': 'https://e-docs.geo-leo.de/',
         'publisher_name': 'GEO-LEO',
-        'is_oa': True,
-        'issue': 13,
+        'feed_type': 'oai-pmh',
+    },
+    'scientific-data': {
+        'name': 'Scientific Data',
+        'url': 'https://www.nature.com/sdata.rss',
+        'collection_name': 'Scientific Data',
+        'homepage_url': 'https://www.nature.com/sdata/',
+        'publisher_name': 'Nature Publishing Group',
+        'feed_type': 'rss',
     },
 }
 
@@ -138,7 +143,6 @@ class Command(BaseCommand):
             config = JOURNAL_CONFIGS[journal_key]
 
             self.stdout.write(self.style.WARNING(f'\n--- Harvesting: {config["name"]} ---'))
-            self.stdout.write(f'Issue: https://github.com/GeoinformationSystems/optimap/issues/{config["issue"]}')
             self.stdout.write(f'URL: {config["url"]}')
             if max_records:
                 self.stdout.write(f'Max records: {max_records}')
@@ -147,9 +151,16 @@ class Command(BaseCommand):
                 # Find or create source
                 source = self._get_or_create_source(config, create_sources)
 
-                # Harvest
+                # Harvest based on feed type
                 harvest_start = timezone.now()
-                harvest_oai_endpoint(source.id, user=user, max_records=max_records)
+                feed_type = config.get('feed_type', 'oai-pmh')
+
+                if feed_type == 'rss':
+                    self.stdout.write(f'Feed type: RSS/Atom')
+                    harvest_rss_endpoint(source.id, user=user, max_records=max_records)
+                else:
+                    self.stdout.write(f'Feed type: OAI-PMH')
+                    harvest_oai_endpoint(source.id, user=user, max_records=max_records)
 
                 # Get results
                 event = HarvestingEvent.objects.filter(source=source).latest('started_at')

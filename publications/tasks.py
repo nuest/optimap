@@ -157,11 +157,15 @@ def parse_oai_xml_and_save_publications(content, event: HarvestingEvent, max_rec
     processed_count = 0
     saved_count = 0
 
+    # Calculate progress reporting interval (every 10% of records)
+    total_records = len(records) if hasattr(records, '__len__') else None
+    log_interval = max(1, total_records // 10) if total_records else 10
+
     for rec in records:
         try:
             processed_count += 1
-            if processed_count % 10 == 0:
-                logger.debug("Processing record %d of %d", processed_count, len(records) if hasattr(records, '__len__') else '?')
+            if processed_count % log_interval == 0:
+                logger.debug("Processing record %d of %d", processed_count, total_records if total_records else '?')
 
             if hasattr(rec, "metadata"):
                 identifiers = rec.metadata.get("identifier", []) + rec.metadata.get("relation", [])
@@ -583,3 +587,210 @@ def regenerate_geopackage_cache():
     gpkg_path = convert_geojson_to_geopackage(geojson_path)
     cleanup_old_data_dumps(cache_dir, settings.DATA_DUMP_RETENTION)
     return gpkg_path
+
+
+# ============================================================================
+# RSS/Atom Feed Harvesting
+# ============================================================================
+
+def parse_rss_feed_and_save_publications(feed_url, event: 'HarvestingEvent', max_records=None):
+    """
+    Parse RSS/Atom feed and save publications.
+
+    Args:
+        feed_url: URL of the RSS/Atom feed
+        event: HarvestingEvent instance
+        max_records: Maximum number of records to process (optional)
+
+    Returns:
+        tuple: (processed_count, saved_count)
+    """
+    import feedparser
+
+    source = event.source
+    logger.info("Starting RSS/Atom feed parsing for source: %s", source.name)
+
+    try:
+        # Parse the feed
+        feed = feedparser.parse(feed_url)
+
+        if not feed or not hasattr(feed, 'entries'):
+            logger.error("Failed to parse RSS feed: %s", feed_url)
+            return 0, 0
+
+        entries = feed.entries
+        logger.info("Found %d entries in RSS feed", len(entries))
+
+        if not entries:
+            logger.warning("No entries found in RSS feed!")
+            return 0, 0
+
+        # Limit records if specified
+        if max_records:
+            entries = entries[:max_records]
+            logger.info("Limited to first %d records", max_records)
+
+        processed_count = 0
+        saved_count = 0
+
+        # Calculate progress reporting interval (every 10% of entries)
+        total_entries = len(entries)
+        log_interval = max(1, total_entries // 10)
+
+        for entry in entries:
+            try:
+                processed_count += 1
+                if processed_count % log_interval == 0:
+                    logger.debug("Processing entry %d of %d", processed_count, total_entries)
+
+                # Extract metadata from feed entry
+                title = entry.get('title', '').strip()
+                link = entry.get('link', entry.get('id', '')).strip()
+
+                # Extract DOI - try multiple fields
+                doi = None
+                if 'prism_doi' in entry:
+                    doi = entry.prism_doi.strip()
+                elif 'dc_identifier' in entry and 'doi' in entry.dc_identifier.lower():
+                    doi_match = DOI_REGEX.search(entry.dc_identifier)
+                    if doi_match:
+                        doi = doi_match.group(0)
+
+                # Extract date
+                published_date = None
+                date_str = entry.get('updated', entry.get('published', entry.get('dc_date')))
+                if date_str:
+                    if hasattr(date_str, 'strftime'):
+                        # It's already a datetime
+                        published_date = date_str.strftime('%Y-%m-%d')
+                    else:
+                        # Parse date string
+                        published_date = parse_publication_date(str(date_str))
+
+                # Extract abstract/description
+                abstract = ''
+                if 'summary' in entry:
+                    abstract = BeautifulSoup(entry.summary, 'html.parser').get_text()
+                elif 'content' in entry and entry.content:
+                    abstract = BeautifulSoup(entry.content[0].get('value', ''), 'html.parser').get_text()
+
+                # Skip if no title
+                if not title:
+                    logger.warning("Skipping entry with no title: %s", link)
+                    continue
+
+                # Skip if no URL/identifier
+                if not link:
+                    logger.warning("Skipping entry '%s' with no URL", title[:50])
+                    continue
+
+                logger.debug("Processing publication: %s", title[:50])
+
+                # Check for duplicates by DOI or URL
+                existing_pub = None
+                if doi:
+                    existing_pub = Publication.objects.filter(doi=doi).first()
+                if not existing_pub and link:
+                    existing_pub = Publication.objects.filter(url=link).first()
+
+                if existing_pub:
+                    logger.debug("Publication already exists: %s", title[:50])
+                    continue
+
+                # Create publication
+                pub = Publication(
+                    title=title,
+                    doi=doi,
+                    url=link,
+                    abstract=abstract[:5000] if abstract else None,  # Limit abstract length
+                    publicationDate=published_date,
+                    source=source,
+                    job=event,
+                    timeperiod_startdate=[],
+                    timeperiod_enddate=[],
+                    geometry=GeometryCollection(),  # No spatial data from RSS typically
+                )
+
+                pub.save()
+                saved_count += 1
+                logger.debug("Saved publication: %s", title[:50])
+
+            except Exception as e:
+                logger.error("Failed to process entry '%s': %s",
+                           entry.get('title', 'Unknown')[:50], str(e))
+                continue
+
+        logger.info("RSS feed parsing completed for source %s: processed %d entries, saved %d publications",
+                   source.name, processed_count, saved_count)
+        return processed_count, saved_count
+
+    except Exception as e:
+        logger.error("Failed to parse RSS feed %s: %s", feed_url, str(e))
+        return 0, 0
+
+
+def harvest_rss_endpoint(source_id, user=None, max_records=None):
+    """
+    Harvest publications from an RSS/Atom feed.
+
+    Args:
+        source_id: ID of the Source model instance
+        user: User who initiated the harvest (optional)
+        max_records: Maximum number of records to harvest (optional)
+    """
+    from publications.models import Source, HarvestingEvent, Publication
+
+    source = Source.objects.get(id=source_id)
+    event = HarvestingEvent.objects.create(source=source, status="in_progress")
+
+    try:
+        feed_url = source.url_field
+        logger.info("Fetching from RSS feed: %s", feed_url)
+
+        processed, saved = parse_rss_feed_and_save_publications(feed_url, event, max_records=max_records)
+
+        event.status = "completed"
+        event.completed_at = timezone.now()
+        event.save()
+
+        new_count = Publication.objects.filter(job=event).count()
+        spatial_count = Publication.objects.filter(job=event).exclude(geometry__isnull=True).count()
+        temporal_count = Publication.objects.filter(job=event).exclude(timeperiod_startdate=[]).count()
+
+        subject = f"RSS Feed Harvesting Completed for {source.name}"
+        completed_str = event.completed_at.strftime('%Y-%m-%d %H:%M:%S')
+        message = (
+            f"RSS/Atom feed harvesting job details:\n\n"
+            f"Number of added articles: {new_count}\n"
+            f"Number of articles with spatial metadata: {spatial_count}\n"
+            f"Number of articles with temporal metadata: {temporal_count}\n"
+            f"Source: {source.name}\n"
+            f"Feed URL: {source.url_field}\n"
+            f"Job started at: {event.started_at.strftime('%Y-%m-%d %H:%M:%S')}\n"
+            f"Job completed at: {completed_str}\n"
+        )
+
+        if user and user.email:
+            send_mail(
+                subject,
+                message,
+                settings.EMAIL_HOST_USER,
+                [user.email],
+                fail_silently=False,
+            )
+
+    except Exception as e:
+        logger.error("RSS feed harvesting failed for source %s: %s", source.url_field, str(e))
+        event.status = "failed"
+        event.completed_at = timezone.now()
+        event.save()
+
+        # Send failure notification
+        if user and user.email:
+            send_mail(
+                f"RSS Feed Harvesting Failed for {source.name}",
+                f"RSS feed harvesting failed for {source.name}\n\nError: {str(e)}\n\nFeed URL: {source.url_field}",
+                settings.EMAIL_HOST_USER,
+                [user.email],
+                fail_silently=True,
+            )

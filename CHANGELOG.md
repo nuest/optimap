@@ -4,8 +4,26 @@
 
 ### Added
 
-- Django management command `harvest_journals` for harvesting real OAI-PMH journal sources
-  - Support for ESSD, AGILE-GISS, and GEO-LEO journals
+- **RSS/Atom feed harvesting support** (`publications/tasks.py`)
+  - `parse_rss_feed_and_save_publications()` function for parsing RSS/Atom feeds
+  - `harvest_rss_endpoint()` function for complete RSS harvesting workflow
+  - Support for RDF-based RSS feeds (Scientific Data journal)
+  - DOI extraction from multiple feed fields (prism:doi, dc:identifier)
+  - Duplicate detection by DOI and URL
+  - Abstract/description extraction from feed content
+- feedparser library integration (v6.0.12)
+  - Added to requirements.txt for RSS/Atom feed parsing
+  - Supports RSS 1.0/2.0, Atom, and RDF feeds
+- Django management command `harvest_journals` enhanced for RSS/Atom feeds
+  - Added Scientific Data journal with RSS feed support
+  - Support for both OAI-PMH and RSS/Atom feed types
+  - Automatic feed type detection based on journal configuration
+  - Now supports 4 journals: ESSD, AGILE-GISS, GEO-LEO (OAI-PMH), Scientific Data (RSS)
+- Comprehensive RSS harvesting tests (`RSSFeedHarvestingTests`)
+  - 7 test cases covering RSS parsing, duplicate detection, error handling
+  - Test fixture with sample RDF/RSS feed (`tests/harvesting/rss_feed_sample.xml`)
+  - Tests for max_records limit, invalid feeds, and HTTP errors
+- Django management command `harvest_journals` for harvesting real journal sources
   - Command-line options for journal selection, record limits, and source creation
   - Detailed progress reporting with colored output
   - Statistics for spatial/temporal metadata extraction

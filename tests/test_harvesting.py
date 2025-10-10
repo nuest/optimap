@@ -10,7 +10,12 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'optimap.settings')
 django.setup()
 
 from publications.models import Publication, Source, HarvestingEvent, Schedule
-from publications.tasks import parse_oai_xml_and_save_publications, harvest_oai_endpoint
+from publications.tasks import (
+    parse_oai_xml_and_save_publications,
+    harvest_oai_endpoint,
+    parse_rss_feed_and_save_publications,
+    harvest_rss_endpoint
+)
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -539,4 +544,179 @@ class HarvestingErrorTests(TestCase):
         # Should process only 1 record
         pub_count = Publication.objects.filter(job=event).count()
         self.assertLessEqual(pub_count, 1, "Should respect max_records limit even with errors")
+
+
+class RSSFeedHarvestingTests(TestCase):
+    """
+    Test cases for RSS/Atom feed harvesting.
+
+    These tests verify that the RSS harvesting system properly handles:
+    - RDF/RSS feed parsing
+    - Publication extraction from feed entries
+    - Duplicate detection
+    - DOI and metadata extraction
+    """
+
+    def setUp(self):
+        """Set up test source for RSS feeds."""
+        Publication.objects.all().delete()
+        self.source = Source.objects.create(
+            url_field="https://www.example.com/feed.rss",
+            harvest_interval_minutes=60,
+            name="Test RSS Source"
+        )
+
+    def test_parse_rss_feed_from_file(self):
+        """Test parsing RSS feed from local file."""
+        event = HarvestingEvent.objects.create(
+            source=self.source,
+            status="in_progress"
+        )
+
+        rss_feed_path = BASE_TEST_DIR / 'harvesting' / 'rss_feed_sample.xml'
+        feed_url = f"file://{rss_feed_path}"
+
+        processed, saved = parse_rss_feed_and_save_publications(feed_url, event)
+
+        # Check counts
+        self.assertEqual(processed, 2, "Should process 2 entries")
+        self.assertEqual(saved, 2, "Should save 2 publications")
+
+        # Check created publications
+        pubs = Publication.objects.filter(job=event)
+        self.assertEqual(pubs.count(), 2)
+
+        # Check first publication
+        pub1 = pubs.filter(doi='10.1234/test-001').first()
+        self.assertIsNotNone(pub1)
+        self.assertEqual(pub1.title, 'Test Article One: Data Repository')
+        self.assertEqual(pub1.url, 'https://www.example.com/articles/test-article-1')
+        self.assertEqual(str(pub1.publicationDate), '2025-10-01')
+
+        # Check second publication
+        pub2 = pubs.filter(doi='10.1234/test-002').first()
+        self.assertIsNotNone(pub2)
+        self.assertEqual(pub2.title, 'Test Article Two: Analysis Methods')
+
+    def test_rss_duplicate_detection_by_doi(self):
+        """Test that duplicate detection works by DOI."""
+        event = HarvestingEvent.objects.create(
+            source=self.source,
+            status="in_progress"
+        )
+
+        # Create existing publication with same DOI
+        Publication.objects.create(
+            title="Existing Publication",
+            doi="10.1234/test-001",
+            source=self.source,
+            timeperiod_startdate=[],
+            timeperiod_enddate=[]
+        )
+
+        rss_feed_path = BASE_TEST_DIR / 'harvesting' / 'rss_feed_sample.xml'
+        feed_url = f"file://{rss_feed_path}"
+
+        processed, saved = parse_rss_feed_and_save_publications(feed_url, event)
+
+        # Should process both but only save one (the one without duplicate DOI)
+        self.assertEqual(processed, 2)
+        self.assertEqual(saved, 1, "Should only save publication without duplicate DOI")
+
+    def test_rss_duplicate_detection_by_url(self):
+        """Test that duplicate detection works by URL."""
+        event = HarvestingEvent.objects.create(
+            source=self.source,
+            status="in_progress"
+        )
+
+        # Create existing publication with same URL
+        Publication.objects.create(
+            title="Existing Publication",
+            url="https://www.example.com/articles/test-article-1",
+            source=self.source,
+            timeperiod_startdate=[],
+            timeperiod_enddate=[]
+        )
+
+        rss_feed_path = BASE_TEST_DIR / 'harvesting' / 'rss_feed_sample.xml'
+        feed_url = f"file://{rss_feed_path}"
+
+        processed, saved = parse_rss_feed_and_save_publications(feed_url, event)
+
+        # Should process both but only save one
+        self.assertEqual(processed, 2)
+        self.assertEqual(saved, 1, "Should only save publication without duplicate URL")
+
+    def test_rss_max_records_limit(self):
+        """Test that max_records parameter limits RSS harvesting."""
+        event = HarvestingEvent.objects.create(
+            source=self.source,
+            status="in_progress"
+        )
+
+        rss_feed_path = BASE_TEST_DIR / 'harvesting' / 'rss_feed_sample.xml'
+        feed_url = f"file://{rss_feed_path}"
+
+        # Limit to 1 record
+        processed, saved = parse_rss_feed_and_save_publications(feed_url, event, max_records=1)
+
+        self.assertEqual(processed, 1, "Should only process 1 entry")
+        self.assertEqual(saved, 1, "Should only save 1 publication")
+
+        pubs = Publication.objects.filter(job=event)
+        self.assertEqual(pubs.count(), 1)
+
+    def test_harvest_rss_endpoint_from_file(self):
+        """Test complete RSS harvesting workflow from file."""
+        rss_feed_path = BASE_TEST_DIR / 'harvesting' / 'rss_feed_sample.xml'
+
+        # Update source to use file:// URL
+        self.source.url_field = f"file://{rss_feed_path}"
+        self.source.save()
+
+        # Harvest
+        harvest_rss_endpoint(self.source.id, max_records=10)
+
+        # Check event status
+        event = HarvestingEvent.objects.filter(source=self.source).latest('started_at')
+        self.assertEqual(event.status, 'completed')
+
+        # Check publications
+        pubs = Publication.objects.filter(job=event)
+        self.assertEqual(pubs.count(), 2, "Should create 2 publications from RSS feed")
+
+    def test_harvest_rss_endpoint_invalid_file(self):
+        """Test RSS harvesting handles invalid file paths."""
+        # Update source to use non-existent file
+        self.source.url_field = "file:///tmp/nonexistent_rss_feed.xml"
+        self.source.save()
+
+        # Harvest should handle error gracefully
+        harvest_rss_endpoint(self.source.id)
+
+        # Check event was marked as completed (feedparser returns empty feed for invalid URLs)
+        event = HarvestingEvent.objects.filter(source=self.source).latest('started_at')
+        # Event completes but creates no publications
+        self.assertEqual(event.status, 'completed')
+
+        # No publications should be created
+        pubs = Publication.objects.filter(job=event)
+        self.assertEqual(pubs.count(), 0)
+
+    def test_rss_invalid_feed_url(self):
+        """Test handling of invalid RSS feed URL."""
+        event = HarvestingEvent.objects.create(
+            source=self.source,
+            status="in_progress"
+        )
+
+        # Try to parse non-existent file
+        feed_url = "file:///tmp/nonexistent_feed.xml"
+
+        processed, saved = parse_rss_feed_and_save_publications(feed_url, event)
+
+        # Should handle gracefully and return zero
+        self.assertEqual(processed, 0)
+        self.assertEqual(saved, 0)
 
