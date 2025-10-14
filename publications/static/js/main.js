@@ -69,8 +69,17 @@ function publicationPopup(feature, layer) {
   const p = feature.properties;
   let html = '<div>';
 
-  // Title
-  if (p.title) html += `<h3>${p.title}</h3>`;
+  // Title with link to work landing page
+  if (p.title) {
+    html += `<h3>${p.title}</h3>`;
+
+    // Add link to work landing page
+    if (p.doi) {
+      html += `<div style="margin-bottom: 10px;"><a href="/work/${encodeURIComponent(p.doi)}/" class="btn btn-sm btn-primary" style="color: white; text-decoration: none; padding: 5px 10px; border-radius: 3px; display: inline-block;">View Publication Details</a></div>`;
+    } else if (p.id) {
+      html += `<div style="margin-bottom: 10px;"><a href="/work/${p.id}/" class="btn btn-sm btn-primary" style="color: white; text-decoration: none; padding: 5px 10px; border-radius: 3px; display: inline-block;">View Publication Details</a></div>`;
+    }
+  }
 
   // Source details from nested object
   if (p.source_details) {

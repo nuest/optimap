@@ -12,6 +12,56 @@ The OPTIMAP has the following features:
 - Start page with a full screen map (showing geometries and metadata) and a time line of the areas and time periods of interest for scientific publications
 - Passwordless login via email
 - RESTful API at `/api`
+- **Crowdsourced metadata contribution**: Logged-in users can contribute spatial and temporal extent data for publications
+- **Publication workflow**: Harvested → Contributed → Published status transitions with full provenance tracking
+- **Admin controls**: Publish/unpublish functionality with audit trails
+
+## Publication Status Workflow
+
+Publications in OPTIMAP follow a status-based workflow with six possible states:
+
+### Status Definitions
+
+- **Draft** (`d`): Internal draft state. Not visible to public. Can be edited by admins. Created when unpublishing a published work.
+- **Harvested** (`h`): Automatically harvested from OAI-PMH or RSS feeds. May or may not have spatial/temporal extent. Not publicly visible.
+- **Contributed** (`c`): User has contributed spatial and/or temporal extent. Awaits admin review. Not publicly visible.
+- **Published** (`p`): Public-facing works visible to all users via website, map, API, and feeds.
+- **Testing** (`t`): Reserved for testing purposes. Not publicly visible. Admin access only.
+- **Withdrawn** (`w`): Publication has been withdrawn or retracted. Not publicly visible.
+
+### Workflow Transitions
+
+**Harvesting → Publishing:**
+
+1. Publication harvested from external source → Status: **Harvested** (`h`)
+2. User contributes spatial/temporal extent → Status: **Contributed** (`c`)
+3. Admin reviews and approves → Status: **Published** (`p`)
+4. If needed, admin can unpublish → Status: **Draft** (`d`)
+
+**Direct Publishing (Skip Contribution):**
+
+- Harvested publications with **at least one extent type** (spatial OR temporal) can be published directly by admins without user contribution
+
+**Contribution Requirements:**
+
+- Users can only contribute to publications with **Harvested** (`h`) status
+- Harvested publications **without any extent** require user contribution before publishing
+- Contributed publications can always be published after admin review
+
+**Visibility Rules:**
+
+- Only **Published** (`p`) status is visible to non-admin users
+- All other statuses require admin privileges to view
+- Published works appear in: main map, work list, API responses, RSS/Atom feeds
+
+**Extent Contribution:**
+
+- Users can contribute **spatial extent** (geographic location) via interactive map with drawing tools
+- Users can contribute **temporal extent** (time period) via date form (formats: YYYY, YYYY-MM, YYYY-MM-DD)
+- Both extent types can be contributed separately or together in a single submission
+- Publications without DOI are supported via ID-based URLs (`/work/<id>/`)
+- All contributions are tracked with full provenance (user, timestamp, changes)
+- Contribute page lists publications missing either spatial OR temporal extent
 
 OPTIMAP is based on [Django](https://www.djangoproject.com/) (with [GeoDjango](https://docs.djangoproject.com/en/4.1/ref/contrib/gis/) and [Django REST framework](https://www.django-rest-framework.org/)) with a [PostgreSQL](https://www.postgresql.org/)/[PostGIS](https://postgis.net/) database backend.
 

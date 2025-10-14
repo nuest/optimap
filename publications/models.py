@@ -23,6 +23,7 @@ STATUS_CHOICES = (
     ("t", "Testing"),
     ("w", "Withdrawn"),
     ("h", "Harvested"),
+    ("c", "Contributed"),
 )
 
 EMAIL_STATUS_CHOICES = [

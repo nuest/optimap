@@ -15,6 +15,7 @@
 
 {% block content %}
 <div class="work-landing-page">
+{% csrf_token %}
 
 <h1 class="page-title">{{ pub.title }}</h1>
 
@@ -26,6 +27,7 @@
       {% elif pub.status == 't' %}badge-warning
       {% elif pub.status == 'w' %}badge-danger
       {% elif pub.status == 'h' %}badge-info
+      {% elif pub.status == 'c' %}badge-primary
       {% endif %}">{{ status_display }}</span>
     {% if pub.status != 'p' %}
       and is not visible to the public.
@@ -59,25 +61,123 @@
   <p>{{ pub.abstract }}</p>
 {% endif %}
 
-{% if feature_json %}
-  <!-- Leaflet assets included here -->
-  <link rel="stylesheet"
-        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-        crossorigin="">
-  <!-- Leaflet Fullscreen plugin -->
-  <link rel="stylesheet"
-        href="https://unpkg.com/leaflet.fullscreen@3.0.2/Control.FullScreen.css"
-        crossorigin="">
-  <div id="mini-map"></div>
+{%if show_provenance and pub.provenance %}
+  <div class="alert alert-info">
+    <strong>Provenance information (admin only):</strong>
+    <pre style="white-space: pre-wrap; margin-top: 10px;">{{ pub.provenance }}</pre>
+  </div>
+{% endif %}
+
+<!-- Leaflet assets -->
+<link rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin="">
+<!-- Leaflet Draw plugin for geometry editing -->
+{% if can_contribute or is_admin %}
+<link rel="stylesheet"
+      href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css"
+      crossorigin="">
+{% endif %}
+<!-- Leaflet Fullscreen plugin -->
+<link rel="stylesheet"
+      href="https://unpkg.com/leaflet.fullscreen@3.0.2/Control.FullScreen.css"
+      crossorigin="">
+
+{% if can_contribute %}
+  <div class="alert alert-warning">
+    <strong>Missing information:</strong> This publication is missing
+    {% if not has_geometry and not has_temporal %}
+      geographic location and temporal extent
+    {% elif not has_geometry %}
+      geographic location
+    {% elif not has_temporal %}
+      temporal extent (time period)
+    {% endif %}.
+    You can help by adding this information below!
+  </div>
+{% endif %}
+
+{% if can_publish %}
+  <div class="alert alert-success">
+    <strong>Ready to publish:</strong> This contribution has been reviewed and is ready to be made public.
+    <button id="publish-btn" class="btn btn-success btn-sm float-right">Publish this work</button>
+  </div>
+{% endif %}
+
+{% if can_unpublish %}
+  <div class="alert alert-warning">
+    <strong>Published work:</strong> This publication is currently public.
+    <button id="unpublish-btn" class="btn btn-warning btn-sm float-right">Unpublish (set to Draft)</button>
+  </div>
+{% endif %}
+
+<div id="mini-map"></div>
+
+{% if can_contribute %}
+<div class="mt-3">
+  {% if not has_geometry %}
+  <div class="text-center mb-4">
+    <button id="contribute-geometry-btn" class="btn btn-primary btn-lg">
+      <i class="fas fa-map-marked-alt"></i> Contribute geolocation
+    </button>
+    <p class="text-muted mt-2">
+      <small>Use the drawing tools on the map above to mark the geographic area, then click this button to submit.</small>
+    </p>
+  </div>
+  {% endif %}
+
+  {% if not has_temporal %}
+  <div class="card">
+    <div class="card-header">
+      <h5 class="mb-0"><i class="fas fa-calendar"></i> Contribute temporal extent</h5>
+    </div>
+    <div class="card-body">
+      <p class="text-muted">Please provide the time period this research data covers (not the publication date).</p>
+      <form id="temporal-contribution-form">
+        <div class="form-row">
+          <div class="form-group col-md-6">
+            <label for="start-date">Start date</label>
+            <input type="text" class="form-control" id="start-date" placeholder="e.g., 2010, 2010-01, 2010-01-15">
+            <small class="form-text text-muted">Formats: YYYY, YYYY-MM, or YYYY-MM-DD</small>
+          </div>
+          <div class="form-group col-md-6">
+            <label for="end-date">End date</label>
+            <input type="text" class="form-control" id="end-date" placeholder="e.g., 2020, 2020-12, 2020-12-31">
+            <small class="form-text text-muted">Formats: YYYY, YYYY-MM, or YYYY-MM-DD</small>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary">
+          <i class="fas fa-clock"></i> Submit temporal extent
+        </button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
           crossorigin=""></script>
+  {% if can_contribute or is_admin %}
+  <!-- Leaflet Draw plugin -->
+  <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"
+          crossorigin=""></script>
+  {% endif %}
   <!-- Leaflet Fullscreen plugin -->
   <script src="https://unpkg.com/leaflet.fullscreen@3.0.2/Control.FullScreen.js"
           crossorigin=""></script>
   <script>
-    const publicationFeature = {{ feature_json|safe }};
+    const publicationFeature = {{ feature_json|default:"null"|safe }};
+    const canContribute = {{ can_contribute|yesno:"true,false" }};
+    const canPublish = {{ can_publish|yesno:"true,false" }};
+    const canUnpublish = {{ can_unpublish|yesno:"true,false" }};
+    const hasGeometry = {{ has_geometry|yesno:"true,false" }};
+    const doi = "{{ pub.doi }}";
+    const useIdUrls = {{ use_id_urls|default:"false"|yesno:"true,false" }};
+    const pubId = {{ pub.id }};
+
     const map = L.map('mini-map', {
       scrollWheelZoom: true,
       fullscreenControl: true,
@@ -91,18 +191,279 @@
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    const layer = L.geoJSON(publicationFeature, {
-      pointToLayer: (feat, latlng) => L.circleMarker(latlng, { radius: 6 })
-    }).addTo(map);
+    // Display existing geometry if available
+    let layer = null;
+    if (publicationFeature) {
+      layer = L.geoJSON(publicationFeature, {
+        pointToLayer: (feat, latlng) => L.circleMarker(latlng, { radius: 6 })
+      }).addTo(map);
 
-    const bounds = layer.getBounds ? layer.getBounds() : null;
-    if (bounds && bounds.isValid && bounds.isValid()) {
-      map.fitBounds(bounds.pad(0.2));
-    } else if (publicationFeature.geometry && publicationFeature.geometry.type === "Point") {
-      const c = publicationFeature.geometry.coordinates; // [lng, lat]
-      map.setView([c[1], c[0]], 10);
+      const bounds = layer.getBounds ? layer.getBounds() : null;
+      if (bounds && bounds.isValid && bounds.isValid()) {
+        map.fitBounds(bounds.pad(0.2));
+      } else if (publicationFeature.geometry && publicationFeature.geometry.type === "Point") {
+        const c = publicationFeature.geometry.coordinates; // [lng, lat]
+        map.setView([c[1], c[0]], 10);
+      } else {
+        map.setView([0, 0], 2);
+      }
     } else {
       map.setView([0, 0], 2);
+    }
+
+    // Add drawing controls for contributions
+    if (canContribute) {
+      const drawnItems = new L.FeatureGroup();
+      map.addLayer(drawnItems);
+
+      const drawControl = new L.Control.Draw({
+        edit: {
+          featureGroup: drawnItems,
+          remove: true
+        },
+        draw: {
+          polygon: true,
+          polyline: false,
+          rectangle: true,
+          circle: false,
+          circlemarker: false,
+          marker: true
+        }
+      });
+      map.addControl(drawControl);
+
+      // Handle drawing events
+      map.on(L.Draw.Event.CREATED, function (event) {
+        const layer = event.layer;
+        drawnItems.addLayer(layer);
+      });
+
+      // Add contribution button handler (button is below the map in HTML)
+      const contributeBtn = document.getElementById('contribute-geometry-btn');
+      if (contributeBtn) {
+        contributeBtn.addEventListener('click', function(e) {
+          if (drawnItems.getLayers().length === 0) {
+            alert('Please draw at least one geometry on the map first.');
+            return;
+          }
+
+          if (!confirm('Are you sure you want to submit this geolocation? It will be reviewed by administrators.')) {
+            return;
+          }
+
+          // Convert drawn items to GeoJSON
+          const geojson = drawnItems.toGeoJSON();
+          const geometries = geojson.features.map(f => f.geometry);
+
+          // Create GeometryCollection
+          const geometryCollection = {
+            type: 'GeometryCollection',
+            geometries: geometries
+          };
+
+          console.log('Geometry to submit:', geometryCollection);
+
+          // Get CSRF token
+          const csrfElement = document.querySelector('[name=csrfmiddlewaretoken]');
+          if (!csrfElement) {
+            alert('CSRF token not found. Please refresh the page.');
+            return;
+          }
+          const csrftoken = csrfElement.value;
+
+          const url = useIdUrls ? `/work/${pubId}/contribute-geometry/` : `/work/${doi}/contribute-geometry/`;
+          console.log('Submitting to URL:', url);
+
+          // Submit contribution
+          fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': csrftoken
+            },
+            body: JSON.stringify({ geometry: geometryCollection })
+          })
+          .then(response => {
+            if (!response.ok) {
+              return response.json().then(data => {
+                throw new Error(data.error || `HTTP error ${response.status}`);
+              });
+            }
+            return response.json();
+          })
+          .then(data => {
+            if (data.success) {
+              alert(data.message);
+              location.reload();
+            } else {
+              alert('Error: ' + (data.error || 'Unknown error'));
+            }
+          })
+          .catch(error => {
+            console.error('Error:', error);
+            alert('Error: ' + error.message);
+          });
+        });
+      }
+    }
+
+    // Add temporal extent contribution form handler
+    const temporalForm = document.getElementById('temporal-contribution-form');
+    if (temporalForm) {
+      temporalForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        const startDate = document.getElementById('start-date').value.trim();
+        const endDate = document.getElementById('end-date').value.trim();
+
+        // At least one date must be provided
+        if (!startDate && !endDate) {
+          alert('Please provide at least a start date or end date.');
+          return;
+        }
+
+        // Validate date format (YYYY, YYYY-MM, or YYYY-MM-DD)
+        const datePattern = /^\d{4}(-\d{2})?(-\d{2})?$/;
+        if (startDate && !datePattern.test(startDate)) {
+          alert('Invalid start date format. Please use YYYY, YYYY-MM, or YYYY-MM-DD.');
+          return;
+        }
+        if (endDate && !datePattern.test(endDate)) {
+          alert('Invalid end date format. Please use YYYY, YYYY-MM, or YYYY-MM-DD.');
+          return;
+        }
+
+        if (!confirm('Are you sure you want to submit this temporal extent? It will be reviewed by administrators.')) {
+          return;
+        }
+
+        // Get CSRF token
+        const csrfElement = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (!csrfElement) {
+          alert('CSRF token not found. Please refresh the page.');
+          return;
+        }
+        const csrftoken = csrfElement.value;
+
+        const url = useIdUrls ? `/work/${pubId}/contribute-geometry/` : `/work/${doi}/contribute-geometry/`;
+
+        // Prepare temporal extent data
+        const temporalData = {};
+        if (startDate) temporalData.start_date = startDate;
+        if (endDate) temporalData.end_date = endDate;
+
+        // Submit contribution
+        fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrftoken
+          },
+          body: JSON.stringify({ temporal_extent: temporalData })
+        })
+        .then(response => {
+          if (!response.ok) {
+            return response.json().then(data => {
+              throw new Error(data.error || `HTTP error ${response.status}`);
+            });
+          }
+          return response.json();
+        })
+        .then(data => {
+          if (data.success) {
+            alert(data.message);
+            location.reload();
+          } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+          }
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          alert('Error: ' + error.message);
+        });
+      });
+    }
+
+    // Add publish button handler for admins
+    if (canPublish) {
+      const publishBtn = document.getElementById('publish-btn');
+      if (publishBtn) {
+        publishBtn.addEventListener('click', function() {
+          if (!confirm('Are you sure you want to publish this work? It will become publicly visible.')) {
+            return;
+          }
+
+          const csrfElement = document.querySelector('[name=csrfmiddlewaretoken]');
+          if (!csrfElement) {
+            alert('CSRF token not found. Please refresh the page.');
+            return;
+          }
+          const csrftoken = csrfElement.value;
+
+          const publishUrl = useIdUrls ? `/work/${pubId}/publish/` : `/work/${doi}/publish/`;
+        fetch(publishUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrftoken
+          }
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            alert(data.message);
+            location.reload();
+          } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+          }
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          alert('An error occurred while publishing the work.');
+        });
+        });
+      }
+    }
+
+    // Add unpublish button handler for admins
+    if (canUnpublish) {
+      const unpublishBtn = document.getElementById('unpublish-btn');
+      if (unpublishBtn) {
+        unpublishBtn.addEventListener('click', function() {
+          if (!confirm('Are you sure you want to unpublish this work? It will be set to Draft status and will no longer be publicly visible.')) {
+            return;
+          }
+
+          const csrfElement = document.querySelector('[name=csrfmiddlewaretoken]');
+          if (!csrfElement) {
+            alert('CSRF token not found. Please refresh the page.');
+            return;
+          }
+          const csrftoken = csrfElement.value;
+
+          const unpublishUrl = useIdUrls ? `/work/${pubId}/unpublish/` : `/work/${doi}/unpublish/`;
+        fetch(unpublishUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrftoken
+          }
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            alert(data.message);
+            location.reload();
+          } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+          }
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          alert('An error occurred while unpublishing the work.');
+        });
+        });
+      }
     }
 
     // Add custom "Zoom to All Features" button
@@ -131,7 +492,6 @@
     // Add the zoom to all button to the map
     new L.Control.ZoomAll({ position: 'topleft' }).addTo(map);
   </script>
-{% endif %}
 
 <p class="muted">
   <a href="/api/v1/publications/{{ pub.id }}/" target="_blank" rel="noopener">View raw JSON from API</a>

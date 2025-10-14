@@ -4,13 +4,13 @@ from django.contrib import admin
 from django.urls import path, include
 from django.shortcuts import redirect
 from publications import views
+from publications import views_geometry
 from .feeds import GeoFeed
 from django.views.generic import RedirectView
 from .feeds_geometry import GeoFeedByGeometry
 from django.urls import path
-from . import views 
+from . import views
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView
-from publications.api  import router as publications_router
 from publications.api  import router as publications_router
 
 
@@ -25,6 +25,15 @@ urlpatterns = [
     path('api/schema/ui/', SpectacularRedocView.as_view(url_name='optimap:schema'), name='redoc'),
     path('download/geojson/', views.download_geojson, name='download_geojson'),
     path("works/", views.works_list, name="works-list"),
+    # ID-based URLs (for publications without DOI)
+    path("work/<int:pub_id>/contribute-geometry/", views_geometry.contribute_geometry_by_id, name="contribute-geometry-by-id"),
+    path("work/<int:pub_id>/publish/", views_geometry.publish_work_by_id, name="publish-work-by-id"),
+    path("work/<int:pub_id>/unpublish/", views_geometry.unpublish_work_by_id, name="unpublish-work-by-id"),
+    path("work/<int:pub_id>/", views.work_landing_by_id, name="publication-by-id"),
+    # DOI-based URLs (primary method)
+    path("work/<path:doi>/contribute-geometry/", views_geometry.contribute_geometry, name="contribute-geometry"),
+    path("work/<path:doi>/publish/", views_geometry.publish_work, name="publish-work"),
+    path("work/<path:doi>/unpublish/", views_geometry.unpublish_work, name="unpublish-work"),
     path("work/<path:doi>/", views.work_landing, name="article-landing"),
     path('download/geopackage/', views.download_geopackage, name='download_geopackage'),
     path('favicon.ico', lambda request: redirect('static/favicon.ico', permanent=True)),
@@ -56,6 +65,6 @@ urlpatterns = [
          GeoFeedByGeometry(feed_type_variant="georss"), name="feed-georss-by-slug",),
     path("feeds/geoatom/<slug:geometry_slug>/",
          GeoFeedByGeometry(feed_type_variant="geoatom"), name="feed-geoatom-by-slug"),
-    path('locate/', views.locate, name="locate"),
+    path('contribute/', views.contribute, name="contribute"),
 
 ]

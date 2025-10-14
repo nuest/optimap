@@ -1,4 +1,7 @@
 {% extends "base.html" %}
+
+{% block title %}All works - {% endblock %}
+
 {% block navbar %}
 <ul class="nav navbar-nav">
   {% if request.user.is_authenticated %}
@@ -28,6 +31,7 @@
               {% elif item.status_code == 't' %}badge-warning
               {% elif item.status_code == 'w' %}badge-danger
               {% elif item.status_code == 'h' %}badge-info
+              {% elif item.status_code == 'c' %}badge-primary
               {% endif %}">{{ item.status }}</span>
           {% endif %}
         </li>

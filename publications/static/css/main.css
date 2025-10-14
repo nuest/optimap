@@ -253,3 +253,126 @@ h1.page-title {
   overflow-wrap: break-word;
   hyphens: auto;
 }
+
+/* Contribute page styles - completely refactored */
+
+/* Main container */
+.locate-container {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Grid layout for publication cards */
+.publication-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .publication-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Card wrapper with strict containment */
+.locate-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0; /* Critical for flex items to shrink below content size */
+  overflow: hidden; /* Prevent any overflow from card */
+}
+
+/* Card body with proper text containment */
+.locate-card .card-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  padding: 1.25rem;
+  overflow: hidden; /* Prevent overflow */
+  min-width: 0; /* Allow shrinking */
+}
+
+/* Card title with forced wrapping */
+.locate-card .card-title {
+  font-size: 1.1rem;
+  margin-bottom: 0.75rem;
+  /* Force text wrapping */
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  hyphens: auto;
+  /* Prevent overflow */
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* Links inside titles must wrap */
+.locate-card .card-title a {
+  /* Force wrapping on links */
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  /* Make link behave as block-level for wrapping */
+  display: inline;
+  /* Ensure link can't exceed container */
+  max-width: 100%;
+  overflow: hidden;
+}
+
+/* Abstract area */
+.locate-card .abstract-area {
+  flex: 1 1 auto;
+  margin-bottom: 0.75rem;
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* Card text (abstract) */
+.locate-card .card-text {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  hyphens: auto;
+}
+
+/* Card footer with strict containment */
+.locate-card .card-footer {
+  margin-top: auto;
+  padding: 1rem;
+  border-top: 1px solid rgba(0,0,0,.125);
+  background-color: transparent;
+  /* Prevent overflow */
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* Small text in footer */
+.locate-card .card-footer small {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  display: block;
+}
+
+/* DOI text with special breaking */
+.doi-text {
+  font-family: monospace;
+  font-size: 0.85em;
+  /* Break anywhere if needed for DOIs */
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  display: inline-block;
+  max-width: 100%;
+}
+
+/* Buttons in footer */
+.locate-card .card-footer .btn {
+  width: 100%;
+  margin-top: 0.5rem;
+  /* Prevent button text from breaking card */
+  word-wrap: break-word;
+  white-space: normal;
+}

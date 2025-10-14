@@ -128,28 +128,33 @@ def download_geopackage(request):
 def main(request):
     return render(request, "main.html")
 
-def locate(request):
+def contribute(request):
+    """
+    Page showing harvested publications that need spatial or temporal extent contributions.
+    Displays publications with Harvested status that are missing geometry or temporal extent.
+    """
     from django.contrib.gis.geos import GeometryCollection
     from django.db.models import Q
 
-    # Get publications that are harvested but have no geometry
-    # Include both NULL geometries and empty GeometryCollections
+    # Get publications that are harvested and missing spatial OR temporal extent
     publications_query = Publication.objects.filter(
         status='h',  # Harvested status
     ).filter(
         Q(geometry__isnull=True) |  # NULL geometry
-        Q(geometry__isempty=True)    # Empty GeometryCollection
+        Q(geometry__isempty=True) |  # Empty GeometryCollection
+        Q(timeperiod_startdate__isnull=True) |  # NULL start date
+        Q(timeperiod_enddate__isnull=True)      # NULL end date
     ).order_by('-creationDate')
 
     total_count = publications_query.count()
     # Limit to first 20 for performance (no pagination)
-    publications_without_geo = publications_query[:20]
+    publications_needing_contribution = publications_query[:20]
 
     context = {
-        'publications': publications_without_geo,
+        'publications': publications_needing_contribution,
         'total_count': total_count,
     }
-    return render(request, 'locate.html', context)
+    return render(request, 'contribute.html', context)
 
 def about(request):
     return render(request, 'about.html')
@@ -695,6 +700,19 @@ def work_landing(request, doi):
         }
         feature_json = json.dumps(feature)
 
+    # Check if geometry is missing (NULL or empty)
+    has_geometry = pub.geometry and not pub.geometry.empty
+
+    # Check if temporal extent is missing
+    has_temporal = bool(pub.timeperiod_startdate or pub.timeperiod_enddate)
+
+    # Users can contribute if publication is harvested and missing either geometry or temporal extent
+    can_contribute = request.user.is_authenticated and pub.status == 'h' and (not has_geometry or not has_temporal)
+
+    # Can publish if: Contributed status OR (Harvested with at least one extent type)
+    can_publish = is_admin and (pub.status == 'c' or (pub.status == 'h' and (has_geometry or has_temporal)))
+    can_unpublish = is_admin and pub.status == 'p'  # Can unpublish published works
+
     context = {
         "pub": pub,
         "feature_json": feature_json,
@@ -702,5 +720,71 @@ def work_landing(request, doi):
         "authors_list": _normalize_authors(pub),
         "is_admin": is_admin,
         "status_display": pub.get_status_display() if is_admin else None,
+        "has_geometry": has_geometry,
+        "has_temporal": has_temporal,
+        "can_contribute": can_contribute,
+        "can_publish": can_publish,
+        "can_unpublish": can_unpublish,
+        "show_provenance": is_admin,
+    }
+    return render(request, "work_landing_page.html", context)
+
+
+def work_landing_by_id(request, pub_id):
+    """
+    Landing page for a publication accessed by database ID.
+    Used for publications without a DOI.
+
+    Only published works (status='p') are accessible to non-admin users.
+    Admin users can view all works with a status label.
+    """
+    is_admin = request.user.is_authenticated and request.user.is_staff
+
+    # Get the publication
+    try:
+        pub = Publication.objects.get(id=pub_id)
+    except Publication.DoesNotExist:
+        raise Http404("Publication not found.")
+
+    # Check access permissions
+    if not is_admin and pub.status != 'p':
+        raise Http404("Publication not found.")
+
+    feature_json = None
+    if pub.geometry and not pub.geometry.empty:
+        feature = {
+            "type": "Feature",
+            "geometry": json.loads(pub.geometry.geojson),
+            "properties": {"title": pub.title, "doi": pub.doi},
+        }
+        feature_json = json.dumps(feature)
+
+    # Check if geometry is missing (NULL or empty)
+    has_geometry = pub.geometry and not pub.geometry.empty
+
+    # Check if temporal extent is missing
+    has_temporal = bool(pub.timeperiod_startdate or pub.timeperiod_enddate)
+
+    # Users can contribute if publication is harvested and missing either geometry or temporal extent
+    can_contribute = request.user.is_authenticated and pub.status == 'h' and (not has_geometry or not has_temporal)
+
+    # Can publish if: Contributed status OR (Harvested with at least one extent type)
+    can_publish = is_admin and (pub.status == 'c' or (pub.status == 'h' and (has_geometry or has_temporal)))
+    can_unpublish = is_admin and pub.status == 'p'  # Can unpublish published works
+
+    context = {
+        "pub": pub,
+        "feature_json": feature_json,
+        "timeperiod_label": _format_timeperiod(pub),
+        "authors_list": _normalize_authors(pub),
+        "is_admin": is_admin,
+        "status_display": pub.get_status_display() if is_admin else None,
+        "has_geometry": has_geometry,
+        "has_temporal": has_temporal,
+        "can_contribute": can_contribute,
+        "can_publish": can_publish,
+        "can_unpublish": can_unpublish,
+        "show_provenance": is_admin,
+        "use_id_urls": True,  # Flag to use ID-based URLs in template
     }
     return render(request, "work_landing_page.html", context)

@@ -72,5 +72,81 @@
       "timeperiod_enddate": "[\"2024\"]",
       "provenance": "Manually added from file test_data.json using the Django management script."
     }
+  },
+  {
+    "model": "publications.publication",
+    "pk": 903,
+    "fields": {
+      "status": "c",
+      "title": "Contributed Paper - Hamburg Harbor Study",
+      "abstract": "This paper has been contributed by a user with geolocation data. It studies shipping traffic in Hamburg harbor.",
+      "publicationDate": "2022-05-15",
+      "doi": "10.5555/contrib1",
+      "url": "http://paper.url/contrib1",
+      "geometry": "SRID=4326;GEOMETRYCOLLECTION(POINT (9.9937 53.5511))",
+      "creationDate": "2023-01-15T10:20:30.086Z",
+      "lastUpdate": "2023-01-16T14:35:22.086Z",
+      "source": 9,
+      "timeperiod_startdate": "[\"2020\"]",
+      "timeperiod_enddate": "[\"2021\"]",
+      "provenance": "Harvested via OAI-PMH on 2023-01-15T10:20:30Z.\n\nGeometry contributed by user test_user@example.com on 2023-01-16T14:35:22Z. Changed geometry from empty to Point. Status changed from Harvested to Contributed."
+    }
+  },
+  {
+    "model": "publications.publication",
+    "pk": 904,
+    "fields": {
+      "status": "c",
+      "title": "Contributed Paper - Bavarian Alps Research",
+      "abstract": "User-contributed geolocation for a study about alpine ecosystems in Bavaria.",
+      "publicationDate": "2023-03-20",
+      "doi": "10.5555/contrib2",
+      "url": "http://paper.url/contrib2",
+      "geometry": "SRID=4326;GEOMETRYCOLLECTION(POLYGON ((10.5 47.3, 10.5 47.7, 11.2 47.7, 11.2 47.3, 10.5 47.3)))",
+      "creationDate": "2023-06-10T08:15:45.086Z",
+      "lastUpdate": "2023-06-11T16:22:10.086Z",
+      "source": 9,
+      "timeperiod_startdate": "[\"2022-06\"]",
+      "timeperiod_enddate": "[\"2023-06\"]",
+      "provenance": "Harvested via OAI-PMH on 2023-06-10T08:15:45Z.\n\nGeometry contributed by user scientist@example.org on 2023-06-11T16:22:10Z. Changed geometry from empty to Polygon. Status changed from Harvested to Contributed."
+    }
+  },
+  {
+    "model": "publications.publication",
+    "pk": 905,
+    "fields": {
+      "status": "h",
+      "title": "Harvested Paper Without DOI - Frankfurt Study",
+      "abstract": "This harvested paper has no DOI but has a URL identifier. It needs geolocation contribution.",
+      "publicationDate": "2022-08-10",
+      "doi": null,
+      "url": "http://repository.example.org/id/12345",
+      "geometry": "SRID=4326;GEOMETRYCOLLECTION EMPTY",
+      "creationDate": "2023-08-01T09:30:00.086Z",
+      "lastUpdate": "2023-08-01T09:30:00.086Z",
+      "source": 9,
+      "timeperiod_startdate": "[\"2021\"]",
+      "timeperiod_enddate": "[\"2022\"]",
+      "provenance": "Harvested via RSS feed on 2023-08-01T09:30:00Z from OPTIMAP Test Journal."
+    }
+  },
+  {
+    "model": "publications.publication",
+    "pk": 906,
+    "fields": {
+      "status": "c",
+      "title": "Contributed Paper Without DOI - Stuttgart Research",
+      "abstract": "This paper was harvested without a DOI, but a user contributed geolocation data using the URL identifier.",
+      "publicationDate": "2023-02-14",
+      "doi": null,
+      "url": "http://repository.example.org/id/67890",
+      "geometry": "SRID=4326;GEOMETRYCOLLECTION(POINT (9.1829 48.7758))",
+      "creationDate": "2023-09-05T11:45:00.086Z",
+      "lastUpdate": "2023-09-06T15:20:30.086Z",
+      "source": 9,
+      "timeperiod_startdate": "[\"2022\"]",
+      "timeperiod_enddate": "[\"2023\"]",
+      "provenance": "Harvested via RSS feed on 2023-09-05T11:45:00Z from OPTIMAP Test Journal.\n\nGeometry contributed by user researcher@example.com on 2023-09-06T15:20:30Z. Changed geometry from empty to Point. Status changed from Harvested to Contributed."
+    }
   }
 ]
