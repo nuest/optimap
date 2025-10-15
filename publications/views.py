@@ -788,3 +788,17 @@ def work_landing_by_id(request, pub_id):
         "use_id_urls": True,  # Flag to use ID-based URLs in template
     }
     return render(request, "work_landing_page.html", context)
+
+
+# ------------------------------
+# Error Handlers
+# ------------------------------
+
+def custom_404(request, exception=None):
+    """Custom 404 error handler"""
+    return render(request, '404.html', status=404)
+
+
+def custom_500(request):
+    """Custom 500 error handler"""
+    return render(request, '500.html', status=500)

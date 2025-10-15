@@ -42,6 +42,10 @@ urlpatterns = [
     re_path(r'^robots.txt', RobotsView.as_view(), name="robots_file"),
 ]
 
+# Custom error handlers
+handler404 = 'publications.views.custom_404'
+handler500 = 'publications.views.custom_500'
+
 # Context processor for the site
 from django.contrib.sites.shortcuts import get_current_site
 from django.utils.functional import SimpleLazyObject

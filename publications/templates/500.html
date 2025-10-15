@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Server Error - {% endblock %}
+
+{% block navbar %}
+<ul class="nav navbar-nav">
+  {% if request.user.is_authenticated %}
+    {% include "authenticated_menu_snippet.html" %}
+  {% else %}
+    {% include "menu_snippet.html" %}
+  {% endif %}
+</ul>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-8 col-lg-6 py-5">
+    <div class="text-center mb-4">
+      <i class="fas fa-exclamation-triangle" style="font-size: 5rem; color: #9B2115;"></i>
+    </div>
+
+    <h1 class="text-center mb-4">Server Error</h1>
+
+    <div class="alert alert-danger">
+      <p class="mb-3">
+        <strong>Something went wrong on our end.</strong> We're sorry for the inconvenience.
+      </p>
+      <p class="mb-0">
+        Our team has been notified and is working to fix the issue. Please try again in a few moments.
+      </p>
+    </div>
+
+    <div class="card mt-4">
+      <div class="card-body">
+        <h5 class="card-title"><i class="fas fa-compass"></i> What can you do?</h5>
+        <div class="list-group list-group-flush">
+          <a href="/" class="list-group-item list-group-item-action">
+            <i class="fas fa-home"></i> Go to home page
+          </a>
+          <a href="/works/" class="list-group-item list-group-item-action">
+            <i class="fas fa-list"></i> Browse all works
+          </a>
+          <a href="/contribute/" class="list-group-item list-group-item-action">
+            <i class="fas fa-hands-helping"></i> Contribute metadata
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="alert alert-info mt-4">
+      <h6 class="mb-2"><i class="fas fa-question-circle"></i> Need to report this error?</h6>
+      <p class="mb-2">
+        If this problem persists, please let us know:
+      </p>
+      <ul class="mb-0">
+        <li><a href="/about/" class="alert-link">About page</a> - Contact information and support</li>
+        <li><a href="/accessibility/" class="alert-link">Accessibility page</a> - Accessibility features and help</li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

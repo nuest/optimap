@@ -6,6 +6,7 @@
 
 - **Temporal extent contribution** - Users can now contribute temporal extent (start/end dates) in addition to spatial extent. Works can be published with either spatial, temporal, or both extents. Supports flexible date formats: YYYY, YYYY-MM, YYYY-MM-DD.
 - **Complete status workflow documentation** - Documented all 6 publication statuses (Draft, Harvested, Contributed, Published, Testing, Withdrawn) with workflow transitions and visibility rules in README.md.
+- **Custom error pages** - Added styled 404 and 500 error pages matching application design with navigation links and help information directing users to About and Accessibility pages.
 - **Map popup enhancement** - Added "View Publication Details" button to map popups linking to work landing pages.
 - **Admin unpublish functionality** - Admins can unpublish works, changing status from Published to Draft.
 - **RSS/Atom feed harvesting support** - Added support for harvesting publications from RSS/Atom feeds in addition to OAI-PMH.
@@ -15,7 +16,7 @@
 ### Changed
 
 - **Unified contribution workflow** - Single "Submit contribution" button for both spatial and temporal extent. Users can submit either or both in one action.
-- **Unified admin control panel** - Consolidated admin status display, publish/unpublish buttons, and "Edit in Admin" link into single highlighted box at top of work landing page.
+- **Unified admin control panel** - Consolidated admin status display, publish/unpublish buttons, provenance information, and "Edit in Admin" link into single highlighted box at top of work landing page. Provenance is collapsible.
 - **Improved text wrapping** - Page titles and abstract text now properly wrap on narrow windows instead of overflowing.
 - **Unified URL structure** - Changed ID-based URLs from `/publication/<id>/` to `/work/<id>/` for consistency with DOI-based URLs.
 - **Refactored views_geometry.py** - Eliminated code duplication by making DOI-based functions wrap ID-based functions. Reduced from 375 to 240 lines (~36% reduction).
