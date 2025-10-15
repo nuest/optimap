@@ -20,7 +20,14 @@ class PublicationViewSet(viewsets.ReadOnlyModelViewSet):
     filter_backends = (filters.InBBoxFilter,)
     serializer_class = PublicationSerializer
     permission_classes = [IsAuthenticatedOrReadOnly]
-    queryset = Publication.objects.filter(status="p").distinct()
+
+    def get_queryset(self):
+        """
+        Return all publications for admin users, only published ones for others.
+        """
+        if self.request.user.is_authenticated and self.request.user.is_staff:
+            return Publication.objects.all().distinct()
+        return Publication.objects.filter(status="p").distinct()
 
 class SubscriptionViewSet(viewsets.ModelViewSet):
     """

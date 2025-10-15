@@ -1,0 +1,109 @@
+{% extends "main.html" %}
+
+{% block title %}Contribute Geolocation Data | {% endblock %}
+
+{% block content %}
+
+<div class="container-fluid locate-container">
+  <div class="row justify-content-center">
+    <div class="col-md-10 col-lg-8 py-5">
+    <h1 class="py-2">Contribute Geolocation Data</h1>
+
+    <p class="lead">Help us add geographic data to scientific publications!</p>
+
+    <p class="text-wrap text-break">The publications listed below have been harvested from various scientific sources but do not have geolocation data yet. If you know the geographic location or area mentioned in any of these publications, you can help us improve our database.</p>
+
+    {% if total_count > 0 %}
+      <div class="alert alert-info text-break" role="alert">
+        <i class="fas fa-info-circle"></i>
+        <strong>{{ total_count }}</strong> publication{{ total_count|pluralize }} need{{ total_count|pluralize:"s," }} geolocation data.
+      </div>
+
+      <div class="publication-grid">
+        {% for publication in publications %}
+          <div class="card locate-card">
+            <div class="card-body">
+              <h5 class="card-title">
+                {% if publication.doi %}
+                  <a href="https://doi.org/{{ publication.doi }}" target="_blank" rel="noopener noreferrer">
+                    {{ publication.title|truncatechars:120 }}
+                    <i class="fas fa-external-link-alt fa-xs"></i>
+                  </a>
+                {% else %}
+                  <span>{{ publication.title|truncatechars:120 }}</span>
+                {% endif %}
+              </h5>
+
+              <div class="abstract-area">
+                {% if publication.abstract %}
+                  <p class="card-text text-muted small">
+                    {{ publication.abstract|truncatechars:180 }}
+                  </p>
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="card-footer">
+              <small class="text-muted">
+                {% if publication.publicationDate %}
+                  <div class="mb-1">Published: {{ publication.publicationDate|date:"M d, Y" }}</div>
+                {% endif %}
+                {% if publication.source %}
+                  <div class="mb-1">Source: {{ publication.source.name }}</div>
+                {% endif %}
+                {% if publication.doi %}
+                  <div class="mb-1">DOI: <span class="doi-text">{{ publication.doi }}</span></div>
+                {% endif %}
+              </small>
+
+              {% if request.user.is_authenticated %}
+                {% if publication.doi %}
+                  <a href="{% url 'optimap:article-landing' publication.doi %}" class="btn btn-primary btn-sm">
+                    <i class="fas fa-map-marked-alt"></i> Contribute metadata
+                  </a>
+                {% else %}
+                  <a href="{% url 'optimap:publication-by-id' publication.id %}" class="btn btn-primary btn-sm">
+                    <i class="fas fa-map-marked-alt"></i> Contribute metadata
+                  </a>
+                {% endif %}
+              {% else %}
+                <button disabled class="btn btn-outline-secondary btn-sm" title="Please use the user menu at the top right to log in">
+                  <i class="fas fa-user-circle"></i> Please log in to contribute (user menu at top right)
+                </button>
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+
+      {% if publications|length >= 20 %}
+        <div class="alert alert-secondary mt-4" role="alert">
+          <i class="fas fa-info-circle"></i>
+          Showing first 20 publications only. More publications without geolocation data are available, please make your contributions and then refresh this page. If you would like to contribute for a specific journal or field, please get in touch.
+        </div>
+      {% endif %}
+
+    {% else %}
+      <div class="alert alert-success" role="alert">
+        <i class="fas fa-check-circle"></i>
+        Great! All harvested publications currently have geolocation data.
+      </div>
+    {% endif %}
+
+    <div class="mt-5">
+      <h3>How to help</h3>
+      <p>If you recognize any publications that reference specific geographic locations, please login, confirm your account, and contribute metadata.</p>
+      <p>In case you find any errors in other metadata fields, if you see a work with incorrect location or time information, or if you find publications that should be included in our database, please contact us:</p>
+      <p>
+        <a href="/about" class="btn btn-primary">
+          <i class="fas fa-envelope"></i> Contact Us
+        </a>
+        <a href="/" class="btn btn-outline-secondary">
+          <i class="fas fa-map"></i> Back to Map
+        </a>
+      </p>
+    </div>
+  </div>
+</div>
+
+{% endblock content %}
