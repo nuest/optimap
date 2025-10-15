@@ -802,3 +802,8 @@ def custom_404(request, exception=None):
 def custom_500(request):
     """Custom 500 error handler"""
     return render(request, '500.html', status=500)
+
+
+def sitemap_page(request):
+    """Human-readable sitemap page"""
+    return render(request, 'sitemap_page.html')

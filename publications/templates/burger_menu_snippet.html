@@ -1,0 +1,29 @@
+<li class="nav-item dropdown">
+  <a
+    class="nav-link dropdown-toggle"
+    href="#"
+    id="burgerMenuDropdown"
+    role="button"
+    data-toggle="dropdown"
+    aria-expanded="false"
+    aria-label="Main menu">
+    <i class="fa-solid fa-bars fa-3x"></i>
+  </a>
+  <ul
+    class="dropdown-menu dropdown-menu-right"
+    aria-labelledby="burgerMenuDropdown"
+    style="min-width: 250px; margin-top: 1rem;">
+    <li><a class="dropdown-item" href="/"><i class="fas fa-home"></i> Home</a></li>
+    <li><a class="dropdown-item" href="{% url 'optimap:works' %}"><i class="fas fa-list"></i> Browse Works</a></li>
+    <li><a class="dropdown-item" href="{% url 'optimap:contribute' %}"><i class="fas fa-hands-helping"></i> Contribute</a></li>
+    <div class="dropdown-divider"></div>
+    <li><a class="dropdown-item" href="{% url 'optimap:data' %}"><i class="fas fa-database"></i> Data & API</a></li>
+    <li><a class="dropdown-item" href="{% url 'optimap:feeds' %}"><i class="fas fa-rss"></i> Feeds</a></li>
+    <div class="dropdown-divider"></div>
+    <li><a class="dropdown-item" href="{% url 'optimap:about' %}"><i class="fas fa-info-circle"></i> About</a></li>
+    <li><a class="dropdown-item" href="{% url 'optimap:contact' %}"><i class="fas fa-envelope"></i> Contact</a></li>
+    <li><a class="dropdown-item" href="{% url 'optimap:accessibility' %}"><i class="fas fa-universal-access"></i> Accessibility</a></li>
+    <div class="dropdown-divider"></div>
+    <li><a class="dropdown-item" href="https://github.com/GeoinformationSystems/optimap" target="_blank" rel="noopener"><i class="fas fa-code"></i> Code on GitHub</a></li>
+  </ul>
+</li>

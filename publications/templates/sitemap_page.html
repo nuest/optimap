@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block title %}Sitemap - {% endblock %}
+
+{% block navbar %}
+<ul class="nav navbar-nav">
+  {% if request.user.is_authenticated %}
+    {% include "authenticated_menu_snippet.html" %}
+  {% else %}
+    {% include "menu_snippet.html" %}
+  {% endif %}
+</ul>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-10 col-lg-8 py-5">
+    <h1 class="mb-4">Sitemap</h1>
+    <p class="lead">Find your way around OPTIMAP with this overview of all available pages.</p>
+
+    <div class="card mb-3">
+      <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="fas fa-compass"></i> Main Pages</h5>
+      </div>
+      <ul class="list-group list-group-flush">
+        <li class="list-group-item">
+          <a href="/"><strong><i class="fas fa-home"></i> Home</strong></a>
+          <p class="text-muted mb-0 small">Interactive map showing all published research with geospatial metadata</p>
+        </li>
+        <li class="list-group-item">
+          <a href="{% url 'optimap:works' %}"><strong><i class="fas fa-list"></i> Browse Works</strong></a>
+          <p class="text-muted mb-0 small">List of all published scientific works with spatial and temporal metadata</p>
+        </li>
+        <li class="list-group-item">
+          <a href="{% url 'optimap:contribute' %}"><strong><i class="fas fa-hands-helping"></i> Contribute</strong></a>
+          <p class="text-muted mb-0 small">Help improve OPTIMAP by contributing geospatial and temporal metadata</p>
+        </li>
+      </ul>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="fas fa-database"></i> Data & Technical</h5>
+      </div>
+      <ul class="list-group list-group-flush">
+        <li class="list-group-item">
+          <a href="{% url 'optimap:data' %}"><strong><i class="fas fa-database"></i> Data & API</strong></a>
+          <p class="text-muted mb-0 small">Download datasets and access the OPTIMAP API for programmatic access</p>
+        </li>
+        <li class="list-group-item">
+          <a href="{% url 'optimap:feeds' %}"><strong><i class="fas fa-rss"></i> Feeds</strong></a>
+          <p class="text-muted mb-0 small">Subscribe to RSS, Atom, and GeoRSS feeds for updates on new publications</p>
+        </li>
+      </ul>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="fas fa-info-circle"></i> Information & Help</h5>
+      </div>
+      <ul class="list-group list-group-flush">
+        <li class="list-group-item">
+          <a href="{% url 'optimap:about' %}"><strong><i class="fas fa-info-circle"></i> About & Imprint</strong></a>
+          <p class="text-muted mb-0 small">Learn about OPTIMAP, our mission, team, licenses, and legal information</p>
+        </li>
+        <li class="list-group-item">
+          <a href="{% url 'optimap:contact' %}"><strong><i class="fas fa-envelope"></i> Contact</strong></a>
+          <p class="text-muted mb-0 small">Get in touch with the OPTIMAP team for questions and support</p>
+        </li>
+        <li class="list-group-item">
+          <a href="{% url 'optimap:accessibility' %}"><strong><i class="fas fa-universal-access"></i> Accessibility</strong></a>
+          <p class="text-muted mb-0 small">Information about accessibility features and our commitment to inclusive design</p>
+        </li>
+        <li class="list-group-item">
+          <a href="{% url 'optimap:privacy' %}"><strong><i class="fas fa-shield-alt"></i> Privacy</strong></a>
+          <p class="text-muted mb-0 small">Privacy policy and information about how we handle your data</p>
+        </li>
+      </ul>
+    </div>
+
+    {% if request.user.is_authenticated %}
+    <div class="card mb-3">
+      <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="fas fa-user"></i> User Pages</h5>
+      </div>
+      <ul class="list-group list-group-flush">
+        <li class="list-group-item">
+          <a href="{% url 'optimap:usersettings' %}"><strong><i class="fas fa-cog"></i> Settings</strong></a>
+          <p class="text-muted mb-0 small">Manage your account settings and preferences</p>
+        </li>
+        <li class="list-group-item">
+          <a href="{% url 'optimap:subscriptions' %}"><strong><i class="fas fa-bell"></i> Subscriptions</strong></a>
+          <p class="text-muted mb-0 small">Manage your notification subscriptions for new publications</p>
+        </li>
+      </ul>
+    </div>
+    {% endif %}
+
+    <div class="card mb-3">
+      <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="fas fa-code"></i> Development</h5>
+      </div>
+      <ul class="list-group list-group-flush">
+        <li class="list-group-item">
+          <a href="https://github.com/GeoinformationSystems/optimap" target="_blank" rel="noopener"><strong><i class="fas fa-code-branch"></i> GitHub Repository</strong></a>
+          <p class="text-muted mb-0 small">View the source code, report issues, and contribute to OPTIMAP development</p>
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

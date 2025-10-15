@@ -6,6 +6,8 @@
 
 - **Temporal extent contribution** - Users can now contribute temporal extent (start/end dates) in addition to spatial extent. Works can be published with either spatial, temporal, or both extents. Supports flexible date formats: YYYY, YYYY-MM, YYYY-MM-DD.
 - **Complete status workflow documentation** - Documented all 6 publication statuses (Draft, Harvested, Contributed, Published, Testing, Withdrawn) with workflow transitions and visibility rules in README.md.
+- **Burger menu navigation** - Added top bar hamburger menu (☰) next to user icon with dropdown links to all main pages including Home, Browse Works, Contribute, Data & API, Feeds, About, Contact, Accessibility, and GitHub code repository.
+- **Human-readable sitemap** - New `/pages` endpoint showing organized list of all pages with descriptions, categorized into Main Pages, Data & Technical, Information & Help, User Pages, and Development sections.
 - **Custom error pages** - Added styled 404 and 500 error pages matching application design with navigation links and help information directing users to About and Accessibility pages.
 - **Map popup enhancement** - Added "View Publication Details" button to map popups linking to work landing pages.
 - **Admin unpublish functionality** - Admins can unpublish works, changing status from Published to Draft.
@@ -24,6 +26,7 @@
 - **Contribute page layout refactored** - Fixed text overflow issues with proper CSS containment strategy.
 - **Flexible publishing requirements** - Harvested publications with geometry can be published directly without requiring user contribution.
 - **Contribute page login button improved** - Changed to informational disabled button with clear text: "Please log in to contribute (user menu at top right)".
+- **Simplified footer navigation** - Footer now contains only Sitemap, About/Contact/Imprint, Privacy, and data license. Other page links moved to burger menu and sitemap.
 
 ### Fixed
 

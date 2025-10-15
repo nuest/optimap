@@ -68,7 +68,10 @@
           >
         </div>
 
-        {% block navbar %}{% endblock %}
+        <ul class="nav navbar-nav ml-auto">
+          {% include "burger_menu_snippet.html" %}
+          {% block navbar %}{% endblock %}
+        </ul>
       </div>
     </nav>
 
