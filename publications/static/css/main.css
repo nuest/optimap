@@ -183,12 +183,24 @@ main {
 }
 
 /* Work landing page styles */
+.work-landing-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
+}
+
 h1.page-title {
   margin-top: 2rem;
   margin-bottom: .5rem;
   word-wrap: break-word;
   overflow-wrap: break-word;
+  word-break: break-word;
   hyphens: auto;
+  white-space: normal !important;
+  max-width: 100%;
 }
 
 .muted {
@@ -196,12 +208,14 @@ h1.page-title {
   font-size: .92rem;
   word-wrap: break-word;
   overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .meta {
   margin: 1rem 0 1.5rem;
   word-wrap: break-word;
   overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .meta a {
@@ -251,7 +265,16 @@ h1.page-title {
 .work-landing-page p {
   word-wrap: break-word;
   overflow-wrap: break-word;
+  word-break: break-word;
   hyphens: auto;
+  max-width: 100%;
+  white-space: normal;
+}
+
+/* Ensure abstract text wraps properly */
+.work-landing-page > p {
+  margin: 1rem 0;
+  line-height: 1.6;
 }
 
 /* Contribute page styles - completely refactored */
