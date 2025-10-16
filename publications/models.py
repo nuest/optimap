@@ -74,6 +74,7 @@ class Publication(models.Model):
     openalex_keywords = ArrayField(models.CharField(max_length=255), blank=True, null=True)
     openalex_open_access_status = models.CharField(max_length=50, blank=True, null=True)
     openalex_topics = ArrayField(models.CharField(max_length=255), blank=True, null=True)
+    openalex_authors = ArrayField(models.CharField(max_length=255), blank=True, null=True, help_text="Author names from OpenAlex")
 
     class Meta:
         ordering = ['-id']

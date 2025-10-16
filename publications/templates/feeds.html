@@ -20,25 +20,50 @@
     </ul>
   {% endif %}
 
-  <h2 class="text-2xl mb-4">Global region feeds</h2>
-  <p>Subscribe to research works from all sources and time periods for selected regions.</p>
-  <ul class="list-disc list-inside space-y-2 mb-8">
-    {% for region in regions %}
-      <li class="flex flex-wrap items-center space-x-2">
-        <strong>{{ region.name }}</strong>
-        <span>({{ region.get_region_type_display }})</span>:<br>
+  <h2 class="text-2xl mb-4">Regional feeds</h2>
+  <p>Subscribe to research works from selected continents or oceans.</p>
 
-        <a href="{% url 'optimap:feed-georss-by-slug' region.name|slugify %}"
+  <h3 class="text-xl mb-2 mt-4">Continents</h3>
+  <ul class="list-disc list-inside space-y-2 mb-6">
+    {% for region in regions %}
+      {% if region.region_type == 'C' %}
+      <li class="flex flex-wrap items-center space-x-2">
+        <strong><a href="{% url 'optimap:feed-continent-page' region.normalized_slug %}" class="text-blue-800 hover:underline">{{ region.name }}</a></strong>:
+
+        <a href="{% url 'optimap:api-continent-georss' region.normalized_slug %}"
            class="text-blue-600 hover:underline"
-           title="GeoRSS for {{ region.name }}">GeoRSS</a>
+           title="GeoRSS for {{ region.name }}">RSS</a>
         <span>|</span>
 
-        <a href="{{% url 'optimap:feed-geoatom-by-slug' region.name|slugify %}"
+        <a href="{% url 'optimap:api-continent-atom' region.normalized_slug %}"
            class="text-blue-600 hover:underline"
-           title="Atom for {{ region.name }}">GeoAtom</a>
+           title="Atom for {{ region.name }}">Atom</a>
 
         <small class="text-gray-500">(updated {{ region.last_loaded|date:"Y-m-d H:i" }})</small>
       </li>
+      {% endif %}
+    {% endfor %}
+  </ul>
+
+  <h3 class="text-xl mb-2">Oceans</h3>
+  <ul class="list-disc list-inside space-y-2 mb-8">
+    {% for region in regions %}
+      {% if region.region_type == 'O' %}
+      <li class="flex flex-wrap items-center space-x-2">
+        <strong><a href="{% url 'optimap:feed-ocean-page' region.normalized_slug %}" class="text-blue-800 hover:underline">{{ region.name }}</a></strong>:
+
+        <a href="{% url 'optimap:api-ocean-georss' region.normalized_slug %}"
+           class="text-blue-600 hover:underline"
+           title="GeoRSS for {{ region.name }}">RSS</a>
+        <span>|</span>
+
+        <a href="{% url 'optimap:api-ocean-atom' region.normalized_slug %}"
+           class="text-blue-600 hover:underline"
+           title="Atom for {{ region.name }}">Atom</a>
+
+        <small class="text-gray-500">(updated {{ region.last_loaded|date:"Y-m-d H:i" }})</small>
+      </li>
+      {% endif %}
     {% endfor %}
   </ul>
 

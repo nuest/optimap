@@ -13,7 +13,8 @@
       "Bash(python manage.py makemigrations:*)",
       "Bash(source:*)",
       "Bash(python manage.py shell:*)",
-      "Bash(python manage.py:*)"
+      "Bash(python manage.py:*)",
+      "Bash(python -m py_compile:*)"
     ],
     "deny": [],
     "ask": []

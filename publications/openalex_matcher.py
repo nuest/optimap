@@ -189,8 +189,19 @@ class OpenAlexMatcher:
             'openalex_ids': work_data.get('ids', {}),
             'openalex_keywords': [],
             'openalex_open_access_status': None,
-            'openalex_topics': []
+            'openalex_topics': [],
+            'openalex_authors': []
         }
+
+        # Extract authors (display_name from authorships)
+        authorships = work_data.get('authorships', [])
+        if authorships:
+            authors = []
+            for authorship in authorships:
+                author = authorship.get('author', {})
+                if author and author.get('display_name'):
+                    authors.append(author.get('display_name'))
+            extracted['openalex_authors'] = authors
 
         # Extract keywords (display_name only)
         keywords = work_data.get('keywords', [])

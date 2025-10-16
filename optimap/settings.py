@@ -49,6 +49,9 @@ ROOT_URLCONF = 'optimap.urls'
 
 DATA_DUMP_RETENTION = int(os.getenv("OPTIMAP_DATA_DUMP_RETENTION", 3))
 
+# Feed configuration
+FEED_CACHE_HOURS = int(os.getenv("OPTIMAP_FEED_CACHE_HOURS", 24))
+
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
     "sesame.backends.ModelBackend",

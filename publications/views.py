@@ -572,26 +572,70 @@ def finalize_account_deletion(request):
             request.session.modified = True
 
 def feeds(request):
+    from .feeds_v2 import normalize_region_slug
+
     global_feeds = [
-        { "title": "Geo RSS",     "url": reverse("optimap:georss_feed")   },
-        { "title": "Geo Atom",    "url": reverse("optimap:geoatom_feed")  },
-        { "title": "W3C Geo",     "url": reverse("optimap:w3cgeo_feed")   },
+        { "title": "Geo RSS",     "url": reverse("optimap:api-feed-georss")   },
+        { "title": "Atom",        "url": reverse("optimap:api-feed-atom")     },
     ]
 
     regions = GlobalRegion.objects.all().order_by("region_type", "name")
 
+    # Add normalized slugs to regions for URL generation
+    regions_with_slugs = []
+    for region in regions:
+        slug = normalize_region_slug(region.name)
+        region.normalized_slug = slug
+        regions_with_slugs.append(region)
+
     return render(request, "feeds.html", {
         "global_feeds": global_feeds,
-        "regions": regions,
+        "regions": regions_with_slugs,
     })
 
 class RobotsView(View):
     http_method_names = ['get']
     def get(self, request):
-        response = HttpResponse(
-            "User-Agent: *\nDisallow:\nSitemap: %s://%s/sitemap.xml" % (request.scheme, request.site.domain),
-            content_type="text/plain"
-        )
+        from .feeds_v2 import normalize_region_slug
+
+        # Build robots.txt content
+        lines = [
+            "User-Agent: *",
+            "Disallow:",
+            "",
+            "# Sitemaps",
+            f"Sitemap: {request.scheme}://{request.site.domain}/sitemap.xml",
+            "",
+            "# Feed URLs for indexing",
+            "# Global feeds",
+            f"Allow: {reverse('optimap:api-feed-georss')}",
+            f"Allow: {reverse('optimap:api-feed-atom')}",
+            "",
+        ]
+
+        # Add regional feeds
+        regions = GlobalRegion.objects.all().order_by("region_type", "name")
+
+        # Continents
+        lines.append("# Continent feeds")
+        for region in regions:
+            if region.region_type == GlobalRegion.CONTINENT:
+                slug = normalize_region_slug(region.name)
+                lines.append(f"Allow: /feeds/continent/{slug}/")
+                lines.append(f"Allow: /api/v1/feeds/continent/{slug}.rss")
+                lines.append(f"Allow: /api/v1/feeds/continent/{slug}.atom")
+
+        lines.append("")
+        lines.append("# Ocean feeds")
+        for region in regions:
+            if region.region_type == GlobalRegion.OCEAN:
+                slug = normalize_region_slug(region.name)
+                lines.append(f"Allow: /feeds/ocean/{slug}/")
+                lines.append(f"Allow: /api/v1/feeds/ocean/{slug}.rss")
+                lines.append(f"Allow: /api/v1/feeds/ocean/{slug}.atom")
+
+        content = "\n".join(lines)
+        response = HttpResponse(content, content_type="text/plain")
         return response
 
 def _format_timeperiod(pub):
@@ -619,6 +663,7 @@ def _normalize_authors(pub):
     Returns list[str] or None.
     """
     candidates = (
+        getattr(pub, "openalex_authors", None),  # Primary: OpenAlex authors
         getattr(pub, "authors", None),
         getattr(pub, "author", None),
         getattr(pub, "creators", None),

@@ -18,6 +18,24 @@ main {
   padding-bottom: 3em;
 }
 
+/* Override white-space for content pages that need text wrapping */
+main .locate-container,
+main .work-landing-page,
+main .works-page {
+  white-space: normal;
+}
+
+/* Ensure Bootstrap text utilities work properly */
+.text-wrap {
+  white-space: normal !important;
+}
+
+.text-break {
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
+  word-break: break-word !important;
+}
+
 .navbar {
   height: 50px;
   background-color: #158F9B;
@@ -287,6 +305,42 @@ h1.page-title {
 .locate-container {
   max-width: 100%;
   overflow-x: hidden;
+}
+
+/* Ensure the inner column doesn't overflow */
+.locate-container .col-md-10,
+.locate-container .col-lg-8 {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Alert boxes on contribute page - ensure proper wrapping */
+.locate-container .alert {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  hyphens: auto;
+  white-space: normal;
+  overflow: hidden;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* How to help section - ensure text wraps properly */
+.locate-container h3 {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+}
+
+.locate-container p {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  hyphens: auto;
+  white-space: normal;
+  max-width: 100%;
 }
 
 /* Grid layout for publication cards */

@@ -36,13 +36,6 @@
           {% elif pub.status == 'h' %}badge-info
           {% elif pub.status == 'c' %}badge-primary
           {% endif %}">{{ status_display }}</span>
-        {% if pub.status == 'p' %}
-          · This publication is public
-        {% elif pub.status == 'c' %}
-          · Ready to publish (contribution reviewed)
-        {% else %}
-          · Not visible to the public
-        {% endif %}
       </div>
       <div>
         {% if can_publish %}

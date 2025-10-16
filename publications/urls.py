@@ -5,7 +5,9 @@ from django.urls import path, include
 from django.shortcuts import redirect
 from publications import views
 from publications import views_geometry
+from publications import views_feeds
 from .feeds import GeoFeed
+from .feeds_v2 import GlobalGeoFeed, RegionalGeoFeed
 from django.views.generic import RedirectView
 from .feeds_geometry import GeoFeedByGeometry
 from django.urls import path
@@ -23,6 +25,20 @@ urlpatterns = [
     path("api/v1/", include((publications_router.urls, "publications"), namespace="publications"), name="api_current"),
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/schema/ui/', SpectacularRedocView.as_view(url_name='optimap:schema'), name='redoc'),
+
+    # API v1 Feed endpoints - GeoRSS format (with .rss extension)
+    path('api/v1/feeds/optimap-global.rss', GlobalGeoFeed(feed_type_variant="georss"), name='api-feed-georss'),
+    path('api/v1/feeds/optimap-<slug:continent_slug>.rss', RegionalGeoFeed(feed_type_variant="georss"), name='api-continent-georss'),
+    path('api/v1/feeds/optimap-<slug:ocean_slug>.rss', RegionalGeoFeed(feed_type_variant="georss"), name='api-ocean-georss'),
+
+    # API v1 Feed endpoints - Atom format (with .atom extension)
+    path('api/v1/feeds/optimap-global.atom', GlobalGeoFeed(feed_type_variant="atom"), name='api-feed-atom'),
+    path('api/v1/feeds/optimap-<slug:continent_slug>.atom', RegionalGeoFeed(feed_type_variant="atom"), name='api-continent-atom'),
+    path('api/v1/feeds/optimap-<slug:ocean_slug>.atom', RegionalGeoFeed(feed_type_variant="atom"), name='api-ocean-atom'),
+
+    # Feed HTML pages (human-readable)
+    path('feeds/continent/<slug:continent_slug>/', views_feeds.continent_feed_page, name='feed-continent-page'),
+    path('feeds/ocean/<slug:ocean_slug>/', views_feeds.ocean_feed_page, name='feed-ocean-page'),
     path('download/geojson/', views.download_geojson, name='download_geojson'),
     path("works/", views.works_list, name="works"),
     # ID-based URLs (for publications without DOI)
@@ -37,10 +53,11 @@ urlpatterns = [
     path("work/<path:doi>/", views.work_landing, name="article-landing"),
     path('download/geopackage/', views.download_geopackage, name='download_geopackage'),
     path('favicon.ico', lambda request: redirect('static/favicon.ico', permanent=True)),
-    path('feed/', RedirectView.as_view(pattern_name='optimap:georss_feed', permanent=True)),
-    path('feed/geoatom/', GeoFeed(feed_type_variant="geoatom"), name='geoatom_feed'),
-    path('feed/georss/', GeoFeed(feed_type_variant="georss"), name='georss_feed'),
-    path('feed/w3cgeo/', GeoFeed(feed_type_variant="w3cgeo"), name='w3cgeo_feed'),
+    # Legacy feed URLs - redirect to new API v1 endpoints
+    path('feed/', RedirectView.as_view(pattern_name='optimap:api-feed-georss', permanent=True)),
+    path('feed/geoatom/', RedirectView.as_view(pattern_name='optimap:api-feed-atom', permanent=True), name='geoatom_feed'),
+    path('feed/georss/', RedirectView.as_view(pattern_name='optimap:api-feed-georss', permanent=True), name='georss_feed'),
+    path('feed/w3cgeo/', RedirectView.as_view(pattern_name='optimap:api-feed-georss', permanent=True), name='w3cgeo_feed'),
     path("finalize-delete/", views.finalize_account_deletion, name="finalize_delete"),
     path("about/", views.about, name="about"),
     path("accessibility/", views.accessibility, name="accessibility"),
@@ -62,6 +79,7 @@ urlpatterns = [
     path("unsubscribe/", views.unsubscribe, name="unsubscribe"),
     path("usersettings/", views.user_settings, name="usersettings"),
     path("feeds/", views.feeds, name="feeds"),
+    # Legacy regional feed URLs - kept for backwards compatibility but will be deprecated
     path("feeds/georss/<slug:geometry_slug>/",
          GeoFeedByGeometry(feed_type_variant="georss"), name="feed-georss-by-slug",),
     path("feeds/geoatom/<slug:geometry_slug>/",
