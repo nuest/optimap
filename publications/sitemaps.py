@@ -15,18 +15,35 @@ class PublicationsSitemap(Sitemap): # based on django.contrib.sitemaps.GenericSi
         # items.count()
         return items
 
+    def location(self, item):
+        """Return the URL path for a publication (without domain)."""
+        # Return only the path, not the full URL (Django's sitemap adds domain)
+        if item.doi:
+            return reverse("optimap:article-landing", args=[item.doi])
+        else:
+            return f"/work/{item.id}/"
+
     def lastmod(self, item):
-        item.lastUpdate
+        """Return the last modification date of the publication."""
+        return item.lastUpdate
 
 class StaticViewSitemap(Sitemap):
     priority = 0.5
     changefreq = "monthly"
 
     def items(self):
-        return ["main",
-                "data",
-                "api",
-                "privacy"]
+        return [
+            "main",           # Home page (/)
+            "about",          # About page (/about/)
+            "accessibility",  # Accessibility statement (/accessibility/)
+            "contribute",     # Contribute page (/contribute/)
+            "data",           # Data download page (/data/)
+            "feeds",          # RSS/Atom feeds listing (/feeds/)
+            "privacy",        # Privacy policy (/privacy/)
+            "redoc",          # API schema UI (/api/schema/ui/)
+            "sitemap-page",   # Human-readable sitemap (/pages/)
+            "works",          # Works listing (/works/)
+        ]
 
     def location(self, item):
         return reverse(f"optimap:{item}") 
