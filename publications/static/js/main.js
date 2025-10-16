@@ -96,14 +96,14 @@ function publicationPopup(feature, layer) {
 
     // Homepage link
     if (s.homepage_url) {
-      html += `<div><a href="${s.homepage_url}" target="_blank">Visit journal site</a></div>`;
+      html += `<div><a href="${s.homepage_url}" target="_blank"><i class="fas fa-external-link-alt"></i> Visit journal site</a></div>`;
     }
 
     // ISSN-L link
     if (s.issn_l) {
       html +=
         `<div><strong>ISSN-L:</strong> ` +
-        `<a href="https://openalex.org/sources/issn:${s.issn_l}" target="_blank">${s.issn_l}</a></div>`;
+        `<a href="https://openalex.org/sources/issn:${s.issn_l}" target="_blank"><i class="fas fa-external-link-alt"></i> ${s.issn_l}</a></div>`;
     }
 
     // Publisher (only if different from display name)
@@ -139,7 +139,12 @@ function publicationPopup(feature, layer) {
 
   // Article link
   if (p.url) {
-    html += `<div><a href="${p.url}" target="_blank">Visit Article</a></div>`;
+    html += `<div><a href="${p.url}" target="_blank"><i class="fas fa-external-link-alt"></i> Visit Article</a></div>`;
+  }
+
+  // OpenAlex link
+  if (p.openalex_id) {
+    html += `<div style="margin-top: 8px;"><a href="${p.openalex_id}" target="_blank" style="color: #2563eb;"><i class="fas fa-external-link-alt"></i> View in OpenAlex</a></div>`;
   }
 
   html += '</div>';

@@ -65,6 +65,16 @@ class Publication(models.Model):
         'HarvestingEvent', on_delete=models.CASCADE, related_name='publications', null=True, blank=True
     )
 
+    # OpenAlex integration fields
+    openalex_id = models.CharField(max_length=255, blank=True, null=True, db_index=True)
+    openalex_match_info = models.JSONField(blank=True, null=True, help_text="Information about partial matches found")
+    openalex_fulltext_origin = models.CharField(max_length=255, blank=True, null=True)
+    openalex_is_retracted = models.BooleanField(default=False)
+    openalex_ids = models.JSONField(blank=True, null=True, help_text="OpenAlex IDs object (doi, pmid, etc)")
+    openalex_keywords = ArrayField(models.CharField(max_length=255), blank=True, null=True)
+    openalex_open_access_status = models.CharField(max_length=50, blank=True, null=True)
+    openalex_topics = ArrayField(models.CharField(max_length=255), blank=True, null=True)
+
     class Meta:
         ordering = ['-id']
         constraints = [

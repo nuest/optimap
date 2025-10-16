@@ -9,7 +9,11 @@
       "Bash(pip search:*)",
       "Bash(psql:*)",
       "Bash(OPTIMAP_LOGGING_LEVEL=WARNING python manage.py test tests.test_work_landing_page.PublicationStatusVisibilityTest)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(python manage.py makemigrations:*)",
+      "Bash(source:*)",
+      "Bash(python manage.py shell:*)",
+      "Bash(python manage.py:*)"
     ],
     "deny": [],
     "ask": []

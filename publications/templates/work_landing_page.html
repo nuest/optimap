@@ -81,15 +81,19 @@
   {% if timeperiod_label %}
     <strong>Time period:</strong> {{ timeperiod_label }} ·
   {% endif %}
-  {% if pub.doi %}<strong>DOI:</strong> <a href="https://doi.org/{{ pub.doi }}" target="_blank" rel="noopener">{{ pub.doi }}</a> ·{% endif %}
+  {% if pub.doi %}<strong>DOI:</strong> <a href="https://doi.org/{{ pub.doi }}" target="_blank" rel="noopener"><i class="fas fa-external-link-alt"></i> {{ pub.doi }}</a> ·{% endif %}
   {% if pub.publicationDate %}<strong>Published:</strong> {{ pub.publicationDate }} ·{% endif %}
   {% if pub.source %}
     <strong>Source:</strong>
     {% if pub.source.homepage_url %}
-      <a href="{{ pub.source.homepage_url }}" target="_blank" rel="noopener">{{ pub.source.name }}</a>
+      <a href="{{ pub.source.homepage_url }}" target="_blank" rel="noopener"><i class="fas fa-external-link-alt"></i> {{ pub.source.name }}</a>
     {% else %}
       {{ pub.source.name }}
     {% endif %}
+    ·
+  {% endif %}
+  {% if pub.openalex_id %}
+    <strong>OpenAlex:</strong> <a href="{{ pub.openalex_id }}" target="_blank" rel="noopener"><i class="fas fa-external-link-alt"></i> View in OpenAlex</a>
   {% endif %}
 </div>
 

@@ -42,11 +42,60 @@ from .models import EmailLog, Subscription
 from django.urls import reverse
 from geopy.geocoders import Nominatim
 from django.contrib.gis.geos import Point
+from .openalex_matcher import get_openalex_matcher
 
 logger = logging.getLogger(__name__)
 BASE_URL = settings.BASE_URL
 DOI_REGEX = re.compile(r'10\.\d{4,9}/[-._;()/:A-Z0-9]+', re.IGNORECASE)
 CACHE_DIR = Path(tempfile.gettempdir()) / 'optimap_cache'
+
+
+def build_openalex_fields(title, doi=None, author=None):
+    """
+    Match a publication against OpenAlex and return the appropriate fields dictionary.
+
+    Args:
+        title: Publication title (required)
+        doi: Publication DOI (optional)
+        author: Publication author (optional)
+
+    Returns:
+        dict: Dictionary containing OpenAlex fields to be unpacked into Publication.objects.create()
+              - If perfect match found: returns full openalex_data
+              - If partial matches found: returns {'openalex_id': None, 'openalex_match_info': partial_matches}
+              - If no match found: returns {'openalex_id': None}
+    """
+    openalex_fields = {}
+    try:
+        matcher = get_openalex_matcher()
+        openalex_data, partial_matches = matcher.match_publication(
+            title=title,
+            doi=doi,
+            author=author
+        )
+
+        if openalex_data:
+            # Perfect match found
+            openalex_fields = openalex_data
+            logger.debug("OpenAlex match found for: %s", title[:50] if title else 'No title')
+        elif partial_matches:
+            # No perfect match, store partial match info
+            openalex_fields['openalex_id'] = None
+            openalex_fields['openalex_match_info'] = partial_matches
+            logger.debug("OpenAlex partial matches found for: %s", title[:50] if title else 'No title')
+        else:
+            # No match at all
+            openalex_fields['openalex_id'] = None
+            if doi:
+                # WARNING: OpenAlex should contain all records with DOI
+                logger.warning("No OpenAlex match for publication with DOI %s: %s", doi, title[:50] if title else 'No title')
+            else:
+                logger.debug("No OpenAlex match for: %s", title[:50] if title else 'No title')
+    except Exception as openalex_err:
+        logger.warning("OpenAlex matching failed for '%s': %s", title[:50] if title else 'No title', openalex_err)
+        openalex_fields['openalex_id'] = None
+
+    return openalex_fields
 
 
 def get_or_create_admin_command_user():
@@ -298,6 +347,14 @@ def parse_oai_xml_and_save_publications(content, event: HarvestingEvent, max_rec
             except Exception as fetch_err:
                 logger.debug("Error fetching HTML for %s: %s", identifier_value, fetch_err)
 
+            # OpenAlex matching
+            author_field = get_field("creator") or get_field("dc:creator")
+            openalex_fields = build_openalex_fields(
+                title=title_value,
+                doi=doi_text,
+                author=author_field
+            )
+
             try:
                 with transaction.atomic():
                     # Get system user for harvested publications
@@ -325,6 +382,8 @@ def parse_oai_xml_and_save_publications(content, event: HarvestingEvent, max_rec
                         job                  = event,
                         provenance           = provenance,
                         created_by           = admin_user,
+                        # OpenAlex fields
+                        **openalex_fields
                     )
                     saved_count += 1
                     logger.info("Saved publication id=%s: %s", pub.id, title_value[:80] if title_value else 'No title')
@@ -737,6 +796,20 @@ def parse_rss_feed_and_save_publications(feed_url, event: 'HarvestingEvent', max
                     logger.debug("Publication already exists: %s", title[:50])
                     continue
 
+                # OpenAlex matching
+                # Try to extract author from feed entry
+                author = None
+                if 'author' in entry:
+                    author = entry.author
+                elif 'dc_creator' in entry:
+                    author = entry.dc_creator
+
+                openalex_fields = build_openalex_fields(
+                    title=title,
+                    doi=doi,
+                    author=author
+                )
+
                 # Get system user for harvested publications
                 admin_user = get_or_create_admin_command_user()
 
@@ -762,6 +835,8 @@ def parse_rss_feed_and_save_publications(feed_url, event: 'HarvestingEvent', max
                     geometry=GeometryCollection(),  # No spatial data from RSS typically
                     provenance=provenance,
                     created_by=admin_user,
+                    # OpenAlex fields
+                    **openalex_fields
                 )
 
                 pub.save()

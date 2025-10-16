@@ -143,13 +143,17 @@ def regenerate_all_exports(modeladmin, request, queryset):
 class PublicationAdmin(LeafletGeoAdmin, ImportExportModelAdmin):
     list_display  = ("title", "doi", "has_permalink", "permalink_link",
                      "creationDate", "lastUpdate", "created_by", "updated_by",
-                     "status", "provenance", "source")
-    search_fields = ("title", "doi", "abstract", "source__name")
-    list_filter   = ("status", "creationDate")
+                     "status", "provenance", "source", "openalex_id")
+    search_fields = ("title", "doi", "abstract", "source__name", "openalex_id")
+    list_filter   = ("status", "creationDate", "openalex_is_retracted", "openalex_open_access_status")
     fields        = ("title", "doi", "status", "source", "abstract",
                      "geometry", "timeperiod_startdate", "timeperiod_enddate",
-                     "created_by", "updated_by", "provenance")
-    readonly_fields = ("created_by", "updated_by")
+                     "created_by", "updated_by", "provenance",
+                     "openalex_id", "openalex_link", "openalex_match_info",
+                     "openalex_fulltext_origin", "openalex_is_retracted",
+                     "openalex_ids", "openalex_keywords", "openalex_open_access_status",
+                     "openalex_topics")
+    readonly_fields = ("created_by", "updated_by", "openalex_link")
     actions = ["make_public", "make_draft", "regenerate_all_exports",
                "export_permalinks_csv", "email_permalinks_preview"]
 
@@ -161,6 +165,12 @@ class PublicationAdmin(LeafletGeoAdmin, ImportExportModelAdmin):
     def permalink_link(self, obj):
         url = obj.permalink()
         return format_html('<a href="{}" target="_blank">{}</a>', url, url) if url else "—"
+
+    @admin.display(description="OpenAlex Link")
+    def openalex_link(self, obj):
+        if obj.openalex_id:
+            return format_html('<a href="{}" target="_blank"><i class="fas fa-external-link-alt"></i> View in OpenAlex</a>', obj.openalex_id)
+        return "—"
 
     def export_permalinks_csv(self, request, queryset):
         rows = [("title", "doi", "permalink")]

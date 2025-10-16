@@ -41,6 +41,14 @@ class PublicationSerializer(GeoFeatureModelSerializer):
             "timeperiod_startdate",
             "timeperiod_enddate",
             "source_details",
+            "openalex_id",
+            "openalex_match_info",
+            "openalex_fulltext_origin",
+            "openalex_is_retracted",
+            "openalex_ids",
+            "openalex_keywords",
+            "openalex_open_access_status",
+            "openalex_topics",
         ]
 
     def get_source_details(self, obj):
