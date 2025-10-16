@@ -31,6 +31,7 @@ JOURNAL_CONFIGS = {
         'homepage_url': 'https://essd.copernicus.org/',
         'publisher_name': 'Copernicus Publications',
         'feed_type': 'oai-pmh',
+        'is_oa': True,
     },
     'agile-giss': {
         'name': 'AGILE-GISS',
@@ -39,6 +40,7 @@ JOURNAL_CONFIGS = {
         'homepage_url': 'https://www.agile-giscience-series.net/',
         'publisher_name': 'Copernicus Publications',
         'feed_type': 'oai-pmh',
+        'is_oa': True,
     },
     'geo-leo': {
         'name': 'GEO-LEO e-docs',
@@ -47,6 +49,17 @@ JOURNAL_CONFIGS = {
         'homepage_url': 'https://e-docs.geo-leo.de/',
         'publisher_name': 'GEO-LEO',
         'feed_type': 'oai-pmh',
+        'is_oa': True,
+    },
+    'eartharxiv': {
+        'name': 'EarthArXiv',
+        'url': 'https://eartharxiv.org/api/oai/?verb=ListRecords&metadataPrefix=oai_dc',
+        'collection_name': 'EarthArXiv',
+        'homepage_url': 'https://eartharxiv.org/',
+        'publisher_name': 'California Digital Library',
+        'feed_type': 'oai-pmh',
+        'is_oa': True,
+        'is_preprint': True,
     },
     'scientific-data': {
         'name': 'Scientific Data',
@@ -55,6 +68,7 @@ JOURNAL_CONFIGS = {
         'homepage_url': 'https://www.nature.com/sdata/',
         'publisher_name': 'Nature Publishing Group',
         'feed_type': 'rss',
+        'is_oa': True,
     },
 }
 
@@ -102,8 +116,10 @@ class Command(BaseCommand):
         if options['list']:
             self.stdout.write(self.style.SUCCESS('\nAvailable journals for harvesting:\n'))
             for key, config in JOURNAL_CONFIGS.items():
-                self.stdout.write(f"  {key:15} - {config['name']}")
-                self.stdout.write(f"                  Issue: #{config['issue']}, URL: {config['homepage_url']}")
+                feed_type = config.get('feed_type', 'oai-pmh').upper()
+                is_preprint = ' (preprint)' if config.get('is_preprint', False) else ''
+                self.stdout.write(f"  {key:15} - {config['name']}{is_preprint}")
+                self.stdout.write(f"                  Type: {feed_type}, URL: {config['homepage_url']}")
             return
 
         # Determine which journals to harvest
@@ -270,6 +286,7 @@ class Command(BaseCommand):
             homepage_url=config.get('homepage_url'),
             publisher_name=config.get('publisher_name'),
             is_oa=config.get('is_oa', False),
+            is_preprint=config.get('is_preprint', False),
             harvest_interval_minutes=60 * 24 * 7,  # Weekly
         )
 
