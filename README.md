@@ -335,9 +335,32 @@ python manage.py harvest_journals --all --user-email admin@optimap.science
 - `essd` - Earth System Science Data (OAI-PMH) ([Issue #59](https://github.com/GeoinformationSystems/optimap/issues/59))
 - `agile-giss` - AGILE-GISS conference series (OAI-PMH) ([Issue #60](https://github.com/GeoinformationSystems/optimap/issues/60))
 - `geo-leo` - GEO-LEO e-docs repository (OAI-PMH) ([Issue #13](https://github.com/GeoinformationSystems/optimap/issues/13))
+- `eartharxiv` - EarthArXiv preprint repository (OAI-PMH, ~6,000+ preprints)
 - `scientific-data` - Scientific Data (RSS/Atom) ([Issue #58](https://github.com/GeoinformationSystems/optimap/issues/58))
 
 The command supports both OAI-PMH and RSS/Atom feeds, automatically detecting the feed type for each journal.
+
+**Harvesting EarthArxiv preprints**:
+
+EarthArxiv is a preprint server for Earth Sciences hosted by the California Digital Library. All harvested articles automatically receive metadata enrichment from OpenAlex, including author names, keywords, and topics.
+
+```bash
+# Harvest first 100 preprints for testing
+python manage.py harvest_journals --journal eartharxiv --max-records 100 --create-sources
+
+# Harvest all EarthArxiv preprints (6,000+)
+python manage.py harvest_journals --journal eartharxiv --create-sources
+
+# Harvest EarthArxiv along with other journals
+python manage.py harvest_journals --journal eartharxiv --journal essd --journal geo-leo
+```
+
+EarthArxiv provides comprehensive coverage of Earth Science preprints via its OAI-PMH API endpoint. Each publication is automatically matched with OpenAlex to retrieve:
+- Author information
+- Keywords and subject classification
+- Citation data
+- Open access status
+- Publication topics
 
 The command provides detailed progress reporting including:
 
