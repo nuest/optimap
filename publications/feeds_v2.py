@@ -316,7 +316,7 @@ class BaseCachedGeoFeed(Feed):
         Extract author names from publication item.
 
         Tries multiple sources:
-        1. openalex_authors field (primary)
+        1. authors field (primary)
         2. OpenAlex match info (fallback for older data)
 
         Returns:
@@ -324,9 +324,9 @@ class BaseCachedGeoFeed(Feed):
         """
         authors = []
 
-        # Primary: Try openalex_authors field
-        if hasattr(item, 'openalex_authors') and item.openalex_authors:
-            authors = [a for a in item.openalex_authors if a]
+        # Primary: Try authors field
+        if hasattr(item, 'authors') and item.authors:
+            authors = [a for a in item.authors if a]
             if authors:
                 return authors
 
@@ -371,16 +371,16 @@ class BaseCachedGeoFeed(Feed):
         return extra
 
     def item_categories(self, item):
-        """Return item categories (keywords and topics from OpenAlex)."""
+        """Return item categories (keywords and topics)."""
         categories = []
 
-        # Add OpenAlex keywords
-        if hasattr(item, 'openalex_keywords') and item.openalex_keywords:
-            categories.extend([kw for kw in item.openalex_keywords if kw])
+        # Add keywords
+        if hasattr(item, 'keywords') and item.keywords:
+            categories.extend([kw for kw in item.keywords if kw])
 
-        # Add OpenAlex topics (limit to first 3 to avoid clutter)
-        if hasattr(item, 'openalex_topics') and item.openalex_topics:
-            topics = [t for t in item.openalex_topics if t][:3]
+        # Add topics (limit to first 3 to avoid clutter)
+        if hasattr(item, 'topics') and item.topics:
+            topics = [t for t in item.topics if t][:3]
             categories.extend(topics)
 
         return categories if categories else None

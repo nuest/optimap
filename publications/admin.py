@@ -149,10 +149,10 @@ class PublicationAdmin(LeafletGeoAdmin, ImportExportModelAdmin):
     fields        = ("title", "doi", "status", "source", "abstract",
                      "geometry", "timeperiod_startdate", "timeperiod_enddate",
                      "created_by", "updated_by", "provenance",
+                     "authors", "keywords", "topics",
                      "openalex_id", "openalex_link", "openalex_match_info",
                      "openalex_fulltext_origin", "openalex_is_retracted",
-                     "openalex_ids", "openalex_keywords", "openalex_open_access_status",
-                     "openalex_topics")
+                     "openalex_ids", "openalex_open_access_status")
     readonly_fields = ("created_by", "updated_by", "openalex_link")
     actions = ["make_public", "make_draft", "regenerate_all_exports",
                "export_permalinks_csv", "email_permalinks_preview"]

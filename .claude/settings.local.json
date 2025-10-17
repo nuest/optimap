@@ -14,7 +14,8 @@
       "Bash(source:*)",
       "Bash(python manage.py shell:*)",
       "Bash(python manage.py:*)",
-      "Bash(python -m py_compile:*)"
+      "Bash(python -m py_compile:*)",
+      "Bash(python:*)"
     ],
     "deny": [],
     "ask": []

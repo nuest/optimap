@@ -63,16 +63,17 @@ def _publications_to_geojson(publications):
                 "publicationDate": pub.publicationDate.isoformat() if pub.publicationDate else None,
                 "timeperiod_startdate": pub.timeperiod_startdate,
                 "timeperiod_enddate": pub.timeperiod_enddate,
-                # OpenAlex properties
+                # Metadata fields
+                "authors": pub.authors,
+                "keywords": pub.keywords,
+                "topics": pub.topics,
+                # OpenAlex-specific properties
                 "openalex_id": pub.openalex_id,
                 "openalex_match_info": pub.openalex_match_info,
                 "openalex_fulltext_origin": pub.openalex_fulltext_origin,
                 "openalex_is_retracted": pub.openalex_is_retracted,
                 "openalex_ids": pub.openalex_ids,
-                "openalex_keywords": pub.openalex_keywords,
                 "openalex_open_access_status": pub.openalex_open_access_status,
-                "openalex_topics": pub.openalex_topics,
-                "openalex_authors": pub.openalex_authors,
             }
         }
         features.append(feature)

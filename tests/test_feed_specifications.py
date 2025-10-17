@@ -77,9 +77,9 @@ class RSS20SpecificationTestCase(TestCase):
             source=cls.source,
             geometry=GeometryCollection(Point(13.0, 52.0)),
             openalex_id="https://openalex.org/W123456789",
-            openalex_authors=["Alice Smith", "Bob Jones", "Carol Williams"],
-            openalex_keywords=["test", "validation", "feeds"],
-            openalex_topics=["Computer Science", "Data Science"],
+            authors=["Alice Smith", "Bob Jones", "Carol Williams"],
+            keywords=["test", "validation", "feeds"],
+            topics=["Computer Science", "Data Science"],
         )
 
         # Publication without authors (should not have dc:creator)
@@ -105,7 +105,7 @@ class RSS20SpecificationTestCase(TestCase):
             geometry=GeometryCollection(Polygon([
                 (10.0, 50.0), (11.0, 51.0), (12.0, 50.0), (10.0, 50.0)
             ])),
-            openalex_authors=[
+            authors=[
                 f"Author{i}" for i in range(1, 15)
             ],  # 14 authors - should trigger "et al."
         )
@@ -609,8 +609,8 @@ class Atom10SpecificationTestCase(TestCase):
             source=cls.source,
             geometry=GeometryCollection(Point(13.0, 52.0)),
             openalex_id="https://openalex.org/W123456789",
-            openalex_authors=["Alice Smith", "Bob Jones"],
-            openalex_keywords=["test", "atom"],
+            authors=["Alice Smith", "Bob Jones"],
+            keywords=["test", "atom"],
         )
 
         # Publication without authors

@@ -663,8 +663,7 @@ def _normalize_authors(pub):
     Returns list[str] or None.
     """
     candidates = (
-        getattr(pub, "openalex_authors", None),  # Primary: OpenAlex authors
-        getattr(pub, "authors", None),
+        getattr(pub, "authors", None),  # Primary: authors field
         getattr(pub, "author", None),
         getattr(pub, "creators", None),
         getattr(pub, "creator", None),

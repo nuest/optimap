@@ -187,10 +187,10 @@ class OpenAlexMatcher:
             'openalex_fulltext_origin': fulltext_origin,
             'openalex_is_retracted': work_data.get('is_retracted', False),
             'openalex_ids': work_data.get('ids', {}),
-            'openalex_keywords': [],
+            'keywords': [],
             'openalex_open_access_status': None,
-            'openalex_topics': [],
-            'openalex_authors': []
+            'topics': [],
+            'authors': []
         }
 
         # Extract authors (display_name from authorships)
@@ -201,12 +201,12 @@ class OpenAlexMatcher:
                 author = authorship.get('author', {})
                 if author and author.get('display_name'):
                     authors.append(author.get('display_name'))
-            extracted['openalex_authors'] = authors
+            extracted['authors'] = authors
 
         # Extract keywords (display_name only)
         keywords = work_data.get('keywords', [])
         if keywords:
-            extracted['openalex_keywords'] = [kw.get('display_name') for kw in keywords if kw.get('display_name')]
+            extracted['keywords'] = [kw.get('display_name') for kw in keywords if kw.get('display_name')]
 
         # Extract open access status
         open_access = work_data.get('open_access', {})
@@ -218,7 +218,7 @@ class OpenAlexMatcher:
         # Extract topics (display_name only)
         topics = work_data.get('topics', [])
         if topics:
-            extracted['openalex_topics'] = [topic.get('display_name') for topic in topics if topic.get('display_name')]
+            extracted['topics'] = [topic.get('display_name') for topic in topics if topic.get('display_name')]
 
         return extracted
 

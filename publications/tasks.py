@@ -50,22 +50,105 @@ DOI_REGEX = re.compile(r'10\.\d{4,9}/[-._;()/:A-Z0-9]+', re.IGNORECASE)
 CACHE_DIR = Path(tempfile.gettempdir()) / 'optimap_cache'
 
 
-def build_openalex_fields(title, doi=None, author=None):
+class HarvestWarningCollector(logging.Handler):
+    """
+    Custom logging handler to collect warning and error messages during harvesting.
+
+    This handler collects messages for email summaries while also ensuring they are
+    logged to the standard output/error through the normal logging chain.
+
+    Categorizes messages with emoji severity indicators:
+    - 🔴 ERROR: Critical errors that prevented processing
+    - 🟡 WARNING: Issues that didn't prevent processing but need attention
+    - 🔵 INFO: Important informational messages
+    """
+
+    def __init__(self, passthrough=True):
+        """
+        Initialize the warning collector.
+
+        Args:
+            passthrough: If True, allows log records to propagate to other handlers (default: True)
+        """
+        super().__init__()
+        self.warnings = []
+        self.errors = []
+        self.info = []
+        self.passthrough = passthrough
+
+    def emit(self, record):
+        """
+        Collect log records by severity and allow them to propagate to other handlers.
+
+        This method collects messages for the email summary but does NOT prevent
+        them from being logged to stdout/stderr by other handlers.
+        """
+        # Format the message for our internal collection
+        message = self.format(record)
+
+        # Collect by severity
+        if record.levelno >= logging.ERROR:
+            self.errors.append(f"🔴 ERROR: {message}")
+        elif record.levelno >= logging.WARNING:
+            self.warnings.append(f"🟡 WARNING: {message}")
+        elif record.levelno >= logging.INFO and any(keyword in message.lower() for keyword in ['no openalex match', 'openalex matching failed', 'skipping']):
+            self.info.append(f"🔵 INFO: {message}")
+
+        # Note: We do NOT call super().emit() because that would try to write somewhere.
+        # The record will naturally propagate to other handlers in the logger's handler list.
+        # By not raising an exception or calling super().emit(), we allow the logging
+        # framework to continue processing this record with other handlers.
+
+    def get_summary(self):
+        """Return a formatted summary of all collected messages."""
+        summary_parts = []
+
+        if self.errors:
+            summary_parts.append(f"\n{'='*70}\n🔴 ERRORS ({len(self.errors)})\n{'='*70}")
+            summary_parts.extend(self.errors)
+
+        if self.warnings:
+            summary_parts.append(f"\n{'='*70}\n🟡 WARNINGS ({len(self.warnings)})\n{'='*70}")
+            summary_parts.extend(self.warnings)
+
+        if self.info:
+            summary_parts.append(f"\n{'='*70}\n🔵 NOTABLE INFORMATION ({len(self.info)})\n{'='*70}")
+            summary_parts.extend(self.info)
+
+        if not (self.errors or self.warnings or self.info):
+            return "\n✅ No warnings or errors during harvesting!"
+
+        return "\n".join(summary_parts)
+
+    def has_issues(self):
+        """Check if any warnings or errors were collected."""
+        return bool(self.errors or self.warnings or self.info)
+
+
+def build_openalex_fields(title, doi=None, author=None, existing_metadata=None):
     """
     Match a publication against OpenAlex and return the appropriate fields dictionary.
+
+    This function prioritizes existing metadata from the original source and only fills
+    in missing information from OpenAlex.
 
     Args:
         title: Publication title (required)
         doi: Publication DOI (optional)
         author: Publication author (optional)
+        existing_metadata: Dict of metadata already extracted from original source (optional)
 
     Returns:
-        dict: Dictionary containing OpenAlex fields to be unpacked into Publication.objects.create()
-              - If perfect match found: returns full openalex_data
-              - If partial matches found: returns {'openalex_id': None, 'openalex_match_info': partial_matches}
-              - If no match found: returns {'openalex_id': None}
+        tuple: (openalex_fields dict, metadata_provenance dict)
+              openalex_fields: Dictionary containing fields to be unpacked into Publication.objects.create()
+              metadata_provenance: Dictionary tracking the source of each metadata field
     """
+    if existing_metadata is None:
+        existing_metadata = {}
+
     openalex_fields = {}
+    metadata_provenance = {}
+
     try:
         matcher = get_openalex_matcher()
         openalex_data, partial_matches = matcher.match_publication(
@@ -76,13 +159,53 @@ def build_openalex_fields(title, doi=None, author=None):
 
         if openalex_data:
             # Perfect match found
-            openalex_fields = openalex_data
             logger.debug("OpenAlex match found for: %s", title[:50] if title else 'No title')
+
+            # Merge fields, prioritizing existing metadata
+            # Authors: use existing if available, otherwise OpenAlex
+            if existing_metadata.get('authors'):
+                openalex_fields['authors'] = existing_metadata['authors']
+                metadata_provenance['authors'] = 'original_source'
+            elif openalex_data.get('authors'):
+                openalex_fields['authors'] = openalex_data['authors']
+                metadata_provenance['authors'] = 'openalex'
+
+            # Keywords: use existing if available, otherwise OpenAlex
+            if existing_metadata.get('keywords'):
+                openalex_fields['keywords'] = existing_metadata['keywords']
+                metadata_provenance['keywords'] = 'original_source'
+            elif openalex_data.get('keywords'):
+                openalex_fields['keywords'] = openalex_data['keywords']
+                metadata_provenance['keywords'] = 'openalex'
+
+            # Topics: only from OpenAlex (original sources typically don't have topic classification)
+            if openalex_data.get('topics'):
+                openalex_fields['topics'] = openalex_data['topics']
+                metadata_provenance['topics'] = 'openalex'
+
+            # OpenAlex-specific fields (always from OpenAlex)
+            openalex_fields['openalex_id'] = openalex_data.get('openalex_id')
+            openalex_fields['openalex_fulltext_origin'] = openalex_data.get('openalex_fulltext_origin')
+            openalex_fields['openalex_is_retracted'] = openalex_data.get('openalex_is_retracted', False)
+            openalex_fields['openalex_ids'] = openalex_data.get('openalex_ids', {})
+            openalex_fields['openalex_open_access_status'] = openalex_data.get('openalex_open_access_status')
+
+            metadata_provenance['openalex_metadata'] = 'openalex'
+
         elif partial_matches:
             # No perfect match, store partial match info
             openalex_fields['openalex_id'] = None
             openalex_fields['openalex_match_info'] = partial_matches
             logger.debug("OpenAlex partial matches found for: %s", title[:50] if title else 'No title')
+
+            # Still use existing metadata if available
+            if existing_metadata.get('authors'):
+                openalex_fields['authors'] = existing_metadata['authors']
+                metadata_provenance['authors'] = 'original_source'
+            if existing_metadata.get('keywords'):
+                openalex_fields['keywords'] = existing_metadata['keywords']
+                metadata_provenance['keywords'] = 'original_source'
+
         else:
             # No match at all
             openalex_fields['openalex_id'] = None
@@ -91,11 +214,28 @@ def build_openalex_fields(title, doi=None, author=None):
                 logger.warning("No OpenAlex match for publication with DOI %s: %s", doi, title[:50] if title else 'No title')
             else:
                 logger.debug("No OpenAlex match for: %s", title[:50] if title else 'No title')
+
+            # Use existing metadata if available
+            if existing_metadata.get('authors'):
+                openalex_fields['authors'] = existing_metadata['authors']
+                metadata_provenance['authors'] = 'original_source'
+            if existing_metadata.get('keywords'):
+                openalex_fields['keywords'] = existing_metadata['keywords']
+                metadata_provenance['keywords'] = 'original_source'
+
     except Exception as openalex_err:
         logger.warning("OpenAlex matching failed for '%s': %s", title[:50] if title else 'No title', openalex_err)
         openalex_fields['openalex_id'] = None
 
-    return openalex_fields
+        # Use existing metadata if available
+        if existing_metadata.get('authors'):
+            openalex_fields['authors'] = existing_metadata['authors']
+            metadata_provenance['authors'] = 'original_source'
+        if existing_metadata.get('keywords'):
+            openalex_fields['keywords'] = existing_metadata['keywords']
+            metadata_provenance['keywords'] = 'original_source'
+
+    return openalex_fields, metadata_provenance
 
 
 def get_or_create_admin_command_user():
@@ -200,7 +340,7 @@ def extract_timeperiod_from_html(soup: BeautifulSoup):
     return [None], [None]
 
 
-def parse_oai_xml_and_save_publications(content, event: HarvestingEvent, max_records=None):
+def parse_oai_xml_and_save_publications(content, event: HarvestingEvent, max_records=None, warning_collector=None):
     source = event.source
     logger.info("Starting OAI-PMH parsing for source: %s", source.name)
     parsed = urlsplit(source.url_field)
@@ -347,12 +487,33 @@ def parse_oai_xml_and_save_publications(content, event: HarvestingEvent, max_rec
             except Exception as fetch_err:
                 logger.debug("Error fetching HTML for %s: %s", identifier_value, fetch_err)
 
-            # OpenAlex matching
+            # Extract author metadata from original source
             author_field = get_field("creator") or get_field("dc:creator")
-            openalex_fields = build_openalex_fields(
+            authors_list = []
+            if author_field:
+                # Split multiple authors if separated by common delimiters
+                authors_list = [a.strip() for a in author_field.replace(';', ',').split(',') if a.strip()]
+
+            # Extract keyword metadata from original source (if available in OAI-PMH)
+            subject_field = get_field("subject") or get_field("dc:subject")
+            keywords_list = []
+            if subject_field:
+                # Split multiple keywords if separated by common delimiters
+                keywords_list = [k.strip() for k in subject_field.replace(';', ',').split(',') if k.strip()]
+
+            # Prepare existing metadata for OpenAlex matching
+            existing_metadata = {}
+            if authors_list:
+                existing_metadata['authors'] = authors_list
+            if keywords_list:
+                existing_metadata['keywords'] = keywords_list
+
+            # OpenAlex matching - prioritize existing metadata
+            openalex_fields, metadata_provenance = build_openalex_fields(
                 title=title_value,
                 doi=doi_text,
-                author=author_field
+                author=author_field,
+                existing_metadata=existing_metadata
             )
 
             try:
@@ -360,13 +521,20 @@ def parse_oai_xml_and_save_publications(content, event: HarvestingEvent, max_rec
                     # Get system user for harvested publications
                     admin_user = get_or_create_admin_command_user()
 
-                    # Build provenance string
+                    # Build structured provenance including metadata sources
                     harvest_timestamp = timezone.now().isoformat()
-                    provenance = (
-                        f"Harvested via OAI-PMH from {source.name} "
-                        f"(URL: {source.url_field}) on {harvest_timestamp}. "
+                    provenance_parts = [
+                        f"Harvested via OAI-PMH from {source.name} (URL: {source.url_field}) on {harvest_timestamp}.",
                         f"HarvestingEvent ID: {event.id}."
-                    )
+                    ]
+
+                    # Add metadata source tracking
+                    if metadata_provenance:
+                        provenance_parts.append("\nMetadata Sources:")
+                        for field, source_type in metadata_provenance.items():
+                            provenance_parts.append(f"  - {field}: {source_type}")
+
+                    provenance = "\n".join(provenance_parts)
 
                     pub = Publication.objects.create(
                         title                = title_value,
@@ -405,6 +573,11 @@ def harvest_oai_endpoint(source_id, user=None, max_records=None):
     spatial_count = None
     temporal_count = None
 
+    # Set up warning collector
+    warning_collector = HarvestWarningCollector()
+    warning_collector.setLevel(logging.INFO)
+    logger.addHandler(warning_collector)
+
     try:
         # Construct proper OAI-PMH URL
         if '?' not in source.url_field:
@@ -416,17 +589,17 @@ def harvest_oai_endpoint(source_id, user=None, max_records=None):
         response = requests.get(oai_url)
         response.raise_for_status()
 
-        parse_oai_xml_and_save_publications(response.content, event, max_records=max_records)
+        parse_oai_xml_and_save_publications(response.content, event, max_records=max_records, warning_collector=warning_collector)
 
         event.status      = "completed"
         event.completed_at = timezone.now()
         event.save()
-        
+
         new_count      = Publication.objects.filter(job=event).count()
         spatial_count  = Publication.objects.filter(job=event).exclude(geometry__isnull=True).count()
         temporal_count = Publication.objects.filter(job=event).exclude(timeperiod_startdate=[]).count()
-        
-        subject = f"Harvesting Completed for {source.collection_name}"
+
+        subject = f"✅ Harvesting Completed for {source.collection_name}"
         completed_str = event.completed_at.strftime('%Y-%m-%d %H:%M:%S')
         message = (
             f"Harvesting job details:\n\n"
@@ -438,7 +611,10 @@ def harvest_oai_endpoint(source_id, user=None, max_records=None):
             f"Job started at: {event.started_at.strftime('%Y-%m-%d %H:%M:%S')}\n"
             f"Job completed at: {completed_str}\n"
         )
-        
+
+        # Add warning summary
+        message += f"\n{warning_collector.get_summary()}"
+
         if user and user.email:
             send_mail(
                 subject,
@@ -456,7 +632,7 @@ def harvest_oai_endpoint(source_id, user=None, max_records=None):
 
         # Send failure notification email to user
         if user and user.email:
-            failure_subject = f"Harvesting Failed for {source.collection_name or source.name}"
+            failure_subject = f"❌ Harvesting Failed for {source.collection_name or source.name}"
             failure_message = (
                 f"Unfortunately, the harvesting job failed for the following source:\n\n"
                 f"Source: {source.name}\n"
@@ -467,6 +643,11 @@ def harvest_oai_endpoint(source_id, user=None, max_records=None):
                 f"Error details: {str(e)}\n\n"
                 f"Please check the source configuration and try again, or contact support if the issue persists."
             )
+
+            # Add warning summary if there were any warnings before the failure
+            if warning_collector.has_issues():
+                failure_message += f"\n{warning_collector.get_summary()}"
+
             try:
                 send_mail(
                     failure_subject,
@@ -478,6 +659,10 @@ def harvest_oai_endpoint(source_id, user=None, max_records=None):
                 logger.info("Failure notification email sent to %s", user.email)
             except Exception as email_error:
                 logger.error("Failed to send failure notification email: %s", str(email_error))
+
+    finally:
+        # Always remove the warning collector handler
+        logger.removeHandler(warning_collector)
 
     return new_count, spatial_count, temporal_count
 
@@ -692,7 +877,7 @@ def regenerate_geopackage_cache():
 # RSS/Atom Feed Harvesting
 # ============================================================================
 
-def parse_rss_feed_and_save_publications(feed_url, event: 'HarvestingEvent', max_records=None):
+def parse_rss_feed_and_save_publications(feed_url, event: 'HarvestingEvent', max_records=None, warning_collector=None):
     """
     Parse RSS/Atom feed and save publications.
 
@@ -700,6 +885,7 @@ def parse_rss_feed_and_save_publications(feed_url, event: 'HarvestingEvent', max
         feed_url: URL of the RSS/Atom feed
         event: HarvestingEvent instance
         max_records: Maximum number of records to process (optional)
+        warning_collector: HarvestWarningCollector instance (optional)
 
     Returns:
         tuple: (processed_count, saved_count)
@@ -796,30 +982,62 @@ def parse_rss_feed_and_save_publications(feed_url, event: 'HarvestingEvent', max
                     logger.debug("Publication already exists: %s", title[:50])
                     continue
 
-                # OpenAlex matching
-                # Try to extract author from feed entry
+                # Extract author metadata from feed
                 author = None
+                authors_list = []
                 if 'author' in entry:
                     author = entry.author
+                    authors_list = [a.strip() for a in author.replace(';', ',').split(',') if a.strip()]
                 elif 'dc_creator' in entry:
                     author = entry.dc_creator
+                    authors_list = [a.strip() for a in author.replace(';', ',').split(',') if a.strip()]
+                elif 'authors' in entry:  # Some feeds have authors as a list
+                    authors_list = [a.get('name', '').strip() for a in entry.authors if a.get('name')]
+                    author = ', '.join(authors_list) if authors_list else None
 
-                openalex_fields = build_openalex_fields(
+                # Extract keyword/tag metadata from feed
+                keywords_list = []
+                if 'tags' in entry:
+                    keywords_list = [tag.get('term', '').strip() for tag in entry.tags if tag.get('term')]
+                elif 'categories' in entry:
+                    if isinstance(entry.categories, list):
+                        keywords_list = [cat.get('term', '').strip() for cat in entry.categories if isinstance(cat, dict) and cat.get('term')]
+                elif 'dc_subject' in entry:
+                    subject = entry.dc_subject
+                    keywords_list = [k.strip() for k in subject.replace(';', ',').split(',') if k.strip()]
+
+                # Prepare existing metadata for OpenAlex matching
+                existing_metadata = {}
+                if authors_list:
+                    existing_metadata['authors'] = authors_list
+                if keywords_list:
+                    existing_metadata['keywords'] = keywords_list
+
+                # OpenAlex matching - prioritize existing metadata
+                openalex_fields, metadata_provenance = build_openalex_fields(
                     title=title,
                     doi=doi,
-                    author=author
+                    author=author,
+                    existing_metadata=existing_metadata
                 )
 
                 # Get system user for harvested publications
                 admin_user = get_or_create_admin_command_user()
 
-                # Build provenance string
+                # Build structured provenance including metadata sources
                 harvest_timestamp = timezone.now().isoformat()
-                provenance = (
-                    f"Harvested via RSS/Atom feed from {source.name} "
-                    f"(URL: {feed_url}) on {harvest_timestamp}. "
+                provenance_parts = [
+                    f"Harvested via RSS/Atom feed from {source.name} (URL: {feed_url}) on {harvest_timestamp}.",
                     f"HarvestingEvent ID: {event.id}."
-                )
+                ]
+
+                # Add metadata source tracking
+                if metadata_provenance:
+                    provenance_parts.append("\nMetadata Sources:")
+                    for field, source_type in metadata_provenance.items():
+                        provenance_parts.append(f"  - {field}: {source_type}")
+
+                provenance = "\n".join(provenance_parts)
 
                 # Create publication
                 pub = Publication(
@@ -871,11 +1089,16 @@ def harvest_rss_endpoint(source_id, user=None, max_records=None):
     source = Source.objects.get(id=source_id)
     event = HarvestingEvent.objects.create(source=source, status="in_progress")
 
+    # Set up warning collector
+    warning_collector = HarvestWarningCollector()
+    warning_collector.setLevel(logging.INFO)
+    logger.addHandler(warning_collector)
+
     try:
         feed_url = source.url_field
         logger.info("Fetching from RSS feed: %s", feed_url)
 
-        processed, saved = parse_rss_feed_and_save_publications(feed_url, event, max_records=max_records)
+        processed, saved = parse_rss_feed_and_save_publications(feed_url, event, max_records=max_records, warning_collector=warning_collector)
 
         event.status = "completed"
         event.completed_at = timezone.now()
@@ -885,7 +1108,7 @@ def harvest_rss_endpoint(source_id, user=None, max_records=None):
         spatial_count = Publication.objects.filter(job=event).exclude(geometry__isnull=True).count()
         temporal_count = Publication.objects.filter(job=event).exclude(timeperiod_startdate=[]).count()
 
-        subject = f"RSS Feed Harvesting Completed for {source.name}"
+        subject = f"✅ RSS Feed Harvesting Completed for {source.name}"
         completed_str = event.completed_at.strftime('%Y-%m-%d %H:%M:%S')
         message = (
             f"RSS/Atom feed harvesting job details:\n\n"
@@ -897,6 +1120,9 @@ def harvest_rss_endpoint(source_id, user=None, max_records=None):
             f"Job started at: {event.started_at.strftime('%Y-%m-%d %H:%M:%S')}\n"
             f"Job completed at: {completed_str}\n"
         )
+
+        # Add warning summary
+        message += f"\n{warning_collector.get_summary()}"
 
         if user and user.email:
             send_mail(
@@ -915,10 +1141,24 @@ def harvest_rss_endpoint(source_id, user=None, max_records=None):
 
         # Send failure notification
         if user and user.email:
+            failure_message = (
+                f"RSS feed harvesting failed for {source.name}\n\n"
+                f"Error: {str(e)}\n\n"
+                f"Feed URL: {source.url_field}"
+            )
+
+            # Add warning summary if there were any warnings before the failure
+            if warning_collector.has_issues():
+                failure_message += f"\n{warning_collector.get_summary()}"
+
             send_mail(
-                f"RSS Feed Harvesting Failed for {source.name}",
-                f"RSS feed harvesting failed for {source.name}\n\nError: {str(e)}\n\nFeed URL: {source.url_field}",
+                f"❌ RSS Feed Harvesting Failed for {source.name}",
+                failure_message,
                 settings.EMAIL_HOST_USER,
                 [user.email],
                 fail_silently=True,
             )
+
+    finally:
+        # Always remove the warning collector handler
+        logger.removeHandler(warning_collector)
