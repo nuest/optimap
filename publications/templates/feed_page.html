@@ -27,7 +27,7 @@
 
       {% if publications %}
         <!-- Map showing all publications -->
-        <div id="feed-map" style="height: 400px; width: 100%; margin-bottom: 2rem; border-radius: 8px;"></div>
+        <div id="feed-map" style="height: 540px; width: 100%; margin-bottom: 2rem; border-radius: 8px;"></div>
 
         <div class="alert alert-secondary" role="alert">
           <i class="fas fa-info-circle"></i>
@@ -133,6 +133,7 @@
 {% block scripts %}
 {{ block.super }}
 <script src="{% static 'js/map-popup.js' %}"></script>
+<script src="{% static 'js/map-interaction.js' %}"></script>
 <script type="text/javascript">
   // Initialize map with publications
   $(document).ready(function() {
@@ -155,6 +156,12 @@
       style: publicationStyle,
       onEachFeature: publicationPopup
     }).addTo(map);
+
+    // Initialize enhanced interaction manager for handling overlapping polygons
+    if (typeof MapInteractionManager !== 'undefined') {
+      const interactionManager = new MapInteractionManager(map, publicationsLayer);
+      console.log('Enhanced map interaction enabled on feed page');
+    }
 
     // Fit map to show all publications
     if (publicationsLayer.getBounds().isValid()) {

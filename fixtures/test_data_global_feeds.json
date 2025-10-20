@@ -5,15 +5,15 @@
     "fields": {
       "name": "Global Geoscience Journal",
       "issn_l": "2234-5678",
-      "openalex_id": "https://openalex.org/S2000000000",
+      "openalex_id": null,
       "openalex_url": "https://api.openalex.org/sources/S2000000000",
       "publisher_name": "Global Publishers",
-      "works_count": 4971,
+      "works_count": 1438,
       "homepage_url": "http://globalgeosciencejournal.example.org",
       "abbreviated_title": "Global Geoscien.",
       "is_oa": true,
-      "cited_by_count": 4857,
-      "is_preprint": false
+      "cited_by_count": 15827,
+      "is_preprint": true
     }
   },
   {
@@ -22,15 +22,15 @@
     "fields": {
       "name": "International Earth Sciences",
       "issn_l": "3345-6789",
-      "openalex_id": null,
+      "openalex_id": "https://openalex.org/S2001000000",
       "openalex_url": "https://api.openalex.org/sources/S2001000000",
       "publisher_name": "International Publishers",
-      "works_count": 2403,
+      "works_count": 902,
       "homepage_url": "http://internationalearthsciences.example.org",
       "abbreviated_title": "International E.",
       "is_oa": true,
-      "cited_by_count": 29969,
-      "is_preprint": false
+      "cited_by_count": 9664,
+      "is_preprint": true
     }
   },
   {
@@ -42,12 +42,12 @@
       "openalex_id": "https://openalex.org/S2002000000",
       "openalex_url": "https://api.openalex.org/sources/S2002000000",
       "publisher_name": "World Publishers",
-      "works_count": 1602,
+      "works_count": 3782,
       "homepage_url": "http://worldenvironmentalresearch.example.org",
       "abbreviated_title": "World Environme.",
       "is_oa": false,
-      "cited_by_count": 22470,
-      "is_preprint": true
+      "cited_by_count": 42954,
+      "is_preprint": false
     }
   },
   {
@@ -56,34 +56,34 @@
     "fields": {
       "name": "Planetary Studies Quarterly",
       "issn_l": "5567-8901",
-      "openalex_id": "https://openalex.org/S2003000000",
-      "openalex_url": null,
+      "openalex_id": null,
+      "openalex_url": "https://api.openalex.org/sources/S2003000000",
       "publisher_name": "Planetary Publishers",
-      "works_count": 2614,
+      "works_count": 4213,
       "homepage_url": "http://planetarystudiesquarterly.example.org",
       "abbreviated_title": "Planetary Studi.",
       "is_oa": true,
-      "cited_by_count": 10268,
-      "is_preprint": true
+      "cited_by_count": 33378,
+      "is_preprint": false
     }
   },
   {
     "model": "publications.publication",
     "pk": 2000,
     "fields": {
-      "status": "c",
+      "status": "p",
       "title": "Geological Survey of Africa",
       "abstract": "Comprehensive geological and environmental study covering Central and Eastern Africa. This research examines africa geology, climate patterns, and ecological systems.",
-      "publicationDate": "2021-12-22",
-      "doi": "10.5555/global-2000-7185",
+      "publicationDate": "2024-04-30",
+      "doi": "10.5555/global-2000-4205",
       "url": "https://example.org/publications/2000",
       "geometry": "SRID=4326;GEOMETRYCOLLECTION(POLYGON ((10 -25, 40 -25, 40 30, 10 30, 10 -25)))",
-      "creationDate": "2022-01-21T00:00:00Z",
-      "lastUpdate": "2022-01-22T17:00:00Z",
+      "creationDate": "2024-05-19T00:00:00Z",
+      "lastUpdate": "2024-05-19T03:00:00Z",
       "source": 2000,
-      "timeperiod_startdate": "[\"2020\"]",
-      "timeperiod_enddate": "[\"2021\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 on 2022-01-21T00:00:00Z.\nHarvestingEvent ID: 3000.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "timeperiod_startdate": "[\"2023\"]",
+      "timeperiod_enddate": "[\"2024\"]",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 on 2024-05-19T00:00:00Z.\nHarvestingEvent ID: 3000.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [],
       "keywords": [],
       "topics": [],
@@ -91,8 +91,8 @@
       "openalex_match_info": null,
       "openalex_fulltext_origin": "repository",
       "openalex_is_retracted": false,
-      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2000-7185\", \"pmid\": \"38002000\"}",
-      "openalex_open_access_status": "closed"
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2000-4205\", \"pmid\": null}",
+      "openalex_open_access_status": "diamond"
     }
   },
   {
@@ -102,16 +102,16 @@
       "status": "p",
       "title": "Geological Survey of Asia",
       "abstract": "Comprehensive geological and environmental study covering Central and East Asia. This research examines asia geology, climate patterns, and ecological systems.",
-      "publicationDate": "2024-05-18",
-      "doi": "10.5555/global-2001-2953",
+      "publicationDate": "2024-08-19",
+      "doi": "10.5555/global-2001-7515",
       "url": "https://example.org/publications/2001",
       "geometry": "SRID=4326;GEOMETRYCOLLECTION(POLYGON ((70 15, 120 15, 120 50, 70 50, 70 15)))",
-      "creationDate": "2024-06-06T00:00:00Z",
-      "lastUpdate": "2024-06-06T10:00:00Z",
+      "creationDate": "2024-08-31T00:00:00Z",
+      "lastUpdate": "2024-08-31T11:00:00Z",
       "source": 2001,
-      "timeperiod_startdate": "[\"2022\"]",
+      "timeperiod_startdate": "[\"2023\"]",
       "timeperiod_enddate": "[\"2024\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2001 on 2024-06-06T00:00:00Z.\nHarvestingEvent ID: 3001.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2001 on 2024-08-31T00:00:00Z.\nHarvestingEvent ID: 3001.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
       "authors": [
         "Dr. Single Author"
       ],
@@ -121,12 +121,12 @@
       "topics": [
         "Geography"
       ],
-      "openalex_id": null,
-      "openalex_match_info": "[{\"openalex_id\": \"https://openalex.org/W2902001\", \"title\": \"Similar Study 2001\", \"doi\": null, \"match_type\": \"title\"}]",
+      "openalex_id": "https://openalex.org/W3002001",
+      "openalex_match_info": null,
       "openalex_fulltext_origin": null,
       "openalex_is_retracted": false,
-      "openalex_ids": null,
-      "openalex_open_access_status": null
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2001-7515\", \"pmid\": \"38002001\"}",
+      "openalex_open_access_status": "hybrid"
     }
   },
   {
@@ -136,16 +136,16 @@
       "status": "p",
       "title": "Geological Survey of Europe",
       "abstract": "Comprehensive geological and environmental study covering Central and Western Europe. This research examines europe geology, climate patterns, and ecological systems.",
-      "publicationDate": "2022-12-04",
-      "doi": "10.5555/global-2002-2817",
+      "publicationDate": "2024-04-12",
+      "doi": "10.5555/global-2002-1794",
       "url": "https://example.org/publications/2002",
       "geometry": "SRID=4326;GEOMETRYCOLLECTION(POLYGON ((0 45, 30 45, 30 65, 0 65, 0 45)))",
-      "creationDate": "2022-12-16T00:00:00Z",
-      "lastUpdate": "2022-12-17T15:00:00Z",
+      "creationDate": "2024-05-04T00:00:00Z",
+      "lastUpdate": "2024-05-04T04:00:00Z",
       "source": 2002,
-      "timeperiod_startdate": "[\"2021\"]",
-      "timeperiod_enddate": "[\"2022\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2002 on 2022-12-16T00:00:00Z.\nHarvestingEvent ID: 3002.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
+      "timeperiod_startdate": "[\"2023\"]",
+      "timeperiod_enddate": "[\"2024\"]",
+      "provenance": "Harvested via OAI-PMH from Global Source 2002 on 2024-05-04T00:00:00Z.\nHarvestingEvent ID: 3002.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. First Author",
         "Prof. Second Author"
@@ -160,10 +160,10 @@
       ],
       "openalex_id": "https://openalex.org/W3002002",
       "openalex_match_info": null,
-      "openalex_fulltext_origin": "repository",
+      "openalex_fulltext_origin": "publisher",
       "openalex_is_retracted": false,
-      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2002-2817\", \"pmid\": null}",
-      "openalex_open_access_status": "gold"
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2002-1794\", \"pmid\": null}",
+      "openalex_open_access_status": null
     }
   },
   {
@@ -173,16 +173,16 @@
       "status": "p",
       "title": "Geological Survey of North America",
       "abstract": "Comprehensive geological and environmental study covering Central United States and Canada. This research examines north america geology, climate patterns, and ecological systems.",
-      "publicationDate": "2023-11-02",
-      "doi": "10.5555/global-2003-5785",
+      "publicationDate": "2020-01-16",
+      "doi": "10.5555/global-2003-4502",
       "url": "https://example.org/publications/2003",
       "geometry": "SRID=4326;GEOMETRYCOLLECTION(POLYGON ((-120 30, -80 30, -80 50, -120 50, -120 30)))",
-      "creationDate": "2023-11-25T00:00:00Z",
-      "lastUpdate": "2023-11-25T21:00:00Z",
+      "creationDate": "2020-02-05T00:00:00Z",
+      "lastUpdate": "2020-02-06T05:00:00Z",
       "source": 2003,
-      "timeperiod_startdate": "[\"2022\"]",
-      "timeperiod_enddate": "[\"2023\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2003 on 2023-11-25T00:00:00Z.\nHarvestingEvent ID: 3003.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "timeperiod_startdate": "[\"2019\"]",
+      "timeperiod_enddate": "[\"2020\"]",
+      "provenance": "Harvested via OAI-PMH from Global Source 2003 on 2020-02-05T00:00:00Z.\nHarvestingEvent ID: 3003.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
       "authors": [
         "Dr. Alice Smith",
         "Prof. Bob Jones",
@@ -200,10 +200,10 @@
       ],
       "openalex_id": "https://openalex.org/W3002003",
       "openalex_match_info": null,
-      "openalex_fulltext_origin": null,
+      "openalex_fulltext_origin": "repository",
       "openalex_is_retracted": false,
-      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2003-5785\", \"pmid\": null}",
-      "openalex_open_access_status": "green"
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2003-4502\", \"pmid\": \"38002003\"}",
+      "openalex_open_access_status": "diamond"
     }
   },
   {
@@ -213,16 +213,16 @@
       "status": "p",
       "title": "Geological Survey of South America",
       "abstract": "Comprehensive geological and environmental study covering Brazil and surrounding regions. This research examines south america geology, climate patterns, and ecological systems.",
-      "publicationDate": "2021-06-21",
-      "doi": "10.5555/global-2004-8844",
+      "publicationDate": "2021-10-18",
+      "doi": "10.5555/global-2004-1023",
       "url": "https://example.org/publications/2004",
       "geometry": "SRID=4326;GEOMETRYCOLLECTION(POLYGON ((-70 -30, -50 -30, -50 0, -70 0, -70 -30)))",
-      "creationDate": "2021-07-11T00:00:00Z",
-      "lastUpdate": "2021-07-12T22:00:00Z",
+      "creationDate": "2021-10-31T00:00:00Z",
+      "lastUpdate": "2021-11-01T06:00:00Z",
       "source": 2000,
       "timeperiod_startdate": "[\"2020\"]",
       "timeperiod_enddate": "[\"2021\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 on 2021-07-11T00:00:00Z.\nHarvestingEvent ID: 3004.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 on 2021-10-31T00:00:00Z.\nHarvestingEvent ID: 3004.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
       "authors": [
         "Dr. Maria Garcia",
         "Prof. John Smith",
@@ -236,31 +236,31 @@
         "habitat mapping"
       ],
       "topics": [],
-      "openalex_id": null,
-      "openalex_match_info": "[{\"openalex_id\": \"https://openalex.org/W2902004\", \"title\": \"Similar Study 2004\", \"doi\": null, \"match_type\": \"title\"}]",
-      "openalex_fulltext_origin": null,
+      "openalex_id": "https://openalex.org/W3002004",
+      "openalex_match_info": null,
+      "openalex_fulltext_origin": "publisher",
       "openalex_is_retracted": false,
-      "openalex_ids": null,
-      "openalex_open_access_status": null
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2004-1023\", \"pmid\": \"38002004\"}",
+      "openalex_open_access_status": "hybrid"
     }
   },
   {
     "model": "publications.publication",
     "pk": 2005,
     "fields": {
-      "status": "c",
+      "status": "p",
       "title": "Geological Survey of Australia",
       "abstract": "Comprehensive geological and environmental study covering Eastern Australia. This research examines australia geology, climate patterns, and ecological systems.",
-      "publicationDate": "2023-07-30",
-      "doi": "10.5555/global-2005-6248",
+      "publicationDate": "2022-01-31",
+      "doi": "10.5555/global-2005-1071",
       "url": "https://example.org/publications/2005",
       "geometry": "SRID=4326;GEOMETRYCOLLECTION(POLYGON ((120 -35, 145 -35, 145 -15, 120 -15, 120 -35)))",
-      "creationDate": "2023-08-13T00:00:00Z",
-      "lastUpdate": "2023-08-13T17:00:00Z",
+      "creationDate": "2022-02-05T00:00:00Z",
+      "lastUpdate": "2022-02-06T19:00:00Z",
       "source": 2001,
-      "timeperiod_startdate": "[\"2022\"]",
-      "timeperiod_enddate": "[\"2023\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2001 on 2023-08-13T00:00:00Z.\nHarvestingEvent ID: 3005.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
+      "timeperiod_startdate": "[\"2019\"]",
+      "timeperiod_enddate": "[\"2022\"]",
+      "provenance": "Harvested via OAI-PMH from Global Source 2001 on 2022-02-05T00:00:00Z.\nHarvestingEvent ID: 3005.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Prof. A",
         "Dr. B",
@@ -280,12 +280,12 @@
       "topics": [
         "Geography"
       ],
-      "openalex_id": null,
-      "openalex_match_info": "[{\"openalex_id\": \"https://openalex.org/W2902005\", \"title\": \"Similar Study 2005\", \"doi\": null, \"match_type\": \"title\"}]",
-      "openalex_fulltext_origin": null,
+      "openalex_id": "https://openalex.org/W3002005",
+      "openalex_match_info": null,
+      "openalex_fulltext_origin": "publisher",
       "openalex_is_retracted": false,
-      "openalex_ids": null,
-      "openalex_open_access_status": null
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2005-1071\", \"pmid\": null}",
+      "openalex_open_access_status": "closed"
     }
   },
   {
@@ -295,16 +295,16 @@
       "status": "p",
       "title": "Geological Survey of Antarctica",
       "abstract": "Comprehensive geological and environmental study covering Antarctic Peninsula region. This research examines antarctica geology, climate patterns, and ecological systems.",
-      "publicationDate": "2023-11-07",
-      "doi": "10.5555/global-2006-2246",
+      "publicationDate": "2024-04-27",
+      "doi": "10.5555/global-2006-5068",
       "url": "https://example.org/publications/2006",
       "geometry": "SRID=4326;GEOMETRYCOLLECTION(POLYGON ((-60 -75, 60 -75, 60 -65, -60 -65, -60 -75)))",
-      "creationDate": "2023-12-05T00:00:00Z",
-      "lastUpdate": "2023-12-05T22:00:00Z",
+      "creationDate": "2024-05-25T00:00:00Z",
+      "lastUpdate": "2024-05-25T13:00:00Z",
       "source": 2002,
-      "timeperiod_startdate": "[\"2020\"]",
-      "timeperiod_enddate": "[\"2023\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2002 on 2023-12-05T00:00:00Z.\nHarvestingEvent ID: 3006.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
+      "timeperiod_startdate": "[\"2022\"]",
+      "timeperiod_enddate": "[\"2024\"]",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2002 on 2024-05-25T00:00:00Z.\nHarvestingEvent ID: 3006.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
       "authors": [
         "Dr. Zhang Wei",
         "Prof. Sarah Johnson",
@@ -319,31 +319,31 @@
         "Environmental Science",
         "Ecology"
       ],
-      "openalex_id": "https://openalex.org/W3002006",
-      "openalex_match_info": null,
-      "openalex_fulltext_origin": "repository",
+      "openalex_id": null,
+      "openalex_match_info": "[{\"openalex_id\": \"https://openalex.org/W2902006\", \"title\": \"Similar Study 2006\", \"doi\": null, \"match_type\": \"title\"}]",
+      "openalex_fulltext_origin": null,
       "openalex_is_retracted": false,
-      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2006-2246\", \"pmid\": null}",
-      "openalex_open_access_status": "closed"
+      "openalex_ids": null,
+      "openalex_open_access_status": null
     }
   },
   {
     "model": "publications.publication",
     "pk": 2007,
     "fields": {
-      "status": "c",
+      "status": "p",
       "title": "Marine Biology and Oceanography of the Atlantic Ocean",
       "abstract": "Detailed oceanographic study of North Atlantic Ocean. Research includes marine ecosystems, ocean currents, temperature patterns, and biodiversity in the atlantic ocean.",
-      "publicationDate": "2020-08-28",
-      "doi": "10.5555/global-2007-4215",
+      "publicationDate": "2024-03-10",
+      "doi": "10.5555/global-2007-2699",
       "url": "https://example.org/publications/2007",
       "geometry": "SRID=4326;GEOMETRYCOLLECTION(POLYGON ((-40 10, -20 10, -20 40, -40 40, -40 10)))",
-      "creationDate": "2020-09-13T00:00:00Z",
-      "lastUpdate": "2020-09-13T19:00:00Z",
+      "creationDate": "2024-04-01T00:00:00Z",
+      "lastUpdate": "2024-04-02T06:00:00Z",
       "source": 2000,
-      "timeperiod_startdate": "[\"2018\"]",
-      "timeperiod_enddate": "[\"2020\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2000 on 2020-09-13T00:00:00Z.\nHarvestingEvent ID: 3007.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "timeperiod_startdate": "[\"2023\"]",
+      "timeperiod_enddate": "[\"2024\"]",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 on 2024-04-01T00:00:00Z.\nHarvestingEvent ID: 3007.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
       "authors": [],
       "keywords": [
         "single keyword"
@@ -355,10 +355,10 @@
       ],
       "openalex_id": "https://openalex.org/W3002007",
       "openalex_match_info": null,
-      "openalex_fulltext_origin": "publisher",
+      "openalex_fulltext_origin": "repository",
       "openalex_is_retracted": false,
-      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2007-4215\", \"pmid\": \"38002007\"}",
-      "openalex_open_access_status": "bronze"
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2007-2699\", \"pmid\": null}",
+      "openalex_open_access_status": "green"
     }
   },
   {
@@ -368,16 +368,16 @@
       "status": "p",
       "title": "Marine Biology and Oceanography of the Pacific Ocean",
       "abstract": "Detailed oceanographic study of Western Pacific Ocean. Research includes marine ecosystems, ocean currents, temperature patterns, and biodiversity in the pacific ocean.",
-      "publicationDate": "2023-04-20",
-      "doi": "10.5555/global-2008-6450",
+      "publicationDate": "2024-10-01",
+      "doi": "10.5555/global-2008-6712",
       "url": "https://example.org/publications/2008",
       "geometry": "SRID=4326;GEOMETRYCOLLECTION(POLYGON ((150 -20, 170 -20, 170 10, 150 10, 150 -20)))",
-      "creationDate": "2023-05-18T00:00:00Z",
-      "lastUpdate": "2023-05-18T22:00:00Z",
+      "creationDate": "2024-10-22T00:00:00Z",
+      "lastUpdate": "2024-10-23T08:00:00Z",
       "source": 2001,
-      "timeperiod_startdate": "[\"2021\"]",
-      "timeperiod_enddate": "[\"2023\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2001 on 2023-05-18T00:00:00Z.\nHarvestingEvent ID: 3008.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
+      "timeperiod_startdate": "[\"2022\"]",
+      "timeperiod_enddate": "[\"2024\"]",
+      "provenance": "Harvested via OAI-PMH from Global Source 2001 on 2024-10-22T00:00:00Z.\nHarvestingEvent ID: 3008.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. Single Author"
       ],
@@ -388,10 +388,10 @@
       "topics": [],
       "openalex_id": "https://openalex.org/W3002008",
       "openalex_match_info": null,
-      "openalex_fulltext_origin": null,
+      "openalex_fulltext_origin": "publisher",
       "openalex_is_retracted": false,
-      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2008-6450\", \"pmid\": \"38002008\"}",
-      "openalex_open_access_status": "hybrid"
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2008-6712\", \"pmid\": \"38002008\"}",
+      "openalex_open_access_status": null
     }
   },
   {
@@ -401,16 +401,16 @@
       "status": "p",
       "title": "Marine Biology and Oceanography of the Indian Ocean",
       "abstract": "Detailed oceanographic study of Western Indian Ocean. Research includes marine ecosystems, ocean currents, temperature patterns, and biodiversity in the indian ocean.",
-      "publicationDate": "2021-05-06",
-      "doi": "10.5555/global-2009-3082",
+      "publicationDate": "2021-01-16",
+      "doi": "10.5555/global-2009-8516",
       "url": "https://example.org/publications/2009",
       "geometry": "SRID=4326;GEOMETRYCOLLECTION(POLYGON ((60 -30, 80 -30, 80 -10, 60 -10, 60 -30)))",
-      "creationDate": "2021-05-26T00:00:00Z",
-      "lastUpdate": "2021-05-26T15:00:00Z",
+      "creationDate": "2021-01-27T00:00:00Z",
+      "lastUpdate": "2021-01-27T02:00:00Z",
       "source": 2002,
-      "timeperiod_startdate": "[\"2018\"]",
+      "timeperiod_startdate": "[\"2020\"]",
       "timeperiod_enddate": "[\"2021\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2002 on 2021-05-26T00:00:00Z.\nHarvestingEvent ID: 3009.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2002 on 2021-01-27T00:00:00Z.\nHarvestingEvent ID: 3009.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
       "authors": [
         "Dr. First Author",
         "Prof. Second Author"
@@ -425,10 +425,10 @@
       ],
       "openalex_id": "https://openalex.org/W3002009",
       "openalex_match_info": null,
-      "openalex_fulltext_origin": "publisher",
+      "openalex_fulltext_origin": "repository",
       "openalex_is_retracted": false,
-      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2009-3082\", \"pmid\": null}",
-      "openalex_open_access_status": "diamond"
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2009-8516\", \"pmid\": \"38002009\"}",
+      "openalex_open_access_status": "closed"
     }
   },
   {
@@ -438,16 +438,16 @@
       "status": "p",
       "title": "Marine Biology and Oceanography of the Arctic Ocean",
       "abstract": "Detailed oceanographic study of Arctic Ocean near North Pole. Research includes marine ecosystems, ocean currents, temperature patterns, and biodiversity in the arctic ocean.",
-      "publicationDate": "2021-03-21",
-      "doi": "10.5555/global-2010-1063",
+      "publicationDate": "2023-04-05",
+      "doi": "10.5555/global-2010-3322",
       "url": "https://example.org/publications/2010",
       "geometry": "SRID=4326;GEOMETRYCOLLECTION(POLYGON ((-20 75, 20 75, 20 85, -20 85, -20 75)))",
-      "creationDate": "2021-03-31T00:00:00Z",
-      "lastUpdate": "2021-04-01T04:00:00Z",
+      "creationDate": "2023-04-14T00:00:00Z",
+      "lastUpdate": "2023-04-14T07:00:00Z",
       "source": 2003,
-      "timeperiod_startdate": "[\"2019\"]",
-      "timeperiod_enddate": "[\"2021\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2003 on 2021-03-31T00:00:00Z.\nHarvestingEvent ID: 3010.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "timeperiod_startdate": "[\"2021\"]",
+      "timeperiod_enddate": "[\"2023\"]",
+      "provenance": "Harvested via OAI-PMH from Global Source 2003 on 2023-04-14T00:00:00Z.\nHarvestingEvent ID: 3010.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
       "authors": [
         "Dr. Alice Smith",
         "Prof. Bob Jones",
@@ -465,29 +465,29 @@
       ],
       "openalex_id": "https://openalex.org/W3002010",
       "openalex_match_info": null,
-      "openalex_fulltext_origin": "publisher",
+      "openalex_fulltext_origin": "repository",
       "openalex_is_retracted": false,
-      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2010-1063\", \"pmid\": null}",
-      "openalex_open_access_status": "gold"
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2010-3322\", \"pmid\": null}",
+      "openalex_open_access_status": "green"
     }
   },
   {
     "model": "publications.publication",
     "pk": 2011,
     "fields": {
-      "status": "h",
+      "status": "p",
       "title": "Marine Biology and Oceanography of the Southern Ocean",
       "abstract": "Detailed oceanographic study of Southern Ocean around Antarctica. Research includes marine ecosystems, ocean currents, temperature patterns, and biodiversity in the southern ocean.",
-      "publicationDate": "2021-08-11",
-      "doi": "10.5555/global-2011-7652",
+      "publicationDate": "2020-06-09",
+      "doi": "10.5555/global-2011-5029",
       "url": "https://example.org/publications/2011",
       "geometry": "SRID=4326;GEOMETRYCOLLECTION(POLYGON ((0 -65, 40 -65, 40 -55, 0 -55, 0 -65)))",
-      "creationDate": "2021-08-24T00:00:00Z",
-      "lastUpdate": "2021-08-25T22:00:00Z",
+      "creationDate": "2020-07-05T00:00:00Z",
+      "lastUpdate": "2020-07-06T20:00:00Z",
       "source": 2000,
-      "timeperiod_startdate": "[\"2020\"]",
-      "timeperiod_enddate": "[\"2021\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 on 2021-08-24T00:00:00Z.\nHarvestingEvent ID: 3011.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
+      "timeperiod_startdate": "[\"2018\"]",
+      "timeperiod_enddate": "[\"2020\"]",
+      "provenance": "Harvested via OAI-PMH from Global Source 2000 on 2020-07-05T00:00:00Z.\nHarvestingEvent ID: 3011.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. Maria Garcia",
         "Prof. John Smith",
@@ -509,10 +509,10 @@
       ],
       "openalex_id": "https://openalex.org/W3002011",
       "openalex_match_info": null,
-      "openalex_fulltext_origin": null,
+      "openalex_fulltext_origin": "publisher",
       "openalex_is_retracted": false,
-      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2011-7652\", \"pmid\": \"38002011\"}",
-      "openalex_open_access_status": "hybrid"
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2011-5029\", \"pmid\": \"38002011\"}",
+      "openalex_open_access_status": "diamond"
     }
   },
   {
@@ -522,16 +522,16 @@
       "status": "p",
       "title": "Cross-Regional Study: Europe-Asia",
       "abstract": "Cross-border environmental and geological research Spanning Eastern Europe and Western Asia. This study analyzes patterns that span multiple geographical regions.",
-      "publicationDate": "2021-01-08",
-      "doi": "10.5555/global-2012-4897",
+      "publicationDate": "2023-09-14",
+      "doi": "10.5555/global-2012-8305",
       "url": "https://example.org/publications/2012",
       "geometry": "SRID=4326;GEOMETRYCOLLECTION(POLYGON ((25 40, 65 40, 65 55, 25 55, 25 40)))",
-      "creationDate": "2021-01-10T00:00:00Z",
-      "lastUpdate": "2021-01-11T06:00:00Z",
+      "creationDate": "2023-09-23T00:00:00Z",
+      "lastUpdate": "2023-09-24T10:00:00Z",
       "source": 2000,
-      "timeperiod_startdate": "[\"2018\"]",
-      "timeperiod_enddate": "[\"2021\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 on 2021-01-10T00:00:00Z.\nHarvestingEvent ID: 3012.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "timeperiod_startdate": "[\"2020\"]",
+      "timeperiod_enddate": "[\"2023\"]",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 on 2023-09-23T00:00:00Z.\nHarvestingEvent ID: 3012.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Prof. A",
         "Dr. B",
@@ -546,8 +546,8 @@
       "openalex_match_info": null,
       "openalex_fulltext_origin": null,
       "openalex_is_retracted": false,
-      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2012-4897\", \"pmid\": \"38002012\"}",
-      "openalex_open_access_status": "closed"
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2012-8305\", \"pmid\": \"38002012\"}",
+      "openalex_open_access_status": "green"
     }
   },
   {
@@ -557,16 +557,16 @@
       "status": "p",
       "title": "Cross-Regional Study: North America-Atlantic",
       "abstract": "Cross-border environmental and geological research Eastern North America and Western Atlantic. This study analyzes patterns that span multiple geographical regions.",
-      "publicationDate": "2022-06-25",
-      "doi": "10.5555/global-2013-5762",
+      "publicationDate": "2020-10-02",
+      "doi": "10.5555/global-2013-6726",
       "url": "https://example.org/publications/2013",
       "geometry": "SRID=4326;GEOMETRYCOLLECTION(POLYGON ((-80 25, -50 25, -50 45, -80 45, -80 25)))",
-      "creationDate": "2022-06-26T00:00:00Z",
-      "lastUpdate": "2022-06-26T02:00:00Z",
+      "creationDate": "2020-10-07T00:00:00Z",
+      "lastUpdate": "2020-10-08T09:00:00Z",
       "source": 2001,
       "timeperiod_startdate": "[\"2019\"]",
-      "timeperiod_enddate": "[\"2022\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2001 on 2022-06-26T00:00:00Z.\nHarvestingEvent ID: 3013.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "timeperiod_enddate": "[\"2020\"]",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2001 on 2020-10-07T00:00:00Z.\nHarvestingEvent ID: 3013.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
       "authors": [
         "Dr. Zhang Wei",
         "Prof. Sarah Johnson",
@@ -584,29 +584,29 @@
       ],
       "openalex_id": "https://openalex.org/W3002013",
       "openalex_match_info": null,
-      "openalex_fulltext_origin": "publisher",
+      "openalex_fulltext_origin": null,
       "openalex_is_retracted": false,
-      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2013-5762\", \"pmid\": \"38002013\"}",
-      "openalex_open_access_status": "green"
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2013-6726\", \"pmid\": null}",
+      "openalex_open_access_status": null
     }
   },
   {
     "model": "publications.publication",
     "pk": 2014,
     "fields": {
-      "status": "c",
+      "status": "p",
       "title": "Cross-Regional Study: Africa-Indian Ocean",
       "abstract": "Cross-border environmental and geological research East African coast and Western Indian Ocean. This study analyzes patterns that span multiple geographical regions.",
-      "publicationDate": "2021-06-27",
-      "doi": "10.5555/global-2014-9633",
+      "publicationDate": "2020-04-30",
+      "doi": "10.5555/global-2014-8400",
       "url": "https://example.org/publications/2014",
       "geometry": "SRID=4326;GEOMETRYCOLLECTION(POLYGON ((35 -20, 55 -20, 55 5, 35 5, 35 -20)))",
-      "creationDate": "2021-07-24T00:00:00Z",
-      "lastUpdate": "2021-07-25T04:00:00Z",
+      "creationDate": "2020-05-11T00:00:00Z",
+      "lastUpdate": "2020-05-12T16:00:00Z",
       "source": 2002,
       "timeperiod_startdate": "[\"2018\"]",
-      "timeperiod_enddate": "[\"2021\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2002 on 2021-07-24T00:00:00Z.\nHarvestingEvent ID: 3014.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "timeperiod_enddate": "[\"2020\"]",
+      "provenance": "Harvested via OAI-PMH from Global Source 2002 on 2020-05-11T00:00:00Z.\nHarvestingEvent ID: 3014.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
       "authors": [],
       "keywords": [
         "first keyword",
@@ -616,31 +616,31 @@
         "Environmental Science",
         "Ecology"
       ],
-      "openalex_id": null,
-      "openalex_match_info": "[{\"openalex_id\": \"https://openalex.org/W2902014\", \"title\": \"Similar Study 2014\", \"doi\": null, \"match_type\": \"title\"}]",
+      "openalex_id": "https://openalex.org/W3002014",
+      "openalex_match_info": null,
       "openalex_fulltext_origin": null,
       "openalex_is_retracted": false,
-      "openalex_ids": null,
-      "openalex_open_access_status": null
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2014-8400\", \"pmid\": \"38002014\"}",
+      "openalex_open_access_status": "closed"
     }
   },
   {
     "model": "publications.publication",
     "pk": 2015,
     "fields": {
-      "status": "c",
+      "status": "p",
       "title": "Cross-Regional Study: South America-Pacific",
       "abstract": "Cross-border environmental and geological research Western South America and Eastern Pacific. This study analyzes patterns that span multiple geographical regions.",
-      "publicationDate": "2023-05-30",
-      "doi": "10.5555/global-2015-6905",
+      "publicationDate": "2024-11-30",
+      "doi": "10.5555/global-2015-2149",
       "url": "https://example.org/publications/2015",
       "geometry": "SRID=4326;GEOMETRYCOLLECTION(POLYGON ((-85 -20, -65 -20, -65 5, -85 5, -85 -20)))",
-      "creationDate": "2023-06-15T00:00:00Z",
-      "lastUpdate": "2023-06-16T02:00:00Z",
+      "creationDate": "2024-12-12T00:00:00Z",
+      "lastUpdate": "2024-12-12T08:00:00Z",
       "source": 2003,
-      "timeperiod_startdate": "[\"2022\"]",
-      "timeperiod_enddate": "[\"2023\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2003 on 2023-06-15T00:00:00Z.\nHarvestingEvent ID: 3015.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
+      "timeperiod_startdate": "[\"2023\"]",
+      "timeperiod_enddate": "[\"2024\"]",
+      "provenance": "Harvested via OAI-PMH from Global Source 2003 on 2024-12-12T00:00:00Z.\nHarvestingEvent ID: 3015.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
       "authors": [
         "Dr. Single Author"
       ],
@@ -656,29 +656,29 @@
       ],
       "openalex_id": "https://openalex.org/W3002015",
       "openalex_match_info": null,
-      "openalex_fulltext_origin": "repository",
+      "openalex_fulltext_origin": "publisher",
       "openalex_is_retracted": false,
-      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2015-6905\", \"pmid\": \"38002015\"}",
-      "openalex_open_access_status": "green"
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2015-2149\", \"pmid\": null}",
+      "openalex_open_access_status": "diamond"
     }
   },
   {
     "model": "publications.publication",
     "pk": 2016,
     "fields": {
-      "status": "h",
+      "status": "p",
       "title": "Cross-Regional Study: Asia-Pacific",
       "abstract": "Cross-border environmental and geological research East Asian coast and Western Pacific. This study analyzes patterns that span multiple geographical regions.",
-      "publicationDate": "2020-06-24",
-      "doi": "10.5555/global-2016-3036",
+      "publicationDate": "2020-01-27",
+      "doi": "10.5555/global-2016-9623",
       "url": "https://example.org/publications/2016",
       "geometry": "SRID=4326;GEOMETRYCOLLECTION(POLYGON ((115 20, 140 20, 140 45, 115 45, 115 20)))",
-      "creationDate": "2020-07-17T00:00:00Z",
-      "lastUpdate": "2020-07-17T13:00:00Z",
+      "creationDate": "2020-02-18T00:00:00Z",
+      "lastUpdate": "2020-02-18T09:00:00Z",
       "source": 2000,
-      "timeperiod_startdate": "[\"2018\"]",
+      "timeperiod_startdate": "[\"2019\"]",
       "timeperiod_enddate": "[\"2020\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 on 2020-07-17T00:00:00Z.\nHarvestingEvent ID: 3016.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via OAI-PMH from Global Source 2000 on 2020-02-18T00:00:00Z.\nHarvestingEvent ID: 3016.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. First Author",
         "Prof. Second Author"
@@ -692,9 +692,9 @@
       "topics": [],
       "openalex_id": "https://openalex.org/W3002016",
       "openalex_match_info": null,
-      "openalex_fulltext_origin": "repository",
+      "openalex_fulltext_origin": null,
       "openalex_is_retracted": false,
-      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2016-3036\", \"pmid\": \"38002016\"}",
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2016-9623\", \"pmid\": null}",
       "openalex_open_access_status": "diamond"
     }
   },
@@ -705,16 +705,16 @@
       "status": "p",
       "title": "Global Ocean Survey",
       "abstract": "Large-scale multi-regional research project covering Atlantic, Indian, and Pacific Oceans. This comprehensive study examines global patterns and connections across multiple continents and oceans.",
-      "publicationDate": "2024-11-26",
-      "doi": "10.5555/global-2017-3778",
+      "publicationDate": "2020-04-08",
+      "doi": "10.5555/global-2017-3649",
       "url": "https://example.org/publications/2017",
       "geometry": "SRID=4326;GEOMETRYCOLLECTION(MULTIPOLYGON (((-40 -10, -20 -10, -20 10, -40 10, -40 -10)), ((60 -20, 80 -20, 80 0, 60 0, 60 -20)), ((150 -30, 170 -30, 170 -10, 150 -10, 150 -30))))",
-      "creationDate": "2024-12-05T00:00:00Z",
-      "lastUpdate": "2024-12-05T06:00:00Z",
+      "creationDate": "2020-04-23T00:00:00Z",
+      "lastUpdate": "2020-04-23T13:00:00Z",
       "source": 2000,
-      "timeperiod_startdate": "[\"2021\"]",
-      "timeperiod_enddate": "[\"2024\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2000 on 2024-12-05T00:00:00Z.\nHarvestingEvent ID: 3017.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "timeperiod_startdate": "[\"2019\"]",
+      "timeperiod_enddate": "[\"2020\"]",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 on 2020-04-23T00:00:00Z.\nHarvestingEvent ID: 3017.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
       "authors": [
         "Dr. Alice Smith",
         "Prof. Bob Jones",
@@ -731,31 +731,31 @@
       "topics": [
         "Geography"
       ],
-      "openalex_id": null,
-      "openalex_match_info": "[{\"openalex_id\": \"https://openalex.org/W2902017\", \"title\": \"Similar Study 2017\", \"doi\": null, \"match_type\": \"title\"}]",
-      "openalex_fulltext_origin": null,
+      "openalex_id": "https://openalex.org/W3002017",
+      "openalex_match_info": null,
+      "openalex_fulltext_origin": "repository",
       "openalex_is_retracted": false,
-      "openalex_ids": null,
-      "openalex_open_access_status": null
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2017-3649\", \"pmid\": null}",
+      "openalex_open_access_status": "diamond"
     }
   },
   {
     "model": "publications.publication",
     "pk": 2018,
     "fields": {
-      "status": "h",
+      "status": "p",
       "title": "Trans-Atlantic Research",
       "abstract": "Large-scale multi-regional research project covering North America, Atlantic Ocean, and Europe. This comprehensive study examines global patterns and connections across multiple continents and oceans.",
-      "publicationDate": "2021-01-04",
-      "doi": "10.5555/global-2018-6722",
+      "publicationDate": "2021-05-26",
+      "doi": "10.5555/global-2018-5013",
       "url": "https://example.org/publications/2018",
       "geometry": "SRID=4326;GEOMETRYCOLLECTION(POLYGON ((-70 20, 10 20, 10 50, -70 50, -70 20)))",
-      "creationDate": "2021-01-05T00:00:00Z",
-      "lastUpdate": "2021-01-06T05:00:00Z",
+      "creationDate": "2021-06-11T00:00:00Z",
+      "lastUpdate": "2021-06-12T13:00:00Z",
       "source": 2001,
-      "timeperiod_startdate": "[\"2019\"]",
+      "timeperiod_startdate": "[\"2018\"]",
       "timeperiod_enddate": "[\"2021\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2001 on 2021-01-05T00:00:00Z.\nHarvestingEvent ID: 3018.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via OAI-PMH from Global Source 2001 on 2021-06-11T00:00:00Z.\nHarvestingEvent ID: 3018.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. Maria Garcia",
         "Prof. John Smith",
@@ -771,27 +771,27 @@
       "openalex_match_info": null,
       "openalex_fulltext_origin": "repository",
       "openalex_is_retracted": false,
-      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2018-6722\", \"pmid\": \"38002018\"}",
-      "openalex_open_access_status": "closed"
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2018-5013\", \"pmid\": null}",
+      "openalex_open_access_status": "gold"
     }
   },
   {
     "model": "publications.publication",
     "pk": 2019,
     "fields": {
-      "status": "h",
+      "status": "p",
       "title": "African-Asian Monsoon Study",
       "abstract": "Large-scale multi-regional research project covering Africa, Indian Ocean, and Asia. This comprehensive study examines global patterns and connections across multiple continents and oceans.",
-      "publicationDate": "2022-07-17",
-      "doi": "10.5555/global-2019-1281",
+      "publicationDate": "2023-06-19",
+      "doi": "10.5555/global-2019-2243",
       "url": "https://example.org/publications/2019",
       "geometry": "SRID=4326;GEOMETRYCOLLECTION(POLYGON ((20 -10, 90 -10, 90 25, 20 25, 20 -10)))",
-      "creationDate": "2022-07-27T00:00:00Z",
-      "lastUpdate": "2022-07-28T09:00:00Z",
+      "creationDate": "2023-06-20T00:00:00Z",
+      "lastUpdate": "2023-06-21T22:00:00Z",
       "source": 2002,
-      "timeperiod_startdate": "[\"2021\"]",
-      "timeperiod_enddate": "[\"2022\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2002 on 2022-07-27T00:00:00Z.\nHarvestingEvent ID: 3019.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
+      "timeperiod_startdate": "[\"2020\"]",
+      "timeperiod_enddate": "[\"2023\"]",
+      "provenance": "Harvested via OAI-PMH from Global Source 2002 on 2023-06-20T00:00:00Z.\nHarvestingEvent ID: 3019.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
       "authors": [
         "Prof. A",
         "Dr. B",
@@ -808,12 +808,12 @@
         "Atmospheric Science",
         "Meteorology"
       ],
-      "openalex_id": "https://openalex.org/W3002019",
-      "openalex_match_info": null,
-      "openalex_fulltext_origin": "publisher",
+      "openalex_id": null,
+      "openalex_match_info": "[{\"openalex_id\": \"https://openalex.org/W2902019\", \"title\": \"Similar Study 2019\", \"doi\": null, \"match_type\": \"title\"}]",
+      "openalex_fulltext_origin": null,
       "openalex_is_retracted": false,
-      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2019-1281\", \"pmid\": \"38002019\"}",
-      "openalex_open_access_status": "hybrid"
+      "openalex_ids": null,
+      "openalex_open_access_status": null
     }
   },
   {
@@ -823,16 +823,16 @@
       "status": "p",
       "title": "Pan-Pacific Study",
       "abstract": "Large-scale multi-regional research project covering Asia, Pacific Ocean, North America, South America, Australia. This comprehensive study examines global patterns and connections across multiple continents and oceans.",
-      "publicationDate": "2020-08-24",
-      "doi": "10.5555/global-2020-1121",
+      "publicationDate": "2021-03-29",
+      "doi": "10.5555/global-2020-4694",
       "url": "https://example.org/publications/2020",
       "geometry": "SRID=4326;GEOMETRYCOLLECTION(POLYGON ((110 -40, -80 -40, -80 50, 110 50, 110 -40)))",
-      "creationDate": "2020-09-09T00:00:00Z",
-      "lastUpdate": "2020-09-10T21:00:00Z",
+      "creationDate": "2021-03-31T00:00:00Z",
+      "lastUpdate": "2021-04-01T08:00:00Z",
       "source": 2003,
-      "timeperiod_startdate": "[\"2017\"]",
-      "timeperiod_enddate": "[\"2020\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2003 on 2020-09-09T00:00:00Z.\nHarvestingEvent ID: 3020.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
+      "timeperiod_startdate": "[\"2019\"]",
+      "timeperiod_enddate": "[\"2021\"]",
+      "provenance": "Harvested via OAI-PMH from Global Source 2003 on 2021-03-31T00:00:00Z.\nHarvestingEvent ID: 3020.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
       "authors": [
         "Dr. Zhang Wei",
         "Prof. Sarah Johnson",
@@ -847,31 +847,31 @@
         "second keyword"
       ],
       "topics": [],
-      "openalex_id": null,
-      "openalex_match_info": "[{\"openalex_id\": \"https://openalex.org/W2902020\", \"title\": \"Similar Study 2020\", \"doi\": null, \"match_type\": \"title\"}]",
-      "openalex_fulltext_origin": null,
+      "openalex_id": "https://openalex.org/W3002020",
+      "openalex_match_info": null,
+      "openalex_fulltext_origin": "publisher",
       "openalex_is_retracted": false,
-      "openalex_ids": null,
-      "openalex_open_access_status": null
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2020-4694\", \"pmid\": null}",
+      "openalex_open_access_status": "hybrid"
     }
   },
   {
     "model": "publications.publication",
     "pk": 2021,
     "fields": {
-      "status": "c",
+      "status": "p",
       "title": "Southern Hemisphere Ocean Study",
       "abstract": "Large-scale multi-regional research project covering Southern Ocean, Pacific, Atlantic, Indian Oceans, South America, Africa, Australia, Antarctica. This comprehensive study examines global patterns and connections across multiple continents and oceans.",
-      "publicationDate": "2022-05-27",
-      "doi": "10.5555/global-2021-6855",
+      "publicationDate": "2023-06-14",
+      "doi": "10.5555/global-2021-3536",
       "url": "https://example.org/publications/2021",
       "geometry": "SRID=4326;GEOMETRYCOLLECTION(POLYGON ((-180 -60, 180 -60, 180 -35, -180 -35, -180 -60)))",
-      "creationDate": "2022-05-31T00:00:00Z",
-      "lastUpdate": "2022-06-01T04:00:00Z",
+      "creationDate": "2023-06-20T00:00:00Z",
+      "lastUpdate": "2023-06-21T23:00:00Z",
       "source": 2000,
-      "timeperiod_startdate": "[\"2021\"]",
-      "timeperiod_enddate": "[\"2022\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 on 2022-05-31T00:00:00Z.\nHarvestingEvent ID: 3021.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "timeperiod_startdate": "[\"2020\"]",
+      "timeperiod_enddate": "[\"2023\"]",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 on 2023-06-20T00:00:00Z.\nHarvestingEvent ID: 3021.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [],
       "keywords": [
         "climate change",
@@ -881,12 +881,12 @@
       "topics": [
         "Geography"
       ],
-      "openalex_id": "https://openalex.org/W3002021",
-      "openalex_match_info": null,
+      "openalex_id": null,
+      "openalex_match_info": "[{\"openalex_id\": \"https://openalex.org/W2902021\", \"title\": \"Similar Study 2021\", \"doi\": null, \"match_type\": \"title\"}]",
       "openalex_fulltext_origin": null,
       "openalex_is_retracted": false,
-      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2021-6855\", \"pmid\": \"38002021\"}",
-      "openalex_open_access_status": "bronze"
+      "openalex_ids": null,
+      "openalex_open_access_status": null
     }
   },
   {
@@ -896,16 +896,16 @@
       "status": "p",
       "title": "Arctic Circumpolar Study",
       "abstract": "Large-scale multi-regional research project covering Arctic Ocean, North America, Europe, Asia. This comprehensive study examines global patterns and connections across multiple continents and oceans.",
-      "publicationDate": "2022-07-03",
-      "doi": "10.5555/global-2022-7409",
+      "publicationDate": "2021-04-01",
+      "doi": "10.5555/global-2022-6734",
       "url": "https://example.org/publications/2022",
       "geometry": "SRID=4326;GEOMETRYCOLLECTION(POLYGON ((-180 65, 180 65, 180 85, -180 85, -180 65)))",
-      "creationDate": "2022-07-17T00:00:00Z",
-      "lastUpdate": "2022-07-18T07:00:00Z",
+      "creationDate": "2021-04-02T00:00:00Z",
+      "lastUpdate": "2021-04-03T04:00:00Z",
       "source": 2001,
-      "timeperiod_startdate": "[\"2019\"]",
-      "timeperiod_enddate": "[\"2022\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2001 on 2022-07-17T00:00:00Z.\nHarvestingEvent ID: 3022.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "timeperiod_startdate": "[\"2020\"]",
+      "timeperiod_enddate": "[\"2021\"]",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2001 on 2021-04-02T00:00:00Z.\nHarvestingEvent ID: 3022.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. Single Author"
       ],
@@ -923,8 +923,8 @@
       "openalex_match_info": null,
       "openalex_fulltext_origin": "repository",
       "openalex_is_retracted": false,
-      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2022-7409\", \"pmid\": \"38002022\"}",
-      "openalex_open_access_status": null
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2022-6734\", \"pmid\": \"38002022\"}",
+      "openalex_open_access_status": "gold"
     }
   },
   {
@@ -934,16 +934,16 @@
       "status": "p",
       "title": "Global Climate Network",
       "abstract": "Large-scale multi-regional research project covering North America, Europe, Australia, South America. This comprehensive study examines global patterns and connections across multiple continents and oceans.",
-      "publicationDate": "2023-11-05",
-      "doi": "10.5555/global-2023-1260",
+      "publicationDate": "2022-08-17",
+      "doi": "10.5555/global-2023-9879",
       "url": "https://example.org/publications/2023",
       "geometry": "SRID=4326;GEOMETRYCOLLECTION(MULTIPOLYGON (((-120 30, -100 30, -100 45, -120 45, -120 30)), ((10 40, 30 40, 30 55, 10 55, 10 40)), ((120 -30, 140 -30, 140 -20, 120 -20, 120 -30)), ((-50 -20, -40 -20, -40 -10, -50 -10, -50 -20))))",
-      "creationDate": "2023-11-19T00:00:00Z",
-      "lastUpdate": "2023-11-20T01:00:00Z",
+      "creationDate": "2022-09-01T00:00:00Z",
+      "lastUpdate": "2022-09-02T21:00:00Z",
       "source": 2002,
-      "timeperiod_startdate": "[\"2020\"]",
-      "timeperiod_enddate": "[\"2023\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2002 on 2023-11-19T00:00:00Z.\nHarvestingEvent ID: 3023.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "timeperiod_startdate": "[\"2019\"]",
+      "timeperiod_enddate": "[\"2022\"]",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2002 on 2022-09-01T00:00:00Z.\nHarvestingEvent ID: 3023.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
       "authors": [
         "Dr. First Author",
         "Prof. Second Author"
@@ -963,10 +963,836 @@
       ],
       "openalex_id": "https://openalex.org/W3002023",
       "openalex_match_info": null,
+      "openalex_fulltext_origin": null,
+      "openalex_is_retracted": false,
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2023-9879\", \"pmid\": \"38002023\"}",
+      "openalex_open_access_status": "bronze"
+    }
+  },
+  {
+    "model": "publications.publication",
+    "pk": 2024,
+    "fields": {
+      "status": "p",
+      "title": "Field Site: Central Africa",
+      "abstract": "Point-based monitoring and research from field research station in central Africa. This site provides continuous data collection and analysis for local environmental conditions.",
+      "publicationDate": "2023-08-10",
+      "doi": "10.5555/global-2024-3314",
+      "url": "https://example.org/publications/2024",
+      "geometry": "SRID=4326;GEOMETRYCOLLECTION(POINT (20 0))",
+      "creationDate": "2023-08-14T00:00:00Z",
+      "lastUpdate": "2023-08-15T08:00:00Z",
+      "source": 2000,
+      "timeperiod_startdate": "[\"2022\"]",
+      "timeperiod_enddate": "[\"2023\"]",
+      "provenance": "Harvested via OAI-PMH from Global Source 2000 on 2023-08-14T00:00:00Z.\nHarvestingEvent ID: 3024.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "authors": [
+        "Dr. Alice Smith",
+        "Prof. Bob Jones",
+        "Dr. Carol Williams"
+      ],
+      "keywords": [],
+      "topics": [],
+      "openalex_id": "https://openalex.org/W3002024",
+      "openalex_match_info": null,
+      "openalex_fulltext_origin": null,
+      "openalex_is_retracted": false,
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2024-3314\", \"pmid\": \"38002024\"}",
+      "openalex_open_access_status": "closed"
+    }
+  },
+  {
+    "model": "publications.publication",
+    "pk": 2025,
+    "fields": {
+      "status": "p",
+      "title": "Field Site: Central Europe",
+      "abstract": "Point-based monitoring and research from field research station in central Europe. This site provides continuous data collection and analysis for local environmental conditions.",
+      "publicationDate": "2022-08-31",
+      "doi": "10.5555/global-2025-5390",
+      "url": "https://example.org/publications/2025",
+      "geometry": "SRID=4326;GEOMETRYCOLLECTION(POINT (15 50))",
+      "creationDate": "2022-09-25T00:00:00Z",
+      "lastUpdate": "2022-09-25T12:00:00Z",
+      "source": 2001,
+      "timeperiod_startdate": "[\"2019\"]",
+      "timeperiod_enddate": "[\"2022\"]",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2001 on 2022-09-25T00:00:00Z.\nHarvestingEvent ID: 3025.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "authors": [
+        "Dr. Maria Garcia",
+        "Prof. John Smith",
+        "Dr. Emma Johnson",
+        "Dr. Li Wei"
+      ],
+      "keywords": [
+        "single keyword"
+      ],
+      "topics": [
+        "Geography"
+      ],
+      "openalex_id": null,
+      "openalex_match_info": "[{\"openalex_id\": \"https://openalex.org/W2902025\", \"title\": \"Similar Study 2025\", \"doi\": null, \"match_type\": \"title\"}]",
+      "openalex_fulltext_origin": null,
+      "openalex_is_retracted": false,
+      "openalex_ids": null,
+      "openalex_open_access_status": null
+    }
+  },
+  {
+    "model": "publications.publication",
+    "pk": 2026,
+    "fields": {
+      "status": "p",
+      "title": "Field Site: Central Asia",
+      "abstract": "Point-based monitoring and research from field research station in central Asia. This site provides continuous data collection and analysis for local environmental conditions.",
+      "publicationDate": "2021-02-02",
+      "doi": "10.5555/global-2026-9567",
+      "url": "https://example.org/publications/2026",
+      "geometry": "SRID=4326;GEOMETRYCOLLECTION(POINT (85 45))",
+      "creationDate": "2021-02-10T00:00:00Z",
+      "lastUpdate": "2021-02-11T18:00:00Z",
+      "source": 2002,
+      "timeperiod_startdate": "[\"2018\"]",
+      "timeperiod_enddate": "[\"2021\"]",
+      "provenance": "Harvested via OAI-PMH from Global Source 2002 on 2021-02-10T00:00:00Z.\nHarvestingEvent ID: 3026.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
+      "authors": [
+        "Prof. A",
+        "Dr. B",
+        "Dr. C",
+        "Dr. D",
+        "Dr. E",
+        "Prof. F"
+      ],
+      "keywords": [
+        "first keyword",
+        "second keyword"
+      ],
+      "topics": [
+        "Environmental Science",
+        "Ecology"
+      ],
+      "openalex_id": "https://openalex.org/W3002026",
+      "openalex_match_info": null,
+      "openalex_fulltext_origin": null,
+      "openalex_is_retracted": false,
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2026-9567\", \"pmid\": null}",
+      "openalex_open_access_status": "diamond"
+    }
+  },
+  {
+    "model": "publications.publication",
+    "pk": 2027,
+    "fields": {
+      "status": "p",
+      "title": "Field Site: Central North America",
+      "abstract": "Point-based monitoring and research from field research station in central North America. This site provides continuous data collection and analysis for local environmental conditions.",
+      "publicationDate": "2021-06-17",
+      "doi": "10.5555/global-2027-6059",
+      "url": "https://example.org/publications/2027",
+      "geometry": "SRID=4326;GEOMETRYCOLLECTION(POINT (-100 45))",
+      "creationDate": "2021-06-20T00:00:00Z",
+      "lastUpdate": "2021-06-21T16:00:00Z",
+      "source": 2003,
+      "timeperiod_startdate": "[\"2020\"]",
+      "timeperiod_enddate": "[\"2021\"]",
+      "provenance": "Harvested via OAI-PMH from Global Source 2003 on 2021-06-20T00:00:00Z.\nHarvestingEvent ID: 3027.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "authors": [
+        "Dr. Zhang Wei",
+        "Prof. Sarah Johnson",
+        "Dr. Ahmed Hassan",
+        "Dr. Maria Rodriguez",
+        "Dr. John O'Connor",
+        "Prof. Yuki Tanaka",
+        "Dr. Pierre Dubois"
+      ],
+      "keywords": [
+        "climate change",
+        "remote sensing",
+        "geospatial analysis"
+      ],
+      "topics": [
+        "Climate Science",
+        "Atmospheric Science",
+        "Meteorology"
+      ],
+      "openalex_id": "https://openalex.org/W3002027",
+      "openalex_match_info": null,
+      "openalex_fulltext_origin": null,
+      "openalex_is_retracted": false,
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2027-6059\", \"pmid\": \"38002027\"}",
+      "openalex_open_access_status": null
+    }
+  },
+  {
+    "model": "publications.publication",
+    "pk": 2028,
+    "fields": {
+      "status": "p",
+      "title": "Field Site: Central South America",
+      "abstract": "Point-based monitoring and research from field research station in central South America. This site provides continuous data collection and analysis for local environmental conditions.",
+      "publicationDate": "2021-04-13",
+      "doi": "10.5555/global-2028-2342",
+      "url": "https://example.org/publications/2028",
+      "geometry": "SRID=4326;GEOMETRYCOLLECTION(POINT (-60 -15))",
+      "creationDate": "2021-04-19T00:00:00Z",
+      "lastUpdate": "2021-04-20T15:00:00Z",
+      "source": 2000,
+      "timeperiod_startdate": "[\"2019\"]",
+      "timeperiod_enddate": "[\"2021\"]",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 on 2021-04-19T00:00:00Z.\nHarvestingEvent ID: 3028.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "authors": [],
+      "keywords": [
+        "biodiversity",
+        "ecosystem services",
+        "conservation",
+        "habitat mapping"
+      ],
+      "topics": [],
+      "openalex_id": "https://openalex.org/W3002028",
+      "openalex_match_info": null,
+      "openalex_fulltext_origin": null,
+      "openalex_is_retracted": false,
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2028-2342\", \"pmid\": null}",
+      "openalex_open_access_status": "hybrid"
+    }
+  },
+  {
+    "model": "publications.publication",
+    "pk": 2029,
+    "fields": {
+      "status": "p",
+      "title": "Field Site: Central Australia",
+      "abstract": "Point-based monitoring and research from field research station in central Australia. This site provides continuous data collection and analysis for local environmental conditions.",
+      "publicationDate": "2021-02-27",
+      "doi": "10.5555/global-2029-5579",
+      "url": "https://example.org/publications/2029",
+      "geometry": "SRID=4326;GEOMETRYCOLLECTION(POINT (135 -25))",
+      "creationDate": "2021-02-28T00:00:00Z",
+      "lastUpdate": "2021-03-01T06:00:00Z",
+      "source": 2001,
+      "timeperiod_startdate": "[\"2019\"]",
+      "timeperiod_enddate": "[\"2021\"]",
+      "provenance": "Harvested via OAI-PMH from Global Source 2001 on 2021-02-28T00:00:00Z.\nHarvestingEvent ID: 3029.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
+      "authors": [
+        "Dr. Single Author"
+      ],
+      "keywords": [
+        "urban planning",
+        "sustainability",
+        "GIS",
+        "land use",
+        "spatial analysis",
+        "demographics"
+      ],
+      "topics": [
+        "Geography"
+      ],
+      "openalex_id": null,
+      "openalex_match_info": "[{\"openalex_id\": \"https://openalex.org/W2902029\", \"title\": \"Similar Study 2029\", \"doi\": null, \"match_type\": \"title\"}]",
+      "openalex_fulltext_origin": null,
+      "openalex_is_retracted": false,
+      "openalex_ids": null,
+      "openalex_open_access_status": null
+    }
+  },
+  {
+    "model": "publications.publication",
+    "pk": 2030,
+    "fields": {
+      "status": "p",
+      "title": "Field Site: Antarctic Peninsula",
+      "abstract": "Point-based monitoring and research from field research station in Antarctica. This site provides continuous data collection and analysis for local environmental conditions.",
+      "publicationDate": "2023-04-13",
+      "doi": "10.5555/global-2030-9361",
+      "url": "https://example.org/publications/2030",
+      "geometry": "SRID=4326;GEOMETRYCOLLECTION(POINT (-60 -70))",
+      "creationDate": "2023-05-03T00:00:00Z",
+      "lastUpdate": "2023-05-04T16:00:00Z",
+      "source": 2002,
+      "timeperiod_startdate": "[\"2021\"]",
+      "timeperiod_enddate": "[\"2023\"]",
+      "provenance": "Harvested via OAI-PMH from Global Source 2002 on 2023-05-03T00:00:00Z.\nHarvestingEvent ID: 3030.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
+      "authors": [
+        "Dr. First Author",
+        "Prof. Second Author"
+      ],
+      "keywords": [],
+      "topics": [
+        "Environmental Science",
+        "Ecology"
+      ],
+      "openalex_id": "https://openalex.org/W3002030",
+      "openalex_match_info": null,
+      "openalex_fulltext_origin": null,
+      "openalex_is_retracted": false,
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2030-9361\", \"pmid\": null}",
+      "openalex_open_access_status": "closed"
+    }
+  },
+  {
+    "model": "publications.publication",
+    "pk": 2031,
+    "fields": {
+      "status": "p",
+      "title": "Monitoring Buoy: Central Atlantic",
+      "abstract": "Point-based monitoring and research from ocean monitoring buoy in the Atlantic Ocean. This site provides continuous data collection and analysis for local environmental conditions.",
+      "publicationDate": "2023-12-19",
+      "doi": "10.5555/global-2031-4582",
+      "url": "https://example.org/publications/2031",
+      "geometry": "SRID=4326;GEOMETRYCOLLECTION(POINT (-30 20))",
+      "creationDate": "2023-12-26T00:00:00Z",
+      "lastUpdate": "2023-12-26T04:00:00Z",
+      "source": 2003,
+      "timeperiod_startdate": "[\"2021\"]",
+      "timeperiod_enddate": "[\"2023\"]",
+      "provenance": "Harvested via OAI-PMH from Global Source 2003 on 2023-12-26T00:00:00Z.\nHarvestingEvent ID: 3031.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "authors": [
+        "Dr. Alice Smith",
+        "Prof. Bob Jones",
+        "Dr. Carol Williams"
+      ],
+      "keywords": [
+        "single keyword"
+      ],
+      "topics": [
+        "Climate Science",
+        "Atmospheric Science",
+        "Meteorology"
+      ],
+      "openalex_id": "https://openalex.org/W3002031",
+      "openalex_match_info": null,
+      "openalex_fulltext_origin": null,
+      "openalex_is_retracted": false,
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2031-4582\", \"pmid\": \"38002031\"}",
+      "openalex_open_access_status": "green"
+    }
+  },
+  {
+    "model": "publications.publication",
+    "pk": 2032,
+    "fields": {
+      "status": "p",
+      "title": "Monitoring Buoy: Central Pacific",
+      "abstract": "Point-based monitoring and research from ocean monitoring buoy in the Pacific Ocean. This site provides continuous data collection and analysis for local environmental conditions.",
+      "publicationDate": "2023-06-02",
+      "doi": "10.5555/global-2032-6701",
+      "url": "https://example.org/publications/2032",
+      "geometry": "SRID=4326;GEOMETRYCOLLECTION(POINT (170 0))",
+      "creationDate": "2023-06-14T00:00:00Z",
+      "lastUpdate": "2023-06-14T18:00:00Z",
+      "source": 2000,
+      "timeperiod_startdate": "[\"2022\"]",
+      "timeperiod_enddate": "[\"2023\"]",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 on 2023-06-14T00:00:00Z.\nHarvestingEvent ID: 3032.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "authors": [
+        "Dr. Maria Garcia",
+        "Prof. John Smith",
+        "Dr. Emma Johnson",
+        "Dr. Li Wei"
+      ],
+      "keywords": [
+        "first keyword",
+        "second keyword"
+      ],
+      "topics": [],
+      "openalex_id": "https://openalex.org/W3002032",
+      "openalex_match_info": null,
       "openalex_fulltext_origin": "publisher",
       "openalex_is_retracted": false,
-      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2023-1260\", \"pmid\": null}",
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2032-6701\", \"pmid\": null}",
+      "openalex_open_access_status": "closed"
+    }
+  },
+  {
+    "model": "publications.publication",
+    "pk": 2033,
+    "fields": {
+      "status": "p",
+      "title": "Monitoring Buoy: Central Indian Ocean",
+      "abstract": "Point-based monitoring and research from ocean monitoring buoy in the Indian Ocean. This site provides continuous data collection and analysis for local environmental conditions.",
+      "publicationDate": "2024-03-30",
+      "doi": "10.5555/global-2033-1204",
+      "url": "https://example.org/publications/2033",
+      "geometry": "SRID=4326;GEOMETRYCOLLECTION(POINT (75 -20))",
+      "creationDate": "2024-04-18T00:00:00Z",
+      "lastUpdate": "2024-04-18T03:00:00Z",
+      "source": 2001,
+      "timeperiod_startdate": "[\"2022\"]",
+      "timeperiod_enddate": "[\"2024\"]",
+      "provenance": "Harvested via OAI-PMH from Global Source 2001 on 2024-04-18T00:00:00Z.\nHarvestingEvent ID: 3033.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "authors": [
+        "Prof. A",
+        "Dr. B",
+        "Dr. C",
+        "Dr. D",
+        "Dr. E",
+        "Prof. F"
+      ],
+      "keywords": [
+        "climate change",
+        "remote sensing",
+        "geospatial analysis"
+      ],
+      "topics": [
+        "Geography"
+      ],
+      "openalex_id": "https://openalex.org/W3002033",
+      "openalex_match_info": null,
+      "openalex_fulltext_origin": "publisher",
+      "openalex_is_retracted": false,
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2033-1204\", \"pmid\": \"38002033\"}",
+      "openalex_open_access_status": "gold"
+    }
+  },
+  {
+    "model": "publications.publication",
+    "pk": 2034,
+    "fields": {
+      "status": "p",
+      "title": "Monitoring Buoy: Arctic Ocean",
+      "abstract": "Point-based monitoring and research from ocean monitoring buoy in the Arctic Ocean. This site provides continuous data collection and analysis for local environmental conditions.",
+      "publicationDate": "2023-03-21",
+      "doi": "10.5555/global-2034-3680",
+      "url": "https://example.org/publications/2034",
+      "geometry": "SRID=4326;GEOMETRYCOLLECTION(POINT (0 85))",
+      "creationDate": "2023-03-26T00:00:00Z",
+      "lastUpdate": "2023-03-27T07:00:00Z",
+      "source": 2002,
+      "timeperiod_startdate": "[\"2021\"]",
+      "timeperiod_enddate": "[\"2023\"]",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2002 on 2023-03-26T00:00:00Z.\nHarvestingEvent ID: 3034.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "authors": [
+        "Dr. Zhang Wei",
+        "Prof. Sarah Johnson",
+        "Dr. Ahmed Hassan",
+        "Dr. Maria Rodriguez",
+        "Dr. John O'Connor",
+        "Prof. Yuki Tanaka",
+        "Dr. Pierre Dubois"
+      ],
+      "keywords": [
+        "biodiversity",
+        "ecosystem services",
+        "conservation",
+        "habitat mapping"
+      ],
+      "topics": [
+        "Environmental Science",
+        "Ecology"
+      ],
+      "openalex_id": "https://openalex.org/W3002034",
+      "openalex_match_info": null,
+      "openalex_fulltext_origin": "publisher",
+      "openalex_is_retracted": false,
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2034-3680\", \"pmid\": null}",
+      "openalex_open_access_status": "closed"
+    }
+  },
+  {
+    "model": "publications.publication",
+    "pk": 2035,
+    "fields": {
+      "status": "p",
+      "title": "Monitoring Buoy: Southern Ocean",
+      "abstract": "Point-based monitoring and research from ocean monitoring buoy in the Southern Ocean. This site provides continuous data collection and analysis for local environmental conditions.",
+      "publicationDate": "2021-05-24",
+      "doi": "10.5555/global-2035-5335",
+      "url": "https://example.org/publications/2035",
+      "geometry": "SRID=4326;GEOMETRYCOLLECTION(POINT (100 -65))",
+      "creationDate": "2021-06-14T00:00:00Z",
+      "lastUpdate": "2021-06-15T17:00:00Z",
+      "source": 2003,
+      "timeperiod_startdate": "[\"2020\"]",
+      "timeperiod_enddate": "[\"2021\"]",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2003 on 2021-06-14T00:00:00Z.\nHarvestingEvent ID: 3035.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
+      "authors": [],
+      "keywords": [
+        "urban planning",
+        "sustainability",
+        "GIS",
+        "land use",
+        "spatial analysis",
+        "demographics"
+      ],
+      "topics": [
+        "Climate Science",
+        "Atmospheric Science",
+        "Meteorology"
+      ],
+      "openalex_id": "https://openalex.org/W3002035",
+      "openalex_match_info": null,
+      "openalex_fulltext_origin": "publisher",
+      "openalex_is_retracted": false,
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2035-5335\", \"pmid\": null}",
+      "openalex_open_access_status": "hybrid"
+    }
+  },
+  {
+    "model": "publications.publication",
+    "pk": 2036,
+    "fields": {
+      "status": "p",
+      "title": "Migration Route: Africa to Europe",
+      "abstract": "Linear pathway study documenting bird migration corridor from Africa through Mediterranean to Europe. This research traces continuous phenomena across regional boundaries.",
+      "publicationDate": "2020-09-09",
+      "doi": "10.5555/global-2036-6708",
+      "url": "https://example.org/publications/2036",
+      "geometry": "SRID=4326;GEOMETRYCOLLECTION(LINESTRING (20 -5, 25 10, 15 35, 10 45))",
+      "creationDate": "2020-09-20T00:00:00Z",
+      "lastUpdate": "2020-09-20T02:00:00Z",
+      "source": 2000,
+      "timeperiod_startdate": "[\"2018\"]",
+      "timeperiod_enddate": "[\"2020\"]",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 on 2020-09-20T00:00:00Z.\nHarvestingEvent ID: 3036.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
+      "authors": [
+        "Dr. Single Author"
+      ],
+      "keywords": [],
+      "topics": [],
+      "openalex_id": null,
+      "openalex_match_info": "[{\"openalex_id\": \"https://openalex.org/W2902036\", \"title\": \"Similar Study 2036\", \"doi\": null, \"match_type\": \"title\"}]",
+      "openalex_fulltext_origin": null,
+      "openalex_is_retracted": false,
+      "openalex_ids": null,
+      "openalex_open_access_status": null
+    }
+  },
+  {
+    "model": "publications.publication",
+    "pk": 2037,
+    "fields": {
+      "status": "p",
+      "title": "Migration Route: Asia to Australia",
+      "abstract": "Linear pathway study documenting bird migration corridor from Asia to Australia. This research traces continuous phenomena across regional boundaries.",
+      "publicationDate": "2023-10-16",
+      "doi": "10.5555/global-2037-9678",
+      "url": "https://example.org/publications/2037",
+      "geometry": "SRID=4326;GEOMETRYCOLLECTION(LINESTRING (100 30, 110 10, 120 -10, 130 -20))",
+      "creationDate": "2023-11-10T00:00:00Z",
+      "lastUpdate": "2023-11-11T14:00:00Z",
+      "source": 2001,
+      "timeperiod_startdate": "[\"2021\"]",
+      "timeperiod_enddate": "[\"2023\"]",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2001 on 2023-11-10T00:00:00Z.\nHarvestingEvent ID: 3037.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
+      "authors": [
+        "Dr. First Author",
+        "Prof. Second Author"
+      ],
+      "keywords": [
+        "single keyword"
+      ],
+      "topics": [
+        "Geography"
+      ],
+      "openalex_id": "https://openalex.org/W3002037",
+      "openalex_match_info": null,
+      "openalex_fulltext_origin": "publisher",
+      "openalex_is_retracted": false,
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2037-9678\", \"pmid\": null}",
+      "openalex_open_access_status": "hybrid"
+    }
+  },
+  {
+    "model": "publications.publication",
+    "pk": 2038,
+    "fields": {
+      "status": "p",
+      "title": "Shipping Lane: Atlantic Crossing",
+      "abstract": "Linear pathway study documenting major shipping route across North Atlantic from North America to Europe. This research traces continuous phenomena across regional boundaries.",
+      "publicationDate": "2023-02-13",
+      "doi": "10.5555/global-2038-4237",
+      "url": "https://example.org/publications/2038",
+      "geometry": "SRID=4326;GEOMETRYCOLLECTION(LINESTRING (-75 40, -50 45, -25 50, -5 52))",
+      "creationDate": "2023-02-25T00:00:00Z",
+      "lastUpdate": "2023-02-26T23:00:00Z",
+      "source": 2002,
+      "timeperiod_startdate": "[\"2020\"]",
+      "timeperiod_enddate": "[\"2023\"]",
+      "provenance": "Harvested via OAI-PMH from Global Source 2002 on 2023-02-25T00:00:00Z.\nHarvestingEvent ID: 3038.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
+      "authors": [
+        "Dr. Alice Smith",
+        "Prof. Bob Jones",
+        "Dr. Carol Williams"
+      ],
+      "keywords": [
+        "first keyword",
+        "second keyword"
+      ],
+      "topics": [
+        "Environmental Science",
+        "Ecology"
+      ],
+      "openalex_id": "https://openalex.org/W3002038",
+      "openalex_match_info": null,
+      "openalex_fulltext_origin": null,
+      "openalex_is_retracted": false,
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2038-4237\", \"pmid\": \"38002038\"}",
+      "openalex_open_access_status": "diamond"
+    }
+  },
+  {
+    "model": "publications.publication",
+    "pk": 2039,
+    "fields": {
+      "status": "p",
+      "title": "Shipping Lane: Pacific Crossing",
+      "abstract": "Linear pathway study documenting major shipping route across North Pacific from Asia to North America. This research traces continuous phenomena across regional boundaries.",
+      "publicationDate": "2020-03-28",
+      "doi": "10.5555/global-2039-5242",
+      "url": "https://example.org/publications/2039",
+      "geometry": "SRID=4326;GEOMETRYCOLLECTION(LINESTRING (140 35, 170 38, -160 40, -130 42))",
+      "creationDate": "2020-04-26T00:00:00Z",
+      "lastUpdate": "2020-04-27T16:00:00Z",
+      "source": 2003,
+      "timeperiod_startdate": "[\"2019\"]",
+      "timeperiod_enddate": "[\"2020\"]",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2003 on 2020-04-26T00:00:00Z.\nHarvestingEvent ID: 3039.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
+      "authors": [
+        "Dr. Maria Garcia",
+        "Prof. John Smith",
+        "Dr. Emma Johnson",
+        "Dr. Li Wei"
+      ],
+      "keywords": [
+        "climate change",
+        "remote sensing",
+        "geospatial analysis"
+      ],
+      "topics": [
+        "Climate Science",
+        "Atmospheric Science",
+        "Meteorology"
+      ],
+      "openalex_id": "https://openalex.org/W3002039",
+      "openalex_match_info": null,
+      "openalex_fulltext_origin": null,
+      "openalex_is_retracted": false,
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2039-5242\", \"pmid\": \"38002039\"}",
+      "openalex_open_access_status": "diamond"
+    }
+  },
+  {
+    "model": "publications.publication",
+    "pk": 2040,
+    "fields": {
+      "status": "p",
+      "title": "Ocean Current: Gulf Stream",
+      "abstract": "Linear pathway study documenting Gulf Stream current from Gulf of Mexico to North Atlantic. This research traces continuous phenomena across regional boundaries.",
+      "publicationDate": "2023-02-25",
+      "doi": "10.5555/global-2040-5102",
+      "url": "https://example.org/publications/2040",
+      "geometry": "SRID=4326;GEOMETRYCOLLECTION(LINESTRING (-80 25, -70 30, -50 35, -30 40, -10 50))",
+      "creationDate": "2023-03-26T00:00:00Z",
+      "lastUpdate": "2023-03-27T15:00:00Z",
+      "source": 2000,
+      "timeperiod_startdate": "[\"2021\"]",
+      "timeperiod_enddate": "[\"2023\"]",
+      "provenance": "Harvested via OAI-PMH from Global Source 2000 on 2023-03-26T00:00:00Z.\nHarvestingEvent ID: 3040.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "authors": [
+        "Prof. A",
+        "Dr. B",
+        "Dr. C",
+        "Dr. D",
+        "Dr. E",
+        "Prof. F"
+      ],
+      "keywords": [
+        "biodiversity",
+        "ecosystem services",
+        "conservation",
+        "habitat mapping"
+      ],
+      "topics": [],
+      "openalex_id": "https://openalex.org/W3002040",
+      "openalex_match_info": null,
+      "openalex_fulltext_origin": "repository",
+      "openalex_is_retracted": false,
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2040-5102\", \"pmid\": \"38002040\"}",
+      "openalex_open_access_status": "hybrid"
+    }
+  },
+  {
+    "model": "publications.publication",
+    "pk": 2041,
+    "fields": {
+      "status": "p",
+      "title": "Ocean Current: Kuroshio",
+      "abstract": "Linear pathway study documenting Kuroshio Current along eastern Asia into Pacific. This research traces continuous phenomena across regional boundaries.",
+      "publicationDate": "2021-04-02",
+      "doi": "10.5555/global-2041-4206",
+      "url": "https://example.org/publications/2041",
+      "geometry": "SRID=4326;GEOMETRYCOLLECTION(LINESTRING (125 25, 135 30, 145 35, 155 40))",
+      "creationDate": "2021-04-30T00:00:00Z",
+      "lastUpdate": "2021-04-30T05:00:00Z",
+      "source": 2001,
+      "timeperiod_startdate": "[\"2019\"]",
+      "timeperiod_enddate": "[\"2021\"]",
+      "provenance": "Harvested via OAI-PMH from Global Source 2001 on 2021-04-30T00:00:00Z.\nHarvestingEvent ID: 3041.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "authors": [
+        "Dr. Zhang Wei",
+        "Prof. Sarah Johnson",
+        "Dr. Ahmed Hassan",
+        "Dr. Maria Rodriguez",
+        "Dr. John O'Connor",
+        "Prof. Yuki Tanaka",
+        "Dr. Pierre Dubois"
+      ],
+      "keywords": [
+        "urban planning",
+        "sustainability",
+        "GIS",
+        "land use",
+        "spatial analysis",
+        "demographics"
+      ],
+      "topics": [
+        "Geography"
+      ],
+      "openalex_id": "https://openalex.org/W3002041",
+      "openalex_match_info": null,
+      "openalex_fulltext_origin": "publisher",
+      "openalex_is_retracted": false,
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2041-4206\", \"pmid\": null}",
+      "openalex_open_access_status": "gold"
+    }
+  },
+  {
+    "model": "publications.publication",
+    "pk": 2042,
+    "fields": {
+      "status": "p",
+      "title": "Seismic Survey: Mid-Atlantic Ridge",
+      "abstract": "Linear pathway study documenting geological survey along Mid-Atlantic Ridge from South Atlantic to North Atlantic. This research traces continuous phenomena across regional boundaries.",
+      "publicationDate": "2020-08-06",
+      "doi": "10.5555/global-2042-5365",
+      "url": "https://example.org/publications/2042",
+      "geometry": "SRID=4326;GEOMETRYCOLLECTION(LINESTRING (-35 -30, -30 -10, -25 10, -20 30, -15 50))",
+      "creationDate": "2020-08-13T00:00:00Z",
+      "lastUpdate": "2020-08-14T05:00:00Z",
+      "source": 2002,
+      "timeperiod_startdate": "[\"2019\"]",
+      "timeperiod_enddate": "[\"2020\"]",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2002 on 2020-08-13T00:00:00Z.\nHarvestingEvent ID: 3042.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
+      "authors": [],
+      "keywords": [],
+      "topics": [
+        "Environmental Science",
+        "Ecology"
+      ],
+      "openalex_id": null,
+      "openalex_match_info": "[{\"openalex_id\": \"https://openalex.org/W2902042\", \"title\": \"Similar Study 2042\", \"doi\": null, \"match_type\": \"title\"}]",
+      "openalex_fulltext_origin": null,
+      "openalex_is_retracted": false,
+      "openalex_ids": null,
+      "openalex_open_access_status": null
+    }
+  },
+  {
+    "model": "publications.publication",
+    "pk": 2043,
+    "fields": {
+      "status": "p",
+      "title": "Seismic Survey: Ring of Fire West",
+      "abstract": "Linear pathway study documenting seismic monitoring along western Pacific Ring of Fire from Indian Ocean to Pacific. This research traces continuous phenomena across regional boundaries.",
+      "publicationDate": "2020-05-28",
+      "doi": "10.5555/global-2043-8025",
+      "url": "https://example.org/publications/2043",
+      "geometry": "SRID=4326;GEOMETRYCOLLECTION(LINESTRING (120 -10, 125 0, 130 10, 135 20, 140 30))",
+      "creationDate": "2020-06-21T00:00:00Z",
+      "lastUpdate": "2020-06-22T01:00:00Z",
+      "source": 2003,
+      "timeperiod_startdate": "[\"2017\"]",
+      "timeperiod_enddate": "[\"2020\"]",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2003 on 2020-06-21T00:00:00Z.\nHarvestingEvent ID: 3043.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
+      "authors": [
+        "Dr. Single Author"
+      ],
+      "keywords": [
+        "single keyword"
+      ],
+      "topics": [
+        "Climate Science",
+        "Atmospheric Science",
+        "Meteorology"
+      ],
+      "openalex_id": "https://openalex.org/W3002043",
+      "openalex_match_info": null,
+      "openalex_fulltext_origin": "publisher",
+      "openalex_is_retracted": false,
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2043-8025\", \"pmid\": \"38002043\"}",
+      "openalex_open_access_status": "diamond"
+    }
+  },
+  {
+    "model": "publications.publication",
+    "pk": 2044,
+    "fields": {
+      "status": "p",
+      "title": "Cable Route: Trans-Pacific",
+      "abstract": "Linear pathway study documenting undersea telecommunications cable across Pacific from North America to Asia. This research traces continuous phenomena across regional boundaries.",
+      "publicationDate": "2021-12-04",
+      "doi": "10.5555/global-2044-4099",
+      "url": "https://example.org/publications/2044",
+      "geometry": "SRID=4326;GEOMETRYCOLLECTION(LINESTRING (-120 35, -140 32, -160 30, -180 28, 170 26, 150 25))",
+      "creationDate": "2021-12-16T00:00:00Z",
+      "lastUpdate": "2021-12-17T20:00:00Z",
+      "source": 2000,
+      "timeperiod_startdate": "[\"2018\"]",
+      "timeperiod_enddate": "[\"2021\"]",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 on 2021-12-16T00:00:00Z.\nHarvestingEvent ID: 3044.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
+      "authors": [
+        "Dr. First Author",
+        "Prof. Second Author"
+      ],
+      "keywords": [
+        "first keyword",
+        "second keyword"
+      ],
+      "topics": [],
+      "openalex_id": "https://openalex.org/W3002044",
+      "openalex_match_info": null,
+      "openalex_fulltext_origin": null,
+      "openalex_is_retracted": false,
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2044-4099\", \"pmid\": null}",
       "openalex_open_access_status": "green"
+    }
+  },
+  {
+    "model": "publications.publication",
+    "pk": 2045,
+    "fields": {
+      "status": "p",
+      "title": "Cable Route: Europe-Africa",
+      "abstract": "Linear pathway study documenting undersea cable from Europe through Atlantic to Africa. This research traces continuous phenomena across regional boundaries.",
+      "publicationDate": "2022-06-20",
+      "doi": "10.5555/global-2045-5074",
+      "url": "https://example.org/publications/2045",
+      "geometry": "SRID=4326;GEOMETRYCOLLECTION(LINESTRING (10 55, 5 45, 0 35, -5 25, 0 10, 5 0))",
+      "creationDate": "2022-06-21T00:00:00Z",
+      "lastUpdate": "2022-06-22T00:00:00Z",
+      "source": 2001,
+      "timeperiod_startdate": "[\"2021\"]",
+      "timeperiod_enddate": "[\"2022\"]",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2001 on 2022-06-21T00:00:00Z.\nHarvestingEvent ID: 3045.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "authors": [
+        "Dr. Alice Smith",
+        "Prof. Bob Jones",
+        "Dr. Carol Williams"
+      ],
+      "keywords": [
+        "climate change",
+        "remote sensing",
+        "geospatial analysis"
+      ],
+      "topics": [
+        "Geography"
+      ],
+      "openalex_id": "https://openalex.org/W3002045",
+      "openalex_match_info": null,
+      "openalex_fulltext_origin": "publisher",
+      "openalex_is_retracted": false,
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2045-5074\", \"pmid\": \"38002045\"}",
+      "openalex_open_access_status": "hybrid"
     }
   }
 ]

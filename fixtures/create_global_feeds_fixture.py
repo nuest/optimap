@@ -99,6 +99,38 @@ MULTI_REGION_SPANS = [
     ("Global Climate Network", "MULTIPOLYGON (((-120 30, -100 30, -100 45, -120 45, -120 30)), ((10 40, 30 40, 30 55, 10 55, 10 40)), ((120 -30, 140 -30, 140 -20, 120 -20, 120 -30)), ((-50 -20, -40 -20, -40 -10, -50 -10, -50 -20)))", "North America, Europe, Australia, South America"),
 ]
 
+# Point geometries - one per global region (7 continents + 5 oceans = 12 points)
+REGION_POINTS = [
+    # Continental points
+    ("Field Site: Central Africa", "POINT (20 0)", "field research station in central Africa"),
+    ("Field Site: Central Europe", "POINT (15 50)", "field research station in central Europe"),
+    ("Field Site: Central Asia", "POINT (85 45)", "field research station in central Asia"),
+    ("Field Site: Central North America", "POINT (-100 45)", "field research station in central North America"),
+    ("Field Site: Central South America", "POINT (-60 -15)", "field research station in central South America"),
+    ("Field Site: Central Australia", "POINT (135 -25)", "field research station in central Australia"),
+    ("Field Site: Antarctic Peninsula", "POINT (-60 -70)", "field research station in Antarctica"),
+    # Ocean points
+    ("Monitoring Buoy: Central Atlantic", "POINT (-30 20)", "ocean monitoring buoy in the Atlantic Ocean"),
+    ("Monitoring Buoy: Central Pacific", "POINT (170 0)", "ocean monitoring buoy in the Pacific Ocean"),
+    ("Monitoring Buoy: Central Indian Ocean", "POINT (75 -20)", "ocean monitoring buoy in the Indian Ocean"),
+    ("Monitoring Buoy: Arctic Ocean", "POINT (0 85)", "ocean monitoring buoy in the Arctic Ocean"),
+    ("Monitoring Buoy: Southern Ocean", "POINT (100 -65)", "ocean monitoring buoy in the Southern Ocean"),
+]
+
+# Line geometries - spanning at least two regions (10 lines)
+CROSS_REGION_LINES = [
+    ("Migration Route: Africa to Europe", "LINESTRING (20 -5, 25 10, 15 35, 10 45)", "bird migration corridor from Africa through Mediterranean to Europe"),
+    ("Migration Route: Asia to Australia", "LINESTRING (100 30, 110 10, 120 -10, 130 -20)", "bird migration corridor from Asia to Australia"),
+    ("Shipping Lane: Atlantic Crossing", "LINESTRING (-75 40, -50 45, -25 50, -5 52)", "major shipping route across North Atlantic from North America to Europe"),
+    ("Shipping Lane: Pacific Crossing", "LINESTRING (140 35, 170 38, -160 40, -130 42)", "major shipping route across North Pacific from Asia to North America"),
+    ("Ocean Current: Gulf Stream", "LINESTRING (-80 25, -70 30, -50 35, -30 40, -10 50)", "Gulf Stream current from Gulf of Mexico to North Atlantic"),
+    ("Ocean Current: Kuroshio", "LINESTRING (125 25, 135 30, 145 35, 155 40)", "Kuroshio Current along eastern Asia into Pacific"),
+    ("Seismic Survey: Mid-Atlantic Ridge", "LINESTRING (-35 -30, -30 -10, -25 10, -20 30, -15 50)", "geological survey along Mid-Atlantic Ridge from South Atlantic to North Atlantic"),
+    ("Seismic Survey: Ring of Fire West", "LINESTRING (120 -10, 125 0, 130 10, 135 20, 140 30)", "seismic monitoring along western Pacific Ring of Fire from Indian Ocean to Pacific"),
+    ("Cable Route: Trans-Pacific", "LINESTRING (-120 35, -140 32, -160 30, -180 28, 170 26, 150 25)", "undersea telecommunications cable across Pacific from North America to Asia"),
+    ("Cable Route: Europe-Africa", "LINESTRING (10 55, 5 45, 0 35, -5 25, 0 10, 5 0)", "undersea cable from Europe through Atlantic to Africa"),
+]
+
 def create_source(pk, name, issn_l=None, is_oa=True):
     """Create a source object."""
     return {
@@ -172,7 +204,7 @@ def create_publication(pk, source_pk, title, abstract, geometry_wkt, region_desc
         "model": "publications.publication",
         "pk": pk,
         "fields": {
-            "status": random.choice(["p", "p", "p", "h", "c"]),  # mostly published
+            "status": "p",  # all published for UI testing
             "title": title,
             "abstract": abstract,
             "publicationDate": pub_date.strftime("%Y-%m-%d"),
@@ -320,6 +352,56 @@ def main():
         keyword_idx += 1
         topic_idx += 1
 
+    print("\n=== Creating point-based field sites and monitoring stations ===")
+    for i, (title, geometry, description) in enumerate(REGION_POINTS):
+        pk = pk_counter
+        pk_counter += 1
+        source_pk_choice = 2000 + (i % len(sources))
+
+        pub = create_publication(
+            pk=pk,
+            source_pk=source_pk_choice,
+            title=title,
+            abstract=f"Point-based monitoring and research from {description}. This site provides continuous data collection and analysis for local environmental conditions.",
+            geometry_wkt=geometry,
+            region_desc=description,
+            authors_idx=author_idx,
+            keywords_idx=keyword_idx,
+            topics_idx=topic_idx,
+            has_openalex=True,
+        )
+        fixture_data.append(pub)
+        print(f"  [{pk}] {title}: {len(pub['fields']['authors'])} authors, {len(pub['fields']['keywords'])} keywords, {len(pub['fields']['topics'])} topics")
+
+        author_idx += 1
+        keyword_idx += 1
+        topic_idx += 1
+
+    print("\n=== Creating cross-region line features (routes, currents, surveys) ===")
+    for i, (title, geometry, description) in enumerate(CROSS_REGION_LINES):
+        pk = pk_counter
+        pk_counter += 1
+        source_pk_choice = 2000 + (i % len(sources))
+
+        pub = create_publication(
+            pk=pk,
+            source_pk=source_pk_choice,
+            title=title,
+            abstract=f"Linear pathway study documenting {description}. This research traces continuous phenomena across regional boundaries.",
+            geometry_wkt=geometry,
+            region_desc=description,
+            authors_idx=author_idx,
+            keywords_idx=keyword_idx,
+            topics_idx=topic_idx,
+            has_openalex=True,
+        )
+        fixture_data.append(pub)
+        print(f"  [{pk}] {title}: {len(pub['fields']['authors'])} authors, {len(pub['fields']['keywords'])} keywords, {len(pub['fields']['topics'])} topics")
+
+        author_idx += 1
+        keyword_idx += 1
+        topic_idx += 1
+
     # Create backup of original
     import os
     import shutil
@@ -346,10 +428,12 @@ def main():
 
     print("\n=== Summary ===")
     print(f"Total publications: {len(publications)}")
-    print(f"  - Continents: {len(CONTINENTS)}")
-    print(f"  - Oceans: {len(OCEANS)}")
-    print(f"  - Two-region overlaps: {len(TWO_REGION_OVERLAPS)}")
-    print(f"  - Multi-region spans: {len(MULTI_REGION_SPANS)}")
+    print(f"  - Continents (polygons): {len(CONTINENTS)}")
+    print(f"  - Oceans (polygons): {len(OCEANS)}")
+    print(f"  - Two-region overlaps (polygons): {len(TWO_REGION_OVERLAPS)}")
+    print(f"  - Multi-region spans (polygons): {len(MULTI_REGION_SPANS)}")
+    print(f"  - Region points (points): {len(REGION_POINTS)}")
+    print(f"  - Cross-region lines (linestrings): {len(CROSS_REGION_LINES)}")
     print(f"\nMetadata coverage:")
     print(f"  - With authors: {with_authors}/{len(publications)}")
     print(f"  - With keywords: {with_keywords}/{len(publications)}")

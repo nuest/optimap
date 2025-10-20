@@ -15,7 +15,8 @@
       "Bash(python manage.py shell:*)",
       "Bash(python manage.py:*)",
       "Bash(python -m py_compile:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(node --check:*)"
     ],
     "deny": [],
     "ask": []

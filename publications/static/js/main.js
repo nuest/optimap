@@ -54,6 +54,12 @@ async function initMap() {
   });
   pubsLayer.eachLayer((layer) => publicationsGroup.addLayer(layer));
 
+  // Initialize enhanced interaction manager for handling overlapping polygons
+  if (typeof MapInteractionManager !== 'undefined') {
+    const interactionManager = new MapInteractionManager(map, pubsLayer);
+    console.log('Enhanced map interaction enabled: overlapping polygon selection and geometry highlighting');
+  }
+
   // Fit map to markers
   if (publicationsGroup.getBounds().isValid()) {
     map.fitBounds(publicationsGroup.getBounds());
