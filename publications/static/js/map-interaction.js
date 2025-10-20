@@ -107,26 +107,29 @@ class MapInteractionManager {
     this.map.on('popupclose', function(e) {
       console.log('Popup closed, event:', e);
 
-      // If this was the paginated popup being closed
-      if (self.paginatedPopup && e.popup === self.paginatedPopup) {
-        console.log('Paginated popup closed');
+      // Use a small delay to check if popup is really being closed or just updated
+      setTimeout(function() {
+        // If this was the paginated popup being closed (and it's actually gone)
+        if (e.popup === self.paginatedPopup && !self.map.hasLayer(e.popup)) {
+          console.log('Paginated popup closed by user');
 
-        // Clear highlights (geometries return to default)
-        self.clearHighlights();
+          // Clear highlights (geometries return to default)
+          self.clearHighlights();
 
-        // Clean up pagination state
-        self.paginatedPopup = null;
-        self.overlappingFeatures = [];
-        self.currentPageIndex = 0;
-      }
-      // If it was a single feature popup (not paginated)
-      else if (!self.paginatedPopup) {
-        console.log('Single popup closed');
+          // Clean up pagination state
+          self.paginatedPopup = null;
+          self.overlappingFeatures = [];
+          self.currentPageIndex = 0;
+        }
+        // If it was a single feature popup (not paginated) and really closed
+        else if (!self.paginatedPopup && !self.map.hasLayer(e.popup)) {
+          console.log('Single popup closed');
 
-        // Clear highlights for single feature popups
-        self.clearHighlights();
-      }
-      // Otherwise, it's an old popup being closed while opening a new one - don't clear
+          // Clear highlights for single feature popups
+          self.clearHighlights();
+        }
+        // Otherwise, it's just a content update or old popup being replaced - don't clear
+      }, 10);
     });
   }
 
@@ -596,14 +599,28 @@ class MapInteractionManager {
       }
     });
 
-    // Check if we're in pagination mode
-    const inPaginationMode = this.paginatedPopup !== null;
+    // Check if we're in pagination mode (based on overlapping features, not popup existence)
+    const inPaginationMode = this.overlappingFeatures.length > 0;
 
     // Highlight all layers for this publication
     publicationLayers.forEach((layer, index) => {
+      const isCircleMarker = layer instanceof L.CircleMarker;
+
       if (layer === featureData.layer) {
         // The clicked layer gets selected style
-        layer.setStyle(this.selectedStyle);
+        if (isCircleMarker) {
+          // For CircleMarkers (point geometries), use modified style
+          layer.setStyle({
+            color: this.selectedStyle.color,
+            fillColor: this.selectedStyle.fillColor || this.selectedStyle.color,
+            weight: this.selectedStyle.weight,
+            fillOpacity: this.selectedStyle.fillOpacity,
+            radius: 10  // Increase radius for visibility
+          });
+        } else {
+          // For polygons/lines, use full selected style
+          layer.setStyle(this.selectedStyle);
+        }
         layer.bringToFront();
 
         // Only open individual popup if NOT in pagination mode
@@ -612,7 +629,19 @@ class MapInteractionManager {
         }
       } else {
         // Other geometries of the same publication get highlight style
-        layer.setStyle(this.highlightStyle);
+        if (isCircleMarker) {
+          // For CircleMarkers, use modified highlight style
+          layer.setStyle({
+            color: this.highlightStyle.color,
+            fillColor: this.highlightStyle.fillColor || this.highlightStyle.color,
+            weight: this.highlightStyle.weight,
+            fillOpacity: this.highlightStyle.fillOpacity,
+            radius: 8  // Slightly increased radius
+          });
+        } else {
+          // For polygons/lines, use full highlight style
+          layer.setStyle(this.highlightStyle);
+        }
         layer.bringToFront();
       }
 
@@ -673,12 +702,23 @@ class MapInteractionManager {
    */
   clearHighlights() {
     this.highlightedLayers.forEach((layer) => {
-      // Reset to default style and explicitly clear properties set by selected/highlight styles
-      layer.setStyle({
-        ...this.defaultStyle,
-        dashArray: null,    // Remove dashed border (from selectedStyle)
-        fillColor: null     // Remove explicit fill color (from selected/highlightStyle)
-      });
+      const isCircleMarker = layer instanceof L.CircleMarker;
+
+      if (isCircleMarker) {
+        // For CircleMarkers, reset to default marker style with default radius
+        layer.setStyle({
+          ...this.defaultStyle,
+          fillColor: null,
+          radius: 6  // Default radius for CircleMarkers
+        });
+      } else {
+        // For polygons/lines, reset to default style
+        layer.setStyle({
+          ...this.defaultStyle,
+          dashArray: null,    // Remove dashed border (from selectedStyle)
+          fillColor: null     // Remove explicit fill color (from selected/highlightStyle)
+        });
+      }
     });
 
     this.highlightedLayers = [];

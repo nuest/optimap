@@ -95,20 +95,13 @@
 {% endif %}
 
 <!-- Leaflet assets -->
-<link rel="stylesheet"
-      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-      crossorigin="">
+<link rel="stylesheet" href="{% static 'css/leaflet.css' %}">
 <!-- Leaflet Draw plugin for geometry editing -->
 {% if can_contribute or is_admin %}
-<link rel="stylesheet"
-      href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css"
-      crossorigin="">
+<link rel="stylesheet" href="{% static 'css/leaflet.draw.css' %}">
 {% endif %}
 <!-- Leaflet Fullscreen plugin -->
-<link rel="stylesheet"
-      href="https://unpkg.com/leaflet.fullscreen@3.0.2/Control.FullScreen.css"
-      crossorigin="">
+<link rel="stylesheet" href="{% static 'css/leaflet.fullscreen.css' %}">
 
 {% if can_contribute %}
   <div class="alert alert-warning">
@@ -192,17 +185,13 @@
 </div>
 {% endif %}
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-          crossorigin=""></script>
+  <script src="{% static 'js/leaflet.js' %}"></script>
   {% if can_contribute or is_admin %}
   <!-- Leaflet Draw plugin -->
-  <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"
-          crossorigin=""></script>
+  <script src="{% static 'js/leaflet.draw.js' %}"></script>
   {% endif %}
   <!-- Leaflet Fullscreen plugin -->
-  <script src="https://unpkg.com/leaflet.fullscreen@3.0.2/Control.FullScreen.js"
-          crossorigin=""></script>
+  <script src="{% static 'js/leaflet.fullscreen.js' %}"></script>
   <script>
     const publicationFeature = {{ feature_json|default:"null"|safe }};
     const canContribute = {{ can_contribute|yesno:"true,false" }};

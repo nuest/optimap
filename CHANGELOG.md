@@ -10,6 +10,8 @@
 - **Human-readable sitemap** - New `/pages` endpoint showing organized list of all pages with descriptions, categorized into Main Pages, Data & Technical, Information & Help, User Pages, and Development sections.
 - **Custom error pages** - Added styled 404 and 500 error pages matching application design with navigation links and help information directing users to About and Accessibility pages.
 - **Map popup enhancement** - Added "View Publication Details" button to map popups linking to work landing pages.
+- **Paginated popup for overlapping features** - When multiple publications overlap on the map, a paginated popup allows users to cycle through them with Previous/Next navigation showing "Publication X of Y".
+- **Point geometry highlighting** - Map markers (CircleMarkers) now show visual feedback when selected with increased size (10px) and high-contrast gold/orange colors, matching polygon highlighting behavior.
 - **Admin unpublish functionality** - Admins can unpublish works, changing status from Published to Draft.
 - **RSS/Atom feed harvesting support** - Added support for harvesting publications from RSS/Atom feeds in addition to OAI-PMH.
 - **Django management command `harvest_journals`** - Command-line tool for harvesting from real journal sources with progress reporting and statistics.
@@ -31,3 +33,10 @@
 ### Fixed
 
 - **JavaScript scope error** - Fixed "drawnItems is not defined" error in contribution form by declaring variable in outer scope.
+- **GeoJSON geometry detection** - Fixed map click detection for GeoJSON layers by working directly with `layer.feature.geometry` instead of unreliable `instanceof` checks. Implemented proper point-in-polygon (ray casting), point-on-line (distance threshold), and point detection algorithms.
+- **Map popup null location error** - Fixed crash when opening paginated popup by reordering operations to close existing popup before setting new location.
+- **Highlight persistence after popup close** - Geometries now properly return to default blue style when popups close, removing gold dashed borders and explicit fill colors.
+- **Individual popups during pagination** - Individual feature popups no longer open simultaneously with paginated popup, preventing UI conflicts.
+- **Close button highlight clearing** - Popup close button (X) and ESC key now properly clear geometry highlights, not just map clicks.
+- **First page highlight race condition** - Fixed race condition where first page of paginated popup wasn't highlighted due to premature clearing by `popupclose` event handler.
+- **CircleMarker style properties** - Point geometries now use appropriate style properties (`radius` instead of `dashArray`) for proper visual feedback.
