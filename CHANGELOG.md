@@ -4,6 +4,13 @@
 
 ### Added
 
+- **Regional subscription system** - Users can subscribe to receive notifications for new publications from specific continents and oceans. Features include:
+  - Checkbox-based UI with 8 continents and 7 oceans
+  - "All Regions" checkbox to select/deselect all at once
+  - "Disable all" link for quick clearing
+  - Real-time subscription summary showing currently monitored regions
+  - Persistent subscriptions across login sessions
+  - Comprehensive test coverage (16 tests)
 - **Temporal extent contribution** - Users can now contribute temporal extent (start/end dates) in addition to spatial extent. Works can be published with either spatial, temporal, or both extents. Supports flexible date formats: YYYY, YYYY-MM, YYYY-MM-DD.
 - **Complete status workflow documentation** - Documented all 6 publication statuses (Draft, Harvested, Contributed, Published, Testing, Withdrawn) with workflow transitions and visibility rules in README.md.
 - **Burger menu navigation** - Added top bar hamburger menu (☰) next to user icon with dropdown links to all main pages including Home, Browse Works, Contribute, Data & API, Feeds, About, Contact, Accessibility, and GitHub code repository.
@@ -19,6 +26,12 @@
 
 ### Changed
 
+- **Regional subscription email notifications** - Notification emails now group publications by region with dedicated sections for each subscribed continent or ocean. Each region section includes:
+  - Region name and type (Continent/Ocean)
+  - Count of new publications in that region
+  - Direct link to the region's landing page to view all publications
+  - Up to 10 publications per region in email (with link to view more)
+  - Subject line shows total publication count across all regions
 - **Unified contribution workflow** - Single "Submit contribution" button for both spatial and temporal extent. Users can submit either or both in one action.
 - **Unified admin control panel** - Consolidated admin status display, publish/unpublish buttons, provenance information, and "Edit in Admin" link into single highlighted box at top of work landing page. Provenance is collapsible.
 - **Improved text wrapping** - Page titles and abstract text now properly wrap on narrow windows instead of overflowing.

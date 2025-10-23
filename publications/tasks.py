@@ -753,38 +753,114 @@ def send_monthly_email(trigger_source="manual", sent_by=None):
 
 
 def send_subscription_based_email(trigger_source='manual', sent_by=None, user_ids=None):
-    query = Subscription.objects.filter(subscribed=True, user__isnull=False)
+    """
+    Send subscription-based notifications grouped by region.
+
+    Publications are grouped by the regions the user has subscribed to.
+    Each region group includes a link to the region's landing page.
+    """
+    from publications.models import GlobalRegion
+    from collections import defaultdict
+
+    query = Subscription.objects.filter(subscribed=True, user__isnull=False).prefetch_related('regions')
     if user_ids:
         query = query.filter(user__id__in=user_ids)
 
     for subscription in query:
         user_email = subscription.user.email
-        new_publications = Publication.objects.filter(geometry__intersects=subscription.region)
-        if not new_publications.exists():
+
+        # Skip if user has no regions selected
+        subscribed_regions = list(subscription.regions.all())
+        if not subscribed_regions:
+            logger.info(f"Skipping subscription for {user_email} - no regions selected")
             continue
 
-        unsubscribe_specific = f"{BASE_URL}{reverse('optimap:unsubscribe')}?search={quote(subscription.search_term)}"
+        # Group publications by region
+        region_publications = defaultdict(list)
+        total_publications = 0
+
+        for region in subscribed_regions:
+            # Find publications that intersect with this region
+            # Use prepared geometry for performance
+            prepared_geom = region.geom.prepared
+
+            candidates = Publication.objects.filter(
+                status="p",  # Only published works
+                geometry__isnull=False,
+                geometry__bboverlaps=region.geom,  # Bounding box filter first
+            ).order_by('-creationDate')[:50]  # Limit per region
+
+            # Filter by actual intersection
+            matching_pubs = [
+                pub for pub in candidates
+                if prepared_geom.intersects(pub.geometry)
+            ]
+
+            if matching_pubs:
+                region_publications[region] = matching_pubs
+                total_publications += len(matching_pubs)
+
+        # Skip if no new publications found
+        if total_publications == 0:
+            logger.info(f"Skipping subscription for {user_email} - no new publications")
+            continue
+
+        # Build email content grouped by region
         unsubscribe_all = f"{BASE_URL}{reverse('optimap:unsubscribe')}?all=true"
-        subject = f"📚 New Manuscripts Matching '{subscription.search_term}'"
+        manage_subscriptions = f"{BASE_URL}{reverse('optimap:subscriptions')}"
 
-        lines = []
-        for pub in new_publications:
-            link = _get_article_link(pub)
-            lines.append(f"- {pub.title}: {link}")
-        bullet_list = "\n".join(lines)
+        subject = f"🌍 {total_publications} New Publications in Your Subscribed Regions"
 
-        content = f"""Dear {subscription.user.username},
-        {bullet_list}
-        Here are the latest manuscripts matching your subscription:
-        Manage your subscriptions:
-        Unsubscribe from '{subscription.search_term}': {unsubscribe_specific}
-        Unsubscribe from All: {unsubscribe_all}
-        """
+        content_lines = [
+            f"Dear {subscription.user.username},",
+            "",
+            f"You have {total_publications} new publication(s) in your subscribed regions:",
+            ""
+        ]
+
+        # Group publications by region
+        for region in sorted(region_publications.keys(), key=lambda r: r.name):
+            pubs = region_publications[region]
+            region_url = f"{BASE_URL}{region.get_absolute_url()}"
+            region_type = region.get_region_type_display()
+
+            content_lines.append(f"📍 {region.name} ({region_type}) - {len(pubs)} publication(s)")
+            content_lines.append(f"   View all publications in this region: {region_url}")
+            content_lines.append("")
+
+            for pub in pubs[:10]:  # Limit to 10 per region in email
+                link = _get_article_link(pub)
+                title = pub.title[:100] + "..." if len(pub.title) > 100 else pub.title
+                content_lines.append(f"   • {title}")
+                content_lines.append(f"     {link}")
+                content_lines.append("")
+
+            if len(pubs) > 10:
+                content_lines.append(f"   ... and {len(pubs) - 10} more in {region.name}")
+                content_lines.append(f"   View all: {region_url}")
+                content_lines.append("")
+
+        content_lines.extend([
+            "───────────────────────────────────────",
+            "",
+            "Manage your regional subscriptions:",
+            f"  {manage_subscriptions}",
+            "",
+            "Unsubscribe from all notifications:",
+            f"  {unsubscribe_all}",
+            "",
+            "---",
+            "OPTIMAP - Open Platform for Geospatial Manuscripts",
+            f"{BASE_URL}"
+        ])
+
+        content = "\n".join(content_lines)
 
         try:
             email = EmailMessage(subject, content, settings.EMAIL_HOST_USER, [user_email])
             email.send()
             EmailLog.log_email(user_email, subject, content, sent_by=sent_by, trigger_source=trigger_source, status="success")
+            logger.info(f"Sent regional subscription email to {user_email} with {total_publications} publications across {len(region_publications)} regions")
             time.sleep(settings.EMAIL_SEND_DELAY)
         except Exception as e:
             error_message = str(e)

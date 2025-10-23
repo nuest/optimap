@@ -161,7 +161,7 @@ def normalize_region_slug(slug):
 
 def get_region_from_slug(slug):
     """
-    Get a GlobalRegion from a slug, trying various name formats.
+    Get a GlobalRegion from a slug by comparing with region's get_slug() method.
 
     Args:
         slug: URL slug for the region
@@ -171,23 +171,14 @@ def get_region_from_slug(slug):
     """
     normalized = normalize_region_slug(slug)
 
-    # Try various formats to match region name
-    search_names = [
-        normalized,  # "north-america"
-        normalized.replace("-", " "),  # "north america"
-        normalized.replace("-", "_"),  # "north_america"
-        normalized.title().replace("-", " "),  # "North America"
-    ]
-
-    for name in search_names:
-        try:
-            region = GlobalRegion.objects.get(name__iexact=name)
+    # Get all regions and find the one whose slug matches
+    # This is more efficient than trying multiple name variations
+    for region in GlobalRegion.objects.all():
+        if region.get_slug() == normalized:
             logger.debug("Found region '%s' for slug '%s'", region.name, slug)
             return region
-        except GlobalRegion.DoesNotExist:
-            continue
 
-    logger.warning("No region found for slug '%s' (tried: %s)", slug, search_names)
+    logger.warning("No region found for slug '%s'", slug)
     return None
 
 

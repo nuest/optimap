@@ -12,18 +12,6 @@
 
 {% endblock head %}
 
-{% block navbar %}
-
-<ul class="nav navbar-nav">
-  {% if request.user.is_authenticated %}
-  {% include "authenticated_menu_snippet.html" %}
-  {% else %}
-  {% include "menu_snippet.html" %}
-  {% endif %}
-</ul>
-
-{% endblock navbar %}
-
 {% block content %}
 <div class="row">
   

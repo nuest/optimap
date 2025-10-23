@@ -2,80 +2,486 @@
 {% load static %}
 
 {% block head %}
-<link rel="stylesheet" href="{% static 'css/bootstrap-datepicker.min.css' %}">
-<link rel="stylesheet" href="{% static 'css/font-awesome.min.css' %}">
-<link rel="stylesheet" href="{% static 'css/main.css' %}" />
-{% endblock head %}
+{{ block.super }}
+<style>
+  /* Page container */
+  .subscriptions-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 40px 20px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
 
-{% block navbar %}
+  /* Ensure all text wraps properly */
+  .subscriptions-container * {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
 
-<ul class="nav navbar-nav">
-  {% if request.user.is_authenticated %}  
-  {% include "authenticated_menu_snippet.html" %}
-  {% else %}
-  {% include "menu_snippet.html" %}
-  {% endif %}
-</ul>
+  /* Page header */
+  .subscriptions-header {
+    margin-bottom: 30px;
+  }
 
-{% endblock navbar %}
+  .subscriptions-header h1 {
+    font-size: 28px;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 10px;
+  }
+
+  .subscriptions-header .subtitle {
+    color: #6c757d;
+    font-size: 15px;
+    line-height: 1.6;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+
+  /* Combined info box */
+  .subscription-info-box {
+    background: white;
+    border: 1px solid #d1ecf1;
+    border-radius: 8px;
+    padding: 20px 25px;
+    margin-bottom: 25px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  }
+
+  .info-section {
+    display: flex;
+    gap: 15px;
+    align-items: flex-start;
+  }
+
+  .info-icon {
+    flex-shrink: 0;
+    color: #0c5460;
+  }
+
+  .info-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .info-content h6 {
+    color: #0c5460;
+    font-size: 16px;
+    margin-bottom: 8px;
+  }
+
+  .info-content p {
+    color: #0c5460;
+    line-height: 1.5;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    white-space: normal;
+  }
+
+  /* Main card */
+  .subscription-card {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    padding: 30px;
+  }
+
+  /* Select all section */
+  .select-all-section {
+    background: #f8f9fa;
+    border: 2px dashed #ced4da;
+    border-radius: 6px;
+    padding: 15px 20px;
+    margin-bottom: 30px;
+  }
+
+  .select-all-section .custom-checkbox {
+    margin-bottom: 0;
+  }
+
+  .select-all-section label {
+    font-size: 16px;
+    font-weight: 600;
+    color: #2c3e50;
+    cursor: pointer;
+  }
+
+  /* Region sections */
+  .region-section {
+    margin-bottom: 30px;
+  }
+
+  .region-section-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 15px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #007bff;
+    display: inline-block;
+  }
+
+  .region-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+  }
+
+  .region-item {
+    background: #ffffff;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    padding: 12px 15px;
+    transition: all 0.2s ease;
+  }
+
+  .region-item:hover {
+    background: #f8f9fa;
+    border-color: #007bff;
+  }
+
+  .region-item .custom-checkbox {
+    margin-bottom: 0;
+  }
+
+  .region-item label {
+    font-size: 14px;
+    color: #495057;
+    cursor: pointer;
+    font-weight: 500;
+  }
+
+  .region-item input[type="checkbox"]:checked + label {
+    color: #007bff;
+    font-weight: 600;
+  }
+
+  /* Action buttons */
+  .action-buttons {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    margin-top: 30px;
+    padding-top: 25px;
+    border-top: 1px solid #dee2e6;
+  }
+
+  /* Save button with tooltip */
+  .save-button-wrapper {
+    position: relative;
+    display: inline-block;
+  }
+
+  #save-button {
+    padding: 10px 30px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+  }
+
+  #save-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  #save-button:disabled:hover {
+    opacity: 0.5;
+    background-color: transparent;
+    border-color: #007bff;
+    color: #007bff;
+  }
+
+  .save-button-wrapper[data-disabled="true"]:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-bottom: 10px;
+    padding: 8px 14px;
+    background-color: #333;
+    color: white;
+    border-radius: 5px;
+    white-space: nowrap;
+    font-size: 13px;
+    font-weight: 400;
+    z-index: 1000;
+    pointer-events: none;
+  }
+
+  .save-button-wrapper[data-disabled="true"]:hover::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-bottom: 4px;
+    border: 6px solid transparent;
+    border-top-color: #333;
+    z-index: 1000;
+    pointer-events: none;
+  }
+
+  /* Status alert */
+  .subscription-status {
+    margin-top: 25px;
+    padding: 15px 20px;
+    border-radius: 6px;
+    font-size: 14px;
+  }
+
+  .subscription-status strong {
+    font-weight: 600;
+  }
+
+  /* Responsive adjustments */
+  @media (max-width: 768px) {
+    .subscriptions-container {
+      padding: 20px 15px;
+    }
+
+    .subscription-card {
+      padding: 20px;
+    }
+
+    .region-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .action-buttons {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .action-buttons button {
+      width: 100%;
+    }
+  }
+</style>
+{% endblock %}
 
 {% block content %}
-<div id="accordion">
-  <div class="card">
-    <div class="card-header" id="headingFour">
-      <h5 class="mb-0">
-        <button class="btn btn-link collapsed" data-toggle="collapse" data-target="#collapseFour" aria-expanded="false" aria-controls="collapseFour">
-          <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" fill="currentColor" class="bi bi-plus" viewBox="0 0 16 16">
-            <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
-          </svg> Add new Subscription 
-        </button>
-      </h5>
+<div class="subscriptions-container">
+  <!-- Page Header -->
+  <div class="subscriptions-header">
+    <h1>Regional Subscriptions</h1>
+    <p class="subtitle">
+      Get notified when new publications are added from specific continents and oceans.
+      Select the regions you're interested in to receive email notifications.
+    </p>
+  </div>
+
+  <!-- Combined Info Box -->
+  <div class="subscription-info-box alert alert-info">
+    <div class="info-section">
+      <div class="info-icon">
+        <i class="fas fa-calendar-alt fa-2x"></i>
+      </div>
+      <div class="info-content">
+        <h6 class="mb-1"><strong>Notification Schedule</strong></h6>
+        <p class="mb-0 small">
+          Email notifications are sent <strong>monthly</strong> on the last day of each month,
+          summarizing all new publications added to your selected regions.
+        </p>
+      </div>
     </div>
-    <div id="collapseFour" class="collapse" aria-labelledby="headingFour" data-parent="#accordion">
-      <div class="card-body">
-        <span class="text-wrap">Note that you can avoid to divulge your own (private) location by choosing a larger area.</span>
-        <form id = "form1" class="form" method="POST" action="{% url 'optimap:addsubscriptions' %}">
-          {% csrf_token %}
-          <div class="form-group">            
-            <input id = "search" type="text" class="form-control" placeholder="Enter Subscription name" aria-describedby="basic-addon1"  name="search">
-          </div>           
-          <div class =row>
-          <div class='col-md-5'>
-            <div class="form-group">
-              <div class="input-group date" id="datepicker1">
-                <input id = "start_date" placeholder="Select Start date" type="text" class="form-control" name="start_date">           
-                <div class="input-group-addon">
-                  <span class="glyphicon glyphicon-th"></span>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class='col-md-5'>
-            <div class="form-group">
-              <div class="input-group date" id ="datepicker2">
-                <input id = "end_date" placeholder="Select End date" type="text" class="form-control" name="end_date">
-                <div class="input-group-addon">
-                  <span class="glyphicon glyphicon-th"></span>
-                </div>
-              </div>
-            </div>
-          </div>
-          </div>
-          <div class="form-group row px-3">
-            <button id = "save_sub" type="submit" class="btn btn-outline-warning">Add</button>
-            <div class="col-sm-2">
-              <button type="reset" class="btn btn-outline-danger">Cancel</button>
-            </div>
-          </div>
-        </form>          
+
+    <hr class="my-3">
+
+    <div class="info-section">
+      <div class="info-icon">
+        {% if selected_region_ids %}
+        <i class="fas fa-check-circle fa-2x text-success"></i>
+        {% else %}
+        <i class="fas fa-exclamation-circle fa-2x text-warning"></i>
+        {% endif %}
+      </div>
+      <div class="info-content">
+        <h6 class="mb-1"><strong>Current Status</strong></h6>
+        {% if selected_region_ids %}
+        <p class="mb-0 small">
+          Currently monitoring <strong>{{ selected_region_ids|length }} region{{ selected_region_ids|length|pluralize }}</strong>.
+          You'll receive email notifications when new publications are added to these regions.
+        </p>
+        {% else %}
+        <p class="mb-0 small">
+          <strong>No regions selected.</strong> Select one or more regions below to start
+          receiving notifications about new publications.
+        </p>
+        {% endif %}
       </div>
     </div>
   </div>
+
+  <!-- Main Card -->
+  <div class="subscription-card">
+    <form method="POST" action="{% url 'optimap:addsubscriptions' %}" id="subscription-form">
+      {% csrf_token %}
+
+      <!-- Select All Section -->
+      <div class="select-all-section">
+        <div class="custom-control custom-checkbox">
+          <input type="checkbox" class="custom-control-input" id="select-all" name="select-all">
+          <label class="custom-control-label" for="select-all">
+            Select All Regions
+          </label>
+        </div>
+      </div>
+
+      <!-- Continents Section -->
+      <div class="region-section">
+        <div class="region-section-title">Continents</div>
+        <div class="region-grid">
+          {% for continent in continents %}
+          <div class="region-item">
+            <div class="custom-control custom-checkbox">
+              <input
+                type="checkbox"
+                class="custom-control-input region-checkbox"
+                id="region-{{ continent.id }}"
+                name="regions"
+                value="{{ continent.id }}"
+                {% if continent.id in selected_region_ids %}checked{% endif %}>
+              <label class="custom-control-label" for="region-{{ continent.id }}">
+                {{ continent.name }}
+              </label>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Oceans Section -->
+      <div class="region-section">
+        <div class="region-section-title">Oceans</div>
+        <div class="region-grid">
+          {% for ocean in oceans %}
+          <div class="region-item">
+            <div class="custom-control custom-checkbox">
+              <input
+                type="checkbox"
+                class="custom-control-input region-checkbox"
+                id="region-{{ ocean.id }}"
+                name="regions"
+                value="{{ ocean.id }}"
+                {% if ocean.id in selected_region_ids %}checked{% endif %}>
+              <label class="custom-control-label" for="region-{{ ocean.id }}">
+                {{ ocean.name }}
+              </label>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="action-buttons">
+        <div class="save-button-wrapper" id="save-button-wrapper" data-disabled="true" data-tooltip="No changes to save">
+          <button type="submit" class="btn btn-primary" id="save-button" disabled>
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
 </div>
-<div id="accordion1"> <br><p><b> Your subscriptions <span class="badge badge-info">list</span> :</b></p></div>
 {% endblock %}
 
 {% block scripts %}
-<script src="{% static 'js/bootstrap-datepicker.min.js' %}"></script>
-<script src="{% static 'js/subscriptions.js' %}"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const selectAllCheckbox = document.getElementById('select-all');
+    const regionCheckboxes = document.querySelectorAll('.region-checkbox');
+    const saveButton = document.getElementById('save-button');
+    const saveButtonWrapper = document.getElementById('save-button-wrapper');
+    const form = document.getElementById('subscription-form');
+
+    // Store initial form state
+    const initialState = getFormState();
+
+    // Get current form state as a Set of checked region IDs
+    function getFormState() {
+      const checkedRegions = new Set();
+      regionCheckboxes.forEach(function(checkbox) {
+        if (checkbox.checked) {
+          checkedRegions.add(checkbox.value);
+        }
+      });
+      return checkedRegions;
+    }
+
+    // Check if form has changed from initial state
+    function hasFormChanged() {
+      const currentState = getFormState();
+
+      // Check if sets are equal
+      if (currentState.size !== initialState.size) {
+        return true;
+      }
+
+      for (let value of currentState) {
+        if (!initialState.has(value)) {
+          return true;
+        }
+      }
+
+      return false;
+    }
+
+    // Update save button state based on form changes
+    function updateSaveButtonState() {
+      const hasChanged = hasFormChanged();
+      saveButton.disabled = !hasChanged;
+
+      // Update wrapper attributes for tooltip display
+      if (hasChanged) {
+        saveButtonWrapper.setAttribute('data-disabled', 'false');
+        saveButtonWrapper.removeAttribute('data-tooltip');
+      } else {
+        saveButtonWrapper.setAttribute('data-disabled', 'true');
+        saveButtonWrapper.setAttribute('data-tooltip', 'No changes to save');
+      }
+    }
+
+    // Function to update "Select All" checkbox state
+    function updateSelectAllState() {
+      const allChecked = Array.from(regionCheckboxes).every(cb => cb.checked);
+      const someChecked = Array.from(regionCheckboxes).some(cb => cb.checked);
+
+      if (allChecked) {
+        selectAllCheckbox.checked = true;
+        selectAllCheckbox.indeterminate = false;
+      } else if (someChecked) {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = true;
+      } else {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = false;
+      }
+
+      // Update save button state whenever checkboxes change
+      updateSaveButtonState();
+    }
+
+    // Initialize select all state and button state
+    updateSelectAllState();
+    updateSaveButtonState();
+
+    // Handle "Select All" checkbox
+    selectAllCheckbox.addEventListener('change', function() {
+      const isChecked = this.checked;
+      regionCheckboxes.forEach(function(checkbox) {
+        checkbox.checked = isChecked;
+      });
+      this.indeterminate = false;
+      updateSaveButtonState();
+    });
+
+    // Handle individual region checkboxes
+    regionCheckboxes.forEach(function(checkbox) {
+      checkbox.addEventListener('change', updateSelectAllState);
+    });
+  });
+</script>
 {% endblock %}

@@ -101,10 +101,11 @@ class Publication(models.Model):
 class Subscription(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="subscriptions", null=True, blank=True)
     name = models.CharField(max_length=4096, default="default_subscription")
-    search_term = models.CharField(max_length=4096, null=True)
-    timeperiod_startdate = models.DateField(null=True)
-    timeperiod_enddate = models.DateField(null=True)
-    region = models.GeometryCollectionField(null=True, blank=True)
+    search_term = models.CharField(max_length=4096, null=True, blank=True)
+    timeperiod_startdate = models.DateField(null=True, blank=True)
+    timeperiod_enddate = models.DateField(null=True, blank=True)
+    region = models.GeometryCollectionField(null=True, blank=True)  # Deprecated, kept for backward compatibility
+    regions = models.ManyToManyField('GlobalRegion', related_name='subscriptions', blank=True, help_text="Predefined geographic regions (continents and oceans)")
     subscribed = models.BooleanField(default=True)
 
     class Meta:
@@ -112,7 +113,7 @@ class Subscription(models.Model):
         verbose_name = "subscription"
 
     def __str__(self):
-        return self.name
+        return f"{self.user.username if self.user else 'Anonymous'} - {self.name}"
 
 class EmailLog(models.Model):
     TRIGGER_CHOICES = [
@@ -202,6 +203,21 @@ class GlobalRegion(models.Model):
     license     = models.CharField(max_length=200)
     geom        = models.MultiPolygonField(srid=4326)
     last_loaded = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.get_region_type_display()})"
+
+    def get_slug(self):
+        """Generate URL slug from region name."""
+        return self.name.lower().replace(' ', '-')
+
+    def get_absolute_url(self):
+        """Get the landing page URL for this region."""
+        slug = self.get_slug()
+        if self.region_type == self.CONTINENT:
+            return reverse('optimap:feed-continent-page', kwargs={'continent_slug': slug})
+        else:  # OCEAN
+            return reverse('optimap:feed-ocean-page', kwargs={'ocean_slug': slug})
 
 class Source(models.Model):
     url_field                = models.URLField(max_length=999)

@@ -3,16 +3,6 @@
 
 {% block title %}{{ pub.title }}{% if pub.doi %} ({{ pub.doi }}){% endif %} - {% endblock %}
 
-{% block navbar %}
-<ul class="nav navbar-nav">
-  {% if request.user.is_authenticated %}
-    {% include "authenticated_menu_snippet.html" %}
-  {% else %}
-    {% include "menu_snippet.html" %}
-  {% endif %}
-</ul>
-{% endblock %}
-
 {% block content %}
 <div class="work-landing-page">
 {% csrf_token %}

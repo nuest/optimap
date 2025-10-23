@@ -126,7 +126,9 @@ def download_geopackage(request):
 
 
 def main(request):
-    return render(request, "main.html")
+    # Pass the 'next' parameter to template for login redirect
+    next_url = request.GET.get('next', '')
+    return render(request, "main.html", {'next': next_url})
 
 def contribute(request):
     """
@@ -289,10 +291,11 @@ def login_user(request, user):
 
 @require_GET
 def authenticate_via_magic_link(request, token):
-    email = cache.get(token)
-    logger.info('Authenticating magic link with token %s: Found user: %s', token, email)
-    if email is None:
-        logger.debug('Magic link invalid for user %s', email)
+    cache_data = cache.get(token)
+    logger.info('Authenticating magic link with token %s: Found data: %s', token, cache_data)
+
+    if cache_data is None:
+        logger.debug('Magic link invalid or expired')
         return render(request, "error.html", {
             'error': {
                 'class': 'danger',
@@ -300,21 +303,44 @@ def authenticate_via_magic_link(request, token):
                 'text': 'Magic link invalid or expired. Please try again!'
             }
         })
+
+    # Extract email and next URL from cache data
+    email = cache_data.get('email')
+    next_url = cache_data.get('next', '/')
+
     user = User.objects.filter(email=email).first()
     if user:
         is_new = False
         needs_confirmation = False
         login_user(request, user)
+        # Store next URL in session for redirect after confirmation
+        request.session['login_redirect_url'] = next_url
     elif request.GET.get('confirmed', None) == 'true':
         user = User.objects.create_user(username=email, email=email)
         is_new = True
         needs_confirmation = False
         login_user(request, user)
+        # Redirect to next URL after successful login
+        logger.info('User %s logged in successfully, redirecting to %s', email, next_url)
+        return redirect(next_url)
     else:
         is_new = True
         needs_confirmation = True
-    
-    return render(request, "confirmation_login.html", {'email': email, 'token': token, 'is_new': is_new, 'needs_confirmation': needs_confirmation})
+        # Store next URL for redirect after confirmation
+        request.session['login_redirect_url'] = next_url
+
+    # If user is already authenticated and doesn't need confirmation, redirect
+    if not needs_confirmation and user:
+        logger.info('User %s authenticated, redirecting to %s', email, next_url)
+        return redirect(next_url)
+
+    return render(request, "confirmation_login.html", {
+        'email': email,
+        'token': token,
+        'is_new': is_new,
+        'needs_confirmation': needs_confirmation,
+        'next': next_url
+    })
 
 @login_required
 def customlogout(request):
@@ -334,33 +360,60 @@ def user_settings(request):
         "delete_token": request.session.get(USER_DELETE_TOKEN_PREFIX, None),
     })
 
+@login_required
 def user_subscriptions(request):
-    if request.user.is_authenticated:
-        subs = Subscription.objects.all()
-        count_subs = subs.count()
-        return render(request, 'subscriptions.html', {'sub': subs, 'count': count_subs})
-    else:
-        return HttpResponse("Unauthorized", status=401)
+    """Display and manage user's regional subscriptions."""
+    user = request.user
 
+    # Get or create the user's subscription
+    subscription, created = Subscription.objects.get_or_create(
+        user=user,
+        defaults={'name': f'{user.username}_subscription'}
+    )
+
+    # Get all available regions, grouped by type
+    continents = GlobalRegion.objects.filter(region_type=GlobalRegion.CONTINENT).order_by('name')
+    oceans = GlobalRegion.objects.filter(region_type=GlobalRegion.OCEAN).order_by('name')
+
+    # Get user's currently selected regions
+    selected_region_ids = list(subscription.regions.values_list('id', flat=True))
+
+    context = {
+        'subscription': subscription,
+        'continents': continents,
+        'oceans': oceans,
+        'selected_region_ids': selected_region_ids,
+    }
+
+    return render(request, 'subscriptions.html', context)
+
+@login_required
 def add_subscriptions(request):
+    """Update user's regional subscriptions."""
     if request.method == "POST":
-        search_term = request.POST.get("search", False)
-        start_date = request.POST.get('start_date', False)
-        end_date = request.POST.get('end_date', False)
-        currentuser = request.user
-        user_name = currentuser.username if currentuser.is_authenticated else None
-        start_date_object = datetime.strptime(start_date, '%m/%d/%Y')
-        end_date_object = datetime.strptime(end_date, '%m/%d/%Y')
+        user = request.user
 
-        subscription = Subscription(
-            search_term=search_term,
-            timeperiod_startdate=start_date_object,
-            timeperiod_enddate=end_date_object,
-            user_name=user_name
+        # Get or create the user's subscription
+        subscription, created = Subscription.objects.get_or_create(
+            user=user,
+            defaults={'name': f'{user.username}_subscription'}
         )
-        logger.info('Adding new subscription for user %s: %s', user_name, subscription)
-        subscription.save()
+
+        # Get selected region IDs from the form
+        selected_region_ids = request.POST.getlist('regions')
+
+        # Update the subscription's regions
+        subscription.regions.clear()
+        if selected_region_ids:
+            regions = GlobalRegion.objects.filter(id__in=selected_region_ids)
+            subscription.regions.set(regions)
+
+        logger.info('Updated subscription for user %s with %d regions', user.username, len(selected_region_ids))
+        messages.success(request, f'Subscription updated! Monitoring {len(selected_region_ids)} regions.')
+
         return HttpResponseRedirect('/subscriptions/')
+
+    return HttpResponseRedirect('/subscriptions/')
 
 @login_required
 def unsubscribe(request):
@@ -495,8 +548,13 @@ Thank you for using OPTIMAP!
 def get_login_link(request, email):
     token = secrets.token_urlsafe(nbytes=LOGIN_TOKEN_LENGTH)
     link = f"{request.scheme}://{request.site.domain}/login/{token}"
-    cache.set(token, email, timeout=LOGIN_TOKEN_TIMEOUT_SECONDS)
-    logger.info('Created login link for %s with token %s - %s', email, token, link)
+
+    # Store both email and next parameter in cache
+    next_url = request.GET.get('next', request.POST.get('next', ''))
+    cache_data = {'email': email, 'next': next_url}
+    cache.set(token, cache_data, timeout=LOGIN_TOKEN_TIMEOUT_SECONDS)
+
+    logger.info('Created login link for %s with token %s (next=%s) - %s', email, token, next_url, link)
     return link
 
 def is_email_blocked(email):
