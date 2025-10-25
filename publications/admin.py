@@ -8,7 +8,7 @@ from django.core.mail import send_mail
 from leaflet.admin import LeafletGeoAdmin
 from publications.models import Publication, Source, HarvestingEvent, BlockedEmail, BlockedDomain, GlobalRegion
 from import_export.admin import ImportExportModelAdmin
-from publications.models import EmailLog, Subscription, UserProfile
+from publications.models import EmailLog, Subscription, UserProfile, WikidataExportLog
 from publications.tasks import harvest_oai_endpoint, schedule_subscription_email_task, send_monthly_email, schedule_monthly_email_task
 from django_q.models import Schedule
 from django.utils.timezone import now
@@ -17,24 +17,45 @@ from publications.tasks import regenerate_geojson_cache
 from publications.tasks import regenerate_geopackage_cache
 from django.test import Client
 from django.http import HttpResponse
-from publications.wikidata import export_publications_to_wikidata
+from publications.wikidata import export_publications_to_wikidata, export_publications_to_wikidata_dryrun
 
-@admin.action(description="Create new Wikidata items for selected publications")
+@admin.action(description="Export selected publications to Wikidata/Wikibase")
 def export_to_wikidata(modeladmin, request, queryset):
-    created_count, updated_count, error_records = export_publications_to_wikidata(queryset)
+    stats = export_publications_to_wikidata(queryset)
 
     # Success messages
-    if created_count:
-        messages.success(request, f"{created_count} new Wikidata item(s) created.")
-    if updated_count:
-        messages.success(request, f"{updated_count} existing Wikidata item(s) updated.")
+    if stats['created']:
+        messages.success(request, f"{stats['created']} new Wikidata item(s) created.")
+    if stats['updated']:
+        messages.success(request, f"{stats['updated']} existing Wikidata item(s) updated.")
+    if stats['skipped']:
+        messages.info(request, f"{stats['skipped']} publication(s) skipped (already exist or duplicate labels).")
 
-    # Warnings and errors
-    for publication, error_message in error_records:
-        if error_message == "no publicationDate":
-            messages.warning(request, f"Skipping “{publication.title}”: no publication date")
-        else:
-            messages.error(request, f"Failed to export “{publication.title}”: {error_message}")
+    # Error messages
+    if stats['errors']:
+        messages.error(request, f"{stats['errors']} publication(s) failed to export. Check the Wikidata export logs for details.")
+
+    # Summary message
+    messages.info(request, f"Total: {stats['total']} publication(s) processed.")
+
+@admin.action(description="[DRY-RUN] Export selected publications to Wikidata/Wikibase")
+def export_to_wikidata_dryrun(modeladmin, request, queryset):
+    stats = export_publications_to_wikidata_dryrun(queryset)
+
+    # Dry-run summary messages
+    messages.info(request, f"[DRY-RUN] Export simulation complete:")
+
+    if stats['created']:
+        messages.info(request, f"  • Would create {stats['created']} new Wikidata item(s)")
+    if stats['updated']:
+        messages.info(request, f"  • Would update {stats['updated']} existing Wikidata item(s)")
+    if stats['skipped']:
+        messages.info(request, f"  • Would skip {stats['skipped']} publication(s)")
+    if stats['errors']:
+        messages.warning(request, f"  • {stats['errors']} publication(s) have validation errors")
+
+    # Summary message
+    messages.success(request, f"[DRY-RUN] Total: {stats['total']} publication(s) analyzed. No changes were written to Wikibase.")
 
 @admin.action(description="Mark selected publications as published")
 def make_public(modeladmin, request, queryset):
@@ -172,8 +193,9 @@ class PublicationAdmin(LeafletGeoAdmin, ImportExportModelAdmin):
                      "openalex_fulltext_origin", "openalex_is_retracted",
                      "openalex_ids", "openalex_open_access_status")
     readonly_fields = ("created_by", "updated_by", "openalex_link")
-    actions = ["make_public", "make_draft", "regenerate_all_exports",
-               "export_permalinks_csv", "email_permalinks_preview", "export_to_wikidata"]
+    actions = [make_public, make_draft, regenerate_all_exports,
+               "export_permalinks_csv", "email_permalinks_preview",
+               export_to_wikidata, export_to_wikidata_dryrun]
 
     @admin.display(boolean=True, description="Has DOI")
     def has_permalink(self, obj):
@@ -243,12 +265,95 @@ class EmailLogAdmin(admin.ModelAdmin):
         "sent_at",
         "sent_by",
         "trigger_source",
-        "status",  
-        "error_message", 
+        "status",
+        "error_message",
     )
-    list_filter = ("status", "trigger_source", "sent_at")  
-    search_fields = ("recipient_email", "subject", "sent_by__username")  
-    actions = [trigger_monthly_email, trigger_monthly_email_task]  
+    list_filter = ("status", "trigger_source", "sent_at")
+    search_fields = ("recipient_email", "subject", "sent_by__username")
+    actions = [trigger_monthly_email, trigger_monthly_email_task]
+
+@admin.register(WikidataExportLog)
+class WikidataExportLogAdmin(admin.ModelAdmin):
+    """Admin interface for Wikidata export logs."""
+    list_display = (
+        "id",
+        "publication_title",
+        "action",
+        "wikidata_link",
+        "export_date",
+        "fields_count",
+    )
+    list_filter = ("action", "export_date")
+    search_fields = (
+        "publication__title",
+        "publication__doi",
+        "wikidata_qid",
+        "export_summary",
+    )
+    readonly_fields = (
+        "publication",
+        "export_date",
+        "action",
+        "wikidata_qid",
+        "wikidata_url",
+        "wikidata_link_display",
+        "wikibase_endpoint",
+        "exported_fields",
+        "error_message_display",
+        "export_summary",
+    )
+    fields = (
+        "publication",
+        "export_date",
+        "action",
+        "wikibase_endpoint",
+        "wikidata_qid",
+        "wikidata_link_display",
+        "export_summary",
+        "exported_fields",
+        "error_message_display",
+    )
+    ordering = ("-export_date",)
+    date_hierarchy = "export_date"
+
+    @admin.display(description="Publication")
+    def publication_title(self, obj):
+        return obj.publication.title[:60] if obj.publication else "—"
+
+    @admin.display(description="Wikidata")
+    def wikidata_link(self, obj):
+        if obj.wikidata_qid and obj.wikidata_url:
+            return format_html(
+                '<a href="{}" target="_blank" rel="noopener"><i class="fas fa-external-link-alt"></i> {}</a>',
+                obj.wikidata_url,
+                obj.wikidata_qid
+            )
+        return "—"
+
+    @admin.display(description="Wikidata Link")
+    def wikidata_link_display(self, obj):
+        if obj.wikidata_qid and obj.wikidata_url:
+            return format_html(
+                '<a href="{}" target="_blank" rel="noopener">{}</a>',
+                obj.wikidata_url,
+                obj.wikidata_url
+            )
+        return "—"
+
+    @admin.display(description="Fields")
+    def fields_count(self, obj):
+        if obj.exported_fields:
+            return len(obj.exported_fields)
+        return 0
+
+    @admin.display(description="Error Message (Full Traceback)")
+    def error_message_display(self, obj):
+        if obj.error_message:
+            return format_html(
+                '<pre style="white-space: pre-wrap; font-family: monospace; font-size: 12px; background: #f5f5f5; padding: 10px; border: 1px solid #ddd; border-radius: 4px; max-height: 400px; overflow-y: auto;">{}</pre>',
+                obj.error_message
+            )
+        return "—"
 
 @admin.register(Subscription)
 class SubscriptionAdmin(admin.ModelAdmin):

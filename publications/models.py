@@ -262,4 +262,66 @@ class Source(models.Model):
             name=f"Harvest Source {self.id}",
         )
         
-Journal = Source  
+Journal = Source
+
+
+class WikidataExportLog(models.Model):
+    """
+    Log of Wikidata exports for publications.
+    Tracks when publications were exported, what action was taken,
+    and links to the created/updated Wikidata items.
+    """
+    ACTION_CHOICES = [
+        ('created', 'Created'),
+        ('updated', 'Updated'),
+        ('skipped', 'Skipped'),
+        ('error', 'Error'),
+    ]
+
+    publication = models.ForeignKey(
+        'Publication',
+        on_delete=models.CASCADE,
+        related_name='wikidata_exports'
+    )
+    export_date = models.DateTimeField(auto_now_add=True, db_index=True)
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES, db_index=True)
+    wikidata_qid = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        help_text='Wikidata Q-ID (e.g., Q12345)'
+    )
+    wikidata_url = models.URLField(
+        max_length=512,
+        blank=True,
+        null=True,
+        help_text='Full URL to Wikidata item'
+    )
+    exported_fields = models.JSONField(
+        blank=True,
+        null=True,
+        help_text='List of fields that were exported'
+    )
+    error_message = models.TextField(blank=True, null=True)
+    export_summary = models.TextField(
+        blank=True,
+        null=True,
+        help_text='Summary of what was exported'
+    )
+    wikibase_endpoint = models.URLField(
+        max_length=512,
+        blank=True,
+        null=True,
+        help_text='Wikibase API endpoint used for this export (e.g., https://www.wikidata.org/w/api.php)'
+    )
+
+    class Meta:
+        ordering = ['-export_date']
+        verbose_name = 'Wikidata Export Log'
+        verbose_name_plural = 'Wikidata Export Logs'
+        indexes = [
+            models.Index(fields=['wikidata_qid'], name='publications_wikidata_qid_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.action.capitalize()} {self.publication.title[:50]} on {self.export_date.strftime('%Y-%m-%d')}"  

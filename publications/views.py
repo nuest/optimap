@@ -815,6 +815,14 @@ def work_landing(request, doi):
     can_publish = is_admin and (pub.status == 'c' or (pub.status == 'h' and (has_geometry or has_temporal)))
     can_unpublish = is_admin and pub.status == 'p'  # Can unpublish published works
 
+    # Get most recent successful Wikidata export
+    latest_wikidata_export = pub.wikidata_exports.filter(
+        action__in=['created', 'updated']
+    ).order_by('-export_date').first()
+
+    # Get all Wikidata exports for admin view
+    all_wikidata_exports = pub.wikidata_exports.all() if is_admin else []
+
     context = {
         "pub": pub,
         "feature_json": feature_json,
@@ -828,6 +836,8 @@ def work_landing(request, doi):
         "can_publish": can_publish,
         "can_unpublish": can_unpublish,
         "show_provenance": is_admin,
+        "latest_wikidata_export": latest_wikidata_export,
+        "all_wikidata_exports": all_wikidata_exports,
     }
     return render(request, "work_landing_page.html", context)
 
@@ -874,6 +884,14 @@ def work_landing_by_id(request, pub_id):
     can_publish = is_admin and (pub.status == 'c' or (pub.status == 'h' and (has_geometry or has_temporal)))
     can_unpublish = is_admin and pub.status == 'p'  # Can unpublish published works
 
+    # Get most recent successful Wikidata export
+    latest_wikidata_export = pub.wikidata_exports.filter(
+        action__in=['created', 'updated']
+    ).order_by('-export_date').first()
+
+    # Get all Wikidata exports for admin view
+    all_wikidata_exports = pub.wikidata_exports.all() if is_admin else []
+
     context = {
         "pub": pub,
         "feature_json": feature_json,
@@ -888,6 +906,8 @@ def work_landing_by_id(request, pub_id):
         "can_unpublish": can_unpublish,
         "show_provenance": is_admin,
         "use_id_urls": True,  # Flag to use ID-based URLs in template
+        "latest_wikidata_export": latest_wikidata_export,
+        "all_wikidata_exports": all_wikidata_exports,
     }
     return render(request, "work_landing_page.html", context)
 

@@ -217,14 +217,27 @@ BASE_URL =            env("OPTIMAP_BASE_URL", default="http://localhost:8000")
 EMAIL_IMAP_SENT_FOLDER = env('OPTIMAP_EMAIL_IMAP_SENT_FOLDER', default='')
 OPTIMAP_EMAIL_SEND_DELAY = env("OPTIMAP_EMAIL_SEND_DELAY", default=2)
 BASE_URL = env("BASE_URL", default="http://127.0.0.1:8000")
-OAI_USERNAME = env("OPTIMAP_OAI_USERNAME", default="")
-OAI_PASSWORD = env("OPTIMAP_OAI_PASSWORD", default="")
 EMAIL_SEND_DELAY = 2
 DATA_DUMP_INTERVAL_HOURS = 6
-OPENALEX_MAILTO = "login@optimap.science"
-WIKIBASE_API_URL = env("WIKIBASE_API_URL")
-WIKIBASE_USERNAME = env("WIKIBASE_USERNAME")
-WIKIBASE_PASSWORD = env("WIKIBASE_PASSWORD")
+
+# Contact email for API user agents (OpenAlex, Wikidata, etc.)
+CONTACT_EMAIL = "login@optimap.science"
+
+# Wikibase/Wikidata configuration
+WIKIBASE_API_URL = env("WIKIBASE_API_URL", default="")
+
+# OAuth 1.0a authentication (required)
+WIKIBASE_CONSUMER_TOKEN = env("WIKIBASE_CONSUMER_TOKEN", default="")
+WIKIBASE_CONSUMER_SECRET = env("WIKIBASE_CONSUMER_SECRET", default="")
+WIKIBASE_ACCESS_TOKEN = env("WIKIBASE_ACCESS_TOKEN", default="")
+WIKIBASE_ACCESS_SECRET = env("WIKIBASE_ACCESS_SECRET", default="")
+
+# Property auto-creation setting
+WIKIBASE_CREATE_PROPERTIES_IF_MISSING = env("WIKIBASE_CREATE_PROPERTIES_IF_MISSING", default=True, cast=bool)
+
+# Import optimap version for user agent
+import optimap
+WIKIBASE_USER_AGENT = f"OPTIMAP/{optimap.__version__} (https://optimap.science; {CONTACT_EMAIL})"
 
 
 MIDDLEWARE = [
