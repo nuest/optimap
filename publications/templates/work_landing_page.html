@@ -26,6 +26,9 @@
           {% elif pub.status == 'h' %}badge-info
           {% elif pub.status == 'c' %}badge-primary
           {% endif %}">{{ status_display }}</span>
+        {% if pub.status != 'p' %}
+          and is not visible to the public.
+        {% endif %}
       </div>
       <div>
         {% if can_publish %}
@@ -43,15 +46,69 @@
         </a>
       </div>
     </div>
-    {% if show_provenance and pub.provenance %}
+    {% if show_provenance %}
       <hr class="my-3">
       <div>
-        <a class="btn btn-sm btn-outline-secondary" data-toggle="collapse" href="#provenance-details" role="button" aria-expanded="false" aria-controls="provenance-details">
+        {% if pub.provenance %}
+        <a class="btn btn-sm btn-outline-secondary mb-2" data-toggle="collapse" href="#provenance-details" role="button" aria-expanded="false" aria-controls="provenance-details">
           <i class="fas fa-history"></i> Show provenance information
         </a>
-        <div class="collapse mt-2" id="provenance-details">
+        <div class="collapse mt-2 mb-3" id="provenance-details">
           <pre style="white-space: pre-wrap; margin: 0; font-size: 0.85rem; background: rgba(255,255,255,0.5); padding: 10px; border-radius: 4px;">{{ pub.provenance }}</pre>
         </div>
+        {% endif %}
+
+        {% if all_wikidata_exports %}
+        <a class="btn btn-sm btn-outline-info" data-toggle="collapse" href="#wikidata-export-details" role="button" aria-expanded="false" aria-controls="wikidata-export-details">
+          <i class="fas fa-database"></i> Show Wikidata export history ({{ all_wikidata_exports|length }})
+        </a>
+        <div class="collapse mt-2" id="wikidata-export-details">
+          <div style="background: rgba(255,255,255,0.5); padding: 15px; border-radius: 4px;">
+            <h6 class="font-weight-bold mb-3">Wikidata Export History</h6>
+            {% for export in all_wikidata_exports %}
+            <div class="mb-3 pb-3 {% if not forloop.last %}border-bottom{% endif %}">
+              <div class="d-flex justify-content-between align-items-start mb-2">
+                <div>
+                  <span class="badge
+                    {% if export.action == 'created' %}badge-success
+                    {% elif export.action == 'updated' %}badge-primary
+                    {% elif export.action == 'skipped' %}badge-warning
+                    {% elif export.action == 'error' %}badge-danger
+                    {% endif %}">{{ export.get_action_display }}</span>
+                  <small class="text-muted ml-2">{{ export.export_date|date:"Y-m-d H:i:s" }}</small>
+                </div>
+                {% if export.wikidata_qid %}
+                <div>
+                  <a href="{{ export.wikidata_url }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary">
+                    <i class="fas fa-external-link-alt"></i> {{ export.wikidata_qid }}
+                  </a>
+                </div>
+                {% endif %}
+              </div>
+
+              {% if export.export_summary %}
+              <div class="small mb-2">
+                <strong>Summary:</strong> {{ export.export_summary }}
+              </div>
+              {% endif %}
+
+              {% if export.exported_fields %}
+              <div class="small mb-2">
+                <strong>Exported fields ({{ export.exported_fields|length }}):</strong>
+                <span class="text-muted">{{ export.exported_fields|join:", " }}</span>
+              </div>
+              {% endif %}
+
+              {% if export.error_message %}
+              <div class="small text-danger">
+                <strong>Error:</strong> {{ export.error_message }}
+              </div>
+              {% endif %}
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
       </div>
     {% endif %}
   </div>
@@ -76,7 +133,10 @@
     ·
   {% endif %}
   {% if pub.openalex_id %}
-    <strong>OpenAlex:</strong> <a href="{{ pub.openalex_id }}" target="_blank" rel="noopener"><i class="fas fa-external-link-alt"></i> View in OpenAlex</a>
+    <strong>OpenAlex:</strong> <a href="{{ pub.openalex_id }}" target="_blank" rel="noopener"><i class="fas fa-external-link-alt"></i> View in OpenAlex</a> ·
+  {% endif %}
+  {% if latest_wikidata_export and latest_wikidata_export.wikidata_url %}
+    <strong>Wikidata:</strong> <a href="{{ latest_wikidata_export.wikidata_url }}" target="_blank" rel="noopener"><i class="fas fa-external-link-alt"></i> {{ latest_wikidata_export.wikidata_qid }}</a>
   {% endif %}
 </div>
 

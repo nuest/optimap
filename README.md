@@ -284,11 +284,12 @@ python -m smtpd -c DebuggingServer -n localhost:5587
 OPTIMAP_EMAIL_HOST=localhost
 OPTIMAP_EMAIL_PORT=5587
 ```
-### Accessing list of article links
 
-Visit the URL - http://127.0.0.1:8000/articles/links/
+### Accessing list of works
 
-### Harvest Publications from Real Journals
+Visit the URL - <http://127.0.0.1:8000/works/>
+
+### Harvest Publications from real journals
 
 The `harvest_journals` management command allows you to harvest publications from real OAI-PMH journal sources directly into your database. This is useful for:
 

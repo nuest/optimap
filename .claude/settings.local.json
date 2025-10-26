@@ -16,7 +16,16 @@
       "Bash(python manage.py:*)",
       "Bash(python -m py_compile:*)",
       "Bash(python:*)",
-      "Bash(node --check:*)"
+      "Bash(node --check:*)",
+      "Bash(find:*)",
+      "Bash(OPTIMAP_LOGGING_LEVEL=WARNING python manage.py test:*)",
+      "Bash(export OPTIMAP_LOGGING_LEVEL=WARNING)",
+      "Bash(awk:*)",
+      "Bash(chmod:*)",
+      "Bash(bash:*)",
+      "Bash(./create_wikibase_property.sh:*)",
+      "Bash(python3:*)",
+      "Bash(pkill:*)"
     ],
     "deny": [],
     "ask": []

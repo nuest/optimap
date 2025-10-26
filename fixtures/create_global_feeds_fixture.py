@@ -131,6 +131,52 @@ CROSS_REGION_LINES = [
     ("Cable Route: Europe-Africa", "LINESTRING (10 55, 5 45, 0 35, -5 25, 0 10, 5 0)", "undersea cable from Europe through Atlantic to Africa"),
 ]
 
+# Complex polygon geometries (triangles, pentagons, concave shapes, holes)
+COMPLEX_POLYGONS = [
+    ("Triangular Survey Area: Mediterranean", "POLYGON ((10 35, 20 45, 5 42, 10 35))", "triangular research zone in Mediterranean Sea"),
+    ("Pentagon Study Region: Central Europe", "POLYGON ((10 48, 15 50, 17 47, 12 44, 8 46, 10 48))", "five-sided ecological study area in Central Europe"),
+    ("Concave Polygon Zone: Southeast Asia", "POLYGON ((100 5, 105 5, 105 10, 103 8, 101 10, 100 10, 100 5))", "irregularly shaped coastal research area"),
+    ("Protected Area with Exclusion Zone: Amazon", "POLYGON ((-65 -5, -60 -5, -60 0, -65 0, -65 -5), (-63 -3, -62 -3, -62 -2, -63 -2, -63 -3))", "conservation area with restricted inner zone in Amazon rainforest"),
+    ("Star-shaped Survey: Arabian Peninsula", "POLYGON ((50 22, 51 23, 52 22, 51 21, 52 20, 51 19, 50 20, 49 19, 48 20, 49 21, 48 22, 49 23, 50 22))", "multi-pronged geological survey region"),
+]
+
+# Mixed geometry collections - all permutations of point, line, polygon
+MIXED_GEOMETRIES = [
+    # Point only (single)
+    ("Point-only Study: Remote Island", "GEOMETRYCOLLECTION (POINT (-10 75))", "single monitoring station on remote Arctic island"),
+    # Line only (single)
+    ("Line-only Survey: Shipping Route", "GEOMETRYCOLLECTION (LINESTRING (-15 70, 5 72, 25 75))", "linear shipping route survey in North Atlantic"),
+    # Polygon only (single)
+    ("Polygon-only Region: Coastal Zone", "GEOMETRYCOLLECTION (POLYGON ((0 80, 10 80, 10 85, 0 85, 0 80)))", "coastal research zone in Arctic Ocean"),
+    # Point + Line
+    ("Point-Line Study: River Monitoring", "GEOMETRYCOLLECTION (POINT (0 5), LINESTRING (-5 0, 0 5, 5 10))", "river monitoring with station and flow path"),
+    # Point + Polygon
+    ("Point-Polygon Study: Harbor Analysis", "GEOMETRYCOLLECTION (POINT (100 10), POLYGON ((98 8, 102 8, 102 12, 98 12, 98 8)))", "harbor with central buoy and boundary zone"),
+    # Line + Polygon
+    ("Line-Polygon Study: Coastal Transect", "GEOMETRYCOLLECTION (LINESTRING (80 27, 85 29, 90 28), POLYGON ((82 26, 88 26, 88 30, 82 30, 82 26)))", "coastal transect through study area"),
+    # Point + Line + Polygon (full combination)
+    ("Multi-site Arctic Study", "GEOMETRYCOLLECTION (POINT (-10 75), LINESTRING (-15 70, 5 72, 25 75), POLYGON ((0 80, 10 80, 10 85, 0 85, 0 80)))", "integrated Arctic research with monitoring stations, survey transects, and study areas"),
+    # Multiple Points + Line
+    ("Multi-Point-Line: Island Network", "GEOMETRYCOLLECTION (POINT (160 -5), POINT (165 0), POINT (170 5), LINESTRING (158 -8, 172 8))", "island monitoring network with connection route"),
+    # Multiple Points + Polygon
+    ("Multi-Point-Polygon: Lake Study", "GEOMETRYCOLLECTION (POINT (-75 20), POINT (-70 18), POLYGON ((-80 15, -60 15, -60 25, -80 25, -80 15)))", "lake study with sampling stations and boundary"),
+    # Multiple Lines + Polygon
+    ("Multi-Line-Polygon: Watershed Analysis", "GEOMETRYCOLLECTION (LINESTRING (50 20, 52 22), LINESTRING (51 19, 52 21), POLYGON ((48 18, 54 18, 54 24, 48 24, 48 18)))", "watershed with multiple streams and catchment area"),
+]
+
+# Very small and very large geometries for edge case testing
+EXTREME_SCALE_GEOMETRIES = [
+    ("Micro-site Study: Urban Park", "POLYGON ((13.40500 52.52000, 13.40510 52.52000, 13.40510 52.52005, 13.40500 52.52005, 13.40500 52.52000))", "very small urban ecology study (sub-meter precision)"),
+    ("Continental-scale Transect", "LINESTRING (-120 25, -80 30, -40 35, 0 40, 40 45, 80 50, 120 55)", "global east-west transect spanning multiple continents"),
+]
+
+# MultiPoint and MultiLineString for additional complexity
+MULTI_GEOMETRY_TYPES = [
+    ("Scattered Monitoring Network: Pacific Islands", "MULTIPOINT ((160 -10), (165 -5), (170 0), (175 5), (180 10))", "distributed ocean monitoring stations across Pacific"),
+    ("Multi-route Shipping Analysis", "MULTILINESTRING ((140 30, 150 32, 160 33), (142 28, 152 29, 162 30), (138 32, 148 34, 158 35))", "parallel shipping corridor analysis in Northwest Pacific"),
+    ("Fragmented Habitat Study: Indonesia", "MULTIPOLYGON (((120 -5, 122 -5, 122 -3, 120 -3, 120 -5)), ((124 -4, 126 -4, 126 -2, 124 -2, 124 -4)), ((128 -6, 130 -6, 130 -4, 128 -4, 128 -6)))", "island biogeography across separated land masses"),
+]
+
 def create_source(pk, name, issn_l=None, is_oa=True):
     """Create a source object."""
     return {
@@ -402,6 +448,106 @@ def main():
         keyword_idx += 1
         topic_idx += 1
 
+    print("\n=== Creating complex polygon geometries ===")
+    for i, (title, geometry, description) in enumerate(COMPLEX_POLYGONS):
+        pk = pk_counter
+        pk_counter += 1
+        source_pk_choice = 2000 + (i % len(sources))
+
+        pub = create_publication(
+            pk=pk,
+            source_pk=source_pk_choice,
+            title=title,
+            abstract=f"Complex polygon study focusing on {description}. This research examines irregular boundaries and geometric complexity in spatial analysis.",
+            geometry_wkt=geometry,
+            region_desc=description,
+            authors_idx=author_idx,
+            keywords_idx=keyword_idx,
+            topics_idx=topic_idx,
+            has_openalex=True,
+        )
+        fixture_data.append(pub)
+        print(f"  [{pk}] {title}: {len(pub['fields']['authors'])} authors, {len(pub['fields']['keywords'])} keywords, {len(pub['fields']['topics'])} topics")
+
+        author_idx += 1
+        keyword_idx += 1
+        topic_idx += 1
+
+    print("\n=== Creating mixed geometry collections ===")
+    for i, (title, geometry, description) in enumerate(MIXED_GEOMETRIES):
+        pk = pk_counter
+        pk_counter += 1
+        source_pk_choice = 2000 + (i % len(sources))
+
+        pub = create_publication(
+            pk=pk,
+            source_pk=source_pk_choice,
+            title=title,
+            abstract=f"Multi-component spatial study integrating {description}. Combines point-based, linear, and areal data collection methods.",
+            geometry_wkt=geometry,
+            region_desc=description,
+            authors_idx=author_idx,
+            keywords_idx=keyword_idx,
+            topics_idx=topic_idx,
+            has_openalex=True,
+        )
+        fixture_data.append(pub)
+        print(f"  [{pk}] {title}: {len(pub['fields']['authors'])} authors, {len(pub['fields']['keywords'])} keywords, {len(pub['fields']['topics'])} topics")
+
+        author_idx += 1
+        keyword_idx += 1
+        topic_idx += 1
+
+    print("\n=== Creating extreme scale geometries ===")
+    for i, (title, geometry, description) in enumerate(EXTREME_SCALE_GEOMETRIES):
+        pk = pk_counter
+        pk_counter += 1
+        source_pk_choice = 2000 + (i % len(sources))
+
+        pub = create_publication(
+            pk=pk,
+            source_pk=source_pk_choice,
+            title=title,
+            abstract=f"Scale-specific analysis examining {description}. Tests spatial processing at extreme precision or extent.",
+            geometry_wkt=geometry,
+            region_desc=description,
+            authors_idx=author_idx,
+            keywords_idx=keyword_idx,
+            topics_idx=topic_idx,
+            has_openalex=True,
+        )
+        fixture_data.append(pub)
+        print(f"  [{pk}] {title}: {len(pub['fields']['authors'])} authors, {len(pub['fields']['keywords'])} keywords, {len(pub['fields']['topics'])} topics")
+
+        author_idx += 1
+        keyword_idx += 1
+        topic_idx += 1
+
+    print("\n=== Creating multi-geometry types ===")
+    for i, (title, geometry, description) in enumerate(MULTI_GEOMETRY_TYPES):
+        pk = pk_counter
+        pk_counter += 1
+        source_pk_choice = 2000 + (i % len(sources))
+
+        pub = create_publication(
+            pk=pk,
+            source_pk=source_pk_choice,
+            title=title,
+            abstract=f"Multi-feature spatial analysis documenting {description}. Studies distributed or parallel spatial phenomena.",
+            geometry_wkt=geometry,
+            region_desc=description,
+            authors_idx=author_idx,
+            keywords_idx=keyword_idx,
+            topics_idx=topic_idx,
+            has_openalex=True,
+        )
+        fixture_data.append(pub)
+        print(f"  [{pk}] {title}: {len(pub['fields']['authors'])} authors, {len(pub['fields']['keywords'])} keywords, {len(pub['fields']['topics'])} topics")
+
+        author_idx += 1
+        keyword_idx += 1
+        topic_idx += 1
+
     # Create backup of original
     import os
     import shutil
@@ -428,12 +574,18 @@ def main():
 
     print("\n=== Summary ===")
     print(f"Total publications: {len(publications)}")
+    print(f"\nBasic geometry types:")
     print(f"  - Continents (polygons): {len(CONTINENTS)}")
     print(f"  - Oceans (polygons): {len(OCEANS)}")
     print(f"  - Two-region overlaps (polygons): {len(TWO_REGION_OVERLAPS)}")
     print(f"  - Multi-region spans (polygons): {len(MULTI_REGION_SPANS)}")
     print(f"  - Region points (points): {len(REGION_POINTS)}")
     print(f"  - Cross-region lines (linestrings): {len(CROSS_REGION_LINES)}")
+    print(f"\nComplex geometry types:")
+    print(f"  - Complex polygons (triangles, pentagons, concave, holes): {len(COMPLEX_POLYGONS)}")
+    print(f"  - Mixed geometries (point+line+polygon): {len(MIXED_GEOMETRIES)}")
+    print(f"  - Extreme scale geometries: {len(EXTREME_SCALE_GEOMETRIES)}")
+    print(f"  - Multi-geometry types (multipoint, multiline, multipoly): {len(MULTI_GEOMETRY_TYPES)}")
     print(f"\nMetadata coverage:")
     print(f"  - With authors: {with_authors}/{len(publications)}")
     print(f"  - With keywords: {with_keywords}/{len(publications)}")
