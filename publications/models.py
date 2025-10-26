@@ -98,6 +98,119 @@ class Publication(models.Model):
         return f"{base}{rel}"
     permalink.short_description = "Permalink"
 
+    def get_center_coordinate(self):
+        """
+        Calculate and return the center coordinate of the publication's geometry using PostGIS.
+
+        For publications with geometry, this method:
+        1. Uses PostGIS ST_Envelope to get the bounding box
+        2. Uses PostGIS ST_Centroid to calculate the center of the bounding box
+        3. Returns a tuple (longitude, latitude) or None if no geometry
+
+        This uses database-level geometry operations for accuracy and performance.
+
+        Returns:
+            tuple: (longitude, latitude) as floats, or None if no geometry
+
+        Examples:
+            >>> pub.geometry = Point(10, 20)
+            >>> pub.get_center_coordinate()
+            (10.0, 20.0)
+
+            >>> pub.geometry = GeometryCollection([Point(0, 0), Point(10, 10)])
+            >>> pub.get_center_coordinate()
+            (5.0, 5.0)
+        """
+        if not self.geometry:
+            return None
+
+        try:
+            from django.contrib.gis.db.models.functions import Centroid, Envelope
+            from django.contrib.gis.geos import Point
+
+            # Use database query to calculate centroid of bounding box
+            # ST_Centroid(ST_Envelope(geometry)) gives us the center of the bounding box
+            result = Publication.objects.filter(pk=self.pk).annotate(
+                bbox_center=Centroid(Envelope('geometry'))
+            ).values_list('bbox_center', flat=True).first()
+
+            if result and isinstance(result, Point):
+                # Return as (longitude, latitude)
+                return (result.x, result.y)
+
+            return None
+
+        except Exception:
+            # If there's any error calculating center, return None
+            return None
+
+    def get_extreme_points(self):
+        """
+        Calculate and return the extreme points (northernmost, southernmost, easternmost, westernmost)
+        of the publication's geometry using PostGIS.
+
+        Uses ST_DumpPoints to extract all vertices and orders them by coordinates.
+
+        Returns:
+            dict: Dictionary with keys 'north', 'south', 'east', 'west', each containing
+                  a tuple (longitude, latitude), or None if no geometry
+
+        Examples:
+            >>> pub.geometry = Polygon([(0, 0), (10, 0), (10, 10), (0, 10), (0, 0)])
+            >>> extremes = pub.get_extreme_points()
+            >>> extremes['north']  # (5.0, 10.0) - any point at max latitude
+            >>> extremes['south']  # (5.0, 0.0) - any point at min latitude
+            >>> extremes['east']   # (10.0, 5.0) - any point at max longitude
+            >>> extremes['west']   # (0.0, 5.0) - any point at min longitude
+        """
+        if not self.geometry:
+            return None
+
+        try:
+            from django.db import connection
+
+            # Raw SQL query to get all extreme points
+            # For each direction, we dump all points, order by coordinate, and take the first
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    WITH points AS (
+                        SELECT (ST_DumpPoints(geometry)).geom AS pt
+                        FROM publications_publication
+                        WHERE id = %s
+                    )
+                    SELECT
+                        -- Northernmost point (highest Y/latitude)
+                        (SELECT ST_X(pt) FROM points ORDER BY ST_Y(pt) DESC LIMIT 1) AS north_lon,
+                        (SELECT ST_Y(pt) FROM points ORDER BY ST_Y(pt) DESC LIMIT 1) AS north_lat,
+                        -- Southernmost point (lowest Y/latitude)
+                        (SELECT ST_X(pt) FROM points ORDER BY ST_Y(pt) ASC LIMIT 1) AS south_lon,
+                        (SELECT ST_Y(pt) FROM points ORDER BY ST_Y(pt) ASC LIMIT 1) AS south_lat,
+                        -- Easternmost point (highest X/longitude)
+                        (SELECT ST_X(pt) FROM points ORDER BY ST_X(pt) DESC LIMIT 1) AS east_lon,
+                        (SELECT ST_Y(pt) FROM points ORDER BY ST_X(pt) DESC LIMIT 1) AS east_lat,
+                        -- Westernmost point (lowest X/longitude)
+                        (SELECT ST_X(pt) FROM points ORDER BY ST_X(pt) ASC LIMIT 1) AS west_lon,
+                        (SELECT ST_Y(pt) FROM points ORDER BY ST_X(pt) ASC LIMIT 1) AS west_lat
+                """, [self.pk])
+
+                row = cursor.fetchone()
+
+                if row:
+                    north_lon, north_lat, south_lon, south_lat, east_lon, east_lat, west_lon, west_lat = row
+
+                    return {
+                        'north': (north_lon, north_lat) if north_lon is not None else None,
+                        'south': (south_lon, south_lat) if south_lon is not None else None,
+                        'east': (east_lon, east_lat) if east_lon is not None else None,
+                        'west': (west_lon, west_lat) if west_lon is not None else None,
+                    }
+
+            return None
+
+        except Exception:
+            # If there's any error calculating extremes, return None
+            return None
+
 class Subscription(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="subscriptions", null=True, blank=True)
     name = models.CharField(max_length=4096, default="default_subscription")

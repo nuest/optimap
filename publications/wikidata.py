@@ -61,6 +61,10 @@ P_AUTHOR = "P50"  # author (item reference)
 P_JOURNAL_NAME = "P1448"  # journal name (monolingual text)
 P_JOURNAL = "P1433"  # published in (journal as item)
 P_GEOMETRY = "P625"   # coordinate location
+P_NORTHERNMOST_POINT = "P1332"  # northernmost point
+P_SOUTHERNMOST_POINT = "P1333"  # southernmost point
+P_EASTERNMOST_POINT = "P1334"   # easternmost point
+P_WESTERNMOST_POINT = "P1335"   # westernmost point
 P_INSTANCE_OF = "P31"  # instance of
 P_KEYWORDS = "P921"  # main subject / keywords
 P_LANGUAGE = "P407"  # language of work
@@ -217,6 +221,7 @@ def build_property_id_mapping():
         standard_properties = [
             P_TITLE, P_ABSTRACT, P_URL, P_PUBLICATION_DATE, P_PERIOD_START, P_PERIOD_END,
             P_DOI, P_AUTHOR_STRING, P_AUTHOR, P_JOURNAL_NAME, P_JOURNAL, P_GEOMETRY,
+            P_NORTHERNMOST_POINT, P_SOUTHERNMOST_POINT, P_EASTERNMOST_POINT, P_WESTERNMOST_POINT,
             P_INSTANCE_OF, P_KEYWORDS, P_LANGUAGE, P_LICENSE, P_FULL_TEXT_URL,
             P_OPENALEX_ID, P_PMID, P_PMC, P_ISSN, P_ISSN_L, P_RETRACTED
         ]
@@ -891,6 +896,58 @@ def find_local_item_by_doi(doi):
         return None
 
 
+def find_local_item_by_openalex_id(openalex_id):
+    """
+    Return the Q-ID of an existing item in our Wikibase instance for the given OpenAlex ID,
+    or None if no match is found.
+
+    Args:
+        openalex_id: OpenAlex ID, either full URL (https://openalex.org/W1234567890) or just the ID (W1234567890)
+
+    Returns:
+        str: QID of the item, or None if not found
+    """
+    # Extract just the ID part if a full URL was provided
+    if openalex_id and '/' in openalex_id:
+        openalex_id = openalex_id.rsplit('/', 1)[-1]
+
+    if not openalex_id:
+        return None
+
+    # Get the local property ID for OpenAlex ID
+    local_openalex_property = get_local_property_id(P_OPENALEX_ID)
+
+    # Try with full URL first
+    sparql_query = f'''
+    SELECT ?item WHERE {{
+      {{ ?item wdt:{local_openalex_property} "https://openalex.org/{openalex_id}" . }}
+      UNION
+      {{ ?item wdt:{local_openalex_property} "{openalex_id}" . }}
+    }} LIMIT 1
+    '''
+    try:
+        response = requests.get(
+            SPARQL_ENDPOINT,
+            params={"query": sparql_query, "format": "json"},
+            headers={"Accept": "application/json"},
+            timeout=30
+        )
+        response.raise_for_status()
+
+        data = response.json()
+        bindings = data.get("results", {}).get("bindings", [])
+        if not bindings:
+            return None
+
+        item_uri = bindings[0]["item"]["value"]
+        qid = item_uri.rsplit("/", 1)[-1]
+        logger.debug(f"Found existing item {qid} for OpenAlex ID {openalex_id}")
+        return qid
+    except Exception as e:
+        logger.error(f"Error querying SPARQL for OpenAlex ID {openalex_id}: {e}")
+        return None
+
+
 def build_statements(publication):
     """
     Build comprehensive list of Wikidata statements from publication data.
@@ -1035,20 +1092,81 @@ def build_statements(publication):
             statements.append(Item(prop_nr=get_local_property_id(P_RETRACTED), value="Q7594826"))
             exported_fields.append('is_retracted')
 
-    # Geometry - coordinates
-    if publication.geometry and check_property_exists(P_GEOMETRY):
+    # Geometry - center coordinate of bounding box and extreme points
+    if publication.geometry:
         try:
-            geometries = getattr(publication.geometry, "geoms", [publication.geometry])
-            for geom in geometries:
-                if getattr(geom, "geom_type", None) != "Point":
-                    geom = geom.centroid
-                statements.append(GlobeCoordinate(
-                    prop_nr=get_local_property_id(P_GEOMETRY),
-                    latitude=geom.y,
-                    longitude=geom.x,
-                    precision=0.0001
-                ))
-            exported_fields.append('geometry')
+            # Add center coordinate
+            if check_property_exists(P_GEOMETRY):
+                center = publication.get_center_coordinate()
+                if center:
+                    lon, lat = center
+                    statements.append(GlobeCoordinate(
+                        prop_nr=get_local_property_id(P_GEOMETRY),
+                        latitude=lat,
+                        longitude=lon,
+                        precision=0.0001,
+                        globe='http://www.wikidata.org/entity/Q2'  # Earth
+                    ))
+                    exported_fields.append('geometry_center')
+                    logger.debug(f"Added center coordinate for publication {publication.id}: ({lon}, {lat})")
+                else:
+                    logger.warning(f"Could not calculate center coordinate for publication {publication.id}")
+
+            # Add extreme points (northernmost, southernmost, easternmost, westernmost)
+            extreme_points = publication.get_extreme_points()
+            if extreme_points:
+                # Northernmost point
+                if extreme_points['north'] and check_property_exists(P_NORTHERNMOST_POINT):
+                    lon, lat = extreme_points['north']
+                    statements.append(GlobeCoordinate(
+                        prop_nr=get_local_property_id(P_NORTHERNMOST_POINT),
+                        latitude=lat,
+                        longitude=lon,
+                        precision=0.0001,
+                        globe='http://www.wikidata.org/entity/Q2'
+                    ))
+                    exported_fields.append('geometry_north')
+                    logger.debug(f"Added northernmost point for publication {publication.id}: ({lon}, {lat})")
+
+                # Southernmost point
+                if extreme_points['south'] and check_property_exists(P_SOUTHERNMOST_POINT):
+                    lon, lat = extreme_points['south']
+                    statements.append(GlobeCoordinate(
+                        prop_nr=get_local_property_id(P_SOUTHERNMOST_POINT),
+                        latitude=lat,
+                        longitude=lon,
+                        precision=0.0001,
+                        globe='http://www.wikidata.org/entity/Q2'
+                    ))
+                    exported_fields.append('geometry_south')
+                    logger.debug(f"Added southernmost point for publication {publication.id}: ({lon}, {lat})")
+
+                # Easternmost point
+                if extreme_points['east'] and check_property_exists(P_EASTERNMOST_POINT):
+                    lon, lat = extreme_points['east']
+                    statements.append(GlobeCoordinate(
+                        prop_nr=get_local_property_id(P_EASTERNMOST_POINT),
+                        latitude=lat,
+                        longitude=lon,
+                        precision=0.0001,
+                        globe='http://www.wikidata.org/entity/Q2'
+                    ))
+                    exported_fields.append('geometry_east')
+                    logger.debug(f"Added easternmost point for publication {publication.id}: ({lon}, {lat})")
+
+                # Westernmost point
+                if extreme_points['west'] and check_property_exists(P_WESTERNMOST_POINT):
+                    lon, lat = extreme_points['west']
+                    statements.append(GlobeCoordinate(
+                        prop_nr=get_local_property_id(P_WESTERNMOST_POINT),
+                        latitude=lat,
+                        longitude=lon,
+                        precision=0.0001,
+                        globe='http://www.wikidata.org/entity/Q2'
+                    ))
+                    exported_fields.append('geometry_west')
+                    logger.debug(f"Added westernmost point for publication {publication.id}: ({lon}, {lat})")
+
         except Exception as e:
             logger.warning(f"Error processing geometry for publication {publication.id}: {e}")
 
@@ -1100,8 +1218,18 @@ def upsert_publication(publication, wikibase_integrator, dryrun=False):
         # Build statements
         statements, exported_fields = build_statements(publication)
 
-        # Check for existing item by DOI
-        existing_qid = find_local_item_by_doi(publication.doi) if publication.doi else None
+        # Check for existing item by DOI first, then fall back to OpenAlex ID
+        existing_qid = None
+        if publication.doi:
+            existing_qid = find_local_item_by_doi(publication.doi)
+            if existing_qid:
+                logger.debug(f"Found existing item {existing_qid} by DOI {publication.doi}")
+
+        # Fallback to OpenAlex ID if DOI didn't find a match
+        if not existing_qid and publication.openalex_id:
+            existing_qid = find_local_item_by_openalex_id(publication.openalex_id)
+            if existing_qid:
+                logger.info(f"Found existing item {existing_qid} by OpenAlex ID {publication.openalex_id} (DOI lookup failed or no DOI)")
 
         if dryrun:
             # Dry-run mode: simulate the export without writing

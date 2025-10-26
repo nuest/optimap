@@ -716,7 +716,12 @@ class WikidataExportTest(TestCase):
             self.assertIn('abstract', exported_fields)
             self.assertIn('authors', exported_fields)
             self.assertIn('keywords', exported_fields)
-            self.assertIn('geometry', exported_fields)
+            # Geometry is now exported as multiple fields
+            self.assertIn('geometry_center', exported_fields)
+            self.assertIn('geometry_north', exported_fields)
+            self.assertIn('geometry_south', exported_fields)
+            self.assertIn('geometry_east', exported_fields)
+            self.assertIn('geometry_west', exported_fields)
             self.assertIn('openalex_id', exported_fields)
             self.assertIn('pmid', exported_fields)
             self.assertIn('pmcid', exported_fields)
