@@ -39,6 +39,7 @@ class StaticViewSitemap(Sitemap):
             "contribute",     # Contribute page (/contribute/)
             "data",           # Data download page (/data/)
             "feeds",          # RSS/Atom feeds listing (/feeds/)
+            "geoextent",      # Geoextent extraction tool (/geoextent/)
             "privacy",        # Privacy policy (/privacy/)
             "redoc",          # API schema UI (/api/schema/ui/)
             "sitemap-page",   # Human-readable sitemap (/pages/)
