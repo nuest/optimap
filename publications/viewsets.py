@@ -24,10 +24,11 @@ class PublicationViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         """
         Return all publications for admin users, only published ones for others.
+        Sorted by creation date (newest first) to match the works list page.
         """
         if self.request.user.is_authenticated and self.request.user.is_staff:
-            return Publication.objects.all().distinct()
-        return Publication.objects.filter(status="p").distinct()
+            return Publication.objects.all().order_by("-creationDate", "-id").distinct()
+        return Publication.objects.filter(status="p").order_by("-creationDate", "-id").distinct()
 
 class SubscriptionViewSet(viewsets.ModelViewSet):
     """

@@ -740,37 +740,94 @@ def _normalize_authors(pub):
 
 def works_list(request):
     """
-    Public page that lists a link for every work:
+    Public page that lists all works with pagination:
     - DOI present  -> /work/<doi> (site-local landing page)
     - no DOI       -> fall back to Publication.url (external/original)
 
     Only published works (status='p') are shown to non-admin users.
     Admin users see all works with status labels.
+
+    Supports pagination with user-selectable page size.
     """
+    from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+    from publications.utils.statistics import get_cached_statistics
+
     is_admin = request.user.is_authenticated and request.user.is_staff
 
-    if is_admin:
-        pubs = Publication.objects.all().order_by("-creationDate", "-id")
-    else:
-        pubs = Publication.objects.filter(status='p').order_by("-creationDate", "-id")
+    # Get page size from request or use default
+    page_size = request.GET.get('size', settings.WORKS_PAGE_SIZE_DEFAULT)
+    try:
+        page_size = int(page_size)
+        # Clamp page size within allowed limits
+        page_size = max(settings.WORKS_PAGE_SIZE_MIN, min(page_size, settings.WORKS_PAGE_SIZE_MAX))
+    except (ValueError, TypeError):
+        page_size = settings.WORKS_PAGE_SIZE_DEFAULT
 
-    links = []
-    for pub in pubs:
-        link_data = {"title": pub.title}
+    # Get page number from request
+    page_number = request.GET.get('page', 1)
+
+    # Base queryset
+    if is_admin:
+        pubs = Publication.objects.all().select_related('source')
+    else:
+        pubs = Publication.objects.filter(status='p').select_related('source')
+
+    pubs = pubs.order_by("-creationDate", "-id")
+
+    # Create paginator
+    paginator = Paginator(pubs, page_size)
+
+    try:
+        page_obj = paginator.page(page_number)
+    except PageNotAnInteger:
+        page_obj = paginator.page(1)
+    except EmptyPage:
+        page_obj = paginator.page(paginator.num_pages)
+
+    # Build work data for current page
+    works = []
+    for pub in page_obj:
+        work_data = {
+            "title": pub.title,
+            "doi": pub.doi,
+            "authors": pub.authors or [],
+            "source": pub.source.name if pub.source else None,
+        }
 
         if pub.doi:
-            link_data["href"] = reverse("optimap:article-landing", args=[pub.doi])
+            work_data["href"] = reverse("optimap:article-landing", args=[pub.doi])
         elif pub.url:
-            link_data["href"] = pub.url
+            work_data["href"] = pub.url
 
         # Add status info for admin users
         if is_admin:
-            link_data["status"] = pub.get_status_display()
-            link_data["status_code"] = pub.status
+            work_data["status"] = pub.get_status_display()
+            work_data["status_code"] = pub.status
 
-        links.append(link_data)
+        works.append(work_data)
 
-    return render(request, "works.html", {"links": links, "is_admin": is_admin})
+    # Get cached statistics
+    stats = get_cached_statistics()
+
+    # Build API URL for current page/size
+    # DRF uses limit/offset pagination, so calculate offset from page number
+    offset = (page_obj.number - 1) * page_size
+    api_url = request.build_absolute_uri(
+        '/api/v1/publications/' +
+        f'?limit={page_size}&offset={offset}'
+    )
+
+    context = {
+        "works": works,
+        "page_obj": page_obj,
+        "page_size": page_size,
+        "page_size_options": settings.WORKS_PAGE_SIZE_OPTIONS,
+        "is_admin": is_admin,
+        "statistics": stats,
+        "api_url": api_url,
+    }
+
+    return render(request, "works.html", context)
 
 
 def work_landing(request, doi):

@@ -384,3 +384,26 @@ GAZETTEER_PROVIDER = env('OPTIMAP_GAZETTEER_PROVIDER', default='nominatim')
 GAZETTEER_PLACEHOLDER = env('OPTIMAP_GAZETTEER_PLACEHOLDER', default='Search for a location...')
 # Optional API key for commercial providers (not required for Nominatim)
 GAZETTEER_API_KEY = env('OPTIMAP_GAZETTEER_API_KEY', default='')
+
+# Works List Pagination Settings
+# Default number of works to display per page
+WORKS_PAGE_SIZE_DEFAULT = int(env('OPTIMAP_WORKS_PAGE_SIZE_DEFAULT', default=50))
+# Minimum page size users can select
+WORKS_PAGE_SIZE_MIN = int(env('OPTIMAP_WORKS_PAGE_SIZE_MIN', default=10))
+# Maximum page size users can select
+WORKS_PAGE_SIZE_MAX = int(env('OPTIMAP_WORKS_PAGE_SIZE_MAX', default=200))
+
+# Calculate available page size options by doubling from MIN to MAX
+# Always includes MIN and MAX values
+def _calculate_page_size_options(min_size, max_size):
+    """Calculate page size options by doubling from min to max"""
+    options = [min_size]
+    current = min_size
+    while current * 2 < max_size:
+        current = current * 2
+        options.append(current)
+    if options[-1] != max_size:
+        options.append(max_size)
+    return options
+
+WORKS_PAGE_SIZE_OPTIONS = _calculate_page_size_options(WORKS_PAGE_SIZE_MIN, WORKS_PAGE_SIZE_MAX)
