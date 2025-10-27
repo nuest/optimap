@@ -16,12 +16,13 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, re_path, include
 from django.contrib.sitemaps import views as sitemaps_views
-from publications.sitemaps import PublicationsSitemap, StaticViewSitemap
+from publications.sitemaps import PublicationsSitemap, StaticViewSitemap, FeedsSitemap
 from publications.views import RobotsView
 
 sitemaps = {
     "static": StaticViewSitemap,
     "publications": PublicationsSitemap,
+    "feeds": FeedsSitemap,
 }
 
 urlpatterns = [

@@ -1,5 +1,5 @@
 from django.contrib.sitemaps import Sitemap
-from .models import Publication
+from .models import Publication, GlobalRegion
 from django.urls import reverse
 
 
@@ -47,4 +47,21 @@ class StaticViewSitemap(Sitemap):
         ]
 
     def location(self, item):
-        return reverse(f"optimap:{item}") 
+        return reverse(f"optimap:{item}")
+
+class FeedsSitemap(Sitemap):
+    """Sitemap for global regional feeds (continents and oceans)."""
+    priority = 0.6
+    changefreq = "daily"
+
+    def items(self):
+        """Return all GlobalRegion objects (continents and oceans)."""
+        return GlobalRegion.objects.all().order_by('region_type', 'name')
+
+    def location(self, obj):
+        """Return the feed page URL for each region."""
+        return obj.get_absolute_url()
+
+    def lastmod(self, obj):
+        """Return the last modification date."""
+        return obj.last_loaded
