@@ -10,16 +10,30 @@
 <link rel="stylesheet" href="{% static 'css/leaflet.css' %}" />
 <script src="{% static 'js/leaflet.js' %}"></script>
 
+<!-- Leaflet Control Geocoder (Gazetteer) -->
+<link rel="stylesheet" href="{% static 'css/leaflet.control.geocoder.css' %}" />
+<script src="{% static 'js/leaflet.control.geocoder.js' %}"></script>
+
+<style>
+  /* Show search bar on map page */
+  #navbar-search-container {
+    display: flex !important;
+  }
+</style>
+
 {% endblock head %}
 
 {% block content %}
 <div class="row">
-  
+
   {# {%include timeline_snippet.html %} #}
 
   <div class="col w-100 p-0" style="width: 100%;">
     <!--Map-->
     <div id="map"></div>
+
+    <!-- Search results status (for screen readers) -->
+    <div id="search-results-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
   </div>
 </div>
 {% endblock content %}
@@ -28,6 +42,19 @@
 {% block scripts %}
 <script src="{% static 'js/map-popup.js' %}"></script>
 <script src="{% static 'js/map-interaction.js' %}"></script>
+<script src="{% static 'js/map-keyboard-navigation.js' %}"></script>
+<script src="{% static 'js/map-search.js' %}"></script>
+<script src="{% static 'js/map-gazetteer.js' %}"></script>
+<script src="{% static 'js/map-zoom-to-all.js' %}"></script>
+<script>
+  // Pass Django settings to JavaScript
+  window.OPTIMAP_SETTINGS = {
+    gazetteer: {
+      provider: '{{ gazetteer_provider }}',
+      placeholder: '{{ gazetteer_placeholder }}'
+    }
+  };
+</script>
 <script src="{% static 'js/main.js' %}"></script>
 {# <script src="{% static 'js/timeline.js' %}"></script> #}
 

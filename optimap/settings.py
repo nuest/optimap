@@ -54,7 +54,6 @@ FEED_CACHE_HOURS = int(os.getenv("OPTIMAP_FEED_CACHE_HOURS", 24))
 
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
-    "sesame.backends.ModelBackend",
 ]
 
 # Login/Logout URLs for @login_required decorator
@@ -240,6 +239,25 @@ import optimap
 WIKIBASE_USER_AGENT = f"OPTIMAP/{optimap.__version__} (https://optimap.science; {CONTACT_EMAIL})"
 
 
+# Geoextent API settings
+GEOEXTENT_MAX_FILE_SIZE_MB = int(os.getenv("OPTIMAP_GEOEXTENT_MAX_FILE_SIZE_MB", 100))
+GEOEXTENT_PROCESSING_TIMEOUT_SECONDS = int(os.getenv("OPTIMAP_GEOEXTENT_TIMEOUT", 30))
+GEOEXTENT_TEMP_DIR = os.getenv("OPTIMAP_GEOEXTENT_TEMP_DIR", "/tmp/optimap_geoextent")
+
+# Download limits - server-enforced maximums that cap user requests
+GEOEXTENT_MAX_DOWNLOAD_SIZE_MB = int(os.getenv("OPTIMAP_GEOEXTENT_MAX_DOWNLOAD_SIZE_MB", 1000))
+GEOEXTENT_MAX_BATCH_SIZE_MB = int(os.getenv("OPTIMAP_GEOEXTENT_MAX_BATCH_SIZE_MB", 500))
+
+# Download workers for parallel processing (remote and batch operations)
+GEOEXTENT_DOWNLOAD_WORKERS = int(os.getenv("OPTIMAP_GEOEXTENT_DOWNLOAD_WORKERS", 4))
+
+# Placename/gazetteer settings
+GEOEXTENT_DEFAULT_GAZETTEER = os.getenv("OPTIMAP_GEOEXTENT_DEFAULT_GAZETTEER", "nominatim")
+GEOEXTENT_GAZETTEER_TIMEOUT_SECONDS = int(os.getenv("OPTIMAP_GEOEXTENT_GAZETTEER_TIMEOUT_SECONDS", 5))
+
+# GeoNames API configuration (if using geonames gazetteer)
+GEOEXTENT_GEONAMES_USERNAME = os.getenv("OPTIMAP_GEOEXTENT_GEONAMES_USERNAME", "")
+
 MIDDLEWARE = [
     'django.middleware.cache.UpdateCacheMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -256,7 +274,6 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.sites.middleware.CurrentSiteMiddleware",
-    "sesame.middleware.AuthenticationMiddleware",
     "django_currentuser.middleware.ThreadLocalUserMiddleware",
     "django.middleware.gzip.GZipMiddleware",
 
@@ -277,6 +294,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'optimap.urls.site',
                 'optimap.context_processors.get_version',
+                'optimap.context_processors.gazetteer_settings',
             ],
         },
     },
@@ -376,3 +394,33 @@ CSRF_TRUSTED_ORIGINS = [i.strip('[]') for i in env('CSRF_TRUSTED_ORIGINS', defau
 ADMINS = [('OPTIMAP', 'login@optimap.science')]
 
 FEED_MAX_ITEMS = 20
+
+# Gazetteer / Geocoding Settings
+# Configures the location search (gazetteer) feature on the map
+GAZETTEER_PROVIDER = env('OPTIMAP_GAZETTEER_PROVIDER', default='nominatim')
+GAZETTEER_PLACEHOLDER = env('OPTIMAP_GAZETTEER_PLACEHOLDER', default='Search for a location...')
+# Optional API key for commercial providers (not required for Nominatim)
+GAZETTEER_API_KEY = env('OPTIMAP_GAZETTEER_API_KEY', default='')
+
+# Works List Pagination Settings
+# Default number of works to display per page
+WORKS_PAGE_SIZE_DEFAULT = int(env('OPTIMAP_WORKS_PAGE_SIZE_DEFAULT', default=50))
+# Minimum page size users can select
+WORKS_PAGE_SIZE_MIN = int(env('OPTIMAP_WORKS_PAGE_SIZE_MIN', default=10))
+# Maximum page size users can select
+WORKS_PAGE_SIZE_MAX = int(env('OPTIMAP_WORKS_PAGE_SIZE_MAX', default=200))
+
+# Calculate available page size options by doubling from MIN to MAX
+# Always includes MIN and MAX values
+def _calculate_page_size_options(min_size, max_size):
+    """Calculate page size options by doubling from min to max"""
+    options = [min_size]
+    current = min_size
+    while current * 2 < max_size:
+        current = current * 2
+        options.append(current)
+    if options[-1] != max_size:
+        options.append(max_size)
+    return options
+
+WORKS_PAGE_SIZE_OPTIONS = _calculate_page_size_options(WORKS_PAGE_SIZE_MIN, WORKS_PAGE_SIZE_MAX)

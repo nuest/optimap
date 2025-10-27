@@ -253,21 +253,45 @@ h1.page-title {
 }
 
 /* Custom zoom to all features button */
-.leaflet-control-zoom-all {
+.leaflet-control-zoom-to-all {
+  margin-top: 10px;
+}
+
+.leaflet-control-zoom-to-all-button {
   background-color: white;
   border: 2px solid rgba(0,0,0,0.2);
   border-radius: 4px;
-  width: 26px;
-  height: 26px;
-  line-height: 26px;
+  width: 30px;
+  height: 30px;
+  line-height: 30px;
   text-align: center;
   cursor: pointer;
-  font-size: 18px;
-  font-weight: bold;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #333;
+  text-decoration: none;
+  transition: background-color 0.2s ease;
 }
 
-.leaflet-control-zoom-all:hover {
+.leaflet-control-zoom-to-all-button i {
+  font-size: 14px;
+}
+
+.leaflet-control-zoom-to-all-button:hover {
   background-color: #f4f4f4;
+  color: #000;
+}
+
+.leaflet-control-zoom-to-all-button:active {
+  background-color: #e0e0e0;
+}
+
+/* Focus outline only in high contrast mode */
+body.high-contrast .leaflet-control-zoom-to-all-button:focus {
+  outline: 3px solid #FFD700;
+  outline-offset: 2px;
 }
 
 /* Works page styles */

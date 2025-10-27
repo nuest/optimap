@@ -242,6 +242,8 @@
   {% endif %}
   <!-- Leaflet Fullscreen plugin -->
   <script src="{% static 'js/leaflet.fullscreen.js' %}"></script>
+  <!-- Zoom to all features control -->
+  <script src="{% static 'js/map-zoom-to-all.js' %}"></script>
   <script>
     const publicationFeature = {{ feature_json|default:"null"|safe }};
     const canContribute = {{ can_contribute|yesno:"true,false" }};
@@ -267,12 +269,15 @@
 
     // Display existing geometry if available
     let layer = null;
+    let featureGroup = new L.FeatureGroup().addTo(map);
+
     if (publicationFeature) {
       layer = L.geoJSON(publicationFeature, {
         pointToLayer: (feat, latlng) => L.circleMarker(latlng, { radius: 6 })
-      }).addTo(map);
+      });
+      featureGroup.addLayer(layer);
 
-      const bounds = layer.getBounds ? layer.getBounds() : null;
+      const bounds = featureGroup.getBounds ? featureGroup.getBounds() : null;
       if (bounds && bounds.isValid && bounds.isValid()) {
         map.fitBounds(bounds.pad(0.2));
       } else if (publicationFeature.geometry && publicationFeature.geometry.type === "Point") {
@@ -534,31 +539,11 @@
       }
     }
 
-    // Add custom "Zoom to All Features" button
-    L.Control.ZoomAll = L.Control.extend({
-      onAdd: function(map) {
-        const btn = L.DomUtil.create('div', 'leaflet-control-zoom-all leaflet-bar leaflet-control');
-        btn.innerHTML = '⌖';
-        btn.title = 'Zoom to all features';
-
-        L.DomEvent.on(btn, 'click', function(e) {
-          L.DomEvent.stopPropagation(e);
-          L.DomEvent.preventDefault(e);
-
-          if (bounds && bounds.isValid && bounds.isValid()) {
-            map.fitBounds(bounds.pad(0.2));
-          } else if (publicationFeature.geometry && publicationFeature.geometry.type === "Point") {
-            const c = publicationFeature.geometry.coordinates;
-            map.setView([c[1], c[0]], 10);
-          }
-        });
-
-        return btn;
-      }
-    });
-
-    // Add the zoom to all button to the map
-    new L.Control.ZoomAll({ position: 'topleft' }).addTo(map);
+    // Add zoom to all features control using the shared module
+    if (typeof MapZoomToAllControl !== 'undefined') {
+      const zoomToAllControl = new MapZoomToAllControl(map, featureGroup);
+      console.log('Zoom to all features control enabled on mini-map');
+    }
   </script>
 
 <p class="muted">

@@ -19,7 +19,7 @@
       href="{% static 'fontawesome/css/solid.min.css' %}"
     />
 
-    <script src="{% static 'js/jquery-3.4.1.slim.min.js' %}"></script>
+    <script src="{% static 'js/jquery-3.4.1.min.js' %}"></script>
     <script src="{% static 'js/bootstrap.min.js' %}"></script>
 
     {{ block.super }}
@@ -48,9 +48,15 @@
     {% endblock head %}
 
     <link rel="stylesheet" type="text/css" href="{% static 'css/main.css' %}" />
+    <link rel="stylesheet" type="text/css" href="{% static 'css/accessibility.css' %}" />
+    <link rel="stylesheet" type="text/css" href="{% static 'css/map-search.css' %}" />
+    <script src="{% static 'js/accessibility-toggle.js' %}"></script>
   </head>
 
   <body>
+    <!-- Skip to main content link for keyboard navigation -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+
     <!--Navbar-->
     <nav class="navbar navbar-expand-sm navbar-dark nav-fill w-100">
       <div class="container-fluid">
@@ -68,13 +74,58 @@
           >
         </div>
 
+        <!-- Map Search (only shown on main/map page) -->
+        <div id="navbar-search-container" class="navbar-search-container" style="display: none;">
+          <form class="navbar-search-form" role="search" onsubmit="return false;">
+            <label for="map-search-input" class="sr-only">Search displayed publications on map</label>
+            <div class="search-input-wrapper">
+              <span class="search-icon" aria-hidden="true">
+                <i class="fas fa-search"></i>
+              </span>
+              <input
+                type="search"
+                id="map-search-input"
+                class="navbar-search-input"
+                placeholder="Search displayed publications..."
+                autocomplete="off"
+                spellcheck="false"
+                aria-label="Search displayed by title, author, abstract, keywords, or any text. Minimum 3 characters required."
+                aria-describedby="search-help-text"
+                title="Search displayed by title, author, abstract, keywords, or any text. Results update as you type (minimum 3 characters)."
+              />
+              <button
+                type="submit"
+                id="search-submit-btn"
+                class="navbar-search-submit-btn"
+                aria-label="Search displayed publications"
+                title="Search (or press Enter)"
+              >
+                <i class="fas fa-search" aria-hidden="true"></i>
+              </button>
+              <button
+                type="button"
+                id="clear-search-btn"
+                class="navbar-clear-search-btn"
+                aria-label="Clear search and show all publications"
+                title="Clear search"
+                style="display: none;"
+              >
+                <i class="fas fa-times" aria-hidden="true"></i>
+              </button>
+            </div>
+            <span id="search-help-text" class="sr-only">
+              Type at least 3 characters to filter publications. Press Enter or click search button to search. Press Escape to clear.
+            </span>
+          </form>
+        </div>
+
         <ul class="nav navbar-nav ml-auto">
           {% include "unified_menu_snippet.html" %}
         </ul>
       </div>
     </nav>
 
-    <main class="container-fluid main">
+    <main id="main-content" class="container-fluid main">
       {% block alert %}{% endblock %} {% block content %}{% endblock %}
     </main>
 
