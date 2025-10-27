@@ -6,6 +6,7 @@ from django.shortcuts import redirect
 from publications import views
 from publications import views_geometry
 from publications import views_feeds
+from publications import views_gazetteer
 from .feeds import GeoFeed
 from .feeds_v2 import GlobalGeoFeed, RegionalGeoFeed
 from django.views.generic import RedirectView
@@ -25,6 +26,10 @@ urlpatterns = [
     path("api/v1/", include((publications_router.urls, "publications"), namespace="publications"), name="api_current"),
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/schema/ui/', SpectacularRedocView.as_view(url_name='optimap:schema'), name='redoc'),
+
+    # API v1 Gazetteer proxy endpoints
+    path('api/v1/gazetteer/<str:provider>/search/', views_gazetteer.gazetteer_search, name='gazetteer-search'),
+    path('api/v1/gazetteer/<str:provider>/reverse/', views_gazetteer.gazetteer_reverse, name='gazetteer-reverse'),
 
     # API v1 Feed endpoints - GeoRSS format (with .rss extension)
     path('api/v1/feeds/optimap-global.rss', GlobalGeoFeed(feed_type_variant="georss"), name='api-feed-georss'),

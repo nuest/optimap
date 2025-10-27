@@ -277,6 +277,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'optimap.urls.site',
                 'optimap.context_processors.get_version',
+                'optimap.context_processors.gazetteer_settings',
             ],
         },
     },
@@ -376,3 +377,10 @@ CSRF_TRUSTED_ORIGINS = [i.strip('[]') for i in env('CSRF_TRUSTED_ORIGINS', defau
 ADMINS = [('OPTIMAP', 'login@optimap.science')]
 
 FEED_MAX_ITEMS = 20
+
+# Gazetteer / Geocoding Settings
+# Configures the location search (gazetteer) feature on the map
+GAZETTEER_PROVIDER = env('OPTIMAP_GAZETTEER_PROVIDER', default='nominatim')
+GAZETTEER_PLACEHOLDER = env('OPTIMAP_GAZETTEER_PLACEHOLDER', default='Search for a location...')
+# Optional API key for commercial providers (not required for Nominatim)
+GAZETTEER_API_KEY = env('OPTIMAP_GAZETTEER_API_KEY', default='')

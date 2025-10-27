@@ -59,6 +59,15 @@ async function initMap() {
     const interactionManager = new MapInteractionManager(map, pubsLayer);
     console.log('Enhanced map interaction enabled: overlapping polygon selection and geometry highlighting');
   }
+  // Initialize gazetteer (location search)
+  if (typeof MapGazetteerManager !== 'undefined' && window.OPTIMAP_SETTINGS?.gazetteer) {
+    const gazetteerManager = new MapGazetteerManager(map, window.OPTIMAP_SETTINGS.gazetteer);
+    console.log('Gazetteer enabled');
+
+    // Make gazetteer manager globally available
+    window.mapGazetteerManager = gazetteerManager;
+  }
+
 
   // Fit map to markers
   if (publicationsGroup.getBounds().isValid()) {
