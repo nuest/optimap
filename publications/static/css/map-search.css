@@ -1,0 +1,316 @@
+/*
+ * Map Search Component Styles
+ * Search bar integrated into navbar for filtering map publications
+ */
+
+/* ==========================================================================
+   Navbar Search Container
+   ========================================================================== */
+
+.navbar-search-container {
+  display: flex;
+  align-items: center;
+  margin: 0 1rem;
+  flex-grow: 1;
+  max-width: 500px;
+}
+
+.navbar-search-form {
+  width: 100%;
+  margin: 0;
+}
+
+.search-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+/* ==========================================================================
+   Search Input
+   ========================================================================== */
+
+.navbar-search-input {
+  width: 100%;
+  padding: 0.5rem 2.5rem 0.5rem 2.5rem;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 25px;
+  background-color: rgba(255, 255, 255, 0.15);
+  color: #FFFFFF;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  outline: none;
+}
+
+.navbar-search-input::placeholder {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.navbar-search-input:hover {
+  background-color: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.navbar-search-input:focus {
+  background-color: rgba(255, 255, 255, 0.95);
+  color: #000000;
+}
+
+.navbar-search-input:focus::placeholder {
+  color: rgba(0, 0, 0, 0.5);
+}
+
+/* Focus outline only in high contrast mode */
+body.high-contrast .navbar-search-input:focus {
+  border-color: #FFD700;
+  box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.3);
+}
+
+/* Search icon */
+.search-input-wrapper .search-icon {
+  position: absolute;
+  left: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  pointer-events: none;
+  z-index: 1;
+  transition: color 0.3s ease;
+}
+
+.navbar-search-input:focus ~ .search-icon,
+.navbar-search-input:focus + .search-icon {
+  color: #158F9B;
+}
+
+/* Ensure icon is before input in DOM but appears correctly */
+.search-input-wrapper {
+  display: flex;
+  flex-direction: row-reverse;
+  justify-content: flex-end;
+}
+
+.search-input-wrapper .navbar-search-input {
+  order: 2;
+}
+
+.search-input-wrapper .search-icon {
+  order: 1;
+}
+
+/* ==========================================================================
+   Search Submit Button (Magnifying Glass)
+   ========================================================================== */
+
+.navbar-search-submit-btn {
+  position: absolute;
+  right: 40px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.8);
+  padding: 0;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  z-index: 2;
+  font-size: 16px;
+}
+
+.navbar-search-submit-btn:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+  color: #FFFFFF;
+}
+
+.navbar-search-submit-btn:focus {
+  background-color: rgba(255, 255, 255, 0.3);
+  color: #FFFFFF;
+}
+
+/* Focus outline only in high contrast mode */
+body.high-contrast .navbar-search-submit-btn:focus {
+  outline: 2px solid #FFD700;
+  outline-offset: 2px;
+}
+
+.navbar-search-input:focus ~ .navbar-search-submit-btn {
+  color: #158F9B;
+}
+
+.navbar-search-input:focus ~ .navbar-search-submit-btn:hover {
+  background-color: rgba(21, 143, 155, 0.1);
+  color: #0A6870;
+}
+
+/* High contrast mode */
+body.high-contrast .navbar-search-submit-btn {
+  color: #FFFF00;
+}
+
+body.high-contrast .navbar-search-submit-btn:hover {
+  color: #FFFFFF;
+}
+
+/* ==========================================================================
+   Clear Button
+   ========================================================================== */
+
+.navbar-clear-search-btn {
+  position: absolute;
+  right: 4px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  padding: 0;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  z-index: 2;
+  font-size: 16px;
+}
+
+.navbar-clear-search-btn:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+  color: #FFFFFF;
+}
+
+.navbar-clear-search-btn:focus {
+  background-color: rgba(255, 255, 255, 0.3);
+  color: #FFFFFF;
+}
+
+/* Focus outline only in high contrast mode */
+body.high-contrast .navbar-clear-search-btn:focus {
+  outline: 2px solid #FFD700;
+  outline-offset: 2px;
+}
+
+.navbar-search-input:focus ~ .navbar-clear-search-btn {
+  color: #158F9B;
+}
+
+.navbar-search-input:focus ~ .navbar-clear-search-btn:hover {
+  background-color: rgba(21, 143, 155, 0.1);
+  color: #0A6870;
+}
+
+/* ==========================================================================
+   Responsive Design
+   ========================================================================== */
+
+@media (max-width: 991px) {
+  .navbar-search-container {
+    max-width: 300px;
+    margin: 0 0.5rem;
+  }
+
+  .navbar-search-input {
+    font-size: 13px;
+    padding: 0.4rem 2.25rem 0.4rem 2.25rem;
+  }
+}
+
+@media (max-width: 767px) {
+  .navbar-search-container {
+    display: none; /* Hide on very small screens, could be replaced with a toggle */
+  }
+
+  /* Alternative: Make it full width on mobile */
+  /* .navbar-search-container {
+    position: absolute;
+    top: 50px;
+    left: 0;
+    right: 0;
+    max-width: none;
+    padding: 0.5rem;
+    background-color: #158F9B;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+  } */
+}
+
+@media (min-width: 768px) and (max-width: 1199px) {
+  .tagline {
+    font-size: 1.2em !important;
+  }
+}
+
+/* ==========================================================================
+   High Contrast Mode Adjustments
+   ========================================================================== */
+
+body.high-contrast .navbar-search-input {
+  background-color: #FFFFFF;
+  color: #000000;
+  border-color: #FFFF00;
+}
+
+body.high-contrast .navbar-search-input::placeholder {
+  color: #666666;
+}
+
+body.high-contrast .navbar-search-input:focus {
+  background-color: #FFFF00;
+  color: #000000;
+  border-color: #FFFFFF;
+  box-shadow: 0 0 0 3px #FFFFFF;
+}
+
+body.high-contrast .search-input-wrapper .search-icon {
+  color: #000000;
+}
+
+body.high-contrast .navbar-clear-search-btn {
+  color: #000000;
+  background-color: rgba(255, 255, 0, 0.2);
+}
+
+body.high-contrast .navbar-clear-search-btn:hover {
+  background-color: #FFFF00;
+  color: #000000;
+  border: 2px solid #000000;
+}
+
+/* ==========================================================================
+   Loading State
+   ========================================================================== */
+
+.navbar-search-input.searching {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Cpath fill='%23158F9B' d='M10 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16zm0 14a6 6 0 1 1 0-12 6 6 0 0 1 0 12z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: calc(100% - 40px) center;
+  background-size: 16px 16px;
+}
+
+/* ==========================================================================
+   Search Results Badge (optional - for showing count)
+   ========================================================================== */
+
+.search-results-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background-color: #FF6B35;
+  color: #FFFFFF;
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: bold;
+  min-width: 20px;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+}
+
+body.high-contrast .search-results-badge {
+  background-color: #FFFF00;
+  color: #000000;
+  border: 2px solid #FFFFFF;
+}

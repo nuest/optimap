@@ -28,7 +28,7 @@
     <li><a class="dropdown-item" href="{% url 'optimap:contact' %}"><i class="fas fa-envelope"></i> Contact</a></li>
     <li><a class="dropdown-item" href="{% url 'optimap:accessibility' %}"><i class="fas fa-universal-access"></i> Accessibility</a></li>
     <div class="dropdown-divider"></div>
-    <li><a class="dropdown-item" href="https://github.com/GeoinformationSystems/optimap" target="_blank" rel="noopener"><i class="fas fa-code"></i> Code on GitHub</a></li>
+    <li><a class="dropdown-item" href="https://github.com/GeoinformationSystems/optimap" target="_blank" rel="noopener" title="View OPTIMAP source code on GitHub (opens in new tab)"><i class="fas fa-code"></i> Code on GitHub</a></li>
 
     <!-- User Section (if authenticated) -->
     {% if request.user.is_authenticated %}
@@ -59,13 +59,16 @@
         <input type="hidden" name="next" value="{{ request.GET.next }}">
         {% endif %}
         <div class="form-group mb-2">
+          <label for="email" class="sr-only">Email address</label>
           <input
             id="email"
             placeholder="Email address"
             class="form-control form-control-sm"
             type="email"
-            required=""
+            required
             name="email"
+            aria-required="true"
+            aria-label="Email address for login"
           />
         </div>
         <div class="form-group mb-2">
@@ -73,7 +76,7 @@
         </div>
       </form>
       <p class="small text-muted mb-0">
-        Want to stay <em>anonymous</em>? Use <a href="https://www.mailinator.com/" target="_blank">Mailinator</a> or check our <a href="{% url 'optimap:privacy' %}">privacy info</a>.
+        Want to stay <em>anonymous</em>? Use <a href="https://www.mailinator.com/" target="_blank" rel="noopener" title="Mailinator - temporary email service (opens in new tab)">Mailinator</a> or check our <a href="{% url 'optimap:privacy' %}">privacy info</a>.
       </p>
     </li>
     {% endif %}

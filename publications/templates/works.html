@@ -4,7 +4,7 @@
 
 {% block content %}
   <div class="container py-5 works-page">
-    <h2>All Article Links</h2>
+    <h1>All Article Links</h1>
     {% if is_admin %}
       <p class="alert alert-info">
         <strong>Admin view:</strong> You can see all publications regardless of status. Status labels are shown next to each entry.
@@ -13,7 +13,7 @@
     <ul>
       {% for item in links %}
         <li>
-          <a href="{{ item.href }}" target="_blank" rel="noopener">{{ item.title }}</a>
+          <a href="{{ item.href }}" target="_blank" rel="noopener" title="Open article: {{ item.title }} (opens in new tab)">{{ item.title }}</a>
           {% if is_admin and item.status %}
             <span class="badge
               {% if item.status_code == 'p' %}badge-success

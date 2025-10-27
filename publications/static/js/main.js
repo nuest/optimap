@@ -39,12 +39,15 @@ async function initMap() {
 
   // Controls: scale and layer switcher
   L.control.scale({ position: 'bottomright' }).addTo(map);
-  L.control
+  const layerControl = L.control
     .layers(
       { 'OpenStreetMap': osmLayer },
-      { Publications: publicationsGroup }
+      { 'All works': publicationsGroup }
     )
     .addTo(map);
+
+  // Make layer control globally available for search manager
+  window.mapLayerControl = layerControl;
 
   // Fetch data and add to map
   const pubs = await load_publications();
@@ -54,10 +57,48 @@ async function initMap() {
   });
   pubsLayer.eachLayer((layer) => publicationsGroup.addLayer(layer));
 
+  // Make style and popup functions globally available for search manager
+  window.publicationStyle = publicationStyle;
+  window.publicationPopup = publicationPopup;
+
   // Initialize enhanced interaction manager for handling overlapping polygons
+  let interactionManager = null;
   if (typeof MapInteractionManager !== 'undefined') {
-    const interactionManager = new MapInteractionManager(map, pubsLayer);
+    interactionManager = new MapInteractionManager(map, pubsLayer);
     console.log('Enhanced map interaction enabled: overlapping polygon selection and geometry highlighting');
+  }
+
+  // Initialize keyboard navigation for accessibility
+  if (typeof MapKeyboardNavigation !== 'undefined' && interactionManager) {
+    const keyboardNav = new MapKeyboardNavigation(map, pubsLayer, interactionManager);
+    console.log('Keyboard navigation enabled for accessibility');
+  }
+
+  // Initialize map search functionality
+  if (typeof MapSearchManager !== 'undefined') {
+    const searchManager = new MapSearchManager(map, pubsLayer, pubs, publicationsGroup);
+    console.log('Map search enabled');
+
+    // Make search manager globally available for potential use by other components
+    window.mapSearchManager = searchManager;
+  }
+
+  // Initialize gazetteer (location search)
+  if (typeof MapGazetteerManager !== 'undefined' && window.OPTIMAP_SETTINGS?.gazetteer) {
+    const gazetteerManager = new MapGazetteerManager(map, window.OPTIMAP_SETTINGS.gazetteer);
+    console.log('Gazetteer enabled');
+
+    // Make gazetteer manager globally available
+    window.mapGazetteerManager = gazetteerManager;
+  }
+
+  // Initialize zoom to all features control
+  if (typeof MapZoomToAllControl !== 'undefined') {
+    const zoomToAllControl = new MapZoomToAllControl(map, publicationsGroup);
+    console.log('Zoom to all features control enabled');
+
+    // Make zoom control globally available
+    window.mapZoomToAllControl = zoomToAllControl;
   }
   // Initialize gazetteer (location search)
   if (typeof MapGazetteerManager !== 'undefined' && window.OPTIMAP_SETTINGS?.gazetteer) {
