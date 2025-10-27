@@ -25,7 +25,8 @@
       "Bash(bash:*)",
       "Bash(./create_wikibase_property.sh:*)",
       "Bash(python3:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(wget:*)"
     ],
     "deny": [],
     "ask": []

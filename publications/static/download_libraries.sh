@@ -32,6 +32,9 @@ wget -q https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js -O js/leaflet.
 echo "  - Leaflet Fullscreen 3.0.2"
 wget -q https://unpkg.com/leaflet.fullscreen@3.0.2/Control.FullScreen.js -O js/leaflet.fullscreen.js
 
+echo "  - Leaflet Control Geocoder 2.4.0"
+wget -q https://unpkg.com/leaflet-control-geocoder@2.4.0/dist/Control.Geocoder.js -O js/leaflet.control.geocoder.js
+
 # Bootstrap Datepicker
 echo "  - Bootstrap Datepicker 1.9.0"
 wget -q https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/js/bootstrap-datepicker.min.js -O js/bootstrap-datepicker.min.js
@@ -70,11 +73,20 @@ wget -q https://unpkg.com/leaflet-draw@1.0.4/dist/images/spritesheet.svg -O css/
 echo "  - Leaflet Fullscreen 3.0.2 CSS"
 wget -q https://unpkg.com/leaflet.fullscreen@3.0.2/Control.FullScreen.css -O css/leaflet.fullscreen.css
 
+# Leaflet Control Geocoder CSS
+echo "  - Leaflet Control Geocoder 2.4.0 CSS"
+wget -q https://unpkg.com/leaflet-control-geocoder@2.4.0/dist/Control.Geocoder.css -O css/leaflet.control.geocoder.css
+
 # Leaflet Fullscreen images
 echo "  - Leaflet Fullscreen images"
 mkdir -p css/images/fullscreen
 wget -q https://unpkg.com/leaflet.fullscreen@3.0.2/icon-fullscreen.png -O css/images/fullscreen/icon-fullscreen.png
 wget -q https://unpkg.com/leaflet.fullscreen@3.0.2/icon-fullscreen-2x.png -O css/images/fullscreen/icon-fullscreen-2x.png
+
+# Leaflet Control Geocoder images
+echo "  - Leaflet Control Geocoder images"
+wget -q https://unpkg.com/leaflet-control-geocoder@2.4.0/dist/images/geocoder.png -O css/images/geocoder.png 2>/dev/null || true
+wget -q https://unpkg.com/leaflet-control-geocoder@2.4.0/dist/images/throbber.gif -O css/images/throbber.gif 2>/dev/null || true
 
 # Bootstrap Datepicker CSS
 echo "  - Bootstrap Datepicker 1.9.0 CSS"
