@@ -2,7 +2,7 @@
 import json
 from django.test import TestCase, Client
 from django.contrib.gis.geos import Point, GeometryCollection
-from publications.models import Publication, Source
+from works.models import Work, Source
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -35,7 +35,7 @@ class TemporalExtentContributionTests(TestCase):
         )
 
         # Create test publication WITHOUT temporal extent
-        self.pub_without_temporal = Publication.objects.create(
+        self.pub_without_temporal = Work.objects.create(
             title='Publication Without Temporal Extent',
             status='h',  # Harvested
             doi='10.1234/no-temporal',
@@ -155,7 +155,7 @@ class TemporalExtentContributionTests(TestCase):
     def test_publish_work_with_only_temporal_extent(self):
         """Test that works with only temporal extent (no geometry) can be published."""
         # Set up publication with only temporal extent
-        pub = Publication.objects.create(
+        pub = Work.objects.create(
             title='Publication with Only Temporal',
             status='h',
             doi='10.1234/only-temporal',
@@ -179,7 +179,7 @@ class TemporalExtentContributionTests(TestCase):
     def test_publish_work_with_only_geometry(self):
         """Test that works with only geometry (no temporal extent) can be published."""
         # Set up publication with only geometry
-        pub = Publication.objects.create(
+        pub = Work.objects.create(
             title='Publication with Only Geometry',
             status='h',
             doi='10.1234/only-geometry',
@@ -203,7 +203,7 @@ class TemporalExtentContributionTests(TestCase):
     def test_cannot_publish_without_any_extent(self):
         """Test that harvested works without any extent cannot be published."""
         # Set up publication with neither geometry nor temporal extent
-        pub = Publication.objects.create(
+        pub = Work.objects.create(
             title='Publication with No Extent',
             status='h',
             doi='10.1234/no-extent',
@@ -237,7 +237,7 @@ class ContributePageFilterTests(TestCase):
 
     def test_contribute_page_shows_missing_geometry(self):
         """Contribute page should show publications missing geometry."""
-        pub = Publication.objects.create(
+        pub = Work.objects.create(
             title='Missing Geometry',
             status='h',
             doi='10.1234/missing-geo',
@@ -249,11 +249,11 @@ class ContributePageFilterTests(TestCase):
 
         response = self.client.get('/contribute/')
         self.assertEqual(response.status_code, 200)
-        self.assertIn(pub, response.context['publications'])
+        self.assertIn(pub, response.context['works'])
 
     def test_contribute_page_shows_missing_temporal(self):
         """Contribute page should show publications missing temporal extent."""
-        pub = Publication.objects.create(
+        pub = Work.objects.create(
             title='Missing Temporal',
             status='h',
             doi='10.1234/missing-temporal',
@@ -265,11 +265,11 @@ class ContributePageFilterTests(TestCase):
 
         response = self.client.get('/contribute/')
         self.assertEqual(response.status_code, 200)
-        self.assertIn(pub, response.context['publications'])
+        self.assertIn(pub, response.context['works'])
 
     def test_contribute_page_shows_missing_both(self):
         """Contribute page should show publications missing both extents."""
-        pub = Publication.objects.create(
+        pub = Work.objects.create(
             title='Missing Both',
             status='h',
             doi='10.1234/missing-both',
@@ -281,11 +281,11 @@ class ContributePageFilterTests(TestCase):
 
         response = self.client.get('/contribute/')
         self.assertEqual(response.status_code, 200)
-        self.assertIn(pub, response.context['publications'])
+        self.assertIn(pub, response.context['works'])
 
     def test_contribute_page_hides_complete_publications(self):
         """Contribute page should not show publications with both extents."""
-        pub = Publication.objects.create(
+        pub = Work.objects.create(
             title='Complete Publication',
             status='h',
             doi='10.1234/complete',
@@ -297,4 +297,4 @@ class ContributePageFilterTests(TestCase):
 
         response = self.client.get('/contribute/')
         self.assertEqual(response.status_code, 200)
-        self.assertNotIn(pub, response.context['publications'])
+        self.assertNotIn(pub, response.context['works'])

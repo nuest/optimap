@@ -4,8 +4,8 @@ import os
 from django.test import TestCase, override_settings
 from django.core import mail
 from django.conf import settings
-from publications.tasks import send_monthly_email
-from publications.models import EmailLog, Publication, UserProfile
+from works.tasks import send_monthly_email
+from works.models import EmailLog, Work, UserProfile
 from django.utils.timezone import now
 from datetime import timedelta
 from django.contrib.gis.geos import Point, GeometryCollection
@@ -23,7 +23,7 @@ django.setup()
 class EmailIntegrationTest(TestCase):
     def setUp(self):
         """Setup test data before each test"""
-        Publication.objects.all().delete()
+        Work.objects.all().delete()
         EmailLog.objects.all().delete()
         User.objects.all().delete()
 
@@ -37,7 +37,7 @@ class EmailIntegrationTest(TestCase):
     def test_send_monthly_email_with_publications(self):
         """Sends email and includes site-local permalink when DOI exists."""
         last_month = now().replace(day=1) - timedelta(days=1)
-        publication = Publication.objects.create(
+        publication = Work.objects.create(
             title="Point Test",
             abstract="Publication with a single point inside a collection.",
             url="https://example.com/point",
@@ -47,7 +47,7 @@ class EmailIntegrationTest(TestCase):
             geometry=GeometryCollection(Point(12.4924, 41.8902)),
         )
         # ensure creationDate falls in last month
-        Publication.objects.filter(id=publication.id).update(creationDate=last_month)
+        Work.objects.filter(id=publication.id).update(creationDate=last_month)
         publication.refresh_from_db()
 
         self.assertEqual(len(mail.outbox), 0)
@@ -72,7 +72,7 @@ class EmailIntegrationTest(TestCase):
     def test_send_monthly_email_fallback_to_url_when_no_doi(self):
         """Falls back to publication.url when no DOI."""
         last_month = now().replace(day=1) - timedelta(days=1)
-        pub = Publication.objects.create(
+        pub = Work.objects.create(
             title="No DOI Paper",
             abstract="No DOI here.",
             url="https://example.com/nodoi",
@@ -81,7 +81,7 @@ class EmailIntegrationTest(TestCase):
             doi=None,
             geometry=GeometryCollection(Point(0, 0)),
         )
-        Publication.objects.filter(id=pub.id).update(creationDate=last_month)
+        Work.objects.filter(id=pub.id).update(creationDate=last_month)
         mail.outbox.clear()
 
         send_monthly_email(sent_by=self.user)

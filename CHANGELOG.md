@@ -1,9 +1,47 @@
 # Changelog
 
+All notable changes to OPTIMAP are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
 ## [Unreleased]
 
 ### Added
 
+- **Geoextent API** - REST API exposing the [geoextent library](https://github.com/nuest/geoextent) for extracting geospatial and temporal extents from various file formats and remote repositories. Features include:
+  - `/api/v1/geoextent/extract/` - Extract from uploaded files (GeoJSON, GeoTIFF, Shapefile, GeoPackage, KML, CSV, etc.)
+  - `/api/v1/geoextent/extract-remote/` - Extract from remote repositories (Zenodo, PANGAEA, OSF, Figshare, Dryad, GFZ Data Services, Dataverse)
+  - `/api/v1/geoextent/extract-batch/` - Batch processing of multiple files with combined extent
+  - Multiple response formats: GeoJSON (default), WKT, WKB
+  - Support for bbox, convex hull, temporal extent, and placename geocoding
+  - Interactive web UI at `/geoextent/` with file upload, remote extraction, and map preview
+  - Comprehensive documentation and integration tests
+- **Geoextent web interface** - Interactive tool at `/geoextent/` for extracting spatial/temporal extents from data files:
+  - File upload with drag-and-drop support and size validation
+  - Remote resource extraction via DOI/URL (comma-separated identifiers)
+  - Interactive Leaflet map preview with clickable features showing properties
+  - Parameter customization (bbox, tbox, convex hull, placename, gazetteer selection)
+  - Response format selection (GeoJSON, WKT, WKB)
+  - Download results in selected format
+  - Documentation section with supported formats and providers
+  - Added to main menu and sitemaps
+- **Feeds sitemap** - Dynamic `/sitemap-feeds.xml` listing all regional feeds (continents and oceans) for search engine discovery
+- **Wikidata export** - Export publication metadata to Wikibase/Wikidata instances:
+  - Export works with spatial metadata to Wikidata
+  - Support for complex geometries (points, lines, polygons, multigeometry)
+  - Export extreme points (northernmost, southernmost, easternmost, westernmost) and geometric center
+  - Configurable via `WIKIBASE_*` environment variables
+- **Geocoding/gazetteer search** - Map search functionality allowing users to search for locations by name:
+  - Nominatim geocoder integration (default)
+  - Optional GeoNames support (requires username configuration)
+  - Search results displayed on map with zoom to location
+  - Accessible via search box in map interface
+- **Works list with pagination** - Browse all works page at `/works/list/` with:
+  - Configurable pagination (default 50 items per page)
+  - User-selectable page size with min/max limits
+  - Cached publication statistics (total works, published works, metadata completeness)
+  - Direct links to work landing pages
 - **Regional subscription system** - Users can subscribe to receive notifications for new publications from specific continents and oceans. Features include:
   - Checkbox-based UI with 8 continents and 7 oceans
   - "All Regions" checkbox to select/deselect all at once
@@ -26,6 +64,22 @@
 
 ### Changed
 
+- **Model terminology alignment** - Renamed base entity from "publications" to "works" throughout the codebase to align with [OpenAlex terminology](https://docs.openalex.org/api-entities/works):
+  - Django app renamed from `publications/` to `works/`
+  - `Publication` model renamed to `Work`
+  - API endpoint changed from `/api/v1/publications/` to `/api/v1/works/`
+  - Sitemap updated from `/sitemap-publications.xml` to `/sitemap-works.xml`
+  - URL patterns updated from `/publication/<id>/` to `/work/<id>/`
+  - All import statements, templates, and configuration files updated
+  - Fresh migrations created from scratch
+  - All test fixtures updated
+- **Work type taxonomy** - Added comprehensive `type` field to works using Crossref/OpenAlex controlled vocabulary:
+  - 39 work types supported (article, book, book-chapter, dataset, preprint, dissertation, etc.)
+  - Type set from source's `default_work_type` during harvesting
+  - Overridden by OpenAlex API type when available
+  - Indexed and filterable in admin interface
+- **Removed external CDN dependencies** - All JavaScript and CSS libraries now served locally for improved privacy, security, and offline functionality
+- **Improved map accessibility** - Enhanced keyboard navigation and screen reader support for map interactions
 - **Regional subscription email notifications** - Notification emails now group publications by region with dedicated sections for each subscribed continent or ocean. Each region section includes:
   - Region name and type (Continent/Ocean)
   - Count of new publications in that region

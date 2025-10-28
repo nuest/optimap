@@ -17,8 +17,8 @@ from datetime import date, timedelta
 from unittest.mock import patch, Mock, MagicMock, call
 import json
 
-from publications.models import Publication, Source, WikidataExportLog, CustomUser
-from publications import wikidata
+from works.models import Work, Source, WikidataExportLog, CustomUser
+from works import wikidata
 
 
 @override_settings(
@@ -53,7 +53,7 @@ class WikidataExportTest(TestCase):
         )
 
         # Create comprehensive test publication
-        self.publication = Publication.objects.create(
+        self.work = Work.objects.create(
             title="Test Publication on Climate Change",
             abstract="This is a test abstract about climate change research.",
             url="https://example.com/publication",
@@ -159,7 +159,7 @@ class WikidataExportTest(TestCase):
             }
         }
 
-    @patch('publications.wikidata.requests.get')
+    @patch('works.wikidata.requests.get')
     def test_property_mapping_build(self, mock_requests_get):
         """Test that property ID mapping is built correctly."""
         # Mock requests.get to return different responses based on params
@@ -234,7 +234,7 @@ class WikidataExportTest(TestCase):
         self.assertIn('P577', mapping)  # publication date
         self.assertEqual(mapping['P577'], 'P3')
 
-    @patch('publications.wikidata.requests.get')
+    @patch('works.wikidata.requests.get')
     def test_fetch_property_metadata_from_wikidata(self, mock_requests_get):
         """Test fetching property metadata from Wikidata.org."""
         # Mock Wikidata API response
@@ -255,7 +255,7 @@ class WikidataExportTest(TestCase):
         self.assertIn('wikidata.org', call_args[0][0])
 
     @patch('requests_oauthlib.OAuth1Session')
-    @patch('publications.wikidata.requests.get')
+    @patch('works.wikidata.requests.get')
     def test_create_property_checks_duplicates(self, mock_requests_get, mock_oauth_session):
         """Test that property creation checks for duplicates first."""
         # Mock Wikidata metadata fetch
@@ -287,17 +287,17 @@ class WikidataExportTest(TestCase):
         # Verify no POST was called (no creation attempt)
         mock_oauth_instance.post.assert_not_called()
 
-    @patch('publications.wikidata.WikibaseIntegrator')
-    @patch('publications.wikidata.get_wikibase_login')
-    @patch('publications.wikidata.build_property_id_mapping')
-    @patch('publications.wikidata.check_property_exists')
-    @patch('publications.wikidata.check_item_exists')
-    @patch('publications.wikidata.find_local_item_by_doi')
-    def test_publication_export_creates_correct_statements(
+    @patch('works.wikidata.WikibaseIntegrator')
+    @patch('works.wikidata.get_wikibase_login')
+    @patch('works.wikidata.build_property_id_mapping')
+    @patch('works.wikidata.check_property_exists')
+    @patch('works.wikidata.check_item_exists')
+    @patch('works.wikidata.find_local_item_by_doi')
+    def test_work_export_creates_correct_statements(
         self, mock_find_doi, mock_check_item, mock_check_prop,
         mock_build_mapping, mock_get_login, mock_wbi
     ):
-        """Test that publication export creates statements with correct field values."""
+        """Test that work export creates statements with correct field values."""
         # Setup mocks
         mock_check_prop.return_value = True
         mock_check_item.return_value = True
@@ -328,7 +328,7 @@ class WikidataExportTest(TestCase):
         mock_get_login.return_value = Mock()
 
         # Perform export
-        stats = wikidata.export_publications_to_wikidata([self.publication])
+        stats = wikidata.export_works_to_wikidata([self.work])
 
         # Verify item was created
         self.assertEqual(stats['created'], 1)
@@ -355,7 +355,7 @@ class WikidataExportTest(TestCase):
         self.assertIn('P4', statement_data)
 
         # Verify export log was created
-        log_entry = WikidataExportLog.objects.filter(publication=self.publication).first()
+        log_entry = WikidataExportLog.objects.filter(work=self.work).first()
         self.assertIsNotNone(log_entry)
         self.assertEqual(log_entry.action, 'created')
         self.assertEqual(log_entry.wikidata_qid, 'Q123')
@@ -363,12 +363,12 @@ class WikidataExportTest(TestCase):
         self.assertIn('doi', log_entry.exported_fields)
         self.assertIn('publication_date', log_entry.exported_fields)
 
-    @patch('publications.wikidata.WikibaseIntegrator')
-    @patch('publications.wikidata.get_wikibase_login')
-    @patch('publications.wikidata.build_property_id_mapping')
-    @patch('publications.wikidata.check_property_exists')
-    @patch('publications.wikidata.check_item_exists')
-    @patch('publications.wikidata.find_local_item_by_doi')
+    @patch('works.wikidata.WikibaseIntegrator')
+    @patch('works.wikidata.get_wikibase_login')
+    @patch('works.wikidata.build_property_id_mapping')
+    @patch('works.wikidata.check_property_exists')
+    @patch('works.wikidata.check_item_exists')
+    @patch('works.wikidata.find_local_item_by_doi')
     def test_export_log_and_landing_page(
         self, mock_find_doi, mock_check_item, mock_check_prop,
         mock_build_mapping, mock_get_login, mock_wbi
@@ -395,10 +395,10 @@ class WikidataExportTest(TestCase):
         mock_get_login.return_value = Mock()
 
         # Perform export
-        stats = wikidata.export_publications_to_wikidata([self.publication])
+        stats = wikidata.export_works_to_wikidata([self.work])
 
         # Verify export log entry
-        log_entry = WikidataExportLog.objects.filter(publication=self.publication).first()
+        log_entry = WikidataExportLog.objects.filter(work=self.work).first()
         self.assertIsNotNone(log_entry)
         self.assertEqual(log_entry.wikidata_qid, 'Q456')
         self.assertEqual(log_entry.action, 'created')
@@ -408,17 +408,17 @@ class WikidataExportTest(TestCase):
         self.assertEqual(log_entry.wikibase_endpoint, 'https://test.wikibase.example/w/api.php')
 
         # Access work landing page (accessed by DOI)
-        response = self.client.get(f"/work/{self.publication.doi}/")
+        response = self.client.get(f"/work/{self.work.doi}/")
         self.assertEqual(response.status_code, 200)
 
         # Verify Wikibase link appears on page (QID at minimum)
         content = response.content.decode('utf-8')
         self.assertIn('Q456', content)
 
-    @patch('publications.wikidata.WikibaseIntegrator')
-    @patch('publications.wikidata.get_wikibase_login')
-    @patch('publications.wikidata.build_property_id_mapping')
-    @patch('publications.wikidata.check_property_exists')
+    @patch('works.wikidata.WikibaseIntegrator')
+    @patch('works.wikidata.get_wikibase_login')
+    @patch('works.wikidata.build_property_id_mapping')
+    @patch('works.wikidata.check_property_exists')
     def test_export_aborts_when_required_properties_missing(
         self, mock_check_prop, mock_build_mapping, mock_get_login, mock_wbi
     ):
@@ -436,7 +436,7 @@ class WikidataExportTest(TestCase):
         mock_wbi.return_value = mock_wbi_instance
 
         # Perform export
-        stats = wikidata.export_publications_to_wikidata([self.publication])
+        stats = wikidata.export_works_to_wikidata([self.work])
 
         # Verify export failed
         self.assertEqual(stats['errors'], 1)
@@ -446,19 +446,19 @@ class WikidataExportTest(TestCase):
         mock_wbi_instance.item.new.assert_not_called()
 
         # Verify error log entry
-        log_entry = WikidataExportLog.objects.filter(publication=self.publication).first()
+        log_entry = WikidataExportLog.objects.filter(work=self.work).first()
         self.assertIsNotNone(log_entry)
         self.assertEqual(log_entry.action, 'error')
         self.assertIn('Required properties missing', log_entry.error_message)
         self.assertIn('P1476', log_entry.error_message)  # title
         self.assertIn('P577', log_entry.error_message)  # publication date
 
-    @patch('publications.wikidata.WikibaseIntegrator')
-    @patch('publications.wikidata.get_wikibase_login')
-    @patch('publications.wikidata.build_property_id_mapping')
-    @patch('publications.wikidata.check_property_exists')
-    @patch('publications.wikidata.check_item_exists')
-    @patch('publications.wikidata.find_local_item_by_doi')
+    @patch('works.wikidata.WikibaseIntegrator')
+    @patch('works.wikidata.get_wikibase_login')
+    @patch('works.wikidata.build_property_id_mapping')
+    @patch('works.wikidata.check_property_exists')
+    @patch('works.wikidata.check_item_exists')
+    @patch('works.wikidata.find_local_item_by_doi')
     def test_dryrun_mode(
         self, mock_find_doi, mock_check_item, mock_check_prop,
         mock_build_mapping, mock_get_login, mock_wbi
@@ -481,7 +481,7 @@ class WikidataExportTest(TestCase):
         mock_wbi.return_value = mock_wbi_instance
 
         # Perform dry-run export
-        stats = wikidata.export_publications_to_wikidata_dryrun([self.publication])
+        stats = wikidata.export_works_to_wikidata_dryrun([self.work])
 
         # Verify stats show what would happen
         self.assertEqual(stats['created'], 1)
@@ -491,15 +491,15 @@ class WikidataExportTest(TestCase):
         mock_wbi_instance.item.new.assert_not_called()
 
         # Verify no log entry was created
-        log_count = WikidataExportLog.objects.filter(publication=self.publication).count()
+        log_count = WikidataExportLog.objects.filter(work=self.work).count()
         self.assertEqual(log_count, 0)
 
-    @patch('publications.wikidata.WikibaseIntegrator')
-    @patch('publications.wikidata.get_wikibase_login')
-    @patch('publications.wikidata.build_property_id_mapping')
-    @patch('publications.wikidata.check_property_exists')
-    @patch('publications.wikidata.check_item_exists')
-    @patch('publications.wikidata.find_local_item_by_doi')
+    @patch('works.wikidata.WikibaseIntegrator')
+    @patch('works.wikidata.get_wikibase_login')
+    @patch('works.wikidata.build_property_id_mapping')
+    @patch('works.wikidata.check_property_exists')
+    @patch('works.wikidata.check_item_exists')
+    @patch('works.wikidata.find_local_item_by_doi')
     def test_export_updates_existing_item(
         self, mock_find_doi, mock_check_item, mock_check_prop,
         mock_build_mapping, mock_get_login, mock_wbi
@@ -529,7 +529,7 @@ class WikidataExportTest(TestCase):
         mock_get_login.return_value = Mock()
 
         # Perform export
-        stats = wikidata.export_publications_to_wikidata([self.publication])
+        stats = wikidata.export_works_to_wikidata([self.work])
 
         # Verify item was updated, not created
         self.assertEqual(stats['updated'], 1)
@@ -548,19 +548,19 @@ class WikidataExportTest(TestCase):
         self.assertEqual(call_kwargs.get('clear'), False)
 
         # Verify export log shows update
-        log_entry = WikidataExportLog.objects.filter(publication=self.publication).first()
+        log_entry = WikidataExportLog.objects.filter(work=self.work).first()
         self.assertIsNotNone(log_entry)
         self.assertEqual(log_entry.action, 'updated')
         self.assertEqual(log_entry.wikidata_qid, 'Q789')
         # Log should mention which properties were added
         self.assertIn('Added', log_entry.export_summary)
 
-    @patch('publications.wikidata.WikibaseIntegrator')
-    @patch('publications.wikidata.get_wikibase_login')
-    @patch('publications.wikidata.build_property_id_mapping')
-    @patch('publications.wikidata.check_property_exists')
-    @patch('publications.wikidata.check_item_exists')
-    @patch('publications.wikidata.find_local_item_by_doi')
+    @patch('works.wikidata.WikibaseIntegrator')
+    @patch('works.wikidata.get_wikibase_login')
+    @patch('works.wikidata.build_property_id_mapping')
+    @patch('works.wikidata.check_property_exists')
+    @patch('works.wikidata.check_item_exists')
+    @patch('works.wikidata.find_local_item_by_doi')
     def test_export_skips_existing_properties(
         self, mock_find_doi, mock_check_item, mock_check_prop,
         mock_build_mapping, mock_get_login, mock_wbi
@@ -598,7 +598,7 @@ class WikidataExportTest(TestCase):
         mock_get_login.return_value = Mock()
 
         # Perform export
-        stats = wikidata.export_publications_to_wikidata([self.publication])
+        stats = wikidata.export_works_to_wikidata([self.work])
 
         # Verify item was updated
         self.assertEqual(stats['updated'], 1)
@@ -617,18 +617,18 @@ class WikidataExportTest(TestCase):
         self.assertLess(len(added_statements), 14)
 
         # Verify export log mentions which properties were added and which were skipped
-        log_entry = WikidataExportLog.objects.filter(publication=self.publication).first()
+        log_entry = WikidataExportLog.objects.filter(work=self.work).first()
         self.assertIsNotNone(log_entry)
         self.assertEqual(log_entry.action, 'updated')
         self.assertIn('Added', log_entry.export_summary)
         self.assertIn('skipped', log_entry.export_summary)
 
-    @patch('publications.wikidata.WikibaseIntegrator')
-    @patch('publications.wikidata.get_wikibase_login')
-    @patch('publications.wikidata.build_property_id_mapping')
-    @patch('publications.wikidata.check_property_exists')
-    @patch('publications.wikidata.check_item_exists')
-    @patch('publications.wikidata.find_local_item_by_doi')
+    @patch('works.wikidata.WikibaseIntegrator')
+    @patch('works.wikidata.get_wikibase_login')
+    @patch('works.wikidata.build_property_id_mapping')
+    @patch('works.wikidata.check_property_exists')
+    @patch('works.wikidata.check_item_exists')
+    @patch('works.wikidata.find_local_item_by_doi')
     def test_export_no_update_when_all_properties_exist(
         self, mock_find_doi, mock_check_item, mock_check_prop,
         mock_build_mapping, mock_get_login, mock_wbi
@@ -669,7 +669,7 @@ class WikidataExportTest(TestCase):
         mock_get_login.return_value = Mock()
 
         # Perform export
-        stats = wikidata.export_publications_to_wikidata([self.publication])
+        stats = wikidata.export_works_to_wikidata([self.work])
 
         # Verify item was still counted as updated
         self.assertEqual(stats['updated'], 1)
@@ -692,21 +692,21 @@ class WikidataExportTest(TestCase):
             mock_item.write.assert_not_called()
 
         # Verify export log exists
-        log_entry = WikidataExportLog.objects.filter(publication=self.publication).first()
+        log_entry = WikidataExportLog.objects.filter(work=self.work).first()
         self.assertIsNotNone(log_entry)
         self.assertEqual(log_entry.action, 'updated')
 
     def test_build_statements_includes_all_fields(self):
         """Test that build_statements includes all publication fields."""
-        with patch('publications.wikidata.check_property_exists', return_value=True), \
-             patch('publications.wikidata.check_item_exists', return_value=True), \
-             patch('publications.wikidata.build_property_id_mapping', return_value={
+        with patch('works.wikidata.check_property_exists', return_value=True), \
+             patch('works.wikidata.check_item_exists', return_value=True), \
+             patch('works.wikidata.build_property_id_mapping', return_value={
                  'P31': 'P1', 'P1476': 'P2', 'P577': 'P3', 'P356': 'P4',
                  'P856': 'P5', 'P1810': 'P6', 'P2093': 'P7', 'P625': 'P8',
                  'P921': 'P9', 'P10283': 'P10', 'P698': 'P11', 'P932': 'P12'
              }):
 
-            statements, exported_fields = wikidata.build_statements(self.publication)
+            statements, exported_fields = wikidata.build_statements(self.work)
 
             # Verify expected fields were exported
             self.assertIn('title', exported_fields)

@@ -151,3 +151,7 @@ publications/management/commands/marine_regions_iho.geojson
 publications/management/commands/world_continents.geojson
 
 .claude/temp.md
+
+works/management/commands/marine_regions_iho.geojson
+
+works/management/commands/world_continents.geojson

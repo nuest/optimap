@@ -3,7 +3,7 @@ import json
 from django.test import TestCase, Client
 from django.contrib.gis.geos import Point, GeometryCollection
 from django.utils import timezone
-from publications.models import Publication, Source
+from works.models import Work, Source
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -39,7 +39,7 @@ class GeometryContributionTests(TestCase):
         )
 
         # Create harvested publication without geometry
-        self.pub_harvested = Publication.objects.create(
+        self.pub_harvested = Work.objects.create(
             title="Harvested Publication Without Geometry",
             abstract="This needs geolocation",
             url="https://example.com/article1",
@@ -52,7 +52,7 @@ class GeometryContributionTests(TestCase):
         )
 
         # Create harvested publication with existing geometry
-        self.pub_with_geometry = Publication.objects.create(
+        self.pub_with_geometry = Work.objects.create(
             title="Publication With Geometry",
             abstract="This already has location",
             url="https://example.com/article2",
@@ -64,7 +64,7 @@ class GeometryContributionTests(TestCase):
         )
 
         # Create published publication
-        self.pub_published = Publication.objects.create(
+        self.pub_published = Work.objects.create(
             title="Published Publication",
             abstract="This is published",
             url="https://example.com/article3",
@@ -137,7 +137,7 @@ class GeometryContributionTests(TestCase):
 
         self.assertEqual(response.status_code, 404)
         data = response.json()
-        self.assertEqual(data['error'], 'Publication not found')
+        self.assertEqual(data['error'], 'Work not found')
 
     def test_contribute_geometry_wrong_status(self):
         """Test that only harvested publications can receive contributions."""
@@ -167,7 +167,7 @@ class GeometryContributionTests(TestCase):
 
         self.assertEqual(response.status_code, 400)
         data = response.json()
-        self.assertEqual(data['error'], 'Publication already has geometry')
+        self.assertEqual(data['error'], 'Work already has geometry')
 
     def test_contribute_geometry_no_geometry_provided(self):
         """Test error when no geometry is provided."""
@@ -264,7 +264,7 @@ class PublishWorkTests(TestCase):
         )
 
         # Create contributed publication
-        self.pub_contributed = Publication.objects.create(
+        self.pub_contributed = Work.objects.create(
             title="Contributed Publication",
             abstract="User contributed location",
             url="https://example.com/article1",
@@ -277,7 +277,7 @@ class PublishWorkTests(TestCase):
         )
 
         # Create harvested publication
-        self.pub_harvested = Publication.objects.create(
+        self.pub_harvested = Work.objects.create(
             title="Harvested Publication",
             abstract="Not yet contributed",
             url="https://example.com/article2",
@@ -308,7 +308,7 @@ class PublishWorkTests(TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertTrue(data['success'])
-        self.assertIn('Publication is now public', data['message'])
+        self.assertIn('Work is now public', data['message'])
 
         # Verify database changes
         self.pub_contributed.refresh_from_db()
@@ -328,7 +328,7 @@ class PublishWorkTests(TestCase):
 
         self.assertEqual(response.status_code, 404)
         data = response.json()
-        self.assertEqual(data['error'], 'Publication not found')
+        self.assertEqual(data['error'], 'Work not found')
 
     def test_publish_wrong_status(self):
         """Test that harvested publications without geometry cannot be published."""
@@ -339,13 +339,13 @@ class PublishWorkTests(TestCase):
 
         self.assertEqual(response.status_code, 400)
         data = response.json()
-        self.assertEqual(data['error'], 'Cannot publish harvested publication without spatial or temporal extent')
+        self.assertEqual(data['error'], 'Cannot publish harvested work without spatial or temporal extent')
 
     def test_publish_harvested_with_geometry(self):
         """Test that harvested publications with geometry can be published."""
         # Create a harvested publication with geometry
         from django.contrib.gis.geos import Point, GeometryCollection
-        pub_harvested_with_geo = Publication.objects.create(
+        pub_harvested_with_geo = Work.objects.create(
             title='Harvested with Geometry',
             status='h',
             doi='10.1234/harvested-geo',
@@ -398,7 +398,7 @@ class WorkflowIntegrationTests(TestCase):
         )
 
         # Create harvested publication
-        self.publication = Publication.objects.create(
+        self.work = Work.objects.create(
             title="Test Publication",
             abstract="Test abstract",
             url="https://example.com/article",
@@ -423,12 +423,12 @@ class WorkflowIntegrationTests(TestCase):
     def test_complete_workflow(self):
         """Test complete workflow: harvest -> contribute -> publish."""
         # Step 1: Verify initial state
-        self.assertEqual(self.publication.status, 'h')
-        self.assertTrue(self.publication.geometry.empty)
+        self.assertEqual(self.work.status, 'h')
+        self.assertTrue(self.work.geometry.empty)
 
         # Step 2: User contributes geometry
         self.client.login(username='contributor@example.com', password='testpass123')
-        contribute_url = f'/work/{self.publication.doi}/contribute-geometry/'
+        contribute_url = f'/work/{self.work.doi}/contribute-geometry/'
         response = self.client.post(
             contribute_url,
             data=json.dumps({'geometry': self.test_geometry}),
@@ -437,24 +437,24 @@ class WorkflowIntegrationTests(TestCase):
         self.assertEqual(response.status_code, 200)
 
         # Verify contribution
-        self.publication.refresh_from_db()
-        self.assertEqual(self.publication.status, 'c')  # Contributed
-        self.assertFalse(self.publication.geometry.empty)
-        self.assertIn('contributor@example.com', self.publication.provenance)
+        self.work.refresh_from_db()
+        self.assertEqual(self.work.status, 'c')  # Contributed
+        self.assertFalse(self.work.geometry.empty)
+        self.assertIn('contributor@example.com', self.work.provenance)
 
         # Step 3: Admin publishes the contribution
         self.client.login(username='admin@example.com', password='adminpass123')
-        publish_url = f'/work/{self.publication.doi}/publish/'
+        publish_url = f'/work/{self.work.doi}/publish/'
         response = self.client.post(publish_url, content_type='application/json')
         self.assertEqual(response.status_code, 200)
 
         # Verify publication
-        self.publication.refresh_from_db()
-        self.assertEqual(self.publication.status, 'p')  # Published
-        self.assertIn('admin@example.com', self.publication.provenance)
+        self.work.refresh_from_db()
+        self.assertEqual(self.work.status, 'p')  # Published
+        self.assertIn('admin@example.com', self.work.provenance)
 
         # Verify complete provenance trail
-        provenance = self.publication.provenance
+        provenance = self.work.provenance
         self.assertIn('Harvested via OAI-PMH', provenance)
         self.assertIn('Contribution by user contributor@example.com', provenance)
         self.assertIn('Status changed from Harvested to Contributed', provenance)
@@ -492,7 +492,7 @@ class UnpublishWorkTests(TestCase):
         )
 
         # Create published publication
-        self.pub_published = Publication.objects.create(
+        self.pub_published = Work.objects.create(
             title='Published Publication',
             status='p',  # Published
             doi='10.1234/published',
@@ -501,7 +501,7 @@ class UnpublishWorkTests(TestCase):
         )
 
         # Create contributed publication (not yet published)
-        self.pub_contributed = Publication.objects.create(
+        self.pub_contributed = Work.objects.create(
             title='Contributed Publication',
             status='c',  # Contributed
             doi='10.1234/contributed',
@@ -560,4 +560,4 @@ class UnpublishWorkTests(TestCase):
 
         self.assertEqual(response.status_code, 404)
         data = response.json()
-        self.assertEqual(data['error'], 'Publication not found')
+        self.assertEqual(data['error'], 'Work not found')

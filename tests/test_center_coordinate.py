@@ -1,5 +1,5 @@
 """
-Unit tests for Publication.get_center_coordinate() method.
+Unit tests for Work.get_center_coordinate() method.
 
 Tests center coordinate calculation for different geometry types:
 - Point
@@ -10,7 +10,7 @@ Tests center coordinate calculation for different geometry types:
 
 from django.test import TestCase
 from django.contrib.gis.geos import Point, LineString, Polygon, GeometryCollection
-from publications.models import Publication
+from works.models import Work
 
 
 class CenterCoordinateTest(TestCase):
@@ -18,7 +18,7 @@ class CenterCoordinateTest(TestCase):
 
     def setUp(self):
         """Create a base publication for testing."""
-        self.publication = Publication.objects.create(
+        self.work = Work.objects.create(
             title="Test Publication",
             doi="10.1234/test",
             status="p"
@@ -27,11 +27,11 @@ class CenterCoordinateTest(TestCase):
     def test_center_coordinate_point(self):
         """Test center coordinate calculation for a single Point geometry."""
         # Create a publication with a single point
-        self.publication.geometry = GeometryCollection(Point(10.0, 20.0))
-        self.publication.save()
+        self.work.geometry = GeometryCollection(Point(10.0, 20.0))
+        self.work.save()
 
         # Get center coordinate
-        center = self.publication.get_center_coordinate()
+        center = self.work.get_center_coordinate()
 
         # For a single point, the center should be the point itself
         self.assertIsNotNone(center)
@@ -43,11 +43,11 @@ class CenterCoordinateTest(TestCase):
         """Test center coordinate calculation for a LineString geometry."""
         # Create a publication with a line from (0, 0) to (10, 10)
         line = LineString([(0.0, 0.0), (10.0, 10.0)])
-        self.publication.geometry = GeometryCollection(line)
-        self.publication.save()
+        self.work.geometry = GeometryCollection(line)
+        self.work.save()
 
         # Get center coordinate
-        center = self.publication.get_center_coordinate()
+        center = self.work.get_center_coordinate()
 
         # The bounding box center of a line from (0,0) to (10,10) should be (5, 5)
         self.assertIsNotNone(center)
@@ -60,11 +60,11 @@ class CenterCoordinateTest(TestCase):
         # Create a publication with a rectangular polygon
         # Rectangle from (0, 0) to (10, 20)
         polygon = Polygon([(0.0, 0.0), (10.0, 0.0), (10.0, 20.0), (0.0, 20.0), (0.0, 0.0)])
-        self.publication.geometry = GeometryCollection(polygon)
-        self.publication.save()
+        self.work.geometry = GeometryCollection(polygon)
+        self.work.save()
 
         # Get center coordinate
-        center = self.publication.get_center_coordinate()
+        center = self.work.get_center_coordinate()
 
         # The bounding box center should be (5, 10)
         self.assertIsNotNone(center)
@@ -77,11 +77,11 @@ class CenterCoordinateTest(TestCase):
         # Create a publication with multiple points
         point1 = Point(0.0, 0.0)
         point2 = Point(10.0, 10.0)
-        self.publication.geometry = GeometryCollection(point1, point2)
-        self.publication.save()
+        self.work.geometry = GeometryCollection(point1, point2)
+        self.work.save()
 
         # Get center coordinate
-        center = self.publication.get_center_coordinate()
+        center = self.work.get_center_coordinate()
 
         # The bounding box center of points at (0,0) and (10,10) should be (5, 5)
         self.assertIsNotNone(center)
@@ -92,11 +92,11 @@ class CenterCoordinateTest(TestCase):
     def test_center_coordinate_no_geometry(self):
         """Test center coordinate calculation when publication has no geometry."""
         # Don't set any geometry
-        self.publication.geometry = None
-        self.publication.save()
+        self.work.geometry = None
+        self.work.save()
 
         # Get center coordinate
-        center = self.publication.get_center_coordinate()
+        center = self.work.get_center_coordinate()
 
         # Should return None when no geometry
         self.assertIsNone(center)
@@ -111,11 +111,11 @@ class CenterCoordinateTest(TestCase):
             (100.0, 70.0),
             (100.0, 50.0)
         ])
-        self.publication.geometry = GeometryCollection(polygon)
-        self.publication.save()
+        self.work.geometry = GeometryCollection(polygon)
+        self.work.save()
 
         # Get center coordinate
-        center = self.publication.get_center_coordinate()
+        center = self.work.get_center_coordinate()
 
         # The bounding box center should be (110, 60)
         self.assertIsNotNone(center)
@@ -129,7 +129,7 @@ class ExtremePointsTest(TestCase):
 
     def setUp(self):
         """Create a base publication for testing."""
-        self.publication = Publication.objects.create(
+        self.work = Work.objects.create(
             title="Test Publication",
             doi="10.1234/test-extremes",
             status="p"
@@ -138,10 +138,10 @@ class ExtremePointsTest(TestCase):
     def test_extreme_points_single_point(self):
         """Test extreme points for a single point - all should be the same."""
         point = Point(10.0, 20.0)
-        self.publication.geometry = GeometryCollection(point)
-        self.publication.save()
+        self.work.geometry = GeometryCollection(point)
+        self.work.save()
 
-        extremes = self.publication.get_extreme_points()
+        extremes = self.work.get_extreme_points()
 
         self.assertIsNotNone(extremes)
         # All extreme points should be the same for a single point
@@ -157,10 +157,10 @@ class ExtremePointsTest(TestCase):
     def test_extreme_points_linestring(self):
         """Test extreme points for a diagonal line."""
         line = LineString([(0.0, 0.0), (10.0, 10.0)])
-        self.publication.geometry = GeometryCollection(line)
-        self.publication.save()
+        self.work.geometry = GeometryCollection(line)
+        self.work.save()
 
-        extremes = self.publication.get_extreme_points()
+        extremes = self.work.get_extreme_points()
 
         self.assertIsNotNone(extremes)
         # Northernmost point (highest Y)
@@ -180,10 +180,10 @@ class ExtremePointsTest(TestCase):
         """Test extreme points for a rectangular polygon."""
         # Rectangle from (0, 0) to (10, 20)
         polygon = Polygon([(0.0, 0.0), (10.0, 0.0), (10.0, 20.0), (0.0, 20.0), (0.0, 0.0)])
-        self.publication.geometry = GeometryCollection(polygon)
-        self.publication.save()
+        self.work.geometry = GeometryCollection(polygon)
+        self.work.save()
 
-        extremes = self.publication.get_extreme_points()
+        extremes = self.work.get_extreme_points()
 
         self.assertIsNotNone(extremes)
         # Northernmost point (highest Y = 20)
@@ -218,10 +218,10 @@ class ExtremePointsTest(TestCase):
             (0.0, 10.0),
             (0.0, 0.0)
         ])
-        self.publication.geometry = GeometryCollection(polygon)
-        self.publication.save()
+        self.work.geometry = GeometryCollection(polygon)
+        self.work.save()
 
-        extremes = self.publication.get_extreme_points()
+        extremes = self.work.get_extreme_points()
 
         self.assertIsNotNone(extremes)
         # Northernmost point (highest Y = 10)
@@ -235,10 +235,10 @@ class ExtremePointsTest(TestCase):
 
     def test_extreme_points_no_geometry(self):
         """Test extreme points when publication has no geometry."""
-        self.publication.geometry = None
-        self.publication.save()
+        self.work.geometry = None
+        self.work.save()
 
-        extremes = self.publication.get_extreme_points()
+        extremes = self.work.get_extreme_points()
 
         self.assertIsNone(extremes)
 
@@ -248,7 +248,7 @@ class ComplexGeometryTest(TestCase):
 
     def setUp(self):
         """Create a base publication for testing."""
-        self.publication = Publication.objects.create(
+        self.work = Work.objects.create(
             title="Test Publication - Complex Geometries",
             doi="10.1234/test-complex",
             status="p"
@@ -258,11 +258,11 @@ class ComplexGeometryTest(TestCase):
         """Test with a triangular polygon."""
         # Equilateral-ish triangle
         triangle = Polygon([(0.0, 0.0), (10.0, 0.0), (5.0, 8.66), (0.0, 0.0)])
-        self.publication.geometry = GeometryCollection(triangle)
-        self.publication.save()
+        self.work.geometry = GeometryCollection(triangle)
+        self.work.save()
 
-        center = self.publication.get_center_coordinate()
-        extremes = self.publication.get_extreme_points()
+        center = self.work.get_center_coordinate()
+        extremes = self.work.get_extreme_points()
 
         # Center should be roughly in the middle
         self.assertIsNotNone(center)
@@ -291,11 +291,11 @@ class ComplexGeometryTest(TestCase):
         points.append(points[0])  # Close the polygon
 
         pentagon = Polygon(points)
-        self.publication.geometry = GeometryCollection(pentagon)
-        self.publication.save()
+        self.work.geometry = GeometryCollection(pentagon)
+        self.work.save()
 
-        center = self.publication.get_center_coordinate()
-        extremes = self.publication.get_extreme_points()
+        center = self.work.get_center_coordinate()
+        extremes = self.work.get_extreme_points()
 
         # Center should be near the pentagon center (bbox center may not match geometric center)
         self.assertIsNotNone(center)
@@ -323,11 +323,11 @@ class ComplexGeometryTest(TestCase):
             (2.5, 4.0),
             (0.0, 5.0)
         ])
-        self.publication.geometry = GeometryCollection(concave)
-        self.publication.save()
+        self.work.geometry = GeometryCollection(concave)
+        self.work.save()
 
-        center = self.publication.get_center_coordinate()
-        extremes = self.publication.get_extreme_points()
+        center = self.work.get_center_coordinate()
+        extremes = self.work.get_extreme_points()
 
         # Should handle concave polygons correctly
         self.assertIsNotNone(center)
@@ -349,11 +349,11 @@ class ComplexGeometryTest(TestCase):
         inner_ring = LinearRing((3.0, 3.0), (7.0, 3.0), (7.0, 7.0), (3.0, 7.0), (3.0, 3.0))
 
         polygon_with_hole = Polygon(outer_ring, [inner_ring])
-        self.publication.geometry = GeometryCollection(polygon_with_hole)
-        self.publication.save()
+        self.work.geometry = GeometryCollection(polygon_with_hole)
+        self.work.save()
 
-        center = self.publication.get_center_coordinate()
-        extremes = self.publication.get_extreme_points()
+        center = self.work.get_center_coordinate()
+        extremes = self.work.get_extreme_points()
 
         # Center should be at center of bounding box (hole doesn't affect bbox)
         self.assertIsNotNone(center)
@@ -373,11 +373,11 @@ class ComplexGeometryTest(TestCase):
         point = Point(0.0, 0.0)
         line = LineString([(10.0, 10.0), (20.0, 20.0)])
 
-        self.publication.geometry = GeometryCollection(point, line)
-        self.publication.save()
+        self.work.geometry = GeometryCollection(point, line)
+        self.work.save()
 
-        center = self.publication.get_center_coordinate()
-        extremes = self.publication.get_extreme_points()
+        center = self.work.get_center_coordinate()
+        extremes = self.work.get_extreme_points()
 
         # Center should be middle of bounding box from (0,0) to (20,20)
         self.assertIsNotNone(center)
@@ -398,11 +398,11 @@ class ComplexGeometryTest(TestCase):
         line = LineString([(5.0, 5.0), (15.0, 5.0)])
         polygon = Polygon([(20.0, 0.0), (30.0, 0.0), (30.0, 10.0), (20.0, 10.0), (20.0, 0.0)])
 
-        self.publication.geometry = GeometryCollection(point, line, polygon)
-        self.publication.save()
+        self.work.geometry = GeometryCollection(point, line, polygon)
+        self.work.save()
 
-        center = self.publication.get_center_coordinate()
-        extremes = self.publication.get_extreme_points()
+        center = self.work.get_center_coordinate()
+        extremes = self.work.get_extreme_points()
 
         # Center should be middle of overall bounding box from (0,0) to (30,10)
         self.assertIsNotNone(center)
@@ -425,11 +425,11 @@ class ComplexGeometryTest(TestCase):
             Point(50.0, 100.0),
             Point(-50.0, 25.0)
         ]
-        self.publication.geometry = GeometryCollection(*points)
-        self.publication.save()
+        self.work.geometry = GeometryCollection(*points)
+        self.work.save()
 
-        center = self.publication.get_center_coordinate()
-        extremes = self.publication.get_extreme_points()
+        center = self.work.get_center_coordinate()
+        extremes = self.work.get_extreme_points()
 
         # Center should be in the middle of bounding box
         self.assertIsNotNone(center)
@@ -451,11 +451,11 @@ class ComplexGeometryTest(TestCase):
         line2 = LineString([(0.0, 10.0), (10.0, 10.0)])
         line3 = LineString([(5.0, 0.0), (5.0, 10.0)])
 
-        self.publication.geometry = GeometryCollection(line1, line2, line3)
-        self.publication.save()
+        self.work.geometry = GeometryCollection(line1, line2, line3)
+        self.work.save()
 
-        center = self.publication.get_center_coordinate()
-        extremes = self.publication.get_extreme_points()
+        center = self.work.get_center_coordinate()
+        extremes = self.work.get_extreme_points()
 
         # Bounding box from (0,0) to (10,10), center at (5,5)
         self.assertIsNotNone(center)
@@ -480,11 +480,11 @@ class ComplexGeometryTest(TestCase):
             (0.0, small_size),
             (0.0, 0.0)
         ])
-        self.publication.geometry = GeometryCollection(small_polygon)
-        self.publication.save()
+        self.work.geometry = GeometryCollection(small_polygon)
+        self.work.save()
 
-        center = self.publication.get_center_coordinate()
-        extremes = self.publication.get_extreme_points()
+        center = self.work.get_center_coordinate()
+        extremes = self.work.get_extreme_points()
 
         # Should handle very small geometries
         self.assertIsNotNone(center)
@@ -505,11 +505,11 @@ class ComplexGeometryTest(TestCase):
             (0.0, 60.0),
             (0.0, 40.0)
         ])
-        self.publication.geometry = GeometryCollection(large_polygon)
-        self.publication.save()
+        self.work.geometry = GeometryCollection(large_polygon)
+        self.work.save()
 
-        center = self.publication.get_center_coordinate()
-        extremes = self.publication.get_extreme_points()
+        center = self.work.get_center_coordinate()
+        extremes = self.work.get_extreme_points()
 
         # Should handle large geometries
         self.assertIsNotNone(center)
@@ -531,9 +531,9 @@ class GlobalFeedsFixtureTest(TestCase):
 
     def test_triangle_from_fixture(self):
         """Test triangle geometry from global feeds fixture."""
-        from publications.models import Publication
+        from works.models import Work
 
-        triangle = Publication.objects.get(title__contains="Triangular Survey")
+        triangle = Work.objects.get(title__contains="Triangular Survey")
         self.assertIsNotNone(triangle.geometry)
 
         center = triangle.get_center_coordinate()
@@ -556,9 +556,9 @@ class GlobalFeedsFixtureTest(TestCase):
 
     def test_pentagon_from_fixture(self):
         """Test pentagon geometry from global feeds fixture."""
-        from publications.models import Publication
+        from works.models import Work
 
-        pentagon = Publication.objects.get(title__contains="Pentagon Study")
+        pentagon = Work.objects.get(title__contains="Pentagon Study")
         self.assertIsNotNone(pentagon.geometry)
 
         center = pentagon.get_center_coordinate()
@@ -577,9 +577,9 @@ class GlobalFeedsFixtureTest(TestCase):
 
     def test_concave_polygon_from_fixture(self):
         """Test concave polygon from global feeds fixture."""
-        from publications.models import Publication
+        from works.models import Work
 
-        concave = Publication.objects.get(title__contains="Concave Polygon")
+        concave = Work.objects.get(title__contains="Concave Polygon")
         self.assertIsNotNone(concave.geometry)
 
         center = concave.get_center_coordinate()
@@ -596,9 +596,9 @@ class GlobalFeedsFixtureTest(TestCase):
 
     def test_polygon_with_hole_from_fixture(self):
         """Test polygon with exclusion zone (hole) from global feeds fixture."""
-        from publications.models import Publication
+        from works.models import Work
 
-        hole = Publication.objects.get(title__contains="Exclusion Zone")
+        hole = Work.objects.get(title__contains="Exclusion Zone")
         self.assertIsNotNone(hole.geometry)
 
         center = hole.get_center_coordinate()
@@ -617,9 +617,9 @@ class GlobalFeedsFixtureTest(TestCase):
 
     def test_mixed_geometry_from_fixture(self):
         """Test mixed geometry collection from global feeds fixture."""
-        from publications.models import Publication
+        from works.models import Work
 
-        mixed = Publication.objects.get(title__contains="Multi-site Arctic")
+        mixed = Work.objects.get(title__contains="Multi-site Arctic")
         self.assertIsNotNone(mixed.geometry)
 
         center = mixed.get_center_coordinate()
@@ -635,9 +635,9 @@ class GlobalFeedsFixtureTest(TestCase):
 
     def test_multipoint_from_fixture(self):
         """Test multipoint geometry from global feeds fixture."""
-        from publications.models import Publication
+        from works.models import Work
 
-        multipoint = Publication.objects.get(title__contains="Scattered Monitoring")
+        multipoint = Work.objects.get(title__contains="Scattered Monitoring")
         self.assertIsNotNone(multipoint.geometry)
 
         center = multipoint.get_center_coordinate()
@@ -653,9 +653,9 @@ class GlobalFeedsFixtureTest(TestCase):
 
     def test_micro_geometry_from_fixture(self):
         """Test very small (sub-meter) geometry from global feeds fixture."""
-        from publications.models import Publication
+        from works.models import Work
 
-        micro = Publication.objects.get(title__contains="Micro-site")
+        micro = Work.objects.get(title__contains="Micro-site")
         self.assertIsNotNone(micro.geometry)
 
         center = micro.get_center_coordinate()
@@ -682,9 +682,9 @@ class GlobalFeedsFixtureTest(TestCase):
 
     def test_continental_scale_from_fixture(self):
         """Test very large continental-scale geometry from global feeds fixture."""
-        from publications.models import Publication
+        from works.models import Work
 
-        continental = Publication.objects.get(title__contains="Continental-scale")
+        continental = Work.objects.get(title__contains="Continental-scale")
         self.assertIsNotNone(continental.geometry)
 
         center = continental.get_center_coordinate()
@@ -702,9 +702,9 @@ class GlobalFeedsFixtureTest(TestCase):
 
     def test_star_shaped_polygon_from_fixture(self):
         """Test star-shaped (non-convex complex) polygon from global feeds fixture."""
-        from publications.models import Publication
+        from works.models import Work
 
-        star = Publication.objects.get(title__contains="Star-shaped")
+        star = Work.objects.get(title__contains="Star-shaped")
         self.assertIsNotNone(star.geometry)
 
         center = star.get_center_coordinate()

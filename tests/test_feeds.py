@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 from django.test import TestCase
 from django.contrib.gis.geos import Point, LineString, Polygon, GeometryCollection
 from datetime import datetime
-from publications.models import Publication
+from works.models import Work
 
 from xmldiff import main as xmldiff_main
 from xmldiff import formatting
@@ -17,8 +17,8 @@ class GeoFeedTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         """ Set up test publications with geospatial data """
-        Publication.objects.all().delete()
-        cls.pub1 = Publication.objects.create(
+        Work.objects.all().delete()
+        cls.pub1 = Work.objects.create(
             title="Point Test",
             abstract="Publication with a single point inside a collection.",
             url="https://example.com/point",
@@ -28,7 +28,7 @@ class GeoFeedTestCase(TestCase):
             geometry=GeometryCollection(Point(12.4924, 41.8902))  
         )
 
-        cls.pub2 = Publication.objects.create(
+        cls.pub2 = Work.objects.create(
             title="Polygon Test",
             abstract="Publication with a polygon inside a collection.",
             url="https://example.com/polygon",
@@ -40,7 +40,7 @@ class GeoFeedTestCase(TestCase):
             ])) 
         )
 
-        cls.pub3 = Publication.objects.create(
+        cls.pub3 = Work.objects.create(
             title="LineString Test",
             abstract="Publication with a linestring inside a collection.",
             url="https://example.com/linestring",
@@ -53,8 +53,8 @@ class GeoFeedTestCase(TestCase):
     def _fetch_feed(self, feed_type):
         """ Helper function to fetch RSS/Atom feed content """
         feed_urls = {
-            "georss": "/feed/georss/",
-            "geoatom": "/feed/geoatom/",
+            "georss": "/api/v1/feeds/optimap-global.rss",
+            "geoatom": "/api/v1/feeds/optimap-global.atom",
         }
 
         if feed_type not in feed_urls:
@@ -69,6 +69,22 @@ class GeoFeedTestCase(TestCase):
 
         return xml_content
 
+    def _normalize_timestamps(self, xml_content):
+        """ Replace dynamic timestamps with placeholder for comparison """
+        import re
+        # Normalize lastBuildDate/updated timestamps to fixed value
+        xml_content = re.sub(
+            r'<lastBuildDate>[^<]+</lastBuildDate>',
+            '<lastBuildDate>TIMESTAMP</lastBuildDate>',
+            xml_content
+        )
+        xml_content = re.sub(
+            r'<updated>[^<]+</updated>',
+            '<updated>TIMESTAMP</updated>',
+            xml_content
+        )
+        return xml_content
+
     def _compare_with_reference(self, generated_xml, filename):
         """ Save and compare generated XML with reference file """
         reference_path = os.path.join(os.path.dirname(__file__), "reference", filename)
@@ -77,14 +93,18 @@ class GeoFeedTestCase(TestCase):
             os.makedirs(os.path.dirname(reference_path), exist_ok=True)
             with open(reference_path, "w", encoding="utf-8") as f:
                 f.write(generated_xml)
-            return  
+            return
 
         with open(reference_path, "r", encoding="utf-8") as f:
             reference_xml = f.read()
 
+        # Normalize timestamps before comparison
+        normalized_reference = self._normalize_timestamps(reference_xml)
+        normalized_generated = self._normalize_timestamps(generated_xml)
+
         diff = xmldiff_main.diff_texts(
-            reference_xml.encode("utf-8"),
-            generated_xml.encode("utf-8"),
+            normalized_reference.encode("utf-8"),
+            normalized_generated.encode("utf-8"),
             formatter=formatting.DiffFormatter()
         )
 
@@ -131,18 +151,14 @@ class GeoFeedTestCase(TestCase):
         self._compare_with_reference(geoatom_xml, "expected_geoatom.xml")
 
         root = self._parse_xml(geoatom_xml).getroot()
-        namespace = self._extract_namespaces(geoatom_xml)  
+        namespace = self._extract_namespaces(geoatom_xml)
 
-        latitudes = root.findall(".//geo:lat", namespaces=namespace)
-        longitudes = root.findall(".//geo:long", namespaces=namespace)
-        self.assertGreaterEqual(len(latitudes), 1, "Expected at least one <geo:lat> element")
+        # Atom feed uses georss:point format (not geo:lat/geo:long)
+        points = root.findall(".//georss:point", namespaces=namespace)
+        self.assertGreaterEqual(len(points), 1, "Expected at least one <georss:point> element")
 
-        # Validate content of the fields
-        expected_lat = "41.8902"
-        expected_lon = "12.4924"
+        # Validate content of the point field
+        expected_point = "41.8902 12.4924"
+        point_texts = [point.text for point in points]
 
-        lat_texts = [lat.text for lat in latitudes]
-        lon_texts = [lon.text for lon in longitudes]
-
-        self.assertIn(expected_lat, lat_texts, f"Expected latitude '{expected_lat}' not found in feed")
-        self.assertIn(expected_lon, lon_texts, f"Expected longitude '{expected_lon}' not found in feed")
+        self.assertIn(expected_point, point_texts, f"Expected point '{expected_point}' not found in feed")

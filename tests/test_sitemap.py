@@ -1,7 +1,7 @@
 from django.test import TestCase
 from django.contrib.gis.geos import MultiPolygon, Polygon
 from http import HTTPStatus
-from publications.models import GlobalRegion
+from works.models import GlobalRegion
 
 class SitemapTest(TestCase):
     def test_index(self):
@@ -14,8 +14,8 @@ class SitemapTest(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response["content-type"], "application/xml")
 
-    def test_publications(self):
-        response = self.client.get("/sitemap-publications.xml")
+    def test_works(self):
+        response = self.client.get("/sitemap-works.xml")
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response["content-type"], "application/xml")
         # TODO test content

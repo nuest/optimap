@@ -16,18 +16,18 @@ Part of the KOMET project (<https://projects.tib.eu/komet>), continuing from OPT
   - `settings.py` - All configuration via environment variables prefixed with `OPTIMAP_`
   - `.env` file for local config (see `.env.example` for all available parameters)
 
-- **publications/** - Main application containing all models, views, and business logic
-  - **Models** ([models.py](publications/models.py)):
-    - `Publication` - Core model with spatial (`GeometryCollectionField`) and temporal metadata
+- **works/** - Main application containing all models, views, and business logic
+  - **Models** ([models.py](works/models.py)):
+    - `Work` - Core model with spatial (`GeometryCollectionField`) and temporal metadata
     - `Source` - OAI-PMH harvesting sources
     - `HarvestingEvent` - Tracks harvesting jobs
     - `Subscription` - User subscriptions with spatial/temporal filters
     - `CustomUser` - Extended Django user model
     - `BlockedEmail`/`BlockedDomain` - Anti-spam mechanisms
-  - **Views** ([views.py](publications/views.py)) - Handles passwordless login, subscriptions, data downloads
-  - **Tasks** ([tasks.py](publications/tasks.py)) - Django-Q async tasks for harvesting and data export
-  - **API** ([api.py](publications/api.py), [viewsets.py](publications/viewsets.py), [serializers.py](publications/serializers.py)) - DRF REST API at `/api/v1/`
-  - **Feeds** ([feeds.py](publications/feeds.py), [feeds_geometry.py](publications/feeds_geometry.py)) - GeoRSS/GeoAtom feed generation
+  - **Views** ([views.py](works/views.py)) - Handles passwordless login, subscriptions, data downloads
+  - **Tasks** ([tasks.py](works/tasks.py)) - Django-Q async tasks for harvesting and data export
+  - **API** ([api.py](works/api.py), [viewsets.py](works/viewsets.py), [serializers.py](works/serializers.py)) - DRF REST API at `/api/v1/`
+  - **Feeds** ([feeds.py](works/feeds.py), [feeds_geometry.py](works/feeds_geometry.py)) - GeoRSS/GeoAtom feed generation
 
 ### Key Technologies
 
@@ -38,8 +38,8 @@ Part of the KOMET project (<https://projects.tib.eu/komet>), continuing from OPT
 
 ### Data Flow
 
-1. **Harvesting**: OAI-PMH sources → `HarvestingEvent` → parse XML → create `Publication` records with spatial/temporal metadata
-2. **API**: Publications exposed via REST API at `/api/v1/publications/` with spatial filtering
+1. **Harvesting**: OAI-PMH sources → `HarvestingEvent` → parse XML → create `Work` records with spatial/temporal metadata
+2. **API**: Publications exposed via REST API at `/api/v1/works/` with spatial filtering
 3. **Feeds**: Dynamic GeoRSS/GeoAtom feeds filtered by region or global
 4. **Data Export**: Scheduled tasks generate cached GeoJSON/GeoPackage dumps in `/tmp/optimap_cache/`
 
@@ -147,7 +147,7 @@ python manage.py flush                       # Clear all data from database (car
 
 # Shell access
 python manage.py shell                       # Django shell with models loaded
-python manage.py shell -c "from publications.tasks import regenerate_geojson_cache; regenerate_geojson_cache()"
+python manage.py shell -c "from works.tasks import regenerate_geojson_cache; regenerate_geojson_cache()"
 python manage.py dbshell                     # Direct PostgreSQL shell
 
 # Development server
@@ -166,7 +166,7 @@ python -Wa manage.py test                    # Show deprecation warnings
 
 #### Custom OPTIMAP Commands
 
-Located in [publications/management/commands/](publications/management/commands/)
+Located in [works/management/commands/](works/management/commands/)
 
 ```bash
 # Global regions setup
@@ -222,7 +222,7 @@ python manage.py loaddata fixtures/test_data_partners.json
 python manage.py loaddata fixtures/test_data_global_feeds.json
 
 # Manually regenerate GeoJSON/GeoPackage cache (without Django-Q)
-python manage.py shell -c "from publications.tasks import regenerate_geojson_cache; regenerate_geojson_cache()"
+python manage.py shell -c "from works.tasks import regenerate_geojson_cache; regenerate_geojson_cache()"
 ```
 
 ## Important Patterns
@@ -241,7 +241,7 @@ All deployment-specific config uses `OPTIMAP_*` environment variables loaded fro
 
 1. Create/configure `Source` in admin with OAI-PMH URL
 2. Django-Q task creates `HarvestingEvent`
-3. Fetch XML → parse → extract DOI, spatial, temporal metadata → save `Publication` records
+3. Fetch XML → parse → extract DOI, spatial, temporal metadata → save `Work` records
 4. Track status in `HarvestingEvent.status` (pending/in_progress/completed/failed)
 
 ### Authentication
@@ -271,7 +271,7 @@ All deployment-specific config uses `OPTIMAP_*` environment variables loaded fro
 ```
 optimap/
 ├── optimap/          # Django project settings
-├── publications/     # Main app (models, views, tasks, API)
+├── works/     # Main app (models, views, tasks, API)
 │   ├── management/commands/  # Custom Django commands
 │   ├── static/       # Frontend assets, logos
 │   └── templates/    # Django templates
@@ -366,7 +366,7 @@ GeoJSON, GeoTIFF, Shapefile, GeoPackage, KML, GML, GPX, FlatGeobuf, CSV (with la
 
 ### Geoextent Web UI
 
-Interactive web interface at [/geoextent](publications/templates/geoextent.html) for extracting geospatial/temporal extents from data files.
+Interactive web interface at [/geoextent](works/templates/geoextent.html) for extracting geospatial/temporal extents from data files.
 
 **Features:**
 
@@ -383,10 +383,10 @@ Interactive web interface at [/geoextent](publications/templates/geoextent.html)
 
 **Implementation:**
 
-- View: [publications/views.py](publications/views.py) - `geoextent()` function
+- View: [works/views.py](works/views.py) - `geoextent()` function
   - Uses `geoextent.lib.features.get_supported_features()` to dynamically load supported formats and providers
   - No hardcoded format lists - always reflects current geoextent capabilities
-- Template: [publications/templates/geoextent.html](publications/templates/geoextent.html)
+- Template: [works/templates/geoextent.html](works/templates/geoextent.html)
   - Uses Fetch API for AJAX requests (jQuery slim doesn't include $.ajax)
   - Interactive file management with add/remove functionality
   - Multiple file selection from different locations
@@ -406,8 +406,8 @@ Size limits passed from Django settings:
 
 **Navigation:**
 
-- Footer link added to [publications/templates/footer.html](publications/templates/footer.html)
-- URL route: `path("geoextent/", views.geoextent, name="geoextent")` in [publications/urls.py](publications/urls.py)
+- Footer link added to [works/templates/footer.html](works/templates/footer.html)
+- URL route: `path("geoextent/", views.geoextent, name="geoextent")` in [works/urls.py](works/urls.py)
 
 ## Version Management
 

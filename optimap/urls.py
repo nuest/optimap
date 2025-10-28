@@ -16,18 +16,18 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, re_path, include
 from django.contrib.sitemaps import views as sitemaps_views
-from publications.sitemaps import PublicationsSitemap, StaticViewSitemap, FeedsSitemap
-from publications.views import RobotsView
+from optimap.sitemaps import WorksSitemap, StaticViewSitemap, FeedsSitemap
+from optimap.views import RobotsView
 
 sitemaps = {
     "static": StaticViewSitemap,
-    "publications": PublicationsSitemap,
+    "works": WorksSitemap,
     "feeds": FeedsSitemap,
 }
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include(('publications.urls', 'optimap'), namespace='optimap')),
+    path('', include(('works.urls', 'optimap'), namespace='optimap')),
     path(
         "sitemap.xml",
         sitemaps_views.index,
@@ -44,8 +44,8 @@ urlpatterns = [
 ]
 
 # Custom error handlers
-handler404 = 'publications.views.custom_404'
-handler500 = 'publications.views.custom_500'
+handler404 = 'optimap.views.custom_404'
+handler500 = 'optimap.views.custom_500'
 
 # Context processor for the site
 from django.contrib.sites.shortcuts import get_current_site

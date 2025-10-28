@@ -3,7 +3,7 @@ import json
 from django.test import TestCase, Client
 from django.contrib.gis.geos import Point, GeometryCollection
 from django.utils import timezone
-from publications.models import Publication, Source
+from works.models import Work, Source
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -36,7 +36,7 @@ class GeometryContributionByIdTests(TestCase):
         )
 
         # Create test publication WITHOUT DOI (harvested, no geometry)
-        self.pub_without_doi = Publication.objects.create(
+        self.pub_without_doi = Work.objects.create(
             title='Publication Without DOI',
             status='h',  # Harvested
             doi=None,  # No DOI
@@ -46,7 +46,7 @@ class GeometryContributionByIdTests(TestCase):
         )
 
         # Create test publication with contributed geometry but no DOI
-        self.pub_contributed_no_doi = Publication.objects.create(
+        self.pub_contributed_no_doi = Work.objects.create(
             title='Contributed Publication Without DOI',
             status='c',  # Contributed
             doi=None,
@@ -152,7 +152,7 @@ class MixedDOIAndIDTests(TestCase):
         )
 
         # Publication with DOI
-        self.pub_with_doi = Publication.objects.create(
+        self.pub_with_doi = Work.objects.create(
             title='Publication With DOI',
             status='h',
             doi='10.5555/test123',
@@ -161,7 +161,7 @@ class MixedDOIAndIDTests(TestCase):
         )
 
         # Publication without DOI
-        self.pub_without_doi = Publication.objects.create(
+        self.pub_without_doi = Work.objects.create(
             title='Publication Without DOI',
             status='h',
             doi=None,

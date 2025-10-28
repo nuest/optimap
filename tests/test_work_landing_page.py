@@ -1,6 +1,6 @@
 from django.test import TestCase, Client
 from django.urls import reverse
-from publications.models import Publication, Source
+from works.models import Work, Source
 from django.contrib.gis.geos import Point, GeometryCollection
 from django.utils.timezone import now
 from datetime import timedelta
@@ -24,7 +24,7 @@ class WorkLandingPageTest(TestCase):
         )
 
         # Create a test publication with DOI
-        self.pub_with_doi = Publication.objects.create(
+        self.pub_with_doi = Work.objects.create(
             title="Test Publication with DOI",
             abstract="Test abstract for publication with DOI",
             url="https://example.com/pub1",
@@ -43,7 +43,7 @@ class WorkLandingPageTest(TestCase):
             issn_l="8765-4321"
         )
 
-        self.pub_no_homepage = Publication.objects.create(
+        self.pub_no_homepage = Work.objects.create(
             title="Test Publication No Homepage",
             abstract="Test abstract",
             url="https://example.com/pub2",
@@ -59,6 +59,27 @@ class WorkLandingPageTest(TestCase):
         response = self.client.get(f"/work/{self.pub_with_doi.doi}/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.pub_with_doi.title)
+
+    def test_work_landing_page_with_geometry(self):
+        """Test that work landing page properly handles geometry (regression test for json import)."""
+        # This test catches: NameError: name 'json' is not defined
+        # by ensuring the view can process geometry.geojson and create feature_json
+        response = self.client.get(f"/work/{self.pub_with_doi.doi}/")
+        self.assertEqual(response.status_code, 200)
+
+        # Verify feature_json is in context (requires json import to create)
+        self.assertIn('feature_json', response.context)
+        feature_json_str = response.context['feature_json']
+
+        # Verify it's valid JSON string that can be parsed
+        self.assertIsInstance(feature_json_str, str)
+
+        # Parse it to verify it's valid GeoJSON (this also tests json usage)
+        import json
+        feature_data = json.loads(feature_json_str)
+        self.assertEqual(feature_data['type'], 'Feature')
+        self.assertIn('geometry', feature_data)
+        self.assertIn('properties', feature_data)
 
     def test_doi_link_is_correct(self):
         """Test that the DOI link points to the correct DOI resolver URL."""
@@ -96,7 +117,7 @@ class WorkLandingPageTest(TestCase):
         self.assertEqual(response.status_code, 200)
 
         # Check that the API link is present
-        expected_api_url = f'/api/v1/publications/{self.pub_with_doi.id}/'
+        expected_api_url = f'/api/v1/works/{self.pub_with_doi.id}/'
         self.assertContains(response, expected_api_url)
         self.assertContains(response, 'View raw JSON from API')
 
@@ -107,7 +128,7 @@ class WorkLandingPageTest(TestCase):
         self.assertEqual(response.status_code, 200)
 
         # Now test the API endpoint
-        api_response = self.client.get(f'/api/v1/publications/{self.pub_with_doi.id}/')
+        api_response = self.client.get(f'/api/v1/works/{self.pub_with_doi.id}/')
         self.assertEqual(api_response.status_code, 200)
         self.assertIn('application/json', api_response['Content-Type'])
 
@@ -187,7 +208,7 @@ class PublicationStatusVisibilityTest(TestCase):
         )
 
         # Create publications with different statuses
-        self.pub_published = Publication.objects.create(
+        self.pub_published = Work.objects.create(
             title="Published Publication",
             abstract="This is published",
             url="https://example.com/published",
@@ -198,7 +219,7 @@ class PublicationStatusVisibilityTest(TestCase):
             source=self.source
         )
 
-        self.pub_draft = Publication.objects.create(
+        self.pub_draft = Work.objects.create(
             title="Draft Publication",
             abstract="This is a draft",
             url="https://example.com/draft",
@@ -209,7 +230,7 @@ class PublicationStatusVisibilityTest(TestCase):
             source=self.source
         )
 
-        self.pub_testing = Publication.objects.create(
+        self.pub_testing = Work.objects.create(
             title="Testing Publication",
             abstract="This is for testing",
             url="https://example.com/testing",
@@ -219,7 +240,7 @@ class PublicationStatusVisibilityTest(TestCase):
             source=self.source
         )
 
-        self.pub_withdrawn = Publication.objects.create(
+        self.pub_withdrawn = Work.objects.create(
             title="Withdrawn Publication",
             abstract="This is withdrawn",
             url="https://example.com/withdrawn",
@@ -229,7 +250,7 @@ class PublicationStatusVisibilityTest(TestCase):
             source=self.source
         )
 
-        self.pub_harvested = Publication.objects.create(
+        self.pub_harvested = Work.objects.create(
             title="Harvested Publication",
             abstract="This is harvested",
             url="https://example.com/harvested",
@@ -355,17 +376,17 @@ class PublicationStatusVisibilityTest(TestCase):
         self.assertContains(response, 'not visible to the public')
 
     def test_api_viewset_queryset_filtering(self):
-        """Test that PublicationViewSet filters correctly based on user permissions."""
-        from publications.viewsets import PublicationViewSet
+        """Test that WorkViewSet filters correctly based on user permissions."""
+        from works.viewsets import WorkViewSet
         from rest_framework.test import APIRequestFactory
         from django.contrib.auth.models import AnonymousUser
 
         factory = APIRequestFactory()
 
         # Test anonymous user
-        request = factory.get('/api/v1/publications/')
+        request = factory.get('/api/v1/works/')
         request.user = AnonymousUser()
-        viewset = PublicationViewSet()
+        viewset = WorkViewSet()
         viewset.request = request
         queryset = viewset.get_queryset()
 
@@ -375,9 +396,9 @@ class PublicationStatusVisibilityTest(TestCase):
         self.assertNotIn(self.pub_testing, queryset)
 
         # Test regular authenticated user
-        request = factory.get('/api/v1/publications/')
+        request = factory.get('/api/v1/works/')
         request.user = self.regular_user
-        viewset = PublicationViewSet()
+        viewset = WorkViewSet()
         viewset.request = request
         queryset = viewset.get_queryset()
 
@@ -386,9 +407,9 @@ class PublicationStatusVisibilityTest(TestCase):
         self.assertNotIn(self.pub_draft, queryset)
 
         # Test admin user
-        request = factory.get('/api/v1/publications/')
+        request = factory.get('/api/v1/works/')
         request.user = self.admin_user
-        viewset = PublicationViewSet()
+        viewset = WorkViewSet()
         viewset.request = request
         queryset = viewset.get_queryset()
 

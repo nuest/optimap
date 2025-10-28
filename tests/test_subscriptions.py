@@ -6,7 +6,7 @@ django.setup()
 from django.test import TestCase, Client
 from django.contrib.auth import get_user_model
 from django.urls import reverse
-from publications.models import Subscription, GlobalRegion
+from works.models import Subscription, GlobalRegion
 from django.contrib.gis.geos import MultiPolygon, Polygon
 
 User = get_user_model()
@@ -67,7 +67,8 @@ class SubscriptionTests(TestCase):
         """Test that subscription page requires login"""
         response = self.client.get(reverse('optimap:subscriptions'))
         self.assertEqual(response.status_code, 302)  # Redirect to login
-        self.assertIn('/login/', response.url)
+        # Redirects to homepage with next parameter for login
+        self.assertIn('next=/subscriptions/', response.url)
 
     def test_subscription_page_shows_regions(self):
         """Test that subscription page displays all available regions"""
@@ -188,8 +189,9 @@ class SubscriptionTests(TestCase):
         self.assertContains(response, f'value="{self.africa.id}"')
         self.assertContains(response, f'value="{self.pacific.id}"')
 
-        # Check the summary shows correct count
-        self.assertContains(response, 'Currently monitoring 2 region')
+        # Check the summary shows correct count (note: contains HTML <strong> tags)
+        self.assertContains(response, 'Currently monitoring')
+        self.assertContains(response, '2 region')
 
     def test_subscription_summary_shows_region_names(self):
         """Test that subscription summary displays region names"""
@@ -223,7 +225,7 @@ class SubscriptionTests(TestCase):
         response = self.client.get(reverse('optimap:subscriptions'))
 
         self.assertContains(response, 'No regions selected')
-        self.assertContains(response, 'alert-warning')
+        self.assertContains(response, 'text-warning')
 
     def test_invalid_region_id_ignored(self):
         """Test that invalid region IDs are ignored"""
@@ -257,7 +259,8 @@ class SubscriptionTests(TestCase):
 
         # Verify subscription still exists
         response = self.client.get(reverse('optimap:subscriptions'))
-        self.assertContains(response, 'Currently monitoring 2 region')
+        self.assertContains(response, 'Currently monitoring')
+        self.assertContains(response, '2 region')
 
     def test_different_users_have_separate_subscriptions(self):
         """Test that subscriptions are user-specific"""

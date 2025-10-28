@@ -1,6 +1,6 @@
 [
   {
-    "model": "publications.source",
+    "model": "works.source",
     "pk": 1,
     "fields": {
       "name": "Volcanica",
@@ -10,11 +10,12 @@
       "publisher_name": "Volcanica Society",
       "works_count": 12,
       "is_oa": false,
-      "cited_by_count": null
+      "cited_by_count": null,
+      "default_work_type": "article"
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 101,
     "fields": {
       "status": "p",
@@ -27,13 +28,18 @@
       "creationDate": "2024-06-10T08:00:00Z",
       "lastUpdate": "2024-06-10T08:00:00Z",
       "source": 1,
-      "timeperiod_startdate": ["2022-05-01"],
-      "timeperiod_enddate": ["2022-10-01"],
-      "provenance": "Imported from DOAJ on 2024-06-10."
+      "timeperiod_startdate": [
+        "2022-05-01"
+      ],
+      "timeperiod_enddate": [
+        "2022-10-01"
+      ],
+      "provenance": "Imported from DOAJ on 2024-06-10.",
+      "type": "article"
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 102,
     "fields": {
       "status": "d",
@@ -48,12 +54,12 @@
       "source": 1,
       "timeperiod_startdate": [],
       "timeperiod_enddate": [],
-      "provenance": "Draft entry for Volcanica"
+      "provenance": "Draft entry for Volcanica",
+      "type": "article"
     }
   },
-
   {
-    "model": "publications.source",
+    "model": "works.source",
     "pk": 2,
     "fields": {
       "name": "Journal of Spatial Information Science",
@@ -65,11 +71,12 @@
       "homepage_url": null,
       "abbreviated_title": null,
       "is_oa": false,
-      "cited_by_count": null
+      "cited_by_count": null,
+      "default_work_type": "article"
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 201,
     "fields": {
       "status": "p",
@@ -82,13 +89,18 @@
       "creationDate": "2024-06-10T09:00:00Z",
       "lastUpdate": "2024-06-10T09:00:00Z",
       "source": 2,
-      "timeperiod_startdate": ["2021-01-01"],
-      "timeperiod_enddate": ["2021-12-31"],
-      "provenance": "Imported from JOSIS archive"
+      "timeperiod_startdate": [
+        "2021-01-01"
+      ],
+      "timeperiod_enddate": [
+        "2021-12-31"
+      ],
+      "provenance": "Imported from JOSIS archive",
+      "type": "article"
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 202,
     "fields": {
       "status": "p",
@@ -103,12 +115,12 @@
       "source": 2,
       "timeperiod_startdate": [],
       "timeperiod_enddate": [],
-      "provenance": "Manual entry – missing DOI/URL"
+      "provenance": "Manual entry \u2013 missing DOI/URL",
+      "type": "article"
     }
   },
-
   {
-    "model": "publications.source",
+    "model": "works.source",
     "pk": 3,
     "fields": {
       "name": "European Journal of Transport and Infrastructure Research",
@@ -120,11 +132,12 @@
       "homepage_url": null,
       "abbreviated_title": null,
       "is_oa": false,
-      "cited_by_count": null
+      "cited_by_count": null,
+      "default_work_type": "article"
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 301,
     "fields": {
       "status": "p",
@@ -137,13 +150,18 @@
       "creationDate": "2024-06-10T10:00:00Z",
       "lastUpdate": "2024-06-10T10:00:00Z",
       "source": 3,
-      "timeperiod_startdate": ["2020-01-01"],
-      "timeperiod_enddate": ["2020-12-31"],
-      "provenance": "Imported from EJTIR online"
+      "timeperiod_startdate": [
+        "2020-01-01"
+      ],
+      "timeperiod_enddate": [
+        "2020-12-31"
+      ],
+      "provenance": "Imported from EJTIR online",
+      "type": "article"
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 302,
     "fields": {
       "status": "p",
@@ -158,12 +176,12 @@
       "source": 3,
       "timeperiod_startdate": [],
       "timeperiod_enddate": [],
-      "provenance": "URL only; missing DOI & geometry"
+      "provenance": "URL only; missing DOI & geometry",
+      "type": "article"
     }
   },
-
   {
-    "model": "publications.source",
+    "model": "works.source",
     "pk": 4,
     "fields": {
       "name": "AGILE: GIScience Series",
@@ -175,11 +193,12 @@
       "homepage_url": null,
       "abbreviated_title": null,
       "is_oa": false,
-      "cited_by_count": null
+      "cited_by_count": null,
+      "default_work_type": "article"
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 401,
     "fields": {
       "status": "p",
@@ -192,13 +211,18 @@
       "creationDate": "2024-06-10T11:00:00Z",
       "lastUpdate": "2024-06-10T11:00:00Z",
       "source": 4,
-      "timeperiod_startdate": ["2019-01-01"],
-      "timeperiod_enddate": ["2019-12-31"],
-      "provenance": "Imported from Copernicus AGILE archive"
+      "timeperiod_startdate": [
+        "2019-01-01"
+      ],
+      "timeperiod_enddate": [
+        "2019-12-31"
+      ],
+      "provenance": "Imported from Copernicus AGILE archive",
+      "type": "article"
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 402,
     "fields": {
       "status": "d",
@@ -213,11 +237,12 @@
       "source": 4,
       "timeperiod_startdate": [],
       "timeperiod_enddate": [],
-      "provenance": "Draft entry; minimal fields"
+      "provenance": "Draft entry; minimal fields",
+      "type": "article"
     }
   },
   {
-    "model": "publications.source",
+    "model": "works.source",
     "pk": 1,
     "fields": {
       "name": "Volcanica",
@@ -230,11 +255,12 @@
       "abbreviated_title": null,
       "is_oa": false,
       "cited_by_count": null,
-      "is_preprint": false
+      "is_preprint": false,
+      "default_work_type": "article"
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 102,
     "fields": {
       "status": "d",
@@ -249,12 +275,12 @@
       "source": 1,
       "timeperiod_startdate": [],
       "timeperiod_enddate": [],
-      "provenance": "Draft entry for Volcanica"
+      "provenance": "Draft entry for Volcanica",
+      "type": "article"
     }
   },
-
   {
-    "model": "publications.source",
+    "model": "works.source",
     "pk": 2,
     "fields": {
       "name": "Journal of Spatial Information Science",
@@ -267,11 +293,12 @@
       "abbreviated_title": null,
       "is_oa": false,
       "cited_by_count": null,
-      "is_preprint": false
+      "is_preprint": false,
+      "default_work_type": "article"
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 201,
     "fields": {
       "status": "p",
@@ -284,13 +311,18 @@
       "creationDate": "2024-06-10T09:00:00Z",
       "lastUpdate": "2024-06-10T09:00:00Z",
       "source": 2,
-      "timeperiod_startdate": ["2021-01-01"],
-      "timeperiod_enddate": ["2021-12-31"],
-      "provenance": "Imported from JOSIS archive"
+      "timeperiod_startdate": [
+        "2021-01-01"
+      ],
+      "timeperiod_enddate": [
+        "2021-12-31"
+      ],
+      "provenance": "Imported from JOSIS archive",
+      "type": "article"
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 202,
     "fields": {
       "status": "p",
@@ -305,12 +337,12 @@
       "source": 2,
       "timeperiod_startdate": [],
       "timeperiod_enddate": [],
-      "provenance": "Manual entry – missing DOI/URL"
+      "provenance": "Manual entry \u2013 missing DOI/URL",
+      "type": "article"
     }
   },
-
   {
-    "model": "publications.source",
+    "model": "works.source",
     "pk": 3,
     "fields": {
       "name": "European Journal of Transport and Infrastructure Research",
@@ -323,11 +355,12 @@
       "abbreviated_title": null,
       "is_oa": false,
       "cited_by_count": null,
-      "is_preprint": false
+      "is_preprint": false,
+      "default_work_type": "article"
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 301,
     "fields": {
       "status": "p",
@@ -340,13 +373,18 @@
       "creationDate": "2024-06-10T10:00:00Z",
       "lastUpdate": "2024-06-10T10:00:00Z",
       "source": 3,
-      "timeperiod_startdate": ["2020-01-01"],
-      "timeperiod_enddate": ["2020-12-31"],
-      "provenance": "Imported from EJTIR online"
+      "timeperiod_startdate": [
+        "2020-01-01"
+      ],
+      "timeperiod_enddate": [
+        "2020-12-31"
+      ],
+      "provenance": "Imported from EJTIR online",
+      "type": "article"
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 302,
     "fields": {
       "status": "p",
@@ -361,12 +399,12 @@
       "source": 3,
       "timeperiod_startdate": [],
       "timeperiod_enddate": [],
-      "provenance": "URL only; missing DOI & geometry"
+      "provenance": "URL only; missing DOI & geometry",
+      "type": "article"
     }
   },
-
   {
-    "model": "publications.source",
+    "model": "works.source",
     "pk": 4,
     "fields": {
       "name": "AGILE: GIScience Series",
@@ -379,11 +417,12 @@
       "abbreviated_title": null,
       "is_oa": false,
       "cited_by_count": null,
-      "is_preprint": false
+      "is_preprint": false,
+      "default_work_type": "article"
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 401,
     "fields": {
       "status": "p",
@@ -396,13 +435,18 @@
       "creationDate": "2024-06-10T11:00:00Z",
       "lastUpdate": "2024-06-10T11:00:00Z",
       "source": 4,
-      "timeperiod_startdate": ["2019-01-01"],
-      "timeperiod_enddate": ["2019-12-31"],
-      "provenance": "Imported from Copernicus AGILE archive"
+      "timeperiod_startdate": [
+        "2019-01-01"
+      ],
+      "timeperiod_enddate": [
+        "2019-12-31"
+      ],
+      "provenance": "Imported from Copernicus AGILE archive",
+      "type": "article"
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 402,
     "fields": {
       "status": "d",
@@ -417,11 +461,12 @@
       "source": 4,
       "timeperiod_startdate": [],
       "timeperiod_enddate": [],
-      "provenance": "Draft entry; minimal fields"
+      "provenance": "Draft entry; minimal fields",
+      "type": "article"
     }
   },
   {
-    "model": "publications.source",
+    "model": "works.source",
     "pk": 5,
     "fields": {
       "name": "arXiv",
@@ -434,11 +479,12 @@
       "abbreviated_title": null,
       "is_oa": true,
       "cited_by_count": null,
-      "is_preprint": true
+      "is_preprint": true,
+      "default_work_type": "preprint"
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 501,
     "fields": {
       "status": "p",
@@ -453,11 +499,12 @@
       "source": 5,
       "timeperiod_startdate": [],
       "timeperiod_enddate": [],
-      "provenance": "Imported from arXiv"
+      "provenance": "Imported from arXiv",
+      "type": "article"
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 502,
     "fields": {
       "status": "d",
@@ -472,11 +519,12 @@
       "source": 5,
       "timeperiod_startdate": [],
       "timeperiod_enddate": [],
-      "provenance": "Draft entry for preprint test"
+      "provenance": "Draft entry for preprint test",
+      "type": "article"
     }
   },
   {
-    "model": "publications.source",
+    "model": "works.source",
     "pk": 6,
     "fields": {
       "name": "bioRxiv",
@@ -489,16 +537,17 @@
       "abbreviated_title": null,
       "is_oa": true,
       "cited_by_count": null,
-      "is_preprint": true
+      "is_preprint": true,
+      "default_work_type": "preprint"
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 601,
     "fields": {
       "status": "p",
       "title": "CRISPR-based Gene Drives in Mosquito Populations",
-      "abstract": "Modeling gene‐drive spread through wild Anopheles populations.",
+      "abstract": "Modeling gene\u2010drive spread through wild Anopheles populations.",
       "publicationDate": "2023-09-12",
       "doi": "10.1101/2023.09.12.558924",
       "url": "https://www.biorxiv.org/content/10.1101/2023.09.12.558924v1",
@@ -506,13 +555,18 @@
       "creationDate": "2024-06-10T13:00:00Z",
       "lastUpdate": "2024-06-10T13:00:00Z",
       "source": 6,
-      "timeperiod_startdate": ["2023-01-01"],
-      "timeperiod_enddate": ["2023-12-31"],
-      "provenance": "Imported from bioRxiv"
+      "timeperiod_startdate": [
+        "2023-01-01"
+      ],
+      "timeperiod_enddate": [
+        "2023-12-31"
+      ],
+      "provenance": "Imported from bioRxiv",
+      "type": "article"
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 602,
     "fields": {
       "status": "d",
@@ -527,7 +581,8 @@
       "source": 6,
       "timeperiod_startdate": [],
       "timeperiod_enddate": [],
-      "provenance": "Draft entry for bioRxiv preprint test"
+      "provenance": "Draft entry for bioRxiv preprint test",
+      "type": "article"
     }
   }
 ]

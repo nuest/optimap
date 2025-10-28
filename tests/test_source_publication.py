@@ -2,7 +2,7 @@ import json
 from django.test import TransactionTestCase, TestCase
 from rest_framework.test import APIClient
 from rest_framework import status
-from publications.models import Source, Publication
+from works.models import Source, Work
 
 class SourceAPITest(TestCase):
     """
@@ -102,7 +102,7 @@ class SourceAPITest(TestCase):
 class PublicationAPITest(TestCase):
     """
     Tests for the Publication endpoints:
-      - GET /api/v1/publications/
+      - GET /api/v1/works/
       - Filtering by ?source_id={pk}
       - Ensure nested 'source_details' appears with its fields.
     """
@@ -121,7 +121,7 @@ class PublicationAPITest(TestCase):
         )
 
         # 2. Create a published Publication linked to that source
-        Publication.objects.create(
+        Work.objects.create(
             title="API Paper",
             abstract="Testing nested source_details serialization",
             publicationDate="2021-01-01",
@@ -137,7 +137,7 @@ class PublicationAPITest(TestCase):
 
     def _unwrap_publications(self, data):
         """
-        Given JSON from /api/v1/publications/, return a list of property‐dicts.
+        Given JSON from /api/v1/works/, return a list of property‐dicts.
 
         Handles:
           1. Paginated GeoJSON: data["results"] is a dict (FeatureCollection).
@@ -173,10 +173,10 @@ class PublicationAPITest(TestCase):
 
     def test_publication_includes_source_details(self):
         """
-        GET /api/v1/publications/ should return ≥1 publication,
+        GET /api/v1/works/ should return ≥1 publication,
         and each publication’s 'source_details' must include all eight source fields.
         """
-        url = "/api/v1/publications/"
+        url = "/api/v1/works/"
         response = self.client.get(url, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -214,10 +214,10 @@ class PublicationAPITest(TestCase):
 
     def test_filter_publications_by_source(self):
         """
-        GET /api/v1/publications/?source_id=<pk> should return only those
+        GET /api/v1/works/?source_id=<pk> should return only those
         publications whose source_details["id"] equals <pk>.
         """
-        url = f"/api/v1/publications/?source_id={self.src.pk}"
+        url = f"/api/v1/works/?source_id={self.src.pk}"
         response = self.client.get(url, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 

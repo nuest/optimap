@@ -180,7 +180,7 @@ MULTI_GEOMETRY_TYPES = [
 def create_source(pk, name, issn_l=None, is_oa=True):
     """Create a source object."""
     return {
-        "model": "publications.source",
+        "model": "works.source",
         "pk": pk,
         "fields": {
             "name": name,
@@ -194,6 +194,7 @@ def create_source(pk, name, issn_l=None, is_oa=True):
             "is_oa": is_oa,
             "cited_by_count": random.randint(500, 50000),
             "is_preprint": random.choice([True, False]),
+            "default_work_type": "article",
         }
     }
 
@@ -247,7 +248,7 @@ def create_publication(pk, source_pk, title, abstract, geometry_wkt, region_desc
     )
 
     return {
-        "model": "publications.publication",
+        "model": "works.work",
         "pk": pk,
         "fields": {
             "status": "p",  # all published for UI testing
@@ -272,6 +273,7 @@ def create_publication(pk, source_pk, title, abstract, geometry_wkt, region_desc
             "openalex_is_retracted": is_retracted,
             "openalex_ids": openalex_ids,
             "openalex_open_access_status": openalex_open_access_status,
+            "type": "article",
         }
     }
 
@@ -564,7 +566,7 @@ def main():
         json.dump(fixture_data, f, indent=2)
 
     # Calculate statistics
-    publications = [item for item in fixture_data if item["model"] == "publications.publication"]
+    publications = [item for item in fixture_data if item["model"] == "works.work"]
 
     with_authors = sum(1 for p in publications if p["fields"]["authors"])
     with_keywords = sum(1 for p in publications if p["fields"]["keywords"])

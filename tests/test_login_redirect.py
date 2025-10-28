@@ -8,7 +8,7 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.urls import reverse
 from django.contrib.gis.geos import Polygon, MultiPolygon
-from publications.models import Subscription, GlobalRegion
+from works.models import Subscription, GlobalRegion
 
 User = get_user_model()
 

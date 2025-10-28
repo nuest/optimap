@@ -1,6 +1,6 @@
 [
   {
-    "model": "publications.source",
+    "model": "works.source",
     "pk": 9,
     "fields": {
       "name": "OPTIMAP Test Journal",
@@ -13,16 +13,17 @@
       "abbreviated_title": null,
       "is_oa": true,
       "cited_by_count": null,
-      "is_preprint": true
+      "is_preprint": true,
+      "default_work_type": "preprint"
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 900,
     "fields": {
       "status": "p",
       "title": "The First Article",
-      "abstract": "This is the first article. It is good in Münster.",
+      "abstract": "This is the first article. It is good in M\u00fcnster.",
       "publicationDate": "2010-10-10",
       "doi": "10.5555/12345678",
       "url": null,
@@ -46,11 +47,12 @@
       "openalex_fulltext_origin": null,
       "openalex_is_retracted": false,
       "openalex_ids": null,
-      "openalex_open_access_status": null
+      "openalex_open_access_status": null,
+      "type": "article"
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 901,
     "fields": {
       "status": "p",
@@ -83,11 +85,12 @@
       "openalex_fulltext_origin": "repository",
       "openalex_is_retracted": false,
       "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/abcdefgh\", \"pmid\": \"38000001\"}",
-      "openalex_open_access_status": "green"
+      "openalex_open_access_status": "green",
+      "type": "article"
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 902,
     "fields": {
       "status": "p",
@@ -118,11 +121,12 @@
       "openalex_fulltext_origin": null,
       "openalex_is_retracted": false,
       "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/1a2b3c4d\", \"pmid\": null}",
-      "openalex_open_access_status": "hybrid"
+      "openalex_open_access_status": "hybrid",
+      "type": "article"
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 903,
     "fields": {
       "status": "c",
@@ -157,11 +161,12 @@
       "openalex_fulltext_origin": null,
       "openalex_is_retracted": false,
       "openalex_ids": null,
-      "openalex_open_access_status": null
+      "openalex_open_access_status": null,
+      "type": "article"
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 904,
     "fields": {
       "status": "c",
@@ -200,11 +205,12 @@
       "openalex_fulltext_origin": "repository",
       "openalex_is_retracted": false,
       "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/contrib2\", \"pmid\": null}",
-      "openalex_open_access_status": "closed"
+      "openalex_open_access_status": "closed",
+      "type": "article"
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 905,
     "fields": {
       "status": "h",
@@ -239,11 +245,12 @@
       "openalex_fulltext_origin": null,
       "openalex_is_retracted": false,
       "openalex_ids": "{\"doi\": \"https://doi.org/None\", \"pmid\": \"38000005\"}",
-      "openalex_open_access_status": "diamond"
+      "openalex_open_access_status": "diamond",
+      "type": "article"
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 906,
     "fields": {
       "status": "c",
@@ -269,7 +276,8 @@
       "openalex_fulltext_origin": null,
       "openalex_is_retracted": false,
       "openalex_ids": null,
-      "openalex_open_access_status": null
+      "openalex_open_access_status": null,
+      "type": "article"
     }
   }
 ]

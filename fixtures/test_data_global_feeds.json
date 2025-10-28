@@ -1,6 +1,6 @@
 [
   {
-    "model": "publications.source",
+    "model": "works.source",
     "pk": 2000,
     "fields": {
       "name": "Global Geoscience Journal",
@@ -17,7 +17,7 @@
     }
   },
   {
-    "model": "publications.source",
+    "model": "works.source",
     "pk": 2001,
     "fields": {
       "name": "International Earth Sciences",
@@ -34,7 +34,7 @@
     }
   },
   {
-    "model": "publications.source",
+    "model": "works.source",
     "pk": 2002,
     "fields": {
       "name": "World Environmental Research",
@@ -51,7 +51,7 @@
     }
   },
   {
-    "model": "publications.source",
+    "model": "works.source",
     "pk": 2003,
     "fields": {
       "name": "Planetary Studies Quarterly",
@@ -68,7 +68,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2000,
     "fields": {
       "status": "p",
@@ -96,7 +96,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2001,
     "fields": {
       "status": "p",
@@ -130,7 +130,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2002,
     "fields": {
       "status": "p",
@@ -167,7 +167,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2003,
     "fields": {
       "status": "p",
@@ -207,7 +207,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2004,
     "fields": {
       "status": "p",
@@ -245,7 +245,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2005,
     "fields": {
       "status": "p",
@@ -289,7 +289,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2006,
     "fields": {
       "status": "p",
@@ -328,7 +328,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2007,
     "fields": {
       "status": "p",
@@ -362,7 +362,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2008,
     "fields": {
       "status": "p",
@@ -395,7 +395,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2009,
     "fields": {
       "status": "p",
@@ -432,7 +432,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2010,
     "fields": {
       "status": "p",
@@ -472,7 +472,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2011,
     "fields": {
       "status": "p",
@@ -516,7 +516,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2012,
     "fields": {
       "status": "p",
@@ -551,7 +551,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2013,
     "fields": {
       "status": "p",
@@ -591,7 +591,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2014,
     "fields": {
       "status": "p",
@@ -625,7 +625,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2015,
     "fields": {
       "status": "p",
@@ -663,7 +663,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2016,
     "fields": {
       "status": "p",
@@ -699,7 +699,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2017,
     "fields": {
       "status": "p",
@@ -740,7 +740,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2018,
     "fields": {
       "status": "p",
@@ -776,7 +776,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2019,
     "fields": {
       "status": "p",
@@ -817,7 +817,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2020,
     "fields": {
       "status": "p",
@@ -856,7 +856,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2021,
     "fields": {
       "status": "p",
@@ -890,7 +890,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2022,
     "fields": {
       "status": "p",
@@ -928,7 +928,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2023,
     "fields": {
       "status": "p",
@@ -970,7 +970,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2024,
     "fields": {
       "status": "p",
@@ -1002,7 +1002,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2025,
     "fields": {
       "status": "p",
@@ -1039,7 +1039,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2026,
     "fields": {
       "status": "p",
@@ -1080,7 +1080,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2027,
     "fields": {
       "status": "p",
@@ -1124,7 +1124,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2028,
     "fields": {
       "status": "p",
@@ -1157,7 +1157,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2029,
     "fields": {
       "status": "p",
@@ -1196,7 +1196,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2030,
     "fields": {
       "status": "p",
@@ -1230,7 +1230,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2031,
     "fields": {
       "status": "p",
@@ -1268,7 +1268,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2032,
     "fields": {
       "status": "p",
@@ -1304,7 +1304,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2033,
     "fields": {
       "status": "p",
@@ -1345,7 +1345,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2034,
     "fields": {
       "status": "p",
@@ -1389,7 +1389,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2035,
     "fields": {
       "status": "p",
@@ -1428,7 +1428,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2036,
     "fields": {
       "status": "p",
@@ -1458,7 +1458,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2037,
     "fields": {
       "status": "p",
@@ -1493,7 +1493,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2038,
     "fields": {
       "status": "p",
@@ -1531,7 +1531,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2039,
     "fields": {
       "status": "p",
@@ -1572,7 +1572,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2040,
     "fields": {
       "status": "p",
@@ -1612,7 +1612,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2041,
     "fields": {
       "status": "p",
@@ -1657,7 +1657,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2042,
     "fields": {
       "status": "p",
@@ -1688,7 +1688,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2043,
     "fields": {
       "status": "p",
@@ -1724,7 +1724,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2044,
     "fields": {
       "status": "p",
@@ -1758,7 +1758,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2045,
     "fields": {
       "status": "p",
@@ -1796,7 +1796,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2046,
     "fields": {
       "status": "p",
@@ -1837,7 +1837,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2047,
     "fields": {
       "status": "p",
@@ -1883,7 +1883,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2048,
     "fields": {
       "status": "p",
@@ -1919,7 +1919,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2049,
     "fields": {
       "status": "p",
@@ -1951,7 +1951,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2050,
     "fields": {
       "status": "p",
@@ -1987,7 +1987,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2051,
     "fields": {
       "status": "p",
@@ -2026,7 +2026,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2052,
     "fields": {
       "status": "p",
@@ -2063,7 +2063,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2053,
     "fields": {
       "status": "p",
@@ -2105,7 +2105,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2054,
     "fields": {
       "status": "p",
@@ -2143,7 +2143,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2055,
     "fields": {
       "status": "p",
@@ -2185,7 +2185,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2056,
     "fields": {
       "status": "p",
@@ -2216,7 +2216,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2057,
     "fields": {
       "status": "p",
@@ -2252,7 +2252,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2058,
     "fields": {
       "status": "p",
@@ -2291,7 +2291,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2059,
     "fields": {
       "status": "p",
@@ -2334,7 +2334,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2060,
     "fields": {
       "status": "p",
@@ -2367,7 +2367,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2061,
     "fields": {
       "status": "p",
@@ -2406,7 +2406,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2062,
     "fields": {
       "status": "p",
@@ -2448,7 +2448,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2063,
     "fields": {
       "status": "p",
@@ -2484,7 +2484,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2064,
     "fields": {
       "status": "p",
@@ -2519,7 +2519,7 @@
     }
   },
   {
-    "model": "publications.publication",
+    "model": "works.work",
     "pk": 2065,
     "fields": {
       "status": "p",

@@ -2,19 +2,19 @@ import unittest
 import django
 from django.test import TestCase
 from django.urls import reverse
-from publications.models import Publication
+from works.models import Work
 from django.contrib.gis.geos import Point, GeometryCollection
 
 @unittest.skip("Enable after /article/<doi> landing page is implemented and routed.")
 class ArticleLandingTests(TestCase):
     def setUp(self):
-        self.pub_with_geom = Publication.objects.create(
+        self.pub_with_geom = Work.objects.create(
             title="With Geom",
             doi="10.9999/with-geom",
             status="p",
             geometry=GeometryCollection(Point(7.5, 51.9)),
         )
-        self.pub_no_geom = Publication.objects.create(
+        self.pub_no_geom = Work.objects.create(
             title="No Geom",
             doi="10.9999/no-geom",
             status="p",
@@ -47,13 +47,13 @@ class ArticleLandingTests(TestCase):
     
     class ArticleLandingTests(TestCase):
         def setUp(self):
-            self.pub_with_geom = Publication.objects.create(
+            self.pub_with_geom = Work.objects.create(
                 title="With Geom",
                 doi="10.9999/with-geom",
                 status="p",
                 geometry=GeometryCollection(Point(7.5, 51.9)),
             )
-            self.pub_no_geom = Publication.objects.create(
+            self.pub_no_geom = Work.objects.create(
                 title="No Geom",
                 doi="10.9999/no-geom",
                 status="p",

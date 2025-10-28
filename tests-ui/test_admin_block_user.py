@@ -9,7 +9,7 @@ import unittest
 from django.test import TransactionTestCase, TestCase
 from helium import *
 from django.contrib.auth import get_user_model
-from publications.models import BlockedEmail, BlockedDomain
+from works.models import BlockedEmail, BlockedDomain
 from time import sleep
 
 User = get_user_model()

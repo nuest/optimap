@@ -11,7 +11,7 @@ from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 
-from publications.models import Publication, GlobalRegion
+from works.models import Work, GlobalRegion
 
 NSPS = {"atom": "http://www.w3.org/2005/Atom"}
 
@@ -33,9 +33,12 @@ class GlobalRssTests(TestCase):
     def test_georss_feed_per_region(self):
         for region in GlobalRegion.objects.all():
             slug = self.slugify(region.name)
-            url = reverse("optimap:feed-georss-by-slug", kwargs={
-                "geometry_slug": slug
-            })
+            # Use new API v1 endpoint based on region type
+            if region.region_type == 'continent':
+                url = reverse("optimap:api-continent-georss", kwargs={"continent_slug": slug})
+            else:  # ocean
+                url = reverse("optimap:api-ocean-georss", kwargs={"ocean_slug": slug})
+
             resp = self.client.get(url)
             self.assertEqual(resp.status_code, 200,
                              f"{region.name} GeoRSS feed failed")
@@ -45,14 +48,14 @@ class GlobalRssTests(TestCase):
                       for item in root.findall(".//item")]
 
             expected_titles = list(
-                Publication.objects
+                Work.objects
                 .filter(
                     status="p",
                     geometry__isnull=False,
                     geometry__intersects=region.geom
                 )
                 .order_by("-creationDate")
-                .values_list("title", flat=True)[:10]
+                .values_list("title", flat=True)
             )
 
             self.assertCountEqual(
@@ -61,26 +64,28 @@ class GlobalRssTests(TestCase):
             )
 
     def test_geoatom_feed_australia(self):
-        response = self.client.get('/feeds/geoatom/australia')
-        self.assertEqual(response.status_code, 301)
-
-        response = self.client.get('/feeds/geoatom/australia/')
+        # Use new API v1 Atom endpoint
+        url = reverse("optimap:api-continent-atom", kwargs={"continent_slug": "australia"})
+        response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
         root = ET.fromstring(response.content)
         titles = [entry.find("atom:title", namespaces=NSPS).text
                     for entry in root.findall(".//atom:entry", namespaces=NSPS)]
-        
-        self.assertEqual(len(titles), 1, "GeoRSS feed for Australia should return 1 entry")
-        self.assertEqual(titles[0], "First Australia Publication", "GeoRSS feed for Australia returned unexpected title")
+
+        self.assertEqual(len(titles), 6, "Atom feed for Australia should return 6 entries")
+        self.assertEqual(titles[0], "Migration Route: Asia to Australia", "Atom feed for Australia returned unexpected title")
 
     def test_georss_feed_south_atlantic(self):
-        response = self.client.get('/feeds/georss/south-atlantic-ocean/')
+        # Use new API v1 GeoRSS endpoint
+        url = reverse("optimap:api-ocean-georss", kwargs={"ocean_slug": "south-atlantic-ocean"})
+        response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
         root = ET.fromstring(response.content)
         titles = [item.find("title").text
                     for item in root.findall(".//item", namespaces=NSPS)]
-        
-        self.assertEqual(len(titles), 1, "GeoRSS feed for South Atlantic Ocean should return 1 entry")
-        self.assertEqual(titles[0], "First Southern Ocean Publication", "GeoRSS feed for Australia returned unexpected title")
+
+        self.assertEqual(len(titles), 10, "GeoRSS feed for South Atlantic Ocean should return 10 entries")
+        self.assertEqual(titles[0], "Marine Biology and Oceanography of the Southern Ocean", "GeoRSS feed for South Atlantic Ocean returned unexpected first title")
+        self.assertEqual(titles[9], "Global Climate Network", "GeoRSS feed for South Atlantic Ocean returned unexpected last title")

@@ -1,7 +1,7 @@
 """Tests to verify publication status workflow compliance."""
 from django.test import TestCase
 from django.contrib.gis.geos import Point, GeometryCollection
-from publications.models import Publication, Source, STATUS_CHOICES
+from works.models import Work, Source, STATUS_CHOICES
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -48,7 +48,7 @@ class StatusWorkflowComplianceTests(TestCase):
 
     def test_harvested_status_visibility(self):
         """Harvested publications should not be visible to non-admin users."""
-        pub = Publication.objects.create(
+        pub = Work.objects.create(
             title='Harvested Publication',
             status='h',
             doi='10.1234/harvested',
@@ -66,7 +66,7 @@ class StatusWorkflowComplianceTests(TestCase):
 
     def test_contributed_status_visibility(self):
         """Contributed publications should not be visible to non-admin users."""
-        pub = Publication.objects.create(
+        pub = Work.objects.create(
             title='Contributed Publication',
             status='c',
             doi='10.1234/contributed',
@@ -85,7 +85,7 @@ class StatusWorkflowComplianceTests(TestCase):
 
     def test_published_status_visibility(self):
         """Published publications should be visible to all users."""
-        pub = Publication.objects.create(
+        pub = Work.objects.create(
             title='Published Publication',
             status='p',
             doi='10.1234/published',
@@ -99,7 +99,7 @@ class StatusWorkflowComplianceTests(TestCase):
 
     def test_draft_status_visibility(self):
         """Draft publications should not be visible to non-admin users."""
-        pub = Publication.objects.create(
+        pub = Work.objects.create(
             title='Draft Publication',
             status='d',
             doi='10.1234/draft',
@@ -117,7 +117,7 @@ class StatusWorkflowComplianceTests(TestCase):
 
     def test_testing_status_visibility(self):
         """Testing publications should not be visible to non-admin users."""
-        pub = Publication.objects.create(
+        pub = Work.objects.create(
             title='Testing Publication',
             status='t',
             doi='10.1234/testing',
@@ -135,7 +135,7 @@ class StatusWorkflowComplianceTests(TestCase):
 
     def test_withdrawn_status_visibility(self):
         """Withdrawn publications should not be visible to non-admin users."""
-        pub = Publication.objects.create(
+        pub = Work.objects.create(
             title='Withdrawn Publication',
             status='w',
             doi='10.1234/withdrawn',
@@ -159,7 +159,7 @@ class StatusWorkflowComplianceTests(TestCase):
         for status_code, status_name in [('d', 'Draft'), ('p', 'Published'),
                                          ('t', 'Testing'), ('w', 'Withdrawn'),
                                          ('c', 'Contributed')]:
-            pub = Publication.objects.create(
+            pub = Work.objects.create(
                 title=f'{status_name} Publication',
                 status=status_code,
                 doi=f'10.1234/{status_code}',
@@ -180,7 +180,7 @@ class StatusWorkflowComplianceTests(TestCase):
         """API should only return published publications to non-admin users."""
         # Create one of each status
         for status_code, status_name in STATUS_CHOICES:
-            Publication.objects.create(
+            Work.objects.create(
                 title=f'{status_name} Publication',
                 status=status_code,
                 doi=f'10.1234/{status_code}',
@@ -189,7 +189,7 @@ class StatusWorkflowComplianceTests(TestCase):
             )
 
         # Non-admin request
-        response = self.client.get('/api/v1/publications/')
+        response = self.client.get('/api/v1/works/')
         self.assertEqual(response.status_code, 200)
         data = response.json()
 
@@ -199,7 +199,7 @@ class StatusWorkflowComplianceTests(TestCase):
 
     def test_unpublish_creates_draft_status(self):
         """Unpublishing should change status from Published to Draft."""
-        pub = Publication.objects.create(
+        pub = Work.objects.create(
             title='Published Publication',
             status='p',
             doi='10.1234/published',
