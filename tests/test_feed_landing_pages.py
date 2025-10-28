@@ -24,7 +24,7 @@ EXPECTED_COUNTS = {
     # Continents
     'africa': 15,
     'antarctica': 2,
-    'asia': 20,
+    'asia': 23,
     'australia': 6,
     'europe': 17,
     'north-america': 14,

@@ -16,7 +16,7 @@
     <div class="col-md-10 col-lg-8 py-5">
       <h1 class="py-2">{{ region.name }} - Latest works</h1>
 
-      <p class="lead">Research works with geographic data from {{ region.name }} ({{ region_type }}).</p>
+      <p class="lead">{{ works|length }} research work{{ works|length|pluralize }} with geographic metadata for {{ region.name }} ({{ region_type }}).</p>
 
       <div class="alert alert-info" role="alert">
         <i class="fas fa-rss"></i>
@@ -28,11 +28,6 @@
       {% if works %}
         <!-- Map showing all works -->
         <div id="feed-map" style="height: 540px; width: 100%; margin-bottom: 2rem; border-radius: 8px;"></div>
-
-        <div class="alert alert-secondary" role="alert">
-          <i class="fas fa-info-circle"></i>
-          Showing {{ works|length }} publication{{ works|length|pluralize }} from {{ region.name }}.
-        </div>
 
         <div class="publication-grid">
           {% for work in works %}
@@ -112,7 +107,7 @@
       <div class="mt-5">
         <h3>About this feed</h3>
         <p>
-          This page shows the latest research publications with geographic data from {{ region.name }}.
+          This page shows the latest research publications with geographic metadata from {{ region.name }}.
           The data is cached and updated periodically. To force a refresh, add <code>?now</code> to the URL.
         </p>
         <p>

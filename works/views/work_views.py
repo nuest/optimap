@@ -28,9 +28,24 @@ def contribute(request):
     """
     Page showing harvested publications that need spatial or temporal extent contributions.
     Displays publications with Harvested status that are missing geometry or temporal extent.
+
+    Supports pagination with user-selectable page size.
     """
     from django.contrib.gis.geos import GeometryCollection
     from django.db.models import Q
+    from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+
+    # Get page size from request or use default
+    page_size = request.GET.get('size', settings.WORKS_PAGE_SIZE_DEFAULT)
+    try:
+        page_size = int(page_size)
+        # Clamp page size within allowed limits
+        page_size = max(settings.WORKS_PAGE_SIZE_MIN, min(page_size, settings.WORKS_PAGE_SIZE_MAX))
+    except (ValueError, TypeError):
+        page_size = settings.WORKS_PAGE_SIZE_DEFAULT
+
+    # Get page number from request
+    page_number = request.GET.get('page', 1)
 
     # Get publications that are harvested and missing spatial OR temporal extent
     publications_query = Work.objects.filter(
@@ -42,13 +57,22 @@ def contribute(request):
         Q(timeperiod_enddate__isnull=True)      # NULL end date
     ).order_by('-creationDate')
 
-    total_count = publications_query.count()
-    # Limit to first 20 for performance (no pagination)
-    publications_needing_contribution = publications_query[:20]
+    # Create paginator
+    paginator = Paginator(publications_query, page_size)
+
+    try:
+        page_obj = paginator.page(page_number)
+    except PageNotAnInteger:
+        page_obj = paginator.page(1)
+    except EmptyPage:
+        page_obj = paginator.page(paginator.num_pages)
 
     context = {
-        'works': publications_needing_contribution,
-        'total_count': total_count,
+        'works': page_obj,
+        'page_obj': page_obj,
+        'page_size': page_size,
+        'page_size_options': settings.WORKS_PAGE_SIZE_OPTIONS,
+        'total_count': paginator.count,
     }
     return render(request, 'contribute.html', context)
 

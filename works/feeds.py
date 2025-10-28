@@ -387,7 +387,7 @@ class GlobalGeoFeed(BaseCachedGeoFeed):
     def title(self):
         """Return feed title."""
         variant = self.feed_type_variant.upper()
-        return f"OPTIMAP - Latest works ({variant})"
+        return f"OPTIMAP - Latest works"
 
     def link(self):
         """Return feed link."""
@@ -395,7 +395,7 @@ class GlobalGeoFeed(BaseCachedGeoFeed):
 
     def description(self):
         """Return feed description."""
-        return "Latest research works with geographic data from OPTIMAP."
+        return "Latest research works with geographic metadata from OPTIMAP."
 
     def items(self):
         """Return feed items."""
@@ -432,7 +432,7 @@ class RegionalGeoFeed(BaseCachedGeoFeed):
         """Return feed title with region name."""
         variant = self.feed_type_variant.upper()
         region_type = obj.get_region_type_display()
-        return f"OPTIMAP - {obj.name} ({region_type}) - Latest works ({variant})"
+        return f"OPTIMAP - {obj.name} ({region_type}) - Latest works"
 
     def link(self, obj):
         """Return feed link."""
@@ -442,7 +442,7 @@ class RegionalGeoFeed(BaseCachedGeoFeed):
         """Return feed description with region name."""
         region_type = obj.get_region_type_display()
         return (
-            f"Latest research works with geographic data from {obj.name} "
+            f"Latest research works with geographic metadata from {obj.name} "
             f"({region_type}) on OPTIMAP."
         )
 

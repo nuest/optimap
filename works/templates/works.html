@@ -211,7 +211,7 @@
             <dt class="col-sm-8">Published works:</dt>
             <dd class="col-sm-4 text-right">{{ statistics.published_works|default:"0" }}</dd>
 
-            <dt class="col-sm-8">With geographic data:</dt>
+            <dt class="col-sm-8">With geographic metadata:</dt>
             <dd class="col-sm-4 text-right">{{ statistics.with_geometry|default:"0" }}</dd>
 
             <dt class="col-sm-8">With temporal extent:</dt>
@@ -239,7 +239,7 @@
           <div class="alert alert-info">
             <strong>Complete metadata coverage:</strong>
             {{ statistics.with_complete_metadata|default:"0" }} works ({{ statistics.complete_percentage|default:"0" }}%)
-            have geographic data, temporal extent, and author information.
+            have geographic metadata, temporal extent, and author information.
           </div>
         </div>
       </div>

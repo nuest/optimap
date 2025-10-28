@@ -64,6 +64,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Contribution page pagination** - Added full pagination support to the contribution page (`/contribute/`) with:
+  - Configurable page size (default 50, min 10, max 200 works per page)
+  - User-selectable page size dropdown with automatic form submission
+  - Full pagination controls at top and bottom (First, Previous, page numbers, Next, Last)
+  - Shows current range (e.g., "Showing 1 to 50 of 150 works")
+  - Fixed variable name bugs (`publication` → `work` throughout template)
+  - Reuses the same pagination layout as works listing page for consistency
 - **Model terminology alignment** - Renamed base entity from "publications" to "works" throughout the codebase to align with [OpenAlex terminology](https://docs.openalex.org/api-entities/works):
   - Django app renamed from `publications/` to `works/`
   - `Publication` model renamed to `Work`
