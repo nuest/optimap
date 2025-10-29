@@ -27,7 +27,7 @@ class AccountDeletionUITest(unittest.TestCase):
         cache.set(f"user_delete_token_{self.delete_token}", self.user.id, timeout=600)  
 
         # Start browser
-        self.browser = start_firefox("http://localhost:8000", headless=False)
+        self.browser = start_firefox("http://localhost:8000", headless=True)
 
     def test_delete_account(self):
 

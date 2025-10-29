@@ -16,9 +16,9 @@ function publicationPopup(feature, layer) {
 
     // Add link to work landing page
     if (p.doi) {
-      html += `<div style="margin-bottom: 10px;"><a href="/work/${encodeURIComponent(p.doi)}/" class="btn btn-sm btn-primary" style="color: white; text-decoration: none; padding: 5px 10px; border-radius: 3px; display: inline-block;">View Publication Details</a></div>`;
+      html += `<div style="margin-bottom: 10px;"><a href="/work/${encodeURIComponent(p.doi)}/" class="btn btn-sm btn-primary" style="color: white; text-decoration: none; padding: 5px 10px; border-radius: 3px; display: inline-block;">View work details</a></div>`;
     } else if (p.id) {
-      html += `<div style="margin-bottom: 10px;"><a href="/work/${p.id}/" class="btn btn-sm btn-primary" style="color: white; text-decoration: none; padding: 5px 10px; border-radius: 3px; display: inline-block;">View Publication Details</a></div>`;
+      html += `<div style="margin-bottom: 10px;"><a href="/work/${p.id}/" class="btn btn-sm btn-primary" style="color: white; text-decoration: none; padding: 5px 10px; border-radius: 3px; display: inline-block;">View work details</a></div>`;
     }
   }
 
@@ -78,9 +78,9 @@ function publicationPopup(feature, layer) {
   // Abstract
   if (p.abstract) html += `<div><p>${p.abstract}</p></div>`;
 
-  // Article link
+  // Work source link
   if (p.url) {
-    html += `<div><a href="${p.url}" target="_blank"><i class="fas fa-external-link-alt"></i> Visit Article</a></div>`;
+    html += `<div><a href="${p.url}" target="_blank"><i class="fas fa-external-link-alt"></i> Visit work</a></div>`;
   }
 
   // OpenAlex link

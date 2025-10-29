@@ -4,7 +4,7 @@ from helium import *
 class SimpleTest(TestCase):
 
     def test_map_page(self):
-        start_chrome('localhost:8000/map/', headless=True)
+        start_chrome('localhost:8000/', headless=True)
 
         get_driver().save_screenshot(r'tests-ui/screenshots/map.png')
 

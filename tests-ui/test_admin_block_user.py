@@ -33,7 +33,7 @@ class AdminBlockUserTests(TestCase):
         )
         self.test_user.save()
 
-        self.kill_existing_firefox_processes()
+        #self.kill_existing_firefox_processes()
         try:
             self.browser = start_chrome("http://localhost:8000/admin/", headless=True)
         except Exception as e:

@@ -6,7 +6,7 @@ import os
 
 class PrivacypageTests(TestCase):
     def test_privacy_link(self):
-        start_chrome('localhost:8000/')
+        start_chrome('localhost:8000/', headless=True)
         click("privacy")    
         get_driver().save_screenshot(os.path.join(os.getcwd(), 'tests-ui', 'screenshots', 'privacy.png'))
         kill_browser()

@@ -428,9 +428,9 @@ class MapInteractionManager {
       html += `<h3 style="margin: 0 0 10px 0; font-size: 16px;">${properties.title}</h3>`;
 
       if (properties.doi) {
-        html += `<div style="margin-bottom: 10px;"><a href="/work/${encodeURIComponent(properties.doi)}/" class="btn btn-sm btn-primary" style="color: white; text-decoration: none; padding: 5px 10px; border-radius: 3px; display: inline-block; background: #158F9B; border: none;">View Publication Details</a></div>`;
+        html += `<div style="margin-bottom: 10px;"><a href="/work/${encodeURIComponent(properties.doi)}/" class="btn btn-sm btn-primary" style="color: white; text-decoration: none; padding: 5px 10px; border-radius: 3px; display: inline-block; background: #158F9B; border: none;">View work details</a></div>`;
       } else if (featureId) {
-        html += `<div style="margin-bottom: 10px;"><a href="/work/${featureId}/" class="btn btn-sm btn-primary" style="color: white; text-decoration: none; padding: 5px 10px; border-radius: 3px; display: inline-block; background: #158F9B; border: none;">View Publication Details</a></div>`;
+        html += `<div style="margin-bottom: 10px;"><a href="/work/${featureId}/" class="btn btn-sm btn-primary" style="color: white; text-decoration: none; padding: 5px 10px; border-radius: 3px; display: inline-block; background: #158F9B; border: none;">View work details</a></div>`;
       }
     }
 
@@ -480,9 +480,9 @@ class MapInteractionManager {
       html += `<div style="margin-top: 10px;"><p style="margin: 0;">${properties.abstract}</p></div>`;
     }
 
-    // Article link
+    // Work source link
     if (properties.url) {
-      html += `<div style="margin-top: 8px;"><a href="${properties.url}" target="_blank"><i class="fas fa-external-link-alt"></i> Visit Article</a></div>`;
+      html += `<div style="margin-top: 8px;"><a href="${properties.url}" target="_blank"><i class="fas fa-external-link-alt"></i> Visit work</a></div>`;
     }
 
     // OpenAlex link

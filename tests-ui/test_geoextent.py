@@ -37,11 +37,11 @@ class GeoextentPageTests(TestCase):
     def test_template_content(self):
         """Test that the page contains expected content."""
         response = self.client.get(reverse("optimap:geoextent"))
-        self.assertContains(response, "Geoextent Extraction")
-        self.assertContains(response, "Upload Files")
-        self.assertContains(response, "Remote Resource")
-        self.assertContains(response, "Browse Files...")
-        self.assertContains(response, "Extract Extent")
+        self.assertContains(response, "Geoextent extraction")
+        self.assertContains(response, "Upload files")
+        self.assertContains(response, "Remote resources")
+        self.assertContains(response, "Browse files...")
+        self.assertContains(response, "Add extent to map")
 
     def test_page_has_file_upload_form(self):
         """Test that the page has file upload form elements."""
@@ -49,7 +49,7 @@ class GeoextentPageTests(TestCase):
         self.assertContains(response, 'id="file-upload-form"')
         self.assertContains(response, 'id="browse-files-btn"')
         self.assertContains(response, 'id="files"')
-        self.assertContains(response, 'id="extract-files-btn"')
+        self.assertContains(response, 'id="add-extent-btn"')
 
     def test_page_has_remote_resource_form(self):
         """Test that the page has remote resource form elements."""
@@ -72,8 +72,8 @@ class GeoextentPageTests(TestCase):
     def test_page_has_documentation_section(self):
         """Test that the page has documentation section."""
         response = self.client.get(reverse("optimap:geoextent"))
-        self.assertContains(response, "Supported File Formats")
-        self.assertContains(response, "Supported Repository Providers")
+        self.assertContains(response, "Supported file formats")
+        self.assertContains(response, "Supported repository providers")
         self.assertContains(response, "geoextent")  # Should show version
 
     def test_page_displays_geoextent_version(self):
@@ -115,7 +115,7 @@ class GeoextentUIInteractionTests(TestCase):
             self.assertIn("OPTIMAP", driver.title)
 
             # Check main heading exists
-            self.assertTrue(Text("Geoextent Extraction").exists())
+            self.assertTrue(Text("Geoextent extraction").exists())
 
             # Take screenshot
             driver.save_screenshot(
@@ -129,11 +129,11 @@ class GeoextentUIInteractionTests(TestCase):
         try:
             start_chrome(f'{self.base_url}/geoextent/', headless=True)
 
-            # Check default tab is Upload Files
-            self.assertTrue(Text("Browse Files...").exists())
+            # Check default tab is Upload files
+            self.assertTrue(Text("Browse files...").exists())
 
-            # Click Remote Resource tab
-            click("Remote Resource")
+            # Click Remote resources tab
+            click("Remote resources")
 
             # Wait for tab content to appear
             wait_until(lambda: Text("Resource Identifiers").exists(), timeout_secs=5)
@@ -154,11 +154,11 @@ class GeoextentUIInteractionTests(TestCase):
             start_chrome(f'{self.base_url}/geoextent/', headless=True)
 
             # Check browse button exists
-            self.assertTrue(Button("Browse Files...").exists())
+            self.assertTrue(Button("Browse files...").exists())
 
             # Check extract button exists and is disabled initially
             driver = get_driver()
-            extract_btn = driver.find_element("id", "extract-files-btn")
+            extract_btn = driver.find_element("id", "add-extent-btn")
             self.assertTrue(extract_btn.get_attribute("disabled"))
 
         finally:
@@ -169,24 +169,17 @@ class GeoextentUIInteractionTests(TestCase):
         try:
             start_chrome(f'{self.base_url}/geoextent/', headless=True)
 
-            # Switch to Remote Resource tab
-            click("Remote Resource")
-            wait_until(lambda: Text("Resource Identifiers").exists(), timeout_secs=5)
+            # Switch to Remote resources tab
+            click("Remote resources")
+            wait_until(lambda: Text("Resource identifiers").exists(), timeout_secs=5)
 
             # Try to submit without entering identifier
-            # Note: The form submission button in remote tab
-            buttons = find_all(Button)
-            submit_button = None
-            for btn in buttons:
-                if "Extract Extent" in btn.web_element.text:
-                    submit_button = btn
-                    break
-
-            if submit_button:
-                click(submit_button)
-
-                # Wait for error message (should appear)
-                wait_until(lambda: Text("Error").exists() or True, timeout_secs=2)
+            # Try to submit - should show validation error from browser
+            # The "Add extent to map" button should be disabled when no identifier is entered
+            driver = get_driver()
+            submit_btn = driver.find_element("id", "add-extent-btn")
+            # Button should be disabled if no files/identifiers selected
+            self.assertTrue(submit_btn.get_attribute("disabled"))
 
         finally:
             kill_browser()
@@ -197,12 +190,12 @@ class GeoextentUIInteractionTests(TestCase):
             start_chrome(f'{self.base_url}/geoextent/', headless=True)
 
             # Check all option labels exist
-            self.assertTrue(Text("Bounding Box").exists())
-            self.assertTrue(Text("Time Box").exists())
-            self.assertTrue(Text("Convex Hull").exists())
-            self.assertTrue(Text("Place Name").exists())
-            self.assertTrue(Text("Output Format").exists())
-            self.assertTrue(Text("Gazetteer Service").exists())
+            self.assertTrue(Text("Bounding box").exists())
+            self.assertTrue(Text("Time box").exists())
+            self.assertTrue(Text("Convex hull").exists())
+            self.assertTrue(Text("Place name").exists())
+            self.assertTrue(Text("Output format").exists())
+            self.assertTrue(Text("Gazetteer service").exists())
 
             # Take screenshot of options
             get_driver().save_screenshot(
@@ -221,9 +214,9 @@ class GeoextentUIInteractionTests(TestCase):
             driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
 
             # Check documentation headers exist
-            self.assertTrue(Text("Documentation & Supported Formats").exists())
-            self.assertTrue(Text("Supported File Formats").exists())
-            self.assertTrue(Text("Supported Repository Providers").exists())
+            self.assertTrue(Text("Documentation & supported formats").exists())
+            self.assertTrue(Text("Supported file formats").exists())
+            self.assertTrue(Text("Supported repository providers").exists())
 
             # Take screenshot of documentation section
             driver.save_screenshot(
@@ -245,7 +238,7 @@ class GeoextentUIInteractionTests(TestCase):
             click("Geoextent")
 
             # Wait for page to load
-            wait_until(lambda: Text("Geoextent Extraction").exists(), timeout_secs=5)
+            wait_until(lambda: Text("Geoextent extraction").exists(), timeout_secs=5)
 
             # Check URL changed
             self.assertIn("geoextent", driver.current_url)
