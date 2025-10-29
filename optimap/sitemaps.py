@@ -19,7 +19,7 @@ class WorksSitemap(Sitemap): # based on django.contrib.sitemaps.GenericSitemap
         """Return the URL path for a work (without domain)."""
         # Return only the path, not the full URL (Django's sitemap adds domain)
         if item.doi:
-            return reverse("optimap:article-landing", args=[item.doi])
+            return reverse("optimap:work-landing", args=[item.doi])
         else:
             return f"/work/{item.id}/"
 

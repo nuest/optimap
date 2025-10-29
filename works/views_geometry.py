@@ -224,41 +224,71 @@ def unpublish_work_by_id(request, work_id):
 # DOI-based views (wrappers that translate DOI to ID)
 
 @require_POST
-def contribute_geometry(request, doi):
+def contribute_geometry(request, identifier):
     """
-    API endpoint for users to contribute geometry to a work by DOI.
-    Wrapper that translates DOI to ID and delegates to contribute_geometry_by_id.
+    API endpoint for users to contribute geometry to a work by various identifiers.
+
+    Tries to resolve the identifier in this order:
+    1. DOI (if identifier contains '/' or starts with '10.')
+    2. Internal database ID (if identifier is numeric)
+    3. Handle (placeholder for future implementation)
+
+    Delegates to contribute_geometry_by_id after resolving the identifier.
     """
+    from works.utils.identifiers import get_work_by_identifier
+    from django.http import Http404
+
     try:
-        work = Work.objects.get(doi=doi)
-        return contribute_geometry_by_id(request, work.id)
-    except Work.DoesNotExist:
+        work = get_work_by_identifier(identifier)
+    except Http404:
         return JsonResponse({'error': 'Work not found'}, status=404)
+
+    return contribute_geometry_by_id(request, work.id)
 
 
 @staff_member_required
 @require_POST
-def publish_work(request, doi):
+def publish_work(request, identifier):
     """
-    API endpoint for admins to publish a work by DOI.
-    Wrapper that translates DOI to ID and delegates to publish_work_by_id.
+    API endpoint for admins to publish a work by various identifiers.
+
+    Tries to resolve the identifier in this order:
+    1. DOI (if identifier contains '/' or starts with '10.')
+    2. Internal database ID (if identifier is numeric)
+    3. Handle (placeholder for future implementation)
+
+    Delegates to publish_work_by_id after resolving the identifier.
     """
+    from works.utils.identifiers import get_work_by_identifier
+    from django.http import Http404
+
     try:
-        work = Work.objects.get(doi=doi)
-        return publish_work_by_id(request, work.id)
-    except Work.DoesNotExist:
+        work = get_work_by_identifier(identifier)
+    except Http404:
         return JsonResponse({'error': 'Work not found'}, status=404)
+
+    return publish_work_by_id(request, work.id)
 
 
 @staff_member_required
 @require_POST
-def unpublish_work(request, doi):
+def unpublish_work(request, identifier):
     """
-    API endpoint for admins to unpublish a work by DOI.
-    Wrapper that translates DOI to ID and delegates to unpublish_work_by_id.
+    API endpoint for admins to unpublish a work by various identifiers.
+
+    Tries to resolve the identifier in this order:
+    1. DOI (if identifier contains '/' or starts with '10.')
+    2. Internal database ID (if identifier is numeric)
+    3. Handle (placeholder for future implementation)
+
+    Delegates to unpublish_work_by_id after resolving the identifier.
     """
+    from works.utils.identifiers import get_work_by_identifier
+    from django.http import Http404
+
     try:
-        work = Work.objects.get(doi=doi)
-        return unpublish_work_by_id(request, work.id)
-    except Work.DoesNotExist:
+        work = get_work_by_identifier(identifier)
+    except Http404:
         return JsonResponse({'error': 'Work not found'}, status=404)
+
+    return unpublish_work_by_id(request, work.id)

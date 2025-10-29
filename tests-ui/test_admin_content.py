@@ -23,14 +23,30 @@ User = get_user_model()
 
 
 def get_work_from_api():
-    """Helper function to get a work (id, doi) from the API instead of database."""
+    """
+    Helper function to get a work (id, doi) from the API instead of database.
+    Returns the first published work found, preferring works with DOI.
+    Returns identifier field that can be used in URLs (either DOI or ID).
+    """
     response = requests.get('http://localhost:8000/api/v1/works/', timeout=5)
     if response.status_code == 200:
         data = response.json()
         if data.get('results') and len(data['results']) > 0:
             work = data['results']['features'][0]
-            return {'id': work.get('id'), 'doi': work.get('properties').get('doi'), 'title': work.get('properties').get('title')}
-    
+            work_id = work.get('id')
+            work_doi = work.get('properties').get('doi')
+            work_title = work.get('properties').get('title')
+
+            # Use DOI as identifier if available, otherwise use ID
+            identifier = work_doi if work_doi else str(work_id)
+
+            return {
+                'id': work_id,
+                'doi': work_doi,
+                'title': work_title,
+                'identifier': identifier  # Can be used in /work/<identifier>/ URLs
+            }
+    return None
 
 class AdminContentVisibilityTests(TestCase):
     """Test that admin-only content is properly restricted."""
@@ -144,9 +160,12 @@ class AdminButtonsBrowserTests(TestCase):
 
         # Get work from API instead of database
         work_data = get_work_from_api()
+        if not work_data or not work_data.get('identifier'):
+            self.skipTest('No works available via API')
 
         try:
-            start_chrome(f'localhost:8000/work/{work_data["doi"]}/', headless=True)
+            # Use the unified identifier (DOI or ID)
+            start_chrome(f'localhost:8000/work/{work_data["identifier"]}/', headless=True)
             driver = get_driver()
 
             # Wait for page to load

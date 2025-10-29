@@ -185,12 +185,22 @@ class GeoextentUIInteractionTests(TestCase):
             kill_browser()
 
     def test_extraction_options_visible(self):
-        """Test that all extraction options are visible."""
+        """Test that all extraction options are visible after clicking on the options link."""
         try:
             start_chrome(f'{self.base_url}/geoextent/', headless=True)
 
+            self.assertFalse(Text("Bounding box").exists())
+            self.assertFalse(Text("Bounding box").exists())
+            self.assertFalse(Text("Time box").exists())
+            self.assertFalse(Text("Convex hull").exists())
+            self.assertFalse(Text("Place name").exists())
+            self.assertFalse(Text("Output format").exists())
+            self.assertFalse(Text("Gazetteer service").exists())
+
+            click("Extraction options")
+
             # Check all option labels exist
-            self.assertTrue(Text("Bounding box").exists())
+            wait_until(lambda: Text("Bounding box").exists(), timeout_secs=5)
             self.assertTrue(Text("Time box").exists())
             self.assertTrue(Text("Convex hull").exists())
             self.assertTrue(Text("Place name").exists())
@@ -225,14 +235,10 @@ class GeoextentUIInteractionTests(TestCase):
         finally:
             kill_browser()
 
-    def test_footer_link_navigates_to_geoextent(self):
-        """Test that clicking geoextent link in footer navigates to the page."""
+    def test_sitemap_link_navigates_to_geoextent(self):
+        """Test that clicking geoextent link on the user sitemap navigates to the page."""
         try:
-            start_chrome(f'{self.base_url}/', headless=True)
-
-            # Scroll to footer
-            driver = get_driver()
-            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            start_chrome(f'{self.base_url}/pages/', headless=True)
 
             # Click geoextent link in footer
             click("Geoextent")
@@ -241,6 +247,7 @@ class GeoextentUIInteractionTests(TestCase):
             wait_until(lambda: Text("Geoextent extraction").exists(), timeout_secs=5)
 
             # Check URL changed
+            driver = get_driver()
             self.assertIn("geoextent", driver.current_url)
 
         finally:

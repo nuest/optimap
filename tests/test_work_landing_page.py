@@ -419,3 +419,129 @@ class PublicationStatusVisibilityTest(TestCase):
         self.assertIn(self.pub_testing, queryset)
         self.assertIn(self.pub_withdrawn, queryset)
         self.assertIn(self.pub_harvested, queryset)
+
+
+class MultipleIdentifierAccessTest(TestCase):
+    """Tests for accessing works by various identifier types (DOI, ID, future: handle)."""
+
+    def setUp(self):
+        self.client = Client()
+
+        # Create test source
+        self.source = Source.objects.create(
+            name="Test Journal",
+            url_field="https://example.com/oai",
+            homepage_url="https://example.com/journal",
+            issn_l="1234-5678"
+        )
+
+        # Create a work with DOI
+        self.work_with_doi = Work.objects.create(
+            title="Work with DOI",
+            abstract="This work has a DOI",
+            url="https://example.com/work1",
+            status="p",
+            doi="10.1234/test-doi",
+            publicationDate=now() - timedelta(days=30),
+            geometry=GeometryCollection(Point(12.4924, 41.8902)),
+            source=self.source
+        )
+
+        # Create a work without DOI
+        self.work_without_doi = Work.objects.create(
+            title="Work without DOI",
+            abstract="This work has no DOI",
+            url="https://example.com/work2",
+            status="p",
+            publicationDate=now() - timedelta(days=20),
+            geometry=GeometryCollection(Point(13.4050, 52.5200)),
+            source=self.source
+        )
+
+    def test_access_work_by_doi(self):
+        """Test that a work can be accessed by its DOI."""
+        response = self.client.get(f'/work/{self.work_with_doi.doi}/')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.work_with_doi.title)
+        self.assertContains(response, self.work_with_doi.doi)
+
+    def test_access_work_by_internal_id(self):
+        """Test that a work can be accessed by its internal ID."""
+        response = self.client.get(f'/work/{self.work_with_doi.id}/')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.work_with_doi.title)
+
+    def test_access_work_without_doi_by_id(self):
+        """Test that a work without DOI can be accessed by its internal ID."""
+        response = self.client.get(f'/work/{self.work_without_doi.id}/')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.work_without_doi.title)
+        # Should not show DOI link since work has no DOI
+        self.assertNotContains(response, 'https://doi.org/')
+
+    def test_work_with_doi_prefers_doi_identifier(self):
+        """Test that DOI is detected correctly even if ID could also match."""
+        # DOI starts with "10." so should be detected as DOI
+        response = self.client.get(f'/work/{self.work_with_doi.doi}/')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.work_with_doi.title)
+
+    def test_numeric_id_resolves_correctly(self):
+        """Test that numeric IDs are handled correctly."""
+        # Access by numeric ID
+        response = self.client.get(f'/work/{self.work_with_doi.id}/')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.work_with_doi.title)
+
+    def test_invalid_identifier_returns_404(self):
+        """Test that an invalid identifier returns 404."""
+        response = self.client.get('/work/99999999/')  # Non-existent ID
+        self.assertEqual(response.status_code, 404)
+
+        response = self.client.get('/work/10.9999/nonexistent/')  # Non-existent DOI
+        self.assertEqual(response.status_code, 404)
+
+    def test_work_without_doi_title_format(self):
+        """Test that works without DOI have correct title format (no DOI in parentheses)."""
+        response = self.client.get(f'/work/{self.work_without_doi.id}/')
+        self.assertEqual(response.status_code, 200)
+
+        # Extract the title tag content
+        content = response.content.decode('utf-8')
+
+        # Should have title without DOI
+        self.assertIn(f'<title>{self.work_without_doi.title} - OPTIMAP</title>', content)
+
+        # Should NOT have DOI in parentheses
+        self.assertNotIn(f'({self.work_without_doi.title})', content)
+
+    def test_template_handles_null_doi(self):
+        """Test that the template correctly handles works with null DOI."""
+        response = self.client.get(f'/work/{self.work_without_doi.id}/')
+        self.assertEqual(response.status_code, 200)
+
+        # Should have title
+        self.assertContains(response, self.work_without_doi.title)
+
+        # Should NOT have DOI section
+        self.assertNotContains(response, '<strong>DOI:</strong>')
+
+        # JavaScript variables should handle empty DOI
+        self.assertContains(response, 'const doi = ""')
+        self.assertContains(response, 'const useIdUrls = true')
+
+    def test_url_encoded_doi_works(self):
+        """Test that URL-encoded DOIs are properly decoded and work."""
+        # Create work with DOI that has special characters
+        work = Work.objects.create(
+            title="Work with special DOI",
+            abstract="Test",
+            status="p",
+            doi="10.1234/test-doi/with-slash",
+            source=self.source
+        )
+
+        # Django's URL routing should handle this automatically
+        response = self.client.get(f'/work/{work.doi}/')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, work.title)

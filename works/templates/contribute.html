@@ -2,6 +2,16 @@
 
 {% block title %}Contribute Geolocation Data | {% endblock %}
 
+{% block head %}
+{{ block.super }}
+<style>
+  /* Hide search bar on contribute page (no functionality here) */
+  #navbar-search-container {
+    display: none !important;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 
 <div class="container-fluid locate-container">
@@ -134,11 +144,11 @@
 
               {% if request.user.is_authenticated %}
                 {% if work.doi %}
-                  <a href="{% url 'optimap:article-landing' work.doi %}" class="btn btn-primary btn-sm">
+                  <a href="{% url 'optimap:work-landing' work.doi %}" class="btn btn-primary btn-sm">
                     <i class="fas fa-map-marked-alt"></i> Contribute metadata
                   </a>
                 {% else %}
-                  <a href="{% url 'optimap:publication-by-id' work.id %}" class="btn btn-primary btn-sm">
+                  <a href="{% url 'optimap:work-landing' work.id %}" class="btn btn-primary btn-sm">
                     <i class="fas fa-map-marked-alt"></i> Contribute metadata
                   </a>
                 {% endif %}

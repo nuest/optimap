@@ -31,7 +31,6 @@ from .work_views import (
     contribute,
     works_list,
     work_landing,
-    work_landing_by_id,
 )
 
 from .data import (
@@ -61,7 +60,6 @@ __all__ = [
     'contribute',
     'works_list',
     'work_landing',
-    'work_landing_by_id',
     # Data exports
     'download_geojson',
     'download_geopackage',

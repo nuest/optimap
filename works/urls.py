@@ -62,17 +62,12 @@ urlpatterns = [
     path("works/", work_views.works_list, name="works"),
     path('contribute/', work_views.contribute, name="contribute"),
 
-    # ID-based URLs (for works without DOI)
-    path("work/<int:work_id>/contribute-geometry/", views_geometry.contribute_geometry_by_id, name="contribute-geometry-by-id"),
-    path("work/<int:work_id>/publish/", views_geometry.publish_work_by_id, name="publish-work-by-id"),
-    path("work/<int:work_id>/unpublish/", views_geometry.unpublish_work_by_id, name="unpublish-work-by-id"),
-    path("work/<int:work_id>/", work_views.work_landing_by_id, name="work-by-id"),
-
-    # DOI-based URLs (primary method)
-    path("work/<path:doi>/contribute-geometry/", views_geometry.contribute_geometry, name="contribute-geometry"),
-    path("work/<path:doi>/publish/", views_geometry.publish_work, name="publish-work"),
-    path("work/<path:doi>/unpublish/", views_geometry.unpublish_work, name="unpublish-work"),
-    path("work/<path:doi>/", work_views.work_landing, name="article-landing"),
+    # Unified work URLs - accepts DOI, ID, or other identifiers
+    # Note: path:identifier accepts any string including slashes (for DOIs) and numbers (for IDs)
+    path("work/<path:identifier>/contribute-geometry/", views_geometry.contribute_geometry, name="contribute-geometry"),
+    path("work/<path:identifier>/publish/", views_geometry.publish_work, name="publish-work"),
+    path("work/<path:identifier>/unpublish/", views_geometry.unpublish_work, name="unpublish-work"),
+    path("work/<path:identifier>/", work_views.work_landing, name="work-landing"),
 
     # Authentication/User management
     path("login/<str:token>", work_views.authenticate_via_magic_link, name="magic_link"),

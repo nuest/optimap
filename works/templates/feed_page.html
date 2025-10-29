@@ -35,7 +35,7 @@
               <div class="card-body">
                 <h5 class="card-title">
                   {% if work.doi %}
-                    <a href="{% url 'optimap:article-landing' work.doi %}" rel="noopener">
+                    <a href="{% url 'optimap:work-landing' work.doi %}" rel="noopener">
                       {{ work.title|truncatechars:120 }}
                     </a>
                   {% elif work.url %}
@@ -77,7 +77,7 @@
                 </small>
 
                 {% if work.doi %}
-                  <a href="{% url 'optimap:article-landing' work.doi %}" class="btn btn-primary btn-sm">
+                  <a href="{% url 'optimap:work-landing' work.doi %}" class="btn btn-primary btn-sm">
                     <i class="fas fa-map-marked-alt"></i> View work's page
                   </a>
                 {% elif work.url %}

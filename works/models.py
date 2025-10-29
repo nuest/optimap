@@ -145,7 +145,7 @@ class Work(models.Model):
         if not getattr(self, "doi", None):
             return None
         base = settings.BASE_URL.rstrip("/")
-        rel = reverse("optimap:article-landing", args=[self.doi])
+        rel = reverse("optimap:work-landing", args=[self.doi])
         return f"{base}{rel}"
     permalink.short_description = "Permalink"
 

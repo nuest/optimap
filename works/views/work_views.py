@@ -173,7 +173,7 @@ def works_list(request):
         }
 
         if work.doi:
-            work_data["href"] = reverse("optimap:article-landing", args=[work.doi])
+            work_data["href"] = reverse("optimap:work-landing", args=[work.doi])
         elif work.url:
             work_data["href"] = work.url
 
@@ -207,21 +207,26 @@ def works_list(request):
 
     return render(request, "works.html", context)
 
-def work_landing(request, doi):
+def work_landing(request, identifier):
     """
-    Landing page for a work with a DOI.
+    Landing page for a work accessed by various identifier types.
+
+    Tries to resolve the identifier in this order:
+    1. DOI (if identifier contains '/' or starts with '10.')
+    2. Internal database ID (if identifier is numeric)
+    3. Handle (placeholder for future implementation)
+
     Embeds a small Leaflet map when geometry is available.
 
     Only published works (status='p') are accessible to non-admin users.
     Admin users can view all works with a status label.
     """
+    from works.utils.identifiers import resolve_work_identifier
+
     is_admin = request.user.is_authenticated and request.user.is_staff
 
-    # Get the work
-    try:
-        work = Work.objects.get(doi=doi)
-    except Work.DoesNotExist:
-        raise Http404("Work not found.")
+    # Resolve identifier to work object
+    work, identifier_type = resolve_work_identifier(identifier)
 
     # Check access permissions
     if not is_admin and work.status != 'p':
@@ -232,7 +237,7 @@ def work_landing(request, doi):
         feature = {
             "type": "Feature",
             "geometry": json.loads(work.geometry.geojson),
-            "properties": {"title": work.title, "doi": work.doi},
+            "properties": {"title": work.title, "doi": work.doi or None},
         }
         feature_json = json.dumps(feature)
 
@@ -257,6 +262,9 @@ def work_landing(request, doi):
     # Get all Wikidata exports for admin view
     all_wikidata_exports = work.wikidata_exports.all() if is_admin else []
 
+    # Determine if we should use ID-based URLs (when work has no DOI)
+    use_id_urls = not work.doi
+
     context = {
         "work": work,
         "feature_json": feature_json,
@@ -272,74 +280,7 @@ def work_landing(request, doi):
         "show_provenance": is_admin,
         "latest_wikidata_export": latest_wikidata_export,
         "all_wikidata_exports": all_wikidata_exports,
-    }
-    return render(request, "work_landing_page.html", context)
-
-def work_landing_by_id(request, work_id):
-    """
-    Landing page for a work accessed by database ID.
-    Used for publications without a DOI.
-
-    Only published works (status='p') are accessible to non-admin users.
-    Admin users can view all works with a status label.
-    """
-    is_admin = request.user.is_authenticated and request.user.is_staff
-
-    # Get the work
-    try:
-        work = Work.objects.get(id=work_id)
-    except Work.DoesNotExist:
-        raise Http404("Work not found.")
-
-    # Check access permissions
-    if not is_admin and work.status != 'p':
-        raise Http404("Work not found.")
-
-    feature_json = None
-    if work.geometry and not work.geometry.empty:
-        feature = {
-            "type": "Feature",
-            "geometry": json.loads(work.geometry.geojson),
-            "properties": {"title": work.title, "doi": work.doi},
-        }
-        feature_json = json.dumps(feature)
-
-    # Check if geometry is missing (NULL or empty)
-    has_geometry = work.geometry and not work.geometry.empty
-
-    # Check if temporal extent is missing
-    has_temporal = bool(work.timeperiod_startdate or work.timeperiod_enddate)
-
-    # Users can contribute if work is harvested and missing either geometry or temporal extent
-    can_contribute = request.user.is_authenticated and work.status == 'h' and (not has_geometry or not has_temporal)
-
-    # Can publish if: Contributed status OR (Harvested with at least one extent type)
-    can_publish = is_admin and (work.status == 'c' or (work.status == 'h' and (has_geometry or has_temporal)))
-    can_unpublish = is_admin and work.status == 'p'  # Can unpublish published works
-
-    # Get most recent successful Wikidata export
-    latest_wikidata_export = work.wikidata_exports.filter(
-        action__in=['created', 'updated']
-    ).order_by('-export_date').first()
-
-    # Get all Wikidata exports for admin view
-    all_wikidata_exports = work.wikidata_exports.all() if is_admin else []
-
-    context = {
-        "work": work,
-        "feature_json": feature_json,
-        "timeperiod_label": _format_timeperiod(work),
-        "authors_list": _normalize_authors(work),
-        "is_admin": is_admin,
-        "status_display": work.get_status_display() if is_admin else None,
-        "has_geometry": has_geometry,
-        "has_temporal": has_temporal,
-        "can_contribute": can_contribute,
-        "can_publish": can_publish,
-        "can_unpublish": can_unpublish,
-        "show_provenance": is_admin,
-        "use_id_urls": True,  # Flag to use ID-based URLs in template
-        "latest_wikidata_export": latest_wikidata_export,
-        "all_wikidata_exports": all_wikidata_exports,
+        "use_id_urls": use_id_urls,
+        "identifier_type": identifier_type,  # Pass to template for debugging/analytics
     }
     return render(request, "work_landing_page.html", context)

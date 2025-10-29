@@ -835,7 +835,7 @@ def works_list(request):
         }
 
         if work.doi:
-            work_data["href"] = reverse("optimap:article-landing", args=[work.doi])
+            work_data["href"] = reverse("optimap:work-landing", args=[work.doi])
         elif work.url:
             work_data["href"] = work.url
 

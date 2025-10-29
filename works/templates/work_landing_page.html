@@ -250,7 +250,7 @@
     const canPublish = {{ can_publish|yesno:"true,false" }};
     const canUnpublish = {{ can_unpublish|yesno:"true,false" }};
     const hasGeometry = {{ has_geometry|yesno:"true,false" }};
-    const doi = "{{ work.doi }}";
+    const doi = "{{ work.doi|default:'' }}";
     const useIdUrls = {{ use_id_urls|default:"false"|yesno:"true,false" }};
     const pubId = {{ work.id }};
 
