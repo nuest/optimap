@@ -138,14 +138,26 @@ class Work(models.Model):
     def __str__(self):
         return self.title
 
+    def get_identifier(self) -> str:
+        """
+        Return the most suitable identifier for this work.
+        Prefers DOI if available, otherwise returns internal ID as string.
+
+        This identifier can be used in URLs, API responses, and anywhere
+        a unique work identifier is needed.
+
+        Returns:
+            str: DOI (if available) or internal ID (as string)
+        """
+        return self.doi if self.doi else str(self.id)
+
     def permalink(self) -> str | None:
         """
-        Return the absolute OPTIMAP permalink (/work/<doi>) if a DOI exists; otherwise None.
+        Return the absolute OPTIMAP permalink (/work/<identifier>).
+        Uses DOI if available, otherwise falls back to internal ID.
         """
-        if not getattr(self, "doi", None):
-            return None
         base = settings.BASE_URL.rstrip("/")
-        rel = reverse("optimap:work-landing", args=[self.doi])
+        rel = reverse("optimap:work-landing", args=[self.get_identifier()])
         return f"{base}{rel}"
     permalink.short_description = "Permalink"
 

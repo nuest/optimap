@@ -17,11 +17,7 @@ class WorksSitemap(Sitemap): # based on django.contrib.sitemaps.GenericSitemap
 
     def location(self, item):
         """Return the URL path for a work (without domain)."""
-        # Return only the path, not the full URL (Django's sitemap adds domain)
-        if item.doi:
-            return reverse("optimap:work-landing", args=[item.doi])
-        else:
-            return f"/work/{item.id}/"
+        return reverse("optimap:work-landing", args=[item.get_identifier()])
 
     def lastmod(self, item):
         """Return the last modification date of the work."""

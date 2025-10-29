@@ -368,7 +368,8 @@ class MapInteractionManager {
   showPaginatedPopup(overlapping, latlng) {
     console.log('showPaginatedPopup called with latlng:', latlng);
 
-    // Close existing popup FIRST (before setting new location)
+    // Close all existing popups FIRST (both paginated and individual)
+    this.map.closePopup();
     this.closePaginatedPopup();
 
     // Now set new state
@@ -555,6 +556,10 @@ class MapInteractionManager {
    * Show publication popup for single feature
    */
   showPublicationPopup(featureData, latlng) {
+    // Close all existing popups first (both individual and paginated)
+    this.map.closePopup();
+    this.closePaginatedPopup();
+
     // Use layer's built-in popup if it exists
     if (featureData.layer && featureData.layer.getPopup()) {
       featureData.layer.openPopup();

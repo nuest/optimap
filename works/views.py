@@ -832,12 +832,8 @@ def works_list(request):
             "doi": work.doi,
             "authors": work.authors or [],
             "source": work.source.name if work.source else None,
+            "href": reverse("optimap:work-landing", args=[work.get_identifier()]),
         }
-
-        if work.doi:
-            work_data["href"] = reverse("optimap:work-landing", args=[work.doi])
-        elif work.url:
-            work_data["href"] = work.url
 
         # Add status info for admin users
         if is_admin:
