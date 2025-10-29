@@ -26,9 +26,7 @@ from works.utils.statistics import get_cached_statistics
 
 def contribute(request):
     """
-    Page showing harvested publications that need spatial or temporal extent contributions.
-    Displays publications with Harvested status that are missing geometry or temporal extent.
-
+    Page showing harvested works that need spatial or temporal extent contributions.
     Supports pagination with user-selectable page size.
     """
     from django.contrib.gis.geos import GeometryCollection

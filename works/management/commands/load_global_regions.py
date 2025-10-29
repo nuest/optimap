@@ -28,6 +28,8 @@ class Command(BaseCommand):
     help = "Load 7 continents (Esri Hub) and 5 oceans (MarineRegions IHO) into GlobalRegion"
 
     def handle(self, *args, **options):
+        self.stdout.write(f"Looading global regions…")
+
         continents_path = os.path.join(COMMAND_DIR, CONTINENTS_FILE)
 
         if os.path.exists(continents_path):

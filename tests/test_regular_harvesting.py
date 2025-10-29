@@ -41,7 +41,7 @@ class HarvestRegularMetadataTestCase(TestCase):
         fake_response.content = b"<OAI-PMH><ListRecords></ListRecords></OAI-PMH>"
         mock_get.return_value = fake_response
 
-        def fake_parser_func(content, event, max_records=None):
+        def fake_parser_func(content, event, max_records=None, warning_collector=None):
             Work.objects.create(
                 title="Test Publication 1",
                 doi="10.1000/1",

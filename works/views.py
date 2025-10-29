@@ -132,8 +132,8 @@ def main(request):
 
 def contribute(request):
     """
-    Page showing harvested publications that need spatial or temporal extent contributions.
-    Displays publications with Harvested status that are missing geometry or temporal extent.
+    Page showing harvested works that need spatial or temporal extent contributions.
+    Displays works with harvested status that are missing geometry or temporal extent.
     """
     from django.contrib.gis.geos import GeometryCollection
     from django.db.models import Q

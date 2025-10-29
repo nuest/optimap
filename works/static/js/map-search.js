@@ -202,7 +202,7 @@ class MapSearchManager {
       if (this.isSearchActive) {
         console.log('Clearing active search...');
         this.showAllPublications();
-        this.announce('Search cleared. Showing all publications.');
+        this.announce('Search cleared. Showing all works.');
       }
       console.groupEnd();
       return;
@@ -439,7 +439,7 @@ class MapSearchManager {
   showAllPublications() {
     if (!this.map) return;
 
-    console.log('🗺️ Showing all publications...');
+    console.log('🗺️ Showing all works...');
 
     // Remove filtered layer if it exists
     if (this.filteredLayer) {
@@ -466,7 +466,7 @@ class MapSearchManager {
       const bounds = this.publicationsGroup.getBounds();
       if (bounds.isValid()) {
         this.map.fitBounds(bounds);
-        console.log('🗺️ Map fitted to all publications');
+        console.log('🗺️ Map fitted to all works');
       }
     }
 
@@ -487,7 +487,7 @@ class MapSearchManager {
     }
 
     this.showAllPublications();
-    this.announce('Search cleared. Showing all publications.');
+    this.announce('Search cleared. Showing all works.');
   }
 
   /**
@@ -517,7 +517,7 @@ class MapSearchManager {
    */
   updatePublications(publications) {
     this.allPublications = publications || [];
-    console.log(`Map search updated with ${this.allPublications.length} publications`);
+    console.log(`Map search updated with ${this.allPublications.length} works`);
 
     // If search is active, re-run search
     if (this.isSearchActive && this.searchInput && this.searchInput.value.trim().length >= this.minSearchLength) {
