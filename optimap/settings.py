@@ -71,7 +71,7 @@ INSTALLED_APPS = [
     'django.contrib.gis',
     'django.contrib.sitemaps',
     'django.contrib.humanize',
-    'publications',
+    'works',
     'rest_framework',
     'rest_framework_gis',
     'django_q',
@@ -81,7 +81,7 @@ INSTALLED_APPS = [
     'import_export',
 ]
 
-AUTH_USER_MODEL = "publications.CustomUser" 
+AUTH_USER_MODEL = "works.CustomUser" 
 
 REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
@@ -284,7 +284,7 @@ ROOT_URLCONF = 'optimap.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': ['publications/templates'],
+        'DIRS': ['works/templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -319,7 +319,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.1/ref/contrib/staticfiles/
 STATIC_ROOT = 'static/'
 STATIC_URL = '/static/'
-STATICFILES_DIRS = ['publications/static']
+STATICFILES_DIRS = ['works/static']
 
 # serve static files with Django, not with a dedicated webserver: http://whitenoise.evans.io/en/stable/django.html
 STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
@@ -367,7 +367,7 @@ LOGGING = {
             'handlers': ['console', 'mail_admins'],
             'level': env('DJANGO_LOGGING_LEVEL', default='INFO'),
         },
-        'publications': {
+        'works': {
             'handlers': ['console', 'mail_admins'],
             'level': env('OPTIMAP_LOGGING_LEVEL', default='INFO'),
         },
@@ -393,7 +393,7 @@ CSRF_TRUSTED_ORIGINS = [i.strip('[]') for i in env('CSRF_TRUSTED_ORIGINS', defau
 
 ADMINS = [('OPTIMAP', 'login@optimap.science')]
 
-FEED_MAX_ITEMS = 20
+FEED_MAX_ITEMS = 100
 
 # Gazetteer / Geocoding Settings
 # Configures the location search (gazetteer) feature on the map

@@ -1,6 +1,6 @@
 from bs4 import BeautifulSoup
 from django.test import TestCase
-from publications.tasks import extract_geometry_from_html, extract_timeperiod_from_html
+from works.tasks import extract_geometry_from_html, extract_timeperiod_from_html
 
 
 class SimpleTest(TestCase):

@@ -1,12 +1,12 @@
 from django.test import TestCase, override_settings
 from django.core import mail
 from django.conf import settings
-from publications.models import Subscription, Publication, EmailLog, UserProfile
-from publications.tasks import send_subscription_based_email
+from works.models import Subscription, Work, EmailLog, UserProfile, GlobalRegion
+from works.tasks import send_subscription_based_email
 from django.contrib.auth import get_user_model
 from django.utils.timezone import now
 from datetime import timedelta
-from django.contrib.gis.geos import Point, GeometryCollection
+from django.contrib.gis.geos import Point, GeometryCollection, Polygon, MultiPolygon
 
 User = get_user_model()
 
@@ -20,24 +20,40 @@ class SubscriptionEmailTest(TestCase):
             username="subuser", email="subuser@example.com", password="testpass"
         )
         UserProfile.objects.get_or_create(user=self.user)
+
+        # Create a test region covering Dresden area (13.7373, 51.0504)
+        # Create a bounding box around Dresden and convert to MultiPolygon
+        dresden_bbox = Polygon.from_bbox((13.5, 50.9, 13.9, 51.2))
+        dresden_multipolygon = MultiPolygon(dresden_bbox)
+        self.test_region = GlobalRegion.objects.create(
+            name="Test Dresden Region",
+            region_type=GlobalRegion.CONTINENT,  # Use CONTINENT type for test
+            geom=dresden_multipolygon,
+            source_url="http://test.example.com",
+            license="Test License"
+        )
+
+        # Create subscription with the new regions field
         self.subscription = Subscription.objects.create(
             user=self.user,
             name="Test Subscription",
             search_term="AI",
-            region=GeometryCollection(Point(12.4924, 41.8902)),
+            region=GeometryCollection(Point(13.7373, 51.0504)),  # Dresden coordinates, keep for backward compatibility
             subscribed=True
         )
+        # Add the region to the ManyToMany field
+        self.subscription.regions.add(self.test_region)
 
     def test_subscription_email_sent_when_publication_matches(self):
         """Email is sent and includes site-local permalink when a pub with DOI matches."""
-        pub = Publication.objects.create(
-            title="Rome AI Paper",
+        pub = Work.objects.create(
+            title="Dresden AI Paper",
             abstract="Test abstract",
             url="https://example.com/pub",
             status="p",
             publicationDate=now() - timedelta(days=5),
             doi="10.1234/sub-doi",
-            geometry=GeometryCollection(Point(12.4924, 41.8902)),
+            geometry=GeometryCollection(Point(13.7373, 51.0504)),  # Dresden
         )
         send_subscription_based_email(sent_by=self.user)
 
@@ -58,14 +74,14 @@ class SubscriptionEmailTest(TestCase):
 
     def test_subscription_email_fallback_to_url_when_no_doi(self):
         """Falls back to pub.url when DOI is missing."""
-        pub = Publication.objects.create(
+        pub = Work.objects.create(
             title="No DOI Sub Paper",
             abstract="Test abstract",
             url="https://example.com/no-doi-sub",
             status="p",
             publicationDate=now() - timedelta(days=2),
             doi=None,
-            geometry=GeometryCollection(Point(12.4924, 41.8902)),
+            geometry=GeometryCollection(Point(13.7373, 51.0504)),  # Dresden
         )
         mail.outbox.clear()
 
@@ -77,14 +93,14 @@ class SubscriptionEmailTest(TestCase):
 
     def test_subscription_email_not_sent_if_no_publication_matches(self):
         """No email or log if no pubs intersect the region."""
-        Publication.objects.create(
+        Work.objects.create(
             title="Outside Region Paper",
             abstract="Should not match",
             url="https://example.com/outside",
             status="p",
             publicationDate=now(),
             doi="10.1234/outside-doi",
-            geometry=GeometryCollection(Point(0, 0)),
+            geometry=GeometryCollection(Point(9.7320, 52.3759)),  # Hannover (outside Dresden region)
         )
 
         send_subscription_based_email(sent_by=self.user)

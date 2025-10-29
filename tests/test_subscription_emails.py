@@ -6,8 +6,8 @@ django.setup()
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.contrib.gis.geos import MultiPolygon, Polygon, Point, GeometryCollection
-from publications.models import Subscription, GlobalRegion, Publication, Source, EmailLog
-from publications.tasks import send_subscription_based_email
+from works.models import Subscription, GlobalRegion, Work, Source, EmailLog
+from works.tasks import send_subscription_based_email
 from unittest.mock import patch
 from django.conf import settings
 
@@ -67,7 +67,7 @@ class SubscriptionEmailTests(TestCase):
         # Create test publications in different regions
         # Publication in Africa
         africa_point = Point(5, 5)
-        self.pub_africa = Publication.objects.create(
+        self.pub_africa = Work.objects.create(
             title="African Study on Climate Change",
             doi="10.1234/africa.2024",
             status="p",  # Published
@@ -77,7 +77,7 @@ class SubscriptionEmailTests(TestCase):
 
         # Publication in Asia
         asia_point = Point(25, 25)
-        self.pub_asia = Publication.objects.create(
+        self.pub_asia = Work.objects.create(
             title="Asian Biodiversity Research",
             doi="10.1234/asia.2024",
             status="p",  # Published
@@ -87,7 +87,7 @@ class SubscriptionEmailTests(TestCase):
 
         # Publication in Pacific Ocean
         pacific_point = Point(45, 45)
-        self.pub_pacific = Publication.objects.create(
+        self.pub_pacific = Work.objects.create(
             title="Pacific Ocean Current Patterns",
             doi="10.1234/pacific.2024",
             status="p",  # Published
@@ -113,7 +113,7 @@ class SubscriptionEmailTests(TestCase):
         self.assertEqual(str(self.africa), "Africa (Continent)")
         self.assertEqual(str(self.pacific), "Pacific Ocean (Ocean)")
 
-    @patch('publications.tasks.EmailMessage')
+    @patch('works.tasks.EmailMessage')
     def test_email_sent_for_subscribed_regions(self, mock_email):
         """Test that emails are sent when publications match subscribed regions"""
         # Create subscription for Africa
@@ -140,7 +140,7 @@ class SubscriptionEmailTests(TestCase):
         self.assertIn("Africa", content)
         self.assertIn("African Study on Climate Change", content)
 
-    @patch('publications.tasks.EmailMessage')
+    @patch('works.tasks.EmailMessage')
     def test_email_grouped_by_region(self, mock_email):
         """Test that email content groups publications by region"""
         # Create subscription for multiple regions
@@ -169,7 +169,7 @@ class SubscriptionEmailTests(TestCase):
         # Pacific publication should NOT be included
         self.assertNotIn("Pacific Ocean Current Patterns", content)
 
-    @patch('publications.tasks.EmailMessage')
+    @patch('works.tasks.EmailMessage')
     def test_email_includes_region_landing_page_links(self, mock_email):
         """Test that email includes links to region landing pages"""
         subscription = Subscription.objects.create(
@@ -187,7 +187,7 @@ class SubscriptionEmailTests(TestCase):
         self.assertIn("View all publications in this region", content)
         self.assertIn("/feeds/continent/africa/", content)
 
-    @patch('publications.tasks.EmailMessage')
+    @patch('works.tasks.EmailMessage')
     def test_no_email_sent_when_no_publications(self, mock_email):
         """Test that no email is sent when there are no matching publications"""
         # Create subscription for Pacific (which has a publication)
@@ -207,7 +207,7 @@ class SubscriptionEmailTests(TestCase):
         # Verify no email was sent
         self.assertFalse(mock_email.called)
 
-    @patch('publications.tasks.EmailMessage')
+    @patch('works.tasks.EmailMessage')
     def test_no_email_sent_when_no_regions_selected(self, mock_email):
         """Test that no email is sent when user has no regions selected"""
         # Create subscription without regions
@@ -223,7 +223,7 @@ class SubscriptionEmailTests(TestCase):
         # Verify no email was sent
         self.assertFalse(mock_email.called)
 
-    @patch('publications.tasks.EmailMessage')
+    @patch('works.tasks.EmailMessage')
     def test_email_includes_manage_subscriptions_link(self, mock_email):
         """Test that email includes link to manage subscriptions"""
         subscription = Subscription.objects.create(
@@ -242,12 +242,12 @@ class SubscriptionEmailTests(TestCase):
         self.assertIn("/subscriptions", content)
         self.assertIn("Unsubscribe from all notifications", content)
 
-    @patch('publications.tasks.EmailMessage')
+    @patch('works.tasks.EmailMessage')
     def test_email_shows_correct_publication_count(self, mock_email):
         """Test that email shows correct count of publications per region"""
         # Add a second publication to Africa
         africa_point2 = Point(7, 7)
-        Publication.objects.create(
+        Work.objects.create(
             title="Another African Study",
             doi="10.1234/africa2.2024",
             status="p",
@@ -271,14 +271,14 @@ class SubscriptionEmailTests(TestCase):
         self.assertIn("2 New Publications", subject)
 
         # Check count per region
-        self.assertIn("Africa (Continent) - 2 publication(s)", content)
+        self.assertIn("Africa (Continent) - 2 work(s)", content)
 
-    @patch('publications.tasks.EmailMessage')
+    @patch('works.tasks.EmailMessage')
     def test_only_published_works_included(self, mock_email):
         """Test that only published works are included in notifications"""
         # Create a draft publication in Africa
         africa_point_draft = Point(6, 6)
-        Publication.objects.create(
+        Work.objects.create(
             title="Draft African Study",
             doi="10.1234/africa_draft.2024",
             status="d",  # Draft
@@ -302,13 +302,13 @@ class SubscriptionEmailTests(TestCase):
         # Only the published one
         self.assertIn("African Study on Climate Change", content)
 
-    @patch('publications.tasks.EmailMessage')
+    @patch('works.tasks.EmailMessage')
     def test_email_limits_publications_per_region(self, mock_email):
         """Test that email limits the number of publications shown per region"""
         # Create 15 publications in Africa (more than the 10 per region limit)
         for i in range(15):
             point = Point(5 + i * 0.1, 5 + i * 0.1)
-            Publication.objects.create(
+            Work.objects.create(
                 title=f"African Study {i+2}",
                 doi=f"10.1234/africa{i+2}.2024",
                 status="p",
@@ -340,7 +340,7 @@ class SubscriptionEmailTests(TestCase):
         )
         subscription.regions.add(self.africa)
 
-        with patch('publications.tasks.EmailMessage') as mock_email:
+        with patch('works.tasks.EmailMessage') as mock_email:
             mock_instance = mock_email.return_value
             mock_instance.send.return_value = None
 

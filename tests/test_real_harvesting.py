@@ -23,8 +23,8 @@ from django.test import TestCase
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'optimap.settings')
 django.setup()
 
-from publications.models import Publication, Source, HarvestingEvent
-from publications.tasks import harvest_oai_endpoint
+from works.models import Work, Source, HarvestingEvent
+from works.tasks import harvest_oai_endpoint
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -58,7 +58,7 @@ class RealHarvestingTest(TestCase):
 
     def tearDown(self):
         """Clean up created publications and sources."""
-        Publication.objects.filter(source__name__startswith="TEST: ").delete()
+        Work.objects.filter(source__name__startswith="TEST: ").delete()
         Source.objects.filter(name__startswith="TEST: ").delete()
 
     def _create_source(self, name, url, collection_name=None):
@@ -90,7 +90,7 @@ class RealHarvestingTest(TestCase):
         self.assertIsNotNone(event.completed_at, "Harvesting event has no completion time")
 
         # Check publications were created
-        pub_count = Publication.objects.filter(job=event).count()
+        pub_count = Work.objects.filter(job=event).count()
         self.assertGreaterEqual(
             pub_count,
             min_publications,
@@ -98,7 +98,7 @@ class RealHarvestingTest(TestCase):
         )
 
         # Check that publications have required fields
-        pubs = Publication.objects.filter(job=event)
+        pubs = Work.objects.filter(job=event)
         for pub in pubs[:5]:  # Check first 5
             self.assertTrue(
                 pub.title,
@@ -208,7 +208,7 @@ class RealHarvestingTest(TestCase):
 
         # Verify we got exactly the requested number (or slightly more due to batching)
         event = HarvestingEvent.objects.filter(source=source).latest("started_at")
-        pub_count = Publication.objects.filter(job=event).count()
+        pub_count = Work.objects.filter(job=event).count()
 
         self.assertLessEqual(
             pub_count,
@@ -232,7 +232,7 @@ class RealHarvestingTest(TestCase):
         harvest_oai_endpoint(source.id, user=self.user, max_records=20)
 
         event = HarvestingEvent.objects.filter(source=source).latest("started_at")
-        pubs = Publication.objects.filter(job=event)
+        pubs = Work.objects.filter(job=event)
 
         # Check if any publications have spatial metadata
         spatial_count = pubs.exclude(geometry__isnull=True).count()

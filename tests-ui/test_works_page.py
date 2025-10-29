@@ -9,8 +9,8 @@ from django.urls import reverse
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.conf import settings
-from publications.models import Publication, Source
-from publications.utils.statistics import update_statistics_cache, STATS_CACHE_KEY
+from works.models import Work, Source
+from works.utils.statistics import update_statistics_cache, STATS_CACHE_KEY
 
 User = get_user_model()
 
@@ -32,15 +32,15 @@ class WorksListViewTest(TestCase):
         for i in range(75):
             status = 'p' if i < 60 else 'd'
             authors = [f"Author {i}A", f"Author {i}B", f"Author {i}C", f"Author {i}D"] if i % 2 == 0 else [f"Author {i}"]
-            pub = Publication.objects.create(
-                title=f"Test Publication {i}",
+            work = Work.objects.create(
+                title=f"Test Work {i}",
                 status=status,
                 doi=f"10.1234/test.{i}" if i % 3 == 0 else None,
                 source=cls.source if i % 4 == 0 else None,
                 authors=authors,
-                abstract=f"Abstract for publication {i}" if i % 5 == 0 else None,
+                abstract=f"Abstract for work {i}" if i % 5 == 0 else None,
             )
-            cls.publications.append(pub)
+            cls.publications.append(work)
 
     def setUp(self):
         """Set up for each test"""
@@ -53,6 +53,20 @@ class WorksListViewTest(TestCase):
         response = self.client.get(reverse('optimap:works'))
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, 'works.html')
+
+    def test_works_page_settings_import(self):
+        """Test that settings are properly imported and accessible (regression test)"""
+        # This test catches the NameError: name 'settings' is not defined
+        # by verifying the view can access settings.WORKS_PAGE_SIZE_DEFAULT
+        response = self.client.get(reverse('optimap:works'))
+        self.assertEqual(response.status_code, 200)
+
+        # Verify page_size was correctly set using settings
+        self.assertIn('page_size', response.context)
+        self.assertEqual(
+            response.context['page_size'],
+            settings.WORKS_PAGE_SIZE_DEFAULT
+        )
 
     def test_pagination_default_page_size(self):
         """Test that default page size is applied"""
@@ -194,9 +208,10 @@ class WorksListViewTest(TestCase):
         self.assertIn('api_url', response.context)
         api_url = response.context['api_url']
 
-        # API URL should include current page and size
-        self.assertIn('page=2', api_url)
+        # API URL should include limit and offset (not page)
+        # Page 2 with size 25 = offset 25
         self.assertIn('limit=25', api_url)
+        self.assertIn('offset=25', api_url)
 
     def test_pagination_controls_in_template(self):
         """Test that pagination controls are rendered"""

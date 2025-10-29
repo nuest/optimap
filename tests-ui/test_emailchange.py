@@ -32,7 +32,7 @@ class EmailChangeUITest(unittest.TestCase):
             timeout=600
         )
 
-        self.browser = start_firefox("http://localhost:8000", headless=False)
+        self.browser = start_firefox("http://localhost:8000", headless=True)
 
     def test_email_change_process(self):
         """Test the full email change UI process"""

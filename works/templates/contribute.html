@@ -1,0 +1,245 @@
+{% extends "main.html" %}
+
+{% block title %}Contribute Geolocation Data | {% endblock %}
+
+{% block head %}
+{{ block.super }}
+<style>
+  /* Hide search bar on contribute page (no functionality here) */
+  #navbar-search-container {
+    display: none !important;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="container-fluid locate-container">
+  <div class="row justify-content-center">
+    <div class="col-md-10 col-lg-8 py-5">
+    <h1 class="py-2">Contribute Geolocation Data</h1>
+
+    <p class="lead">Help us add geographic metadata to scientific works!</p>
+
+    <p class="text-wrap text-break">The works listed below have been harvested from various scientific sources but do not have geolocation data yet. If you know the geographic location or area mentioned in any of these publications, you can help us improve our database.</p>
+
+    {% if total_count > 0 %}
+      <div class="alert alert-info text-break" role="alert">
+        <i class="fas fa-info-circle"></i>
+        <strong>{{ total_count }}</strong> publication{{ total_count|pluralize }} need{{ total_count|pluralize:"s," }} geolocation data.
+      </div>
+
+      <!-- Pagination controls (top) -->
+      {% if page_obj %}
+      <div class="pagination-controls mb-4">
+        <div class="row align-items-center">
+          <div class="col-md-6">
+            <p class="mb-2">
+              Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} works
+            </p>
+          </div>
+          <div class="col-md-6 text-md-right">
+            <form method="get" class="form-inline justify-content-md-end">
+              <label for="page-size" class="mr-2">Works per page:</label>
+              <select name="size" id="page-size" class="form-control form-control-sm" onchange="this.form.submit()">
+                {% for option in page_size_options %}
+                  <option value="{{ option }}" {% if option == page_size %}selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+              </select>
+            </form>
+          </div>
+        </div>
+
+        <!-- Pagination nav -->
+        <nav aria-label="Works pagination" class="mt-3">
+          <ul class="pagination justify-content-center">
+            {% if page_obj.has_previous %}
+              <li class="page-item">
+                <a class="page-link" href="?page=1&size={{ page_size }}" aria-label="First">
+                  <span aria-hidden="true">&laquo;&laquo;</span>
+                </a>
+              </li>
+              <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}&size={{ page_size }}" aria-label="Previous">
+                  <span aria-hidden="true">&laquo;</span>
+                </a>
+              </li>
+            {% else %}
+              <li class="page-item disabled">
+                <span class="page-link">&laquo;&laquo;</span>
+              </li>
+              <li class="page-item disabled">
+                <span class="page-link">&laquo;</span>
+              </li>
+            {% endif %}
+
+            {% for num in page_obj.paginator.page_range %}
+              {% if page_obj.number == num %}
+                <li class="page-item active"><span class="page-link">{{ num }} <span class="sr-only">(current)</span></span></li>
+              {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                <li class="page-item"><a class="page-link" href="?page={{ num }}&size={{ page_size }}">{{ num }}</a></li>
+              {% endif %}
+            {% endfor %}
+
+            {% if page_obj.has_next %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}&size={{ page_size }}" aria-label="Next">
+                  <span aria-hidden="true">&raquo;</span>
+                </a>
+              </li>
+              <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}&size={{ page_size }}" aria-label="Last">
+                  <span aria-hidden="true">&raquo;&raquo;</span>
+                </a>
+              </li>
+            {% else %}
+              <li class="page-item disabled">
+                <span class="page-link">&raquo;</span>
+              </li>
+              <li class="page-item disabled">
+                <span class="page-link">&raquo;&raquo;</span>
+              </li>
+            {% endif %}
+          </ul>
+        </nav>
+      </div>
+      {% endif %}
+
+      <div class="publication-grid">
+        {% for work in works %}
+          <div class="card locate-card">
+            <div class="card-body">
+              <h5 class="card-title">
+                {% if work.doi %}
+                  <a href="https://doi.org/{{ work.doi }}" target="_blank" rel="noopener noreferrer">
+                    {{ work.title|truncatechars:120 }}
+                    <i class="fas fa-external-link-alt fa-xs"></i>
+                  </a>
+                {% else %}
+                  <span>{{ work.title|truncatechars:120 }}</span>
+                {% endif %}
+              </h5>
+
+              <div class="abstract-area">
+                {% if work.abstract %}
+                  <p class="card-text text-muted small">
+                    {{ work.abstract|truncatechars:180 }}
+                  </p>
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="card-footer">
+              <small class="text-muted">
+                {% if work.publicationDate %}
+                  <div class="mb-1">Published: {{ work.publicationDate|date:"M d, Y" }}</div>
+                {% endif %}
+                {% if work.source %}
+                  <div class="mb-1">Source: {{ work.source.name }}</div>
+                {% endif %}
+                {% if work.doi %}
+                  <div class="mb-1">DOI: <span class="doi-text">{{ work.doi }}</span></div>
+                {% endif %}
+              </small>
+
+              {% if request.user.is_authenticated %}
+                {% if work.doi %}
+                  <a href="{% url 'optimap:work-landing' work.doi %}" class="btn btn-primary btn-sm">
+                    <i class="fas fa-map-marked-alt"></i> Contribute metadata
+                  </a>
+                {% else %}
+                  <a href="{% url 'optimap:work-landing' work.id %}" class="btn btn-primary btn-sm">
+                    <i class="fas fa-map-marked-alt"></i> Contribute metadata
+                  </a>
+                {% endif %}
+              {% else %}
+                <button disabled class="btn btn-outline-secondary btn-sm" title="Please use the user menu at the top right to log in">
+                  <i class="fas fa-user-circle"></i> Please log in to contribute (user menu at top right)
+                </button>
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+
+      <!-- Pagination controls (bottom) -->
+      {% if page_obj and page_obj.paginator.num_pages > 1 %}
+      <div class="pagination-controls mt-4">
+        <nav aria-label="Works pagination" class="mt-3">
+          <ul class="pagination justify-content-center">
+            {% if page_obj.has_previous %}
+              <li class="page-item">
+                <a class="page-link" href="?page=1&size={{ page_size }}" aria-label="First">
+                  <span aria-hidden="true">&laquo;&laquo;</span>
+                </a>
+              </li>
+              <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}&size={{ page_size }}" aria-label="Previous">
+                  <span aria-hidden="true">&laquo;</span>
+                </a>
+              </li>
+            {% else %}
+              <li class="page-item disabled">
+                <span class="page-link">&laquo;&laquo;</span>
+              </li>
+              <li class="page-item disabled">
+                <span class="page-link">&laquo;</span>
+              </li>
+            {% endif %}
+
+            {% for num in page_obj.paginator.page_range %}
+              {% if page_obj.number == num %}
+                <li class="page-item active"><span class="page-link">{{ num }} <span class="sr-only">(current)</span></span></li>
+              {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                <li class="page-item"><a class="page-link" href="?page={{ num }}&size={{ page_size }}">{{ num }}</a></li>
+              {% endif %}
+            {% endfor %}
+
+            {% if page_obj.has_next %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}&size={{ page_size }}" aria-label="Next">
+                  <span aria-hidden="true">&raquo;</span>
+                </a>
+              </li>
+              <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}&size={{ page_size }}" aria-label="Last">
+                  <span aria-hidden="true">&raquo;&raquo;</span>
+                </a>
+              </li>
+            {% else %}
+              <li class="page-item disabled">
+                <span class="page-link">&raquo;</span>
+              </li>
+              <li class="page-item disabled">
+                <span class="page-link">&raquo;&raquo;</span>
+              </li>
+            {% endif %}
+          </ul>
+        </nav>
+      </div>
+      {% endif %}
+
+    {% else %}
+      <div class="alert alert-success" role="alert">
+        <i class="fas fa-check-circle"></i>
+        Great! All harvested publications currently have geolocation data.
+      </div>
+    {% endif %}
+
+    <div class="mt-5">
+      <h3>How to help</h3>
+      <p>If you recognize any publications that reference specific geographic locations, please login, confirm your account, and contribute metadata.</p>
+      <p>In case you find any errors in other metadata fields, if you see a work with incorrect location or time information, or if you find publications that should be included in our database, please contact us:</p>
+      <p>
+        <a href="/about" class="btn btn-primary">
+          <i class="fas fa-envelope"></i> Contact Us
+        </a>
+        <a href="/" class="btn btn-outline-secondary">
+          <i class="fas fa-map"></i> Back to Map
+        </a>
+      </p>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

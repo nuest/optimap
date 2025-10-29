@@ -7,9 +7,9 @@ from django.test import TestCase
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'optimap.settings')
 django.setup()
 
-from publications.models import Publication, Source, HarvestingEvent
-from publications.tasks import (
-    parse_oai_xml_and_save_publications,
+from works.models import Work, Source, HarvestingEvent
+from works.tasks import (
+    parse_oai_xml_and_save_works,
     parse_rss_feed_and_save_publications,
     get_or_create_admin_command_user
 )
@@ -53,10 +53,10 @@ class HarvestingProvenanceTest(TestCase):
         xml_path = BASE_TEST_DIR / 'harvesting' / 'source_1' / 'oai_dc.xml'
         xml_bytes = xml_path.read_bytes()
 
-        parse_oai_xml_and_save_publications(xml_bytes, self.event)
+        parse_oai_xml_and_save_works(xml_bytes, self.event)
 
         # Check that publications were created
-        pubs = Publication.objects.filter(job=self.event)
+        pubs = Work.objects.filter(job=self.event)
         self.assertGreater(pubs.count(), 0, "Should have created at least one publication")
 
         # Check first publication
@@ -81,7 +81,7 @@ class HarvestingProvenanceTest(TestCase):
         parse_rss_feed_and_save_publications(feed_url, self.event)
 
         # Check that publications were created
-        pubs = Publication.objects.filter(job=self.event)
+        pubs = Work.objects.filter(job=self.event)
         self.assertGreater(pubs.count(), 0, "Should have created at least one publication")
 
         # Check first publication

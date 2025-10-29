@@ -52,21 +52,29 @@ jobs:
         python -m pip install -r requirements-dev.txt
   
     - name: Run Django migrations
+      env:
+        DATABASE_URL: postgis://optimap:optimap@localhost:5432/optimap
       run: |
         python manage.py migrate
 
     - name: Load all testdata to see if it is up to date with the Django migrations
+      env:
+        DATABASE_URL: postgis://optimap:optimap@localhost:5432/optimap
       run: |
         python manage.py loaddata fixtures/test_data_optimap.json
         python manage.py loaddata fixtures/test_data_partners.json
 
     - name: Run deploy checks
+      env:
+        DATABASE_URL: postgis://optimap:optimap@localhost:5432/optimap
       run: |
         python -Wa manage.py check --deploy
 
     - name: Run Tests
+      env:
+        DATABASE_URL: postgis://optimap:optimap@localhost:5432/optimap
       run: |
-        coverage run --source='publications' --omit='*/migrations/**' manage.py test tests
+        coverage run --source='works' --omit='*/migrations/**' manage.py test tests
 
     - name: Check coverage and save it to files
       run: |

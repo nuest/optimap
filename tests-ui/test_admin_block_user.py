@@ -9,7 +9,7 @@ import unittest
 from django.test import TransactionTestCase, TestCase
 from helium import *
 from django.contrib.auth import get_user_model
-from publications.models import BlockedEmail, BlockedDomain
+from works.models import BlockedEmail, BlockedDomain
 from time import sleep
 
 User = get_user_model()
@@ -33,7 +33,7 @@ class AdminBlockUserTests(TestCase):
         )
         self.test_user.save()
 
-        self.kill_existing_firefox_processes()
+        #self.kill_existing_firefox_processes()
         try:
             self.browser = start_chrome("http://localhost:8000/admin/", headless=True)
         except Exception as e:

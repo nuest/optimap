@@ -9,9 +9,9 @@ import fiona
 from django.urls import reverse
 from django.conf import settings
 import re
-from publications.models import Publication, Source
-from publications.views import generate_geopackage
-from publications.tasks import (
+from works.models import Work, Source
+from works.views import generate_geopackage
+from works.tasks import (
     regenerate_geojson_cache,
     regenerate_geopackage_cache,
     generate_data_dump_filename,
@@ -21,13 +21,13 @@ from pathlib import Path
 
 class GeoDataAlternativeTestCase(TestCase):
     def setUp(self):
-        Publication.objects.all().delete()
+        Work.objects.all().delete()
         wkt_point1 = "GEOMETRYCOLLECTION(POINT(7.59573 51.96944))"
         wkt_point2 = "GEOMETRYCOLLECTION(POINT(8.59573 52.96944))"
         wkt_point3 = "GEOMETRYCOLLECTION(POINT(9.59573 53.96944))"
         
         s1 = Source.objects.create(name="Source One", url_field="http://example.com/1")
-        Publication.objects.create(
+        Work.objects.create(
             title="Publication One",
             abstract="Abstract of publication one.",
             publicationDate="2020-01-01",
@@ -39,7 +39,7 @@ class GeoDataAlternativeTestCase(TestCase):
             timeperiod_enddate=["2020-12-31"],
         )
         s2 = Source.objects.create(name="Source Two", url_field="http://example.com/2")
-        Publication.objects.create(
+        Work.objects.create(
             title="Publication Two",
             abstract="Abstract of publication two.",
             publicationDate="2020-06-01",
@@ -51,7 +51,7 @@ class GeoDataAlternativeTestCase(TestCase):
             timeperiod_enddate=["2020-12-31"],
         )
         s3 = Source.objects.create(name="Source Three", url_field="http://example.com/3")
-        Publication.objects.create(
+        Work.objects.create(
             title="Publication Three",
             abstract="Abstract of publication three.",
             publicationDate="2020-09-01",
@@ -64,31 +64,31 @@ class GeoDataAlternativeTestCase(TestCase):
         )    
 
     def test_geojson_generation(self):
-        geojson_data = serialize('geojson', Publication.objects.all(), geometry_field='geometry')
+        geojson_data = serialize('geojson', Work.objects.all(), geometry_field='geometry')
         self.assertTrue(len(geojson_data) > 0, "GeoJSON data should not be empty")
         geojson_obj = json.loads(geojson_data)
         self.assertEqual(geojson_obj.get("type"), "FeatureCollection", "GeoJSON type should be FeatureCollection")
         features = geojson_obj.get("features", [])
-        self.assertEqual(len(features), Publication.objects.count(), "Feature count should match Publication count")
+        self.assertEqual(len(features), Work.objects.count(), "Feature count should match Publication count")
         self.assertIn("title", features[0]["properties"], "Each feature should have a 'title' property")
 
     def test_geopackage_generation(self):
         gpkg_path = generate_geopackage()
         self.assertTrue(os.path.exists(gpkg_path), "GeoPackage file should exist")
-        with fiona.open(gpkg_path, layer='publications') as layer:
+        with fiona.open(gpkg_path, layer='works') as layer:
             features = list(layer)
-            self.assertEqual(len(features), Publication.objects.count(),
+            self.assertEqual(len(features), Work.objects.count(),
                              "Feature count in GeoPackage should match the Publication count")
 
     def test_update_reflects_in_generated_data(self):
-        initial_geojson = serialize('geojson', Publication.objects.all(), geometry_field='geometry')
+        initial_geojson = serialize('geojson', Work.objects.all(), geometry_field='geometry')
         initial_obj = json.loads(initial_geojson)
         initial_title = initial_obj['features'][0]['properties']['title']
-        pub = Publication.objects.first()
+        pub = Work.objects.first()
         pub.title += " Updated"
         pub.save()
         
-        updated_geojson = serialize('geojson', Publication.objects.all(), geometry_field='geometry')
+        updated_geojson = serialize('geojson', Work.objects.all(), geometry_field='geometry')
         updated_obj = json.loads(updated_geojson)
         updated_title = updated_obj['features'][0]['properties']['title']
         self.assertNotEqual(initial_title, updated_title,
@@ -146,7 +146,7 @@ class GeoDataAlternativeTestCase(TestCase):
             obj = json.load(f)
         self.assertEqual(obj.get('type'), 'FeatureCollection')
         self.assertIn('features', obj)
-        self.assertEqual(len(obj['features']), Publication.objects.filter(status='p').count())
+        self.assertEqual(len(obj['features']), Work.objects.filter(status='p').count())
 
     def test_cached_gzip_can_be_unpacked(self):
         returned = regenerate_geojson_cache()
@@ -155,7 +155,7 @@ class GeoDataAlternativeTestCase(TestCase):
             obj = json.load(f)
         self.assertEqual(obj.get('type'), 'FeatureCollection')
         self.assertIn('features', obj)
-        self.assertEqual(len(obj['features']), Publication.objects.filter(status='p').count())
+        self.assertEqual(len(obj['features']), Work.objects.filter(status='p').count())
 
     def test_download_geopackage(self):
         url = reverse('optimap:download_geopackage')

@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ region.name }} ({{ region_type }}) works | {% endblock %}
+
+{% block head %}
+{{ block.super }}
+<!-- Leaflet -->
+<link rel="stylesheet" href="{% static 'css/leaflet.css' %}" />
+<script src="{% static 'js/leaflet.js' %}"></script>
+{% endblock head %}
+
+{% block content %}
+<div class="container-fluid locate-container">
+  <div class="row justify-content-center">
+    <div class="col-md-10 col-lg-8 py-5">
+      <h1 class="py-2">{{ region.name }} - Latest works</h1>
+
+      <p class="lead">{{ works|length }} research work{{ works|length|pluralize }} with geographic metadata for {{ region.name }} ({{ region_type }}).</p>
+
+      <div class="alert alert-info" role="alert">
+        <i class="fas fa-rss"></i>
+        <strong>Subscribe to this feed:</strong>
+        <a href="{{ feed_urls.georss }}" class="alert-link">RSS</a> |
+        <a href="{{ feed_urls.atom }}" class="alert-link">Atom</a>
+      </div>
+
+      {% if works %}
+        <!-- Map showing all works -->
+        <div id="feed-map" style="height: 540px; width: 100%; margin-bottom: 2rem; border-radius: 8px;"></div>
+
+        <div class="publication-grid">
+          {% for work in works %}
+            <div class="card locate-card">
+              <div class="card-body">
+                <h5 class="card-title">
+                  {% if work.doi %}
+                    <a href="{% url 'optimap:work-landing' work.doi %}" rel="noopener">
+                      {{ work.title|truncatechars:120 }}
+                    </a>
+                  {% elif work.url %}
+                    <a href="{{ work.url }}" target="_blank" rel="noopener noreferrer">
+                      {{ work.title|truncatechars:120 }}
+                      <i class="fas fa-external-link-alt fa-xs"></i>
+                    </a>
+                  {% else %}
+                    <span>{{ work.title|truncatechars:120 }}</span>
+                  {% endif %}
+                </h5>
+
+                <div class="abstract-area">
+                  {% if work.abstract %}
+                    <p class="card-text text-muted small">
+                      {{ work.abstract|truncatechars:180 }}
+                    </p>
+                  {% endif %}
+                </div>
+              </div>
+
+              <div class="card-footer">
+                <small class="text-muted">
+                  {% if work.publicationDate %}
+                    <div class="mb-1">
+                      <i class="fas fa-calendar"></i> Published: {{ work.publicationDate|date:"M d, Y" }}
+                    </div>
+                  {% endif %}
+                  {% if work.source %}
+                    <div class="mb-1">
+                      <i class="fas fa-book"></i> Source: {{ work.source.name }}
+                    </div>
+                  {% endif %}
+                  {% if work.doi %}
+                    <div class="mb-1">
+                      <i class="fas fa-fingerprint"></i> DOI: <span class="doi-text">{{ work.doi }}</span>
+                    </div>
+                  {% endif %}
+                </small>
+
+                {% if work.doi %}
+                  <a href="{% url 'optimap:work-landing' work.doi %}" class="btn btn-primary btn-sm">
+                    <i class="fas fa-map-marked-alt"></i> View work's page
+                  </a>
+                {% elif work.url %}
+                  <a href="{{ work.url }}" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer">
+                    <i class="fas fa-external-link-alt"></i> View work (external)
+                  </a>
+                {% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+
+        {% if works|length >= 100 %}
+          <div class="alert alert-secondary mt-4" role="alert">
+            <i class="fas fa-info-circle"></i>
+            Showing first 100 of {{ works|length }} works only. Subscribe to the feed to get updates on new publications.
+          </div>
+        {% endif %}
+
+      {% else %}
+        <div class="alert alert-warning" role="alert">
+          <i class="fas fa-exclamation-triangle"></i>
+          No publications found for {{ region.name }} at this time.
+        </div>
+      {% endif %}
+
+      <div class="mt-5">
+        <h3>About this feed</h3>
+        <p>
+          This page shows the latest research publications with geographic metadata from {{ region.name }}.
+          The data is cached and updated periodically. To force a refresh, add <code>?now</code> to the URL.
+        </p>
+        <p>
+          <a href="/feeds" class="btn btn-outline-secondary">
+            <i class="fas fa-rss"></i> View All Feeds
+          </a>
+          <a href="/" class="btn btn-outline-secondary">
+            <i class="fas fa-map"></i> Back to Map
+          </a>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock content %}
+
+{% block scripts %}
+{{ block.super }}
+<script src="{% static 'js/map-popup.js' %}"></script>
+<script src="{% static 'js/map-interaction.js' %}"></script>
+<script type="text/javascript">
+  // Initialize map with publications
+  $(document).ready(function() {
+    const map = L.map('feed-map');
+
+    // Base layer: OpenStreetMap
+    const osmLayer = L.tileLayer(
+      'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      {
+        attribution: 'Map data: © <a href="https://openstreetmap.org">OpenStreetMap</a> contributors',
+        maxZoom: 18,
+      }
+    ).addTo(map);
+
+    // Publication data as GeoJSON
+    const publicationsData = {{ publications_geojson|safe }};
+
+    // Add publications to map using shared popup function
+    const publicationsLayer = L.geoJSON(publicationsData, {
+      style: publicationStyle,
+      onEachFeature: publicationPopup
+    }).addTo(map);
+
+    // Initialize enhanced interaction manager for handling overlapping polygons
+    if (typeof MapInteractionManager !== 'undefined') {
+      const interactionManager = new MapInteractionManager(map, publicationsLayer);
+      console.log('Enhanced map interaction enabled on feed page');
+    }
+
+    // Fit map to show all publications
+    if (publicationsLayer.getBounds().isValid()) {
+      map.fitBounds(publicationsLayer.getBounds(), { padding: [20, 20] });
+    } else {
+      // Default view if no geometries
+      map.setView([0, 0], 2);
+    }
+  });
+</script>
+{% endblock scripts %}

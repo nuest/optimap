@@ -9,9 +9,9 @@ from django.test import Client, TestCase
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'optimap.settings')
 django.setup()
 
-from publications.models import Publication, Source, HarvestingEvent, Schedule
-from publications.tasks import (
-    parse_oai_xml_and_save_publications,
+from works.models import Work, Source, HarvestingEvent, Schedule
+from works.tasks import (
+    parse_oai_xml_and_save_works,
     harvest_oai_endpoint,
     parse_rss_feed_and_save_publications,
     harvest_rss_endpoint
@@ -27,7 +27,7 @@ class SimpleTest(TestCase):
     def setUp(self):
         super().setUp()
 
-        Publication.objects.all().delete()
+        Work.objects.all().delete()
 
         article01_path = BASE_TEST_DIR / 'harvesting' / 'source_1' / 'article_01.html'
         article02_path = BASE_TEST_DIR / 'harvesting' / 'source_1' / 'article_02.html'
@@ -51,9 +51,9 @@ class SimpleTest(TestCase):
 
         oai_path = BASE_TEST_DIR / 'harvesting' / 'source_1' / 'oai_dc.xml'
         xml_bytes = oai_path.read_bytes()
-        parse_oai_xml_and_save_publications(xml_bytes, event)
+        parse_oai_xml_and_save_works(xml_bytes, event)
 
-        Publication.objects.all().update(status="p")
+        Work.objects.all().update(status="p")
 
         self.user = User.objects.create_user(
             username="testuser",
@@ -62,7 +62,7 @@ class SimpleTest(TestCase):
         )
         self.client = Client()
 
-        results = self.client.get('/api/v1/publications/').json()['results']
+        results = self.client.get('/api/v1/works/').json()['results']
         features = results.get('features', [])
         if len(features) >= 2:
             self.id1, self.id2 = features[1]['id'], features[0]['id']
@@ -72,7 +72,7 @@ class SimpleTest(TestCase):
             self.id1 = self.id2 = None
 
     def test_api_root(self):
-        response = self.client.get('/api/v1/publications/')
+        response = self.client.get('/api/v1/works/')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get('Content-Type'), 'application/json')
         results = response.json()['results']
@@ -80,7 +80,7 @@ class SimpleTest(TestCase):
         self.assertEqual(len(results['features']), 2)
 
     def test_api_publication_1(self):
-        response = self.client.get(f'/api/v1/publications/{self.id1}.json')
+        response = self.client.get(f'/api/v1/works/{self.id1}.json')
         self.assertEqual(response.status_code, 200)
         body = response.json()
         self.assertEqual(body['type'], 'Feature')
@@ -95,7 +95,7 @@ class SimpleTest(TestCase):
         )
 
     def test_api_publication_2(self):
-        response = self.client.get(f'/api/v1/publications/{self.id2}.json')
+        response = self.client.get(f'/api/v1/works/{self.id2}.json')
         self.assertEqual(response.status_code, 200)
         body = response.json()
         self.assertEqual(body['type'], 'Feature')
@@ -129,7 +129,7 @@ class SimpleTest(TestCase):
         self.assertTrue(schedule_q.exists(), "Django-Q task not scheduled for source.")
 
     def test_no_duplicates(self):
-        publications = Publication.objects.all()
+        publications = Work.objects.all()
         self.assertEqual(publications.count(), 2, "Expected exactly 2 unique publications")
         titles = [p.title for p in publications]
         self.assertEqual(len(titles), len(set(titles)), "Duplicate titles found")
@@ -142,11 +142,11 @@ class SimpleTest(TestCase):
         event = HarvestingEvent.objects.create(source=src, status="in_progress")
 
         invalid_xml = b'<invalid>malformed xml without proper closing'
-        initial_count = Publication.objects.count()
+        initial_count = Work.objects.count()
 
-        parse_oai_xml_and_save_publications(invalid_xml, event)
+        parse_oai_xml_and_save_works(invalid_xml, event)
 
-        self.assertEqual(Publication.objects.count(), initial_count)
+        self.assertEqual(Work.objects.count(), initial_count)
 
     def test_empty_xml_input(self):
         """Test harvesting with empty XML input"""
@@ -157,11 +157,11 @@ class SimpleTest(TestCase):
         event = HarvestingEvent.objects.create(source=src, status="in_progress")
 
         empty_xml = b''
-        initial_count = Publication.objects.count()
+        initial_count = Work.objects.count()
 
-        parse_oai_xml_and_save_publications(empty_xml, event)
+        parse_oai_xml_and_save_works(empty_xml, event)
 
-        self.assertEqual(Publication.objects.count(), initial_count)
+        self.assertEqual(Work.objects.count(), initial_count)
 
     def test_xml_with_no_records(self):
         """Test harvesting with valid XML but no record elements"""
@@ -180,11 +180,11 @@ class SimpleTest(TestCase):
             </ListRecords>
         </OAI-PMH>'''
 
-        initial_count = Publication.objects.count()
+        initial_count = Work.objects.count()
 
-        parse_oai_xml_and_save_publications(no_records_xml, event)
+        parse_oai_xml_and_save_works(no_records_xml, event)
 
-        self.assertEqual(Publication.objects.count(), initial_count)
+        self.assertEqual(Work.objects.count(), initial_count)
 
     def test_xml_with_invalid_record_data(self):
         src = Source.objects.create(
@@ -215,18 +215,18 @@ class SimpleTest(TestCase):
             </ListRecords>
         </OAI-PMH>'''
 
-        initial_count = Publication.objects.count()
+        initial_count = Work.objects.count()
 
-        parse_oai_xml_and_save_publications(invalid_data_xml, event)
+        parse_oai_xml_and_save_works(invalid_data_xml, event)
 
-        self.assertEqual(Publication.objects.count(), initial_count)
+        self.assertEqual(Work.objects.count(), initial_count)
 
     def test_real_journal_harvesting_essd(self):
         """Test harvesting from actual ESSD Copernicus endpoint"""
-        from publications.tasks import harvest_oai_endpoint
+        from works.tasks import harvest_oai_endpoint
 
         # Clear existing publications for clean test
-        Publication.objects.all().delete()
+        Work.objects.all().delete()
 
         src = Source.objects.create(
             url_field="https://oai-pmh.copernicus.org/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=essd",
@@ -234,18 +234,18 @@ class SimpleTest(TestCase):
             name="ESSD Copernicus"
         )
 
-        initial_count = Publication.objects.count()
+        initial_count = Work.objects.count()
 
         # Harvest from real endpoint with limit
         harvest_oai_endpoint(src.id, max_records=3)
 
         # Should have harvested some publications
-        final_count = Publication.objects.count()
+        final_count = Work.objects.count()
         self.assertGreater(final_count, initial_count, "Should harvest at least some publications from ESSD")
         self.assertLessEqual(final_count - initial_count, 3, "Should not exceed max_records limit")
 
         # Verify ESSD publications were created
-        essd_pubs = Publication.objects.filter(source=src)
+        essd_pubs = Work.objects.filter(source=src)
         for pub in essd_pubs:
             self.assertIsNotNone(pub.title, f"Publication {pub.id} missing title")
             self.assertIsNotNone(pub.url, f"Publication {pub.id} missing URL")
@@ -255,10 +255,10 @@ class SimpleTest(TestCase):
 
     def test_real_journal_harvesting_geo_leo(self):
         """Test harvesting from actual GEO-LEO e-docs endpoint"""
-        from publications.tasks import harvest_oai_endpoint
+        from works.tasks import harvest_oai_endpoint
 
         # Clear existing publications for clean test
-        Publication.objects.all().delete()
+        Work.objects.all().delete()
 
         src = Source.objects.create(
             url_field="https://e-docs.geo-leo.de/server/oai/request",
@@ -266,28 +266,28 @@ class SimpleTest(TestCase):
             name="GEO-LEO e-docs"
         )
 
-        initial_count = Publication.objects.count()
+        initial_count = Work.objects.count()
 
         # Harvest from real endpoint with limit
         harvest_oai_endpoint(src.id, max_records=5)
 
         # Should have harvested some publications
-        final_count = Publication.objects.count()
+        final_count = Work.objects.count()
         self.assertGreater(final_count, initial_count, "Should harvest at least some publications from GEO-LEO")
         self.assertLessEqual(final_count - initial_count, 5, "Should not exceed max_records limit")
 
         # Verify GEO-LEO publications were created
-        geo_leo_pubs = Publication.objects.filter(source=src)
+        geo_leo_pubs = Work.objects.filter(source=src)
         for pub in geo_leo_pubs:
             self.assertIsNotNone(pub.title, f"Publication {pub.id} missing title")
             self.assertIsNotNone(pub.url, f"Publication {pub.id} missing URL")
 
     def test_real_journal_harvesting_agile_giss(self):
         """Test harvesting from actual AGILE-GISS endpoint"""
-        from publications.tasks import harvest_oai_endpoint
+        from works.tasks import harvest_oai_endpoint
 
         # Clear existing publications for clean test
-        Publication.objects.all().delete()
+        Work.objects.all().delete()
 
         src = Source.objects.create(
             url_field="https://www.agile-giscience-series.net",
@@ -295,19 +295,19 @@ class SimpleTest(TestCase):
             name="AGILE-GISS"
         )
 
-        initial_count = Publication.objects.count()
+        initial_count = Work.objects.count()
 
         # Note: This may fail if AGILE doesn't have OAI-PMH endpoint
         try:
             harvest_oai_endpoint(src.id, max_records=3)
 
             # Should have harvested some publications
-            final_count = Publication.objects.count()
+            final_count = Work.objects.count()
             self.assertGreater(final_count, initial_count, "Should harvest at least some publications from AGILE-GISS")
             self.assertLessEqual(final_count - initial_count, 3, "Should not exceed max_records limit")
 
             # Verify AGILE publications were created
-            agile_pubs = Publication.objects.filter(source=src)
+            agile_pubs = Work.objects.filter(source=src)
             for pub in agile_pubs:
                 self.assertIsNotNone(pub.title, f"Publication {pub.id} missing title")
                 self.assertIsNotNone(pub.url, f"Publication {pub.id} missing URL")
@@ -330,7 +330,7 @@ class HarvestingErrorTests(TestCase):
 
     def setUp(self):
         """Set up test sources and events."""
-        Publication.objects.all().delete()
+        Work.objects.all().delete()
         self.source = Source.objects.create(
             url_field="http://example.com/oai",
             harvest_interval_minutes=60,
@@ -348,10 +348,10 @@ class HarvestingErrorTests(TestCase):
         xml_bytes = malformed_xml_path.read_bytes()
 
         # Should not raise exception, but should log error
-        parse_oai_xml_and_save_publications(xml_bytes, event)
+        parse_oai_xml_and_save_works(xml_bytes, event)
 
         # No publications should be created from malformed XML
-        pub_count = Publication.objects.filter(job=event).count()
+        pub_count = Work.objects.filter(job=event).count()
         self.assertEqual(pub_count, 0, "Malformed XML should not create publications")
 
     def test_empty_response(self):
@@ -365,10 +365,10 @@ class HarvestingErrorTests(TestCase):
         xml_bytes = empty_xml_path.read_bytes()
 
         # Should not raise exception
-        parse_oai_xml_and_save_publications(xml_bytes, event)
+        parse_oai_xml_and_save_works(xml_bytes, event)
 
         # No publications should be created from empty response
-        pub_count = Publication.objects.filter(job=event).count()
+        pub_count = Work.objects.filter(job=event).count()
         self.assertEqual(pub_count, 0, "Empty response should create zero publications")
 
     def test_invalid_xml_structure(self):
@@ -382,10 +382,10 @@ class HarvestingErrorTests(TestCase):
         xml_bytes = invalid_xml_path.read_bytes()
 
         # Should not raise exception
-        parse_oai_xml_and_save_publications(xml_bytes, event)
+        parse_oai_xml_and_save_works(xml_bytes, event)
 
         # No publications should be created from invalid structure
-        pub_count = Publication.objects.filter(job=event).count()
+        pub_count = Work.objects.filter(job=event).count()
         self.assertEqual(pub_count, 0, "Invalid XML structure should create zero publications")
 
     def test_missing_required_metadata(self):
@@ -399,10 +399,10 @@ class HarvestingErrorTests(TestCase):
         xml_bytes = missing_metadata_path.read_bytes()
 
         # Should not raise exception - may create some publications
-        parse_oai_xml_and_save_publications(xml_bytes, event)
+        parse_oai_xml_and_save_works(xml_bytes, event)
 
         # Check what was created
-        pubs = Publication.objects.filter(job=event)
+        pubs = Work.objects.filter(job=event)
 
         # At least one record (the one with title) should be created
         self.assertGreaterEqual(pubs.count(), 1, "Should create publications even with minimal metadata")
@@ -421,13 +421,13 @@ class HarvestingErrorTests(TestCase):
         )
 
         # Test with empty bytes
-        parse_oai_xml_and_save_publications(b"", event)
-        pub_count = Publication.objects.filter(job=event).count()
+        parse_oai_xml_and_save_works(b"", event)
+        pub_count = Work.objects.filter(job=event).count()
         self.assertEqual(pub_count, 0, "Empty content should create zero publications")
 
         # Test with whitespace only
-        parse_oai_xml_and_save_publications(b"   \n\t  ", event)
-        pub_count = Publication.objects.filter(job=event).count()
+        parse_oai_xml_and_save_works(b"   \n\t  ", event)
+        pub_count = Work.objects.filter(job=event).count()
         self.assertEqual(pub_count, 0, "Whitespace-only content should create zero publications")
 
     @responses.activate
@@ -524,7 +524,7 @@ class HarvestingErrorTests(TestCase):
         # Should complete (not fail) but create no publications
         self.assertEqual(event.status, 'completed', "Event should complete even with invalid XML")
 
-        pub_count = Publication.objects.filter(job=event).count()
+        pub_count = Work.objects.filter(job=event).count()
         self.assertEqual(pub_count, 0, "Invalid XML should create zero publications")
 
     def test_max_records_limit_with_errors(self):
@@ -539,10 +539,10 @@ class HarvestingErrorTests(TestCase):
         xml_bytes = missing_metadata_path.read_bytes()
 
         # Limit to 1 record
-        parse_oai_xml_and_save_publications(xml_bytes, event, max_records=1)
+        parse_oai_xml_and_save_works(xml_bytes, event, max_records=1)
 
         # Should process only 1 record
-        pub_count = Publication.objects.filter(job=event).count()
+        pub_count = Work.objects.filter(job=event).count()
         self.assertLessEqual(pub_count, 1, "Should respect max_records limit even with errors")
 
 
@@ -559,7 +559,7 @@ class RSSFeedHarvestingTests(TestCase):
 
     def setUp(self):
         """Set up test source for RSS feeds."""
-        Publication.objects.all().delete()
+        Work.objects.all().delete()
         self.source = Source.objects.create(
             url_field="https://www.example.com/feed.rss",
             harvest_interval_minutes=60,
@@ -583,7 +583,7 @@ class RSSFeedHarvestingTests(TestCase):
         self.assertEqual(saved, 2, "Should save 2 publications")
 
         # Check created publications
-        pubs = Publication.objects.filter(job=event)
+        pubs = Work.objects.filter(job=event)
         self.assertEqual(pubs.count(), 2)
 
         # Check first publication
@@ -606,7 +606,7 @@ class RSSFeedHarvestingTests(TestCase):
         )
 
         # Create existing publication with same DOI
-        Publication.objects.create(
+        Work.objects.create(
             title="Existing Publication",
             doi="10.1234/test-001",
             source=self.source,
@@ -631,7 +631,7 @@ class RSSFeedHarvestingTests(TestCase):
         )
 
         # Create existing publication with same URL
-        Publication.objects.create(
+        Work.objects.create(
             title="Existing Publication",
             url="https://www.example.com/articles/test-article-1",
             source=self.source,
@@ -664,7 +664,7 @@ class RSSFeedHarvestingTests(TestCase):
         self.assertEqual(processed, 1, "Should only process 1 entry")
         self.assertEqual(saved, 1, "Should only save 1 publication")
 
-        pubs = Publication.objects.filter(job=event)
+        pubs = Work.objects.filter(job=event)
         self.assertEqual(pubs.count(), 1)
 
     def test_harvest_rss_endpoint_from_file(self):
@@ -683,7 +683,7 @@ class RSSFeedHarvestingTests(TestCase):
         self.assertEqual(event.status, 'completed')
 
         # Check publications
-        pubs = Publication.objects.filter(job=event)
+        pubs = Work.objects.filter(job=event)
         self.assertEqual(pubs.count(), 2, "Should create 2 publications from RSS feed")
 
     def test_harvest_rss_endpoint_invalid_file(self):
@@ -701,7 +701,7 @@ class RSSFeedHarvestingTests(TestCase):
         self.assertEqual(event.status, 'completed')
 
         # No publications should be created
-        pubs = Publication.objects.filter(job=event)
+        pubs = Work.objects.filter(job=event)
         self.assertEqual(pubs.count(), 0)
 
     def test_rss_invalid_feed_url(self):

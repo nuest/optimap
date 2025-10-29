@@ -1,7 +1,7 @@
 from datetime import date
 import os
 from django.test import Client, TransactionTestCase, TestCase
-from publications.models import Publication
+from works.models import Work
 from django.contrib.gis.geos import Point, MultiPoint, LineString, Polygon, GeometryCollection
 from django.contrib.auth import get_user_model
 User = get_user_model()
@@ -15,7 +15,7 @@ class PublicationsApiTest(TestCase):
         self.user = User.objects.create_user('unittest', 'unit@test.com', 'test')
         self.client.login(username='unittest', password='test')
 
-        pub1 = Publication.objects.create(
+        pub1 = Work.objects.create(
             title="Publication One",
             abstract="This is a first publication. It's good.",
             url="https://test.test/geometries",
@@ -29,7 +29,7 @@ class PublicationsApiTest(TestCase):
         )
         pub1.save()
 
-        pub2 = Publication.objects.create(
+        pub2 = Work.objects.create(
             title="Publication Two",
             abstract="Seconds are better than firsts.",
             url="https://example.com/point",
@@ -41,7 +41,7 @@ class PublicationsApiTest(TestCase):
         pub2.save()
 
     def tearDown(self):
-        Publication.objects.all().delete()
+        Work.objects.all().delete()
 
     def test_api_redirect(self):
         response = self.client.get('/api')
@@ -57,7 +57,7 @@ class PublicationsApiTest(TestCase):
         self.assertEqual(response.url, '/api/v1/')
 
     def test_api_root(self):
-        response = self.client.get('/api/v1/publications/')
+        response = self.client.get('/api/v1/works/')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get('Content-Type'), 'application/json')
 
@@ -67,10 +67,10 @@ class PublicationsApiTest(TestCase):
         self.assertEqual(len(results['features']), 2)
 
     def test_api_publication(self):
-        all = self.client.get('/api/v1/publications/').json()
+        all = self.client.get('/api/v1/works/').json()
         one_publication = [feat for feat in all['results']['features'] if feat['properties']['title'] == 'Publication One']
         #print('\n\n %s \n\n' % all)
-        response = self.client.get('/api/v1/publications/%s.json' % one_publication[0]['id'])
+        response = self.client.get('/api/v1/works/%s.json' % one_publication[0]['id'])
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get('Content-Type'), 'application/json')
 
@@ -85,5 +85,5 @@ class PublicationsApiTest(TestCase):
         self.assertEqual(body['properties']['publicationDate'], '2022-10-10')
 
     def test_api_publication_99_missing(self):
-        response = self.client.get('/api/v1/publications/99.json')
+        response = self.client.get('/api/v1/works/99.json')
         self.assertEqual(response.status_code, 404)

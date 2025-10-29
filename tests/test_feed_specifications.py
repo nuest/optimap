@@ -15,7 +15,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 from django.test import TestCase
 from django.contrib.gis.geos import Point, LineString, Polygon, GeometryCollection
-from publications.models import Publication, Source
+from works.models import Work, Source
 
 
 class RSS20SpecificationTestCase(TestCase):
@@ -50,7 +50,7 @@ class RSS20SpecificationTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         """Set up test data with various publication types."""
-        Publication.objects.all().delete()
+        Work.objects.all().delete()
 
         # Create a test source
         cls.source = Source.objects.create(
@@ -67,7 +67,7 @@ class RSS20SpecificationTestCase(TestCase):
         )
 
         # Publication with full metadata
-        cls.pub_full = Publication.objects.create(
+        cls.pub_full = Work.objects.create(
             title="Complete Publication Test",
             abstract="A complete publication with all metadata fields populated.",
             url="https://example.com/complete",
@@ -83,7 +83,7 @@ class RSS20SpecificationTestCase(TestCase):
         )
 
         # Publication without authors (should not have dc:creator)
-        cls.pub_no_authors = Publication.objects.create(
+        cls.pub_no_authors = Work.objects.create(
             title="Publication Without Authors",
             abstract="A publication without author information.",
             url="https://example.com/no-authors",
@@ -95,7 +95,7 @@ class RSS20SpecificationTestCase(TestCase):
         )
 
         # Publication with many authors (should use "et al.")
-        cls.pub_many_authors = Publication.objects.create(
+        cls.pub_many_authors = Work.objects.create(
             title="Publication With Many Authors",
             abstract="A publication with more than 10 authors.",
             url="https://example.com/many-authors",
@@ -111,7 +111,7 @@ class RSS20SpecificationTestCase(TestCase):
         )
 
         # Publication with GeoRSS line geometry
-        cls.pub_line = Publication.objects.create(
+        cls.pub_line = Work.objects.create(
             title="Publication With LineString",
             abstract="A publication with line geometry.",
             url="https://example.com/line",
@@ -584,7 +584,7 @@ class Atom10SpecificationTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         """Set up test data - same as RSS tests."""
-        Publication.objects.all().delete()
+        Work.objects.all().delete()
 
         # Create a test source
         cls.source = Source.objects.create(
@@ -599,7 +599,7 @@ class Atom10SpecificationTestCase(TestCase):
         )
 
         # Publication with full metadata
-        cls.pub_full = Publication.objects.create(
+        cls.pub_full = Work.objects.create(
             title="Complete Publication Test",
             abstract="A complete publication with all metadata fields populated.",
             url="https://example.com/complete",
@@ -614,7 +614,7 @@ class Atom10SpecificationTestCase(TestCase):
         )
 
         # Publication without authors
-        cls.pub_no_authors = Publication.objects.create(
+        cls.pub_no_authors = Work.objects.create(
             title="Publication Without Authors",
             url="https://example.com/no-authors",
             status="p",
