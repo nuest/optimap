@@ -13,6 +13,7 @@ All interactions are done through the UI (buttons, forms, etc.)
 """
 
 from django.test import TestCase
+from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.contrib.auth import get_user_model
 from helium import (
     start_chrome,
@@ -34,7 +35,7 @@ import time
 User = get_user_model()
 
 
-class ContributionWorkflowE2ETest(TestCase):
+class ContributionWorkflowE2ETest(StaticLiveServerTestCase):
     """End-to-end test for complete contribution and publication workflow."""
 
     @classmethod
@@ -82,12 +83,12 @@ class ContributionWorkflowE2ETest(TestCase):
         """
         try:
             # Start browser
-            start_chrome('localhost:8000/', headless=True)
+            start_chrome(f'{self.live_server_url}/', headless=True)
             driver = get_driver()
 
             # Step 1: Login as admin
             # Navigate to home page and open menu
-            go_to('localhost:8000/')
+            go_to(f'{self.live_server_url}/')
             time.sleep(1)
 
             # Find and click the menu dropdown
@@ -108,7 +109,7 @@ class ContributionWorkflowE2ETest(TestCase):
 
             # Start browser again with authenticated session
             # Set up session cookie
-            start_chrome('localhost:8000/', headless=True)
+            start_chrome(f'{self.live_server_url}/', headless=True)
             driver = get_driver()
 
             # Add session cookie to browser
@@ -122,7 +123,7 @@ class ContributionWorkflowE2ETest(TestCase):
                 })
 
             # Step 2: Navigate to contribute page
-            go_to('localhost:8000/contribute/')
+            go_to(f'{self.live_server_url}/contribute/')
             time.sleep(2)
 
             # Verify we're on the contribute page
@@ -177,7 +178,7 @@ class ContributionWorkflowE2ETest(TestCase):
             self.test_work.save()
 
             # Step 6: Navigate to work landing page
-            work_url = f'localhost:8000/work/{self.test_work.id}/'
+            work_url = ff'{self.live_server_url}/work/{self.test_work.id}/'
             go_to(work_url)
             time.sleep(2)
 
@@ -209,7 +210,7 @@ class ContributionWorkflowE2ETest(TestCase):
                 self.skipTest('Publish button not found - may need to adjust test')
 
             # Step 8: Verify work appears on main map
-            go_to('localhost:8000/')
+            go_to(f'{self.live_server_url}/')
             time.sleep(2)
 
             # Check if map has loaded

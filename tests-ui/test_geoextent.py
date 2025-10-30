@@ -2,6 +2,7 @@ import unittest
 import os
 import tempfile
 from django.test import TestCase
+from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.urls import reverse
 from helium import (
     start_chrome,
@@ -94,7 +95,7 @@ class GeoextentPageTests(TestCase):
         self.assertContains(response, 'Geoextent')
 
 
-class GeoextentUIInteractionTests(TestCase):
+class GeoextentUIInteractionTests(StaticLiveServerTestCase):
     """Browser-based UI interaction tests for geoextent page."""
 
     @classmethod

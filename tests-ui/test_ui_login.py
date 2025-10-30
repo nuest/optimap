@@ -1,11 +1,11 @@
 import os
-from unittest import TestCase
+from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from helium import *
 
-class SimpleTest(TestCase):
+class SimpleTest(StaticLiveServerTestCase):
 
     def test_login_page(self):
-        start_chrome('localhost:8000/login/', headless=True)
+        start_chrome(f'{self.live_server_url}/login/', headless=True)
 
         write('optimap@dev.dev', into='email')
 

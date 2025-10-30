@@ -4,10 +4,10 @@ from helium import *
 import time
 
 
-class MainpageTest(unittest.TestCase):
+class MainpageTest(unittest.StaticLiveServerTestCase):
     def test_timeline_navigation(self):
         """Test timeline button and visualization."""
-        start_chrome('localhost:8000/', headless=True)
+        start_chrome(f'{self.live_server_url}/', headless=True)
         try:
             click(Button("Timeline"))
             time.sleep(2)

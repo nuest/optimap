@@ -12,7 +12,7 @@ django.setup()
 
 User = get_user_model()
 
-class EmailChangeUITest(unittest.TestCase):
+class EmailChangeUITest(unittest.StaticLiveServerTestCase):
     def setUp(self):
         """Set up the test user and start browser"""
         self.old_email = "testuser@example.com"
@@ -44,10 +44,10 @@ class EmailChangeUITest(unittest.TestCase):
 
         sleep(1)
         
-        go_to(f"http://localhost:8000/login/{self.token}")  
+        go_to(ff"{self.live_server_url}/login/{self.token}")  
         sleep(3)
 
-        go_to("http://localhost:8000/usersettings/")
+        go_to(f"{self.live_server_url}/usersettings/")
         sleep(2)
 
         click("Change Email")
@@ -61,7 +61,7 @@ class EmailChangeUITest(unittest.TestCase):
 
         if stored_data and "token" in stored_data:
             correct_token = stored_data["token"]
-            confirmation_url = f"http://localhost:8000/confirm-email/{correct_token}/{self.new_email}"
+            confirmation_url = ff"{self.live_server_url}/confirm-email/{correct_token}/{self.new_email}"
             go_to(confirmation_url)
             sleep(5)
         else:

@@ -7,6 +7,7 @@ Tests verify that admin-only buttons and features are:
 """
 
 from django.test import TestCase
+from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.contrib.auth import get_user_model
 from helium import (
     start_chrome,
@@ -22,13 +23,16 @@ from works.models import Work
 User = get_user_model()
 
 
-def get_work_from_api():
+def get_work_from_api(base_url):
     """
     Helper function to get a work (id, doi) from the API instead of database.
     Returns the first published work found, preferring works with DOI.
     Returns identifier field that can be used in URLs (either DOI or ID).
+
+    Args:
+        base_url: The base URL of the test server (e.g., self.live_server_url)
     """
-    response = requests.get('http://localhost:8000/api/v1/works/', timeout=5)
+    response = requests.get(f'{base_url}/api/v1/works/', timeout=5)
     if response.status_code == 200:
         data = response.json()
         if data.get('results') and len(data['results']) > 0:
@@ -141,10 +145,19 @@ class AdminContentVisibilityTests(TestCase):
         self.assertContains(response, 'Site administration')
 
 
-class AdminButtonsBrowserTests(TestCase):
-    """Browser-based tests for admin button visibility."""
+class AdminButtonsBrowserTests(StaticLiveServerTestCase):
+    """Browser-based tests for admin button visibility.
+
+    Uses StaticLiveServerTestCase to automatically start a live test server
+    that serves both the application and static files.
+    """
 
     fixtures = ['test_data_optimap.json']
+
+    @classmethod
+    def setUpClass(cls):
+        """Set up class-level resources including live server."""
+        super().setUpClass()
 
     def setUp(self):
         """Set up test users for each test."""
@@ -159,13 +172,13 @@ class AdminButtonsBrowserTests(TestCase):
         """Test that work landing page doesn't show admin buttons to anonymous users."""
 
         # Get work from API instead of database
-        work_data = get_work_from_api()
+        work_data = get_work_from_api(self.live_server_url)
         if not work_data or not work_data.get('identifier'):
             self.skipTest('No works available via API')
 
         try:
             # Use the unified identifier (DOI or ID)
-            start_chrome(f'localhost:8000/work/{work_data["identifier"]}/', headless=True)
+            start_chrome(f'{self.live_server_url}/work/{work_data["identifier"]}/', headless=True)
             driver = get_driver()
 
             # Wait for page to load
@@ -181,7 +194,7 @@ class AdminButtonsBrowserTests(TestCase):
     def test_contribute_page_anonymous_no_publish_buttons(self):
         """Test that contribute page doesn't show publish buttons to anonymous users."""
         try:
-            start_chrome('localhost:8000/contribute/', headless=True)
+            start_chrome(f'{self.live_server_url}/contribute/', headless=True)
             driver = get_driver()
 
             # Wait for page to load

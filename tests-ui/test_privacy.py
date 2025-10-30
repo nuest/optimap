@@ -1,12 +1,13 @@
 import unittest
 from django.test import TestCase
+from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.urls import reverse  
 from helium import start_chrome,click,get_driver,kill_browser
 import os
 
-class PrivacypageTests(TestCase):
+class PrivacypageTests(StaticLiveServerTestCase):
     def test_privacy_link(self):
-        start_chrome('localhost:8000/', headless=True)
+        start_chrome(f'{self.live_server_url}/', headless=True)
         click("privacy")    
         get_driver().save_screenshot(os.path.join(os.getcwd(), 'tests-ui', 'screenshots', 'privacy.png'))
         kill_browser()

@@ -14,7 +14,7 @@ from time import sleep
 
 User = get_user_model()
 
-class AdminBlockUserTests(TestCase):
+class AdminBlockUserTests(StaticLiveServerTestCase):
     def setUp(self):
         """Set up a superuser, test user, and start the browser before each test."""
         self.superuser, _ = User.objects.get_or_create(
@@ -35,7 +35,7 @@ class AdminBlockUserTests(TestCase):
 
         #self.kill_existing_firefox_processes()
         try:
-            self.browser = start_chrome("http://localhost:8000/admin/", headless=True)
+            self.browser = start_chrome(f"{self.live_server_url}/admin/", headless=True)
         except Exception as e:
             print(f"Error starting browser: {e}")
             self.browser = None
@@ -65,7 +65,7 @@ class AdminBlockUserTests(TestCase):
             write("admin123", into="Password")
             click("Log in")
 
-            go_to("http://localhost:8000/admin/auth/user/")
+            go_to(f"{self.live_server_url}/admin/auth/user/")
 
             if not User.objects.filter(email="blocked@test.com").exists():
                 self.test_user = User.objects.create_user(

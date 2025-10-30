@@ -1,12 +1,12 @@
-from unittest import TestCase
+from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 import os
 from helium import *
 import time
 
-class LoginresponseTest(TestCase):
+class LoginresponseTest(StaticLiveServerTestCase):
     def test_login_response(self):
         """Test login flow and response message."""
-        start_chrome('localhost:8000/', headless=True)
+        start_chrome(f'{self.live_server_url}/', headless=True)
         try:
             click(Button("signup"))
             write('dev@example.com', into='email')

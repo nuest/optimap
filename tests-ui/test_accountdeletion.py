@@ -12,7 +12,7 @@ django.setup()
 
 User = get_user_model()
 
-class AccountDeletionUITest(unittest.TestCase):
+class AccountDeletionUITest(unittest.StaticLiveServerTestCase):
     def setUp(self):
         """Set up the test user and start browser"""
         self.email = "testuser@example.com"
@@ -36,10 +36,10 @@ class AccountDeletionUITest(unittest.TestCase):
         write(self.email,  into='email')
         click(S('button[type="submit"]'))
 
-        go_to(f"http://localhost:8000/login/{self.token}")  
+        go_to(ff"{self.live_server_url}/login/{self.token}")  
         sleep(3)
 
-        go_to("http://localhost:8000/usersettings/")
+        go_to(f"{self.live_server_url}/usersettings/")
         sleep(2)
 
         click("Delete account")
@@ -48,7 +48,7 @@ class AccountDeletionUITest(unittest.TestCase):
         click("Delete")
         sleep(3)
 
-        go_to(f"http://localhost:8000/confirm-delete/{self.delete_token}")
+        go_to(ff"{self.live_server_url}/confirm-delete/{self.delete_token}")
         sleep(3)
 
         click("Permanently Delete Account")

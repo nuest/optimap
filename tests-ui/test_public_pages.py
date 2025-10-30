@@ -7,6 +7,7 @@ Tests verify:
 """
 
 from django.test import TestCase
+from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.urls import reverse
 from helium import (
     start_chrome,
@@ -139,15 +140,24 @@ class RegionalFeedPagesTests(TestCase):
         self.assertNotContains(response, "/admin/")
 
 
-class PublicPagesBrowserTests(TestCase):
-    """Browser-based tests for public pages using Helium."""
+class PublicPagesBrowserTests(StaticLiveServerTestCase):
+    """Browser-based tests for public pages using Helium.
+
+    Uses StaticLiveServerTestCase to automatically start a live test server
+    that serves both the application and static files.
+    """
 
     fixtures = ['test_data_optimap.json']
+
+    @classmethod
+    def setUpClass(cls):
+        """Set up class-level resources including live server."""
+        super().setUpClass()
 
     def test_about_page_browser(self):
         """Test about page renders correctly in browser."""
         try:
-            start_chrome('localhost:8000/about/', headless=True)
+            start_chrome(f'{self.live_server_url}/about/', headless=True)
             driver = get_driver()
 
             # Check page loaded
@@ -166,7 +176,7 @@ class PublicPagesBrowserTests(TestCase):
     def test_data_page_browser(self):
         """Test data page renders correctly in browser."""
         try:
-            start_chrome('localhost:8000/data/', headless=True)
+            start_chrome(f'{self.live_server_url}/data/', headless=True)
             driver = get_driver()
 
             # Check page loaded
@@ -185,7 +195,7 @@ class PublicPagesBrowserTests(TestCase):
     def test_accessibility_page_browser(self):
         """Test accessibility page renders correctly in browser."""
         try:
-            start_chrome('localhost:8000/accessibility/', headless=True)
+            start_chrome(f'{self.live_server_url}/accessibility/', headless=True)
             driver = get_driver()
 
             # Check page loaded
