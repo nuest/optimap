@@ -141,6 +141,7 @@ def continent_feed_page(request, continent_slug):
         'region_type': 'Continent',
         'works': publications,
         'publications_geojson': _publications_to_geojson(publications),
+        'region_geojson': region.geom.geojson,
         'feed_urls': {
             'georss': reverse('optimap:api-continent-georss', kwargs={'continent_slug': continent_slug}),
             'atom': reverse('optimap:api-continent-atom', kwargs={'continent_slug': continent_slug}),
@@ -186,6 +187,7 @@ def ocean_feed_page(request, ocean_slug):
         'region_type': 'Ocean',
         'works': publications,
         'publications_geojson': _publications_to_geojson(publications),
+        'region_geojson': region.geom.geojson,
         'feed_urls': {
             'georss': reverse('optimap:api-ocean-georss', kwargs={'ocean_slug': ocean_slug}),
             'atom': reverse('optimap:api-ocean-atom', kwargs={'ocean_slug': ocean_slug}),

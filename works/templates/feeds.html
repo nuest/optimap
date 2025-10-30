@@ -67,18 +67,36 @@
     {% endfor %}
   </ul>
 
-  <span class="mt-8 mb-4">Sources &amp; licenses for region data:</span>
-  <ul class="list-inline text-sm text-gray-700">
-    {% for region in regions %}
-      <li class="list-inline-item flex mr-0">
-        <a href="{{ region.source_url }}"
-           class="flex-1 min-w-0 truncate text-blue-600 hover:underline"
-           target="_blank"
-           title="Source for {{ region.name }}">{{ region.name|safe }}</a>&nbsp;<span>(<a href="{{ region.license }}">license</a>)</span>
-        {% if not forloop.last %}, {% endif %}
-      </li>
-    {% endfor %}
-  </ul>
+  <div class="mt-8 mb-4">
+    <h3 class="text-lg font-semibold mb-2">Sources &amp; licenses for region data</h3>
+
+    <div class="mb-4 text-sm text-gray-700">
+      <p class="mb-1">
+        <strong>Source:</strong>
+        <a href="https://doi.org/10.14284/542" class="text-blue-600 hover:underline" target="_blank">Flanders Marine Institute (2021). Global Oceans and Seas, version 1</a>
+        (<a href="https://creativecommons.org/licenses/by/4.0/" class="text-blue-600 hover:underline" target="_blank">CC BY 4.0 license</a>)
+      </p>
+      <p class="ml-4 text-gray-600">
+        <strong>Regions:</strong> Arctic Ocean, Baltic Sea, Indian Ocean, Mediterranean Region, North Atlantic Ocean, North Pacific Ocean, South Atlantic Ocean, South China and Easter Archipelagic Seas, South Pacific Ocean, Southern Ocean
+      </p>
+    </div>
+
+    <div class="text-sm text-gray-700">
+      <p class="mb-1">
+        <strong>Source:</strong>
+        <a href="https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/World_Continents/FeatureServer/0/query?where=1%3D1&outFields=*&f=geojson" class="text-blue-600 hover:underline" target="_blank">Esri Hub World Continents Feature Service</a>
+        (<a href="https://www.arcgis.com/sharing/rest/content/items/57c1ade4fa7c4e2384e6a23f2b3bd254/info/metadata/metadata.xml?format=default&output=html" class="text-blue-600 hover:underline" target="_blank">license</a>)
+      </p>
+      <p class="ml-4 text-gray-600">
+        <strong>Regions:</strong> Africa, Antarctica, Asia, Australia, Europe, North America, Oceania, South America
+      </p>
+    </div>
+  </div>
+
+  <div class="mt-6 mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-xs text-gray-600">
+    <p class="mb-1"><strong>Geometric processing:</strong></p>
+    <p>Ocean geometries are simplified to reduce file size while preserving geographic accuracy. Simplification uses a tolerance of {{ ocean_simplification_tolerance }} degrees and removes the smallest {{ ocean_simplification_percentile }}% of interior holes (islands are preserved).</p>
+  </div>
 
 </div>
 {% endblock content %}

@@ -20,11 +20,12 @@ from django.contrib.gis.geos import Polygon, Point, MultiPoint
 # Import geoextent at module level
 import geoextent.lib.extent as geoextent
 
-from .models import Work, Source, Subscription
+from .models import Work, Source, Subscription, GlobalRegion
 from .serializers import (
     WorkSerializer,
     SourceSerializer,
     SubscriptionSerializer,
+    GlobalRegionSerializer,
     GeoextentExtractSerializer,
     GeoextentRemoteSerializer,
     GeoextentRemoteGetSerializer,
@@ -69,6 +70,17 @@ class SubscriptionViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+
+class GlobalRegionViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    GlobalRegion view set for continent and ocean geometries.
+    Returns GeoJSON FeatureCollection for use in map layers.
+    Read-only - regions are loaded via management command.
+    """
+    queryset = GlobalRegion.objects.all().order_by('region_type', 'name')
+    serializer_class = GlobalRegionSerializer
+    permission_classes = [AllowAny]
 
 
 class GeoextentViewSet(viewsets.ViewSet):

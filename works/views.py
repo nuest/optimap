@@ -167,7 +167,12 @@ def accessibility(request):
 def feeds_list(request):
     """Display available predefined feeds grouped by global regions."""
     regions = GlobalRegion.objects.all().order_by("name")
-    return render(request, "feeds.html", {"regions": regions})
+    context = {
+        "regions": regions,
+        "ocean_simplification_tolerance": settings.OCEAN_SIMPLIFICATION_TOLERANCE,
+        "ocean_simplification_percentile": settings.OCEAN_SIMPLIFICATION_PERCENTILE,
+    }
+    return render(request, "feeds.html", context)
 
 def loginres(request):
     email = request.POST.get('email', False)

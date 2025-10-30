@@ -100,15 +100,15 @@ async function initMap() {
     // Make zoom control globally available
     window.mapZoomToAllControl = zoomToAllControl;
   }
-  // Initialize gazetteer (location search)
-  if (typeof MapGazetteerManager !== 'undefined' && window.OPTIMAP_SETTINGS?.gazetteer) {
-    const gazetteerManager = new MapGazetteerManager(map, window.OPTIMAP_SETTINGS.gazetteer);
-    console.log('Gazetteer enabled');
 
-    // Make gazetteer manager globally available
-    window.mapGazetteerManager = gazetteerManager;
+  // Initialize global regions layer
+  if (typeof MapGlobalRegionsManager !== 'undefined') {
+    const globalRegionsManager = new MapGlobalRegionsManager(map, layerControl);
+    console.log('Global regions layer initialized');
+
+    // Make global regions manager globally available
+    window.mapGlobalRegionsManager = globalRegionsManager;
   }
-
 
   // Fit map to markers
   if (publicationsGroup.getBounds().isValid()) {

@@ -3,7 +3,7 @@
 from rest_framework import serializers
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 from rest_framework import serializers as drf_serializers
-from .models import Work, Subscription, Source
+from .models import Work, Subscription, Source, GlobalRegion
 from django.contrib.auth import get_user_model
 from django.conf import settings
 
@@ -207,3 +207,25 @@ class GeoextentBatchSerializer(GeoextentBaseSerializer):
                 f"Requested batch size ({value}MB) exceeds server maximum ({max_allowed}MB)"
             )
         return value
+
+
+class GlobalRegionSerializer(GeoFeatureModelSerializer):
+    """Serializer for GlobalRegion model with GeoJSON output."""
+    region_type_display = serializers.CharField(source='get_region_type_display', read_only=True)
+    slug = serializers.CharField(source='get_slug', read_only=True)
+    absolute_url = serializers.CharField(source='get_absolute_url', read_only=True)
+
+    class Meta:
+        model = GlobalRegion
+        geo_field = "geom"
+        auto_bbox = True
+        fields = [
+            "id",
+            "name",
+            "region_type",
+            "region_type_display",
+            "slug",
+            "absolute_url",
+            "source_url",
+            "license",
+        ]

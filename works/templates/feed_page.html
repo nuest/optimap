@@ -146,7 +146,23 @@
     // Publication data as GeoJSON
     const publicationsData = {{ publications_geojson|safe }};
 
-    // Add publications to map using shared popup function
+    // Region geometry as GeoJSON
+    const regionGeometry = {{ region_geojson|safe }};
+
+    // Add region outline layer (enabled by default, shown below publications)
+    const regionLayer = L.geoJSON(regionGeometry, {
+      style: {
+        color: '{{ region_type }}' === 'Continent' ? '#8B4513' : '#1E90FF', // Brown for continents, blue for oceans
+        weight: 3,
+        opacity: 0.8,
+        fillOpacity: 0,
+        dashArray: '5, 10', // Dashed line pattern: 5px dash, 10px gap
+        interactive: false,
+        bubblingMouseEvents: false
+      }
+    }).addTo(map);
+
+    // Add publications to map using shared popup function (displayed above region layer)
     const publicationsLayer = L.geoJSON(publicationsData, {
       style: publicationStyle,
       onEachFeature: publicationPopup
@@ -158,9 +174,11 @@
       console.log('Enhanced map interaction enabled on feed page');
     }
 
-    // Fit map to show all publications
+    // Fit map to show all publications (or region if no publications)
     if (publicationsLayer.getBounds().isValid()) {
       map.fitBounds(publicationsLayer.getBounds(), { padding: [20, 20] });
+    } else if (regionLayer.getBounds().isValid()) {
+      map.fitBounds(regionLayer.getBounds(), { padding: [20, 20] });
     } else {
       // Default view if no geometries
       map.setView([0, 0], 2);
