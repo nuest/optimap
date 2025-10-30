@@ -67,16 +67,26 @@ CONTINENTS = [
 ]
 
 OCEANS = [
-    # Atlantic Ocean (completely within)
-    ("Atlantic Ocean", "POLYGON ((-40 10, -20 10, -20 40, -40 40, -40 10))", "North Atlantic Ocean"),
-    # Pacific Ocean (completely within)
-    ("Pacific Ocean", "POLYGON ((150 -20, 170 -20, 170 10, 150 10, 150 -20))", "Western Pacific Ocean"),
-    # Indian Ocean (completely within)
-    ("Indian Ocean", "POLYGON ((60 -30, 80 -30, 80 -10, 60 -10, 60 -30))", "Western Indian Ocean"),
     # Arctic Ocean (completely within)
     ("Arctic Ocean", "POLYGON ((-20 75, 20 75, 20 85, -20 85, -20 75))", "Arctic Ocean near North Pole"),
+    # North Atlantic Ocean (completely within)
+    ("North Atlantic Ocean", "POLYGON ((-40 25, -20 25, -20 50, -40 50, -40 25))", "North Atlantic Ocean"),
+    # South Atlantic Ocean (completely within)
+    ("South Atlantic Ocean", "POLYGON ((-30 -35, -10 -35, -10 -10, -30 -10, -30 -35))", "South Atlantic Ocean"),
+    # Indian Ocean (completely within)
+    ("Indian Ocean", "POLYGON ((60 -30, 80 -30, 80 -10, 60 -10, 60 -30))", "Western Indian Ocean"),
+    # North Pacific Ocean (completely within)
+    ("North Pacific Ocean", "POLYGON ((150 10, 170 10, 170 40, 150 40, 150 10))", "North Pacific Ocean"),
+    # South Pacific Ocean (completely within)
+    ("South Pacific Ocean", "POLYGON ((160 -35, 180 -35, 180 -10, 160 -10, 160 -35))", "South Pacific Ocean"),
     # Southern Ocean (completely within)
     ("Southern Ocean", "POLYGON ((0 -65, 40 -65, 40 -55, 0 -55, 0 -65))", "Southern Ocean around Antarctica"),
+    # Mediterranean Region (completely within)
+    ("Mediterranean Region", "POLYGON ((10 32, 25 32, 25 42, 10 42, 10 32))", "Mediterranean Region"),
+    # South China and Easter Archipelagic Seas (completely within)
+    ("South China and Easter Archipelagic Seas", "POLYGON ((110 -30, 130 -30, 130 10, 110 10, 110 -30))", "South China and Easter Archipelagic Seas"),
+    # Baltic Sea (completely within)
+    ("Baltic Sea", "POLYGON ((15 54, 25 54, 25 62, 15 62, 15 54))", "Baltic Sea"),
 ]
 
 # Works that overlap two neighboring regions
@@ -99,7 +109,7 @@ MULTI_REGION_SPANS = [
     ("Global Climate Network", "MULTIPOLYGON (((-120 30, -100 30, -100 45, -120 45, -120 30)), ((10 40, 30 40, 30 55, 10 55, 10 40)), ((120 -30, 140 -30, 140 -20, 120 -20, 120 -30)), ((-50 -20, -40 -20, -40 -10, -50 -10, -50 -20)))", "North America, Europe, Australia, South America"),
 ]
 
-# Point geometries - one per global region (7 continents + 5 oceans = 12 points)
+# Point geometries - one per global region (7 continents + 10 oceans = 17 points)
 REGION_POINTS = [
     # Continental points
     ("Field Site: Central Africa", "POINT (20 0)", "field research station in central Africa"),
@@ -109,12 +119,20 @@ REGION_POINTS = [
     ("Field Site: Central South America", "POINT (-60 -15)", "field research station in central South America"),
     ("Field Site: Central Australia", "POINT (135 -25)", "field research station in central Australia"),
     ("Field Site: Antarctic Peninsula", "POINT (-60 -70)", "field research station in Antarctica"),
-    # Ocean points
-    ("Monitoring Buoy: Central Atlantic", "POINT (-30 20)", "ocean monitoring buoy in the Atlantic Ocean"),
-    ("Monitoring Buoy: Central Pacific", "POINT (170 0)", "ocean monitoring buoy in the Pacific Ocean"),
+    # Ocean points (10 oceans)
+    ("Monitoring Buoy: Arctic Ocean", "POINT (0 80)", "ocean monitoring buoy in the Arctic Ocean"),
+    ("Monitoring Buoy: North Atlantic", "POINT (-30 35)", "ocean monitoring buoy in the North Atlantic Ocean"),
+    ("Monitoring Buoy: South Atlantic", "POINT (-20 -20)", "ocean monitoring buoy in the South Atlantic Ocean"),
+    ("Monitoring Buoy: Indian Ocean", "POINT (70 -20)", "ocean monitoring buoy in the Indian Ocean"),
+    ("Monitoring Buoy: North Pacific", "POINT (160 25)", "ocean monitoring buoy in the North Pacific Ocean"),
+    ("Monitoring Buoy: South Pacific", "POINT (170 -20)", "ocean monitoring buoy in the South Pacific Ocean"),
+    ("Monitoring Buoy: Southern Ocean", "POINT (20 -60)", "ocean monitoring buoy in the Southern Ocean"),
+    ("Monitoring Buoy: Mediterranean", "POINT (18 37)", "ocean monitoring buoy in the Mediterranean Region"),
+    ("Monitoring Buoy: South China Seas", "POINT (120 0)", "ocean monitoring buoy in the South China and Easter Archipelagic Seas"),
+    ("Monitoring Buoy: Baltic Sea", "POINT (20 58)", "ocean monitoring buoy in the Baltic Sea"),
     ("Monitoring Buoy: Central Indian Ocean", "POINT (75 -20)", "ocean monitoring buoy in the Indian Ocean"),
-    ("Monitoring Buoy: Arctic Ocean", "POINT (0 85)", "ocean monitoring buoy in the Arctic Ocean"),
-    ("Monitoring Buoy: Southern Ocean", "POINT (100 -65)", "ocean monitoring buoy in the Southern Ocean"),
+    ("Monitoring Buoy: Arctic Ocean 2", "POINT (0 85)", "ocean monitoring buoy in the Arctic Ocean"),
+    ("Monitoring Buoy: Southern Ocean 2", "POINT (100 -65)", "ocean monitoring buoy in the Southern Ocean"),
 ]
 
 # Line geometries - spanning at least two regions (10 lines)
@@ -133,7 +151,7 @@ CROSS_REGION_LINES = [
 
 # Complex polygon geometries (triangles, pentagons, concave shapes, holes)
 COMPLEX_POLYGONS = [
-    ("Triangular Survey Area: Mediterranean", "POLYGON ((10 35, 20 45, 5 42, 10 35))", "triangular research zone in Mediterranean Sea"),
+    ("Triangular Survey Area: Mediterranean", "POLYGON ((10 35, 20 45, 5 42, 10 35))", "triangular research zone in Mediterranean Region"),
     ("Pentagon Study Region: Central Europe", "POLYGON ((10 48, 15 50, 17 47, 12 44, 8 46, 10 48))", "five-sided ecological study area in Central Europe"),
     ("Concave Polygon Zone: Southeast Asia", "POLYGON ((100 5, 105 5, 105 10, 103 8, 101 10, 100 10, 100 5))", "irregularly shaped coastal research area"),
     ("Protected Area with Exclusion Zone: Amazon", "POLYGON ((-65 -5, -60 -5, -60 0, -65 0, -65 -5), (-63 -3, -62 -3, -62 -2, -63 -2, -63 -3))", "conservation area with restricted inner zone in Amazon rainforest"),

@@ -52,6 +52,15 @@ DATA_DUMP_RETENTION = int(os.getenv("OPTIMAP_DATA_DUMP_RETENTION", 3))
 # Feed configuration
 FEED_CACHE_HOURS = int(os.getenv("OPTIMAP_FEED_CACHE_HOURS", 24))
 
+# Ocean geometry simplification configuration
+OCEAN_SIMPLIFICATION_TOLERANCE = float(os.getenv("OPTIMAP_OCEAN_SIMPLIFICATION_TOLERANCE", "0.05"))
+OCEAN_SIMPLIFICATION_PERCENTILE = float(os.getenv("OPTIMAP_OCEAN_SIMPLIFICATION_PERCENTILE", "80.0"))
+
+# Global regions data directory (for storing downloaded ocean/continent files)
+# Default: <project_root>/works/management/commands (backwards compatible)
+# For deployment: set to a non-volatile directory like /var/opt/optimap/data
+GLOBAL_REGIONS_DATA_DIR = os.getenv("OPTIMAP_GLOBAL_REGIONS_DATA_DIR", None)
+
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
 ]

@@ -38,12 +38,15 @@ EXPECTED_COUNTS = {
     'south-america': 8,
     # Oceans
     'arctic-ocean': 5,
+    'baltic-sea': 2,  # Baltic Sea + monitoring buoy
     'indian-ocean': 11,
+    'mediterranean-region': 3,  # Mediterranean + monitoring buoy + triangular survey
     'north-atlantic-ocean': 18,
     'north-pacific-ocean': 13,
     'south-atlantic-ocean': 10,
-    'southern-ocean': 5,
+    'south-china-and-easter-archipelagic-seas': 2,  # South China Seas + monitoring buoy
     'south-pacific-ocean': 8,
+    'southern-ocean': 5,
 }
 
 
@@ -62,7 +65,7 @@ class GlobalFeedsAndLandingPageTests(TestCase):
 
     def test_global_region_load(self):
         regions = GlobalRegion.objects.all()
-        self.assertEqual(len(regions), 15)
+        self.assertEqual(len(regions), 17)  # 7 continents + 10 oceans
 
     def test_georss_feed_per_region(self):
         for region in GlobalRegion.objects.all():

@@ -1,6 +1,6 @@
 from datetime import date
 import os
-from django.test import Client, TransactionTestCase, TestCase
+from django.test import Client, TestCase
 from works.models import Work
 from django.contrib.gis.geos import Point, MultiPoint, LineString, Polygon, GeometryCollection
 from django.contrib.auth import get_user_model

@@ -155,3 +155,15 @@ publications/management/commands/world_continents.geojson
 works/management/commands/marine_regions_iho.geojson
 
 works/management/commands/world_continents.geojson
+
+works/management/commands/goas_v01_simplified_0.01-80.geojson
+
+works/management/commands/goas_v01_simplified_0.1-90.geojson
+
+works/management/commands/goas_v01_simplified-0.05-80.geojson
+
+works/management/commands/goas_v01_simplified.geojson
+
+works/management/commands/goas_v01.gpkg
+
+works/management/commands/marine_regions_testing.qgz
