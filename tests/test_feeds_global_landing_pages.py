@@ -30,23 +30,23 @@ EXPECTED_COUNTS = {
     # Continents
     'africa': 15,
     'antarctica': 2,
-    'asia': 23,
-    'australia': 6,
-    'europe': 17,
+    'asia': 24,
+    'australia': 7,
+    'europe': 19,
     'north-america': 14,
-    'oceania': 5,
+    'oceania': 6,
     'south-america': 8,
     # Oceans
-    'arctic-ocean': 5,
-    'baltic-sea': 2,  # Baltic Sea + monitoring buoy
-    'indian-ocean': 11,
-    'mediterranean-region': 3,  # Mediterranean + monitoring buoy + triangular survey
-    'north-atlantic-ocean': 18,
-    'north-pacific-ocean': 13,
-    'south-atlantic-ocean': 10,
-    'south-china-and-easter-archipelagic-seas': 2,  # South China Seas + monitoring buoy
+    'arctic-ocean': 9,
+    'baltic-sea': 6,
+    'indian-ocean': 17,
+    'mediterranean-region': 13,
+    'north-atlantic-ocean': 21,
+    'north-pacific-ocean': 18,
+    'south-atlantic-ocean': 12,
+    'south-china-and-easter-archipelagic-seas': 9,
     'south-pacific-ocean': 8,
-    'southern-ocean': 5,
+    'southern-ocean': 6,
 }
 
 
@@ -65,7 +65,7 @@ class GlobalFeedsAndLandingPageTests(TestCase):
 
     def test_global_region_load(self):
         regions = GlobalRegion.objects.all()
-        self.assertEqual(len(regions), 17)  # 7 continents + 10 oceans
+        self.assertEqual(len(regions), 18)  # 8 continents + 10 oceans
 
     def test_georss_feed_per_region(self):
         for region in GlobalRegion.objects.all():
@@ -110,8 +110,8 @@ class GlobalFeedsAndLandingPageTests(TestCase):
         titles = [entry.find("atom:title", namespaces=NSPS).text
                     for entry in root.findall(".//atom:entry", namespaces=NSPS)]
 
-        self.assertEqual(len(titles), 6, "Atom feed for Australia should return 6 entries")
-        self.assertEqual(titles[0], "Migration Route: Asia to Australia", "Atom feed for Australia returned unexpected title")
+        self.assertEqual(len(titles), 7, "Atom feed for Australia should return 7 entries")
+        self.assertEqual(titles[0], "Marine Biology and Oceanography of the South China and Easter Archipelagic Seas", "Atom feed for Australia returned unexpected title")
 
     def test_georss_feed_south_atlantic(self):
         # Use new API v1 GeoRSS endpoint
@@ -123,9 +123,9 @@ class GlobalFeedsAndLandingPageTests(TestCase):
         titles = [item.find("title").text
                     for item in root.findall(".//item", namespaces=NSPS)]
 
-        self.assertEqual(len(titles), 10, "GeoRSS feed for South Atlantic Ocean should return 10 entries")
-        self.assertEqual(titles[0], "Marine Biology and Oceanography of the Southern Ocean", "GeoRSS feed for South Atlantic Ocean returned unexpected first title")
-        self.assertEqual(titles[9], "Global Climate Network", "GeoRSS feed for South Atlantic Ocean returned unexpected last title")
+        self.assertEqual(len(titles), 12, "GeoRSS feed for South Atlantic Ocean should return 12 entries")
+        self.assertEqual(titles[0], "Pan-Pacific Study", "GeoRSS feed for South Atlantic Ocean returned unexpected first title")
+        self.assertEqual(titles[11], "Seismic Survey: Mid-Atlantic Ridge", "GeoRSS feed for South Atlantic Ocean returned unexpected last title")
 
 
     def test_all_continent_pages_display_correct_work_counts(self):
