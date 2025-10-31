@@ -39,11 +39,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Dashed line styling for clear visual distinction
   - Click to view region details and navigate to regional feeds
   - Integrated with feed landing pages showing region outlines
+- **Zoom-to-all features control** - Quick navigation button on all maps:
+  - Expands view to fit all publications in the current context
+  - Available on main map, feed landing pages, and work landing pages
+  - Accessible button with screen reader support
+  - Uses FontAwesome expand icon for visual clarity
 - **Geocoding/gazetteer search** - Map search functionality allowing users to search for locations by name:
   - Nominatim geocoder integration (default)
   - Optional GeoNames support (requires username configuration)
   - Search results displayed on map with zoom to location
   - Accessible via search box in map interface
+  - Available on feed landing pages and work landing pages for consistent navigation
 - **Works list with pagination** - Browse all works page at `/works/list/` with:
   - Configurable pagination (default 50 items per page)
   - User-selectable page size with min/max limits

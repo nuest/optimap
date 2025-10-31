@@ -152,6 +152,8 @@
 {% endif %}
 <!-- Leaflet Fullscreen plugin -->
 <link rel="stylesheet" href="{% static 'css/leaflet.fullscreen.css' %}">
+<!-- Leaflet Control Geocoder (Gazetteer) -->
+<link rel="stylesheet" href="{% static 'css/leaflet.control.geocoder.css' %}" />
 
 {% if can_contribute %}
   <div class="alert alert-warning">
@@ -242,7 +244,10 @@
   {% endif %}
   <!-- Leaflet Fullscreen plugin -->
   <script src="{% static 'js/leaflet.fullscreen.js' %}"></script>
-  <!-- Zoom to all features control -->
+  <!-- Leaflet Control Geocoder (Gazetteer) -->
+  <script src="{% static 'js/leaflet.control.geocoder.js' %}"></script>
+  <!-- Map controls -->
+  <script src="{% static 'js/map-gazetteer.js' %}"></script>
   <script src="{% static 'js/map-zoom-to-all.js' %}"></script>
   <script>
     const publicationFeature = {{ feature_json|default:"null"|safe }};
@@ -543,6 +548,15 @@
     if (typeof MapZoomToAllControl !== 'undefined') {
       const zoomToAllControl = new MapZoomToAllControl(map, featureGroup);
       console.log('Zoom to all features control enabled on mini-map');
+    }
+
+    // Add gazetteer (location search) control
+    if (typeof MapGazetteerManager !== 'undefined') {
+      const gazetteerManager = new MapGazetteerManager(map, {
+        provider: '{{ gazetteer_provider|default:"nominatim" }}',
+        placeholder: 'Search for a location...'
+      });
+      console.log('Gazetteer search enabled on work landing page');
     }
   </script>
 
