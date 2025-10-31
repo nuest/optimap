@@ -32,6 +32,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Support for complex geometries (points, lines, polygons, multigeometry)
   - Export extreme points (northernmost, southernmost, easternmost, westernmost) and geometric center
   - Configurable via `WIKIBASE_*` environment variables
+- **Global regions layer** - Interactive map overlay showing continent and ocean boundaries:
+  - Toggle-able layer control to show/hide global regions on the main map
+  - Simplified ocean geometries for efficient rendering
+  - Color-coded regions (brown for continents, blue for oceans)
+  - Dashed line styling for clear visual distinction
+  - Click to view region details and navigate to regional feeds
+  - Integrated with feed landing pages showing region outlines
 - **Geocoding/gazetteer search** - Map search functionality allowing users to search for locations by name:
   - Nominatim geocoder integration (default)
   - Optional GeoNames support (requires username configuration)
@@ -97,6 +104,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Unified admin control panel** - Consolidated admin status display, publish/unpublish buttons, provenance information, and "Edit in Admin" link into single highlighted box at top of work landing page. Provenance is collapsible.
 - **Improved text wrapping** - Page titles and abstract text now properly wrap on narrow windows instead of overflowing.
 - **Unified URL structure** - Changed ID-based URLs from `/publication/<id>/` to `/work/<id>/` for consistency with DOI-based URLs.
+- **Consolidated work identifier logic** - Centralized logic for determining work identifiers (DOI or internal ID) in a `get_identifier()` method on the `Work` model:
+  - Ensures consistent identifier usage across permalinks, sitemaps, and API responses
+  - Prioritizes DOI when available, falls back to internal ID
+  - Reduces code duplication across views and serializers
 - **Refactored views_geometry.py** - Eliminated code duplication by making DOI-based functions wrap ID-based functions. Reduced from 375 to 240 lines (~36% reduction).
 - **Renamed "Locate" to "Contribute"** - URL, page title, and navigation updated for clarity about crowdsourcing purpose.
 - **Contribute page layout refactored** - Fixed text overflow issues with proper CSS containment strategy.

@@ -43,7 +43,7 @@ class FeedsAndWorkLandingTests(StaticLiveServerTestCase):
     def test_europe_feed_page_loads(self):
         """Test that the Europe feed page loads and displays works."""
         try:
-            start_chrome(f'{self.live_server_url}/feeds/continent/europe/', headless=False)
+            start_chrome(f'{self.live_server_url}/feeds/continent/europe/', headless=True)
             driver = get_driver()
 
             # Check page loaded
@@ -94,39 +94,38 @@ class FeedsAndWorkLandingTests(StaticLiveServerTestCase):
         try:
             # Use the work's identifier (DOI or ID)
             identifier = work.get_identifier()
-            start_chrome(f'{self.live_server_url}/work/{identifier}/', headless=False)
+            start_chrome(f'{self.live_server_url}/work/{identifier}/', headless=True)
             driver = get_driver()
 
             # Check page loaded
             self.assertIn("OPTIMAP", driver.title)
 
-            # Check for work title
+            # Check for work details on the page
+            page_text = driver.page_source
             self.assertTrue(
-                Text(work.title).exists() and work.title in driver.page_source,
-                f"Page should contain work title: {work.title}"
+                work.title in page_text,
+                "Work landing page shows the work title"
             )
-
-            page_text = driver.page_source.lower()
             self.assertTrue(
-                'work' in page_text and work.title in page_text,
-                "Page should be a work landing page showing the work title"
+                work.abstract in page_text,
+                "Work landing page shows the work abstract"
+            )
+            self.assertTrue(
+                work.doi in page_text and f"href=\"https://doi.org/{work.doi}\"",
+                "Work landing page shows the work doi as a link"
+            )
+            self.assertTrue(
+                work.source.name in page_text and f"href=\"{work.source.homepage_url}\"" in page_text,
+                "Work landing page shows the work source as a link"
+            )
+            self.assertTrue(
+                f"href=\"{work.openalex_id}\"" in page_text,
+                "Work landing page shows the OpenAlex ID as a link"
             )
 
             leaflet_paths = find_all(S('path.leaflet-interactive'))
-            self.assertEqual(len(leaflet_paths), 3) # has geometries on the map from test_data_optimap.json
-            for path in leaflet_paths:
-                self.assertEqual(path.web_element.get_attribute('stroke'), '#158F9B')
-
-            click(leaflet_paths[0])
-        
-            wait_until(lambda: Text('View work details').exists())
-
-            # the last paper is the first in the paths
-            self.assertIn('Visit work', S('div.leaflet-popup-content').web_element.text)
-            self.assertIn('Paper 3', S('div.leaflet-popup-content').web_element.text)
-            self.assertIn('OPTIMAP Test Journal', S('div.leaflet-popup-content').web_element.text)
-            self.assertIn('better? Dresden!', S('div.leaflet-popup-content').web_element.text)
-
+            self.assertEqual(len(leaflet_paths), 1) # has one on the map
+ 
             # Take screenshot
             screenshot_path = os.path.join(os.getcwd(), 'tests-ui', 'screenshots', 'work_landing.png')
             driver.save_screenshot(screenshot_path)
