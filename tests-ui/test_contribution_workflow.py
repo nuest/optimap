@@ -178,7 +178,7 @@ class ContributionWorkflowE2ETest(StaticLiveServerTestCase):
             self.test_work.save()
 
             # Step 6: Navigate to work landing page
-            work_url = ff'{self.live_server_url}/work/{self.test_work.id}/'
+            work_url = f'{self.live_server_url}/work/{self.test_work.id}/'
             go_to(work_url)
             time.sleep(2)
 

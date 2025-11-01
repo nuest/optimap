@@ -1,7 +1,5 @@
-import unittest
-from django.test import TestCase
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
-from django.urls import reverse  
+from django.urls import reverse
 from helium import start_chrome,click,get_driver,kill_browser
 import os
 

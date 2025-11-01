@@ -1,5 +1,4 @@
 import unittest
-import django
 from django.test import TestCase
 from django.urls import reverse
 from works.models import Work

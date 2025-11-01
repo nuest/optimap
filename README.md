@@ -455,11 +455,9 @@ python manage.py test tests.test_real_harvesting -v 2
 
 ### Run UI tests
 
-Running UI tests needs either compose configuration or a manage.py runserver in a seperate shell.
+Uses Django's `StaticLiveServerTestCase` to start a live server for testing and full control over the test database in each test class.
 
 ```bash
-docker-compose up --build
-
 python -Wa manage.py test tests-ui
 ```
 

@@ -1,18 +1,12 @@
-import os
-import django
-import unittest
 from helium import *
 from time import sleep
 from django.core.cache import cache
 from django.contrib.auth import get_user_model
-
-# Ensure Django settings are configured
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "optimap.settings")
-django.setup()
+from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 
 User = get_user_model()
 
-class EmailChangeUITest(unittest.StaticLiveServerTestCase):
+class EmailChangeUITest(StaticLiveServerTestCase):
     def setUp(self):
         """Set up the test user and start browser"""
         self.old_email = "testuser@example.com"
@@ -32,12 +26,12 @@ class EmailChangeUITest(unittest.StaticLiveServerTestCase):
             timeout=600
         )
 
-        self.browser = start_firefox(f"{self.live_server_url}/", headless=True)
+        self.browser = start_chrome(f"{self.live_server_url}/", headless=True)
 
     def test_email_change_process(self):
         """Test the full email change UI process"""
 
-        click(S('#navbarDarkDropdown1'))
+        click(S('#unifiedMenuDropdown'))
 
         write(self.old_email,  into='email')
         click(S('button[type="submit"]'))

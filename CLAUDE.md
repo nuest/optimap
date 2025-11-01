@@ -98,6 +98,8 @@ Access at http://127.0.0.1:8000/
 
 ### Testing
 
+All tests are always run using the virtual environment defined in `.venv/`; the Docker config is only for deployment of the the app.
+
 ```bash
 # Install test dependencies
 pip install -r requirements-dev.txt

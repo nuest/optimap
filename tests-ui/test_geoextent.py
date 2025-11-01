@@ -1,6 +1,5 @@
 import unittest
 import os
-import tempfile
 from django.test import TestCase
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.urls import reverse

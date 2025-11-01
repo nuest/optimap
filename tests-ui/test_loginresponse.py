@@ -1,21 +1,69 @@
-from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 import os
 from helium import *
-import time
+from time import sleep
+from django.core.cache import cache
+from django.contrib.auth import get_user_model
+from django.contrib.staticfiles.testing import StaticLiveServerTestCase
+
+User = get_user_model()
 
 class LoginresponseTest(StaticLiveServerTestCase):
+    def setUp(self):
+        """Set up the test user and start browser"""
+        self.email = "dev@example.com"
+        self.token = "mock-login-token-12345"
+
+        # Clean up any existing users with this email
+        User.objects.filter(email=self.email).delete()
+
+        # Create cache entry for login token (matching the structure in auth.py)
+        cache.set(self.token, {'email': self.email, 'next': '/'}, timeout=300)
+
+        # Start browser
+        self.browser = start_chrome(f'{self.live_server_url}/', headless=True)
+
     def test_login_response(self):
         """Test login flow and response message."""
-        start_chrome(f'{self.live_server_url}/', headless=True)
         try:
-            click(Button("signup"))
-            write('dev@example.com', into='email')
+            # Click unified menu dropdown
+            click(S("#unifiedMenuDropdown"))
+
+            # Fill in email and submit login form
+            write(self.email, into='email')
             get_driver().save_screenshot(os.path.join(os.getcwd(), 'tests-ui', 'screenshots', 'Loginmailid.png'))
-            click("Login")
-            # time to allow loading
-            time.sleep(2)
+
+            # Click the Send/Login button
+            click(S('button[type="submit"]'))
+
+            # Wait for response page to load
+            sleep(2)
             get_driver().save_screenshot(os.path.join(os.getcwd(), 'tests-ui', 'screenshots', 'Loginresponse.png'))
-            if Text("Awesome!").exists():
-                click(Button("×"))
+
+            # Verify success message appears
+            self.assertTrue(Text("Awesome!").exists() or Text("We sent a link").exists(),
+                          "Login response message not found")
+
+            # Now test the actual login using the token
+            go_to(f"{self.live_server_url}/login/{self.token}")
+            sleep(3)
+
+            # Check if we need to confirm (new user) or are logged in (existing user)
+            if Text("I consent").exists():
+                # New user - needs confirmation
+                click(Link("I consent"))
+                sleep(2)
+
+            # Verify we're logged in by checking for user menu
+            click(S("#unifiedMenuDropdown"))
+            self.assertTrue(Text("My subscriptions").exists() or Text("Settings").exists(),
+                          "User menu items not found after login")
+
         finally:
             kill_browser()
+
+    def tearDown(self):
+        """Clean up after test"""
+        # Clean up test user
+        User.objects.filter(email=self.email).delete()
+        # Clean up cache
+        cache.delete(self.token)

@@ -1,12 +1,5 @@
-import os
-import django
 import subprocess
-
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "optimap.settings")
-django.setup()
-
-import unittest
-from django.test import TransactionTestCase, TestCase
+from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from helium import *
 from django.contrib.auth import get_user_model
 from works.models import BlockedEmail, BlockedDomain
