@@ -2,13 +2,11 @@ import os
 import json
 import tempfile
 import gzip
-from datetime import datetime, timedelta
 from django.test import TestCase
 from django.core.serializers import serialize
 import fiona
 from django.urls import reverse
 from django.conf import settings
-import re
 from works.models import Work, Source
 from works.views import generate_geopackage
 from works.tasks import (

@@ -27,7 +27,7 @@ class AccountDeletionUITest(unittest.StaticLiveServerTestCase):
         cache.set(f"user_delete_token_{self.delete_token}", self.user.id, timeout=600)  
 
         # Start browser
-        self.browser = start_firefox("http://localhost:8000", headless=True)
+        self.browser = start_firefox(f"{self.live_server_url}/", headless=True)
 
     def test_delete_account(self):
 
@@ -36,7 +36,7 @@ class AccountDeletionUITest(unittest.StaticLiveServerTestCase):
         write(self.email,  into='email')
         click(S('button[type="submit"]'))
 
-        go_to(ff"{self.live_server_url}/login/{self.token}")  
+        go_to(f"{self.live_server_url}/login/{self.token}")  
         sleep(3)
 
         go_to(f"{self.live_server_url}/usersettings/")
@@ -48,7 +48,7 @@ class AccountDeletionUITest(unittest.StaticLiveServerTestCase):
         click("Delete")
         sleep(3)
 
-        go_to(ff"{self.live_server_url}/confirm-delete/{self.delete_token}")
+        go_to(f"{self.live_server_url}/confirm-delete/{self.delete_token}")
         sleep(3)
 
         click("Permanently Delete Account")

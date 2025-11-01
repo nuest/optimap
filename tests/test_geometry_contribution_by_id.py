@@ -1,8 +1,7 @@
 """Tests for ID-based geometry contribution (publications without DOI)."""
 import json
-from django.test import TestCase, Client
+from django.test import TestCase
 from django.contrib.gis.geos import Point, GeometryCollection
-from django.utils import timezone
 from works.models import Work, Source
 from django.contrib.auth import get_user_model
 

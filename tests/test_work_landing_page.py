@@ -1,5 +1,4 @@
 from django.test import TestCase, Client
-from django.urls import reverse
 from works.models import Work, Source
 from django.contrib.gis.geos import Point, GeometryCollection
 from django.utils.timezone import now

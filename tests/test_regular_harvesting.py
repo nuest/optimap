@@ -2,11 +2,9 @@ import os
 import django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'optimap.settings')
 django.setup()
-import unittest
 from works.tasks import harvest_oai_endpoint
-from django.test import TransactionTestCase, TestCase, Client
+from django.test import TestCase
 from django.core import mail
-from django.utils import timezone
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from unittest.mock import patch, Mock

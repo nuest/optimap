@@ -1,6 +1,6 @@
 """Tests for temporal extent contribution functionality."""
 import json
-from django.test import TestCase, Client
+from django.test import TestCase
 from django.contrib.gis.geos import Point, GeometryCollection
 from works.models import Work, Source
 from django.contrib.auth import get_user_model
