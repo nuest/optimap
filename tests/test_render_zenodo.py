@@ -5,7 +5,7 @@ from unittest import TestCase
 from unittest.mock import patch
 
 from django.core.management import call_command
-from works.models import Publication, Source
+from works.models import Work, Source
 
 
 class RenderZenodoTest(TestCase):
@@ -13,8 +13,8 @@ class RenderZenodoTest(TestCase):
         # Temp “project root”
         self._tmpdir = tempfile.TemporaryDirectory()
         self.project_root = Path(self._tmpdir.name)
-        self.templates_dir = self.project_root / "publications" / "templates"
-        self.cmds_dir = self.project_root / "publications" / "management" / "commands"
+        self.templates_dir = self.project_root / "works" / "templates"
+        self.cmds_dir = self.project_root / "works" / "management" / "commands"
         self.data_dir = self.project_root / "data"
         self.templates_dir.mkdir(parents=True, exist_ok=True)
         self.cmds_dir.mkdir(parents=True, exist_ok=True)
@@ -32,7 +32,7 @@ class RenderZenodoTest(TestCase):
         )
 
         # DB fixtures
-        Publication.objects.create(title="A", publicationDate="2010-10-10")
+        Work.objects.create(title="A", publicationDate="2010-10-10")
 
         # Bad labels to clean
         Source.objects.create(name="2000", url_field="https://optimap.science")  # numeric-only -> OPTIMAP

@@ -8,15 +8,15 @@ from unittest.mock import patch
 
 from django.core.management import call_command
 from django.test import override_settings
-from works.models import Publication, Source
+from works.models import Work, Source
 
 
 class DepositZenodoTest(TestCase):
     def setUp(self):
         self._tmpdir = tempfile.TemporaryDirectory()
         self.project_root = Path(self._tmpdir.name)
-        self.templates_dir = self.project_root / "publications" / "templates"
-        self.cmds_dir = self.project_root / "publications" / "management" / "commands"
+        self.templates_dir = self.project_root / "works" / "templates"
+        self.cmds_dir = self.project_root / "works" / "management" / "commands"
         self.data_dir = self.project_root / "data"
         self.templates_dir.mkdir(parents=True, exist_ok=True)
         self.cmds_dir.mkdir(parents=True, exist_ok=True)
@@ -39,7 +39,7 @@ class DepositZenodoTest(TestCase):
         (self.data_dir / "optimap_data_dump_20250101.gpkg").write_bytes(b"GPKG")
 
         # Minimal DB so import paths work
-        Publication.objects.create(title="A", publicationDate="2010-10-10")
+        Work.objects.create(title="A", publicationDate="2010-10-10")
         Source.objects.create(name="OPTIMAP", url_field="https://optimap.science")
 
         # Command import – prefer deposit_zenodo; fallback to deploy_zenodo if needed

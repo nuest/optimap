@@ -168,6 +168,9 @@ data/*.gpkg
 data/*.geojson
 data/*.geojson.gz
 
+# Test environment files (may contain secrets)
+tests/.env
+
 works/management/commands/goas_v01_simplified.geojson
 
 works/management/commands/goas_v01.gpkg
