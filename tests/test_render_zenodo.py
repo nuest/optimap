@@ -45,29 +45,27 @@ class RenderZenodoTest(TestCase):
             url_field="https://agile-giss.copernicus.org"
         )
 
-        # Import after DB is ready
+        # Import zenodo module after DB is ready
         import importlib
-        self.render_mod = importlib.import_module(
-            "works.management.commands.render_zenodo"
-        )
+        self.zenodo_mod = importlib.import_module("works.zenodo")
 
-        # Fake Path so parents[3] stays inside tmp root
+        # Fake Path so resolve() stays inside tmp root
         class FakePath(Path):
             _flavour = Path(".")._flavour
             def resolve(self):
                 return self
         self.FakePath = FakePath
-        self.render_file = str(self.cmds_dir / "render_zenodo.py")
+        self.zenodo_file = str(self.project_root / "works" / "zenodo.py")
 
     def tearDown(self):
         self._tmpdir.cleanup()
 
     def test_render_produces_clean_readme_and_assets(self):
-        # Don’t actually run `git archive`
+        # Don't actually run `git archive`
         def _noop(*a, **k): return None
 
-        with patch.object(self.render_mod, "__file__", new=self.render_file), \
-             patch.object(self.render_mod, "Path", self.FakePath), \
+        with patch.object(self.zenodo_mod, "__file__", new=self.zenodo_file), \
+             patch.object(self.zenodo_mod, "Path", self.FakePath), \
              patch("subprocess.run", _noop):
             call_command("render_zenodo")
 

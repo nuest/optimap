@@ -1,5 +1,5 @@
 {
-  "version": "v17",
+  "version": "v23",
   "related_identifiers": [
     {
       "scheme": "url",
@@ -18,6 +18,23 @@
       "identifier": "https://optimap.science",
       "relation": "describes",
       "resource_type": "publication"
+    }
+  ],
+  "title": "OPTIMAP FAIR Data Package",
+  "keywords": [
+    "Open Access",
+    "Open Science",
+    "ORI",
+    "Open Data",
+    "FAIR"
+  ],
+  "description_markdown": "# OPTIMAP FAIR Data Package\n\n**Version:** v23\n\n**Generated on:** 2025-11-03\n\n\n## Dataset Summary\n\n- **Total articles:** 22\n- **Articles with spatial data:** 0\n- **Articles with temporal coverage:** 0\n- **Earliest publication date:** 2010-10-10\n- **Latest publication date:** 2010-10-10\n\n\n## Sources\n\n- [name](url)- [name](url)- [name](url)\n\n## Codebook\n\n| Field                  | Description                                           |\n|------------------------|-------------------------------------------------------|\n| `id`                   | Primary key of the publication record                 |\n| `title`                | Title of the article                                  |\n| `abstract`             | Abstract or summary                                   |\n| `doi`                  | Digital Object Identifier (if available)              |\n| `url`                  | URL to the article or preprint                        |\n| `publicationDate`      | Date of publication (ISO format)                      |\n| `geometry`             | Spatial geometry in GeoJSON/WKT                       |\n| `timeperiod_startdate` | Coverage start dates (ISO format)                     |\n| `timeperiod_enddate`   | Coverage end dates (ISO format)                       |\n| `provenance`           | Source/method by which the record was imported/added  |\n\n\n## License\n\nThis record includes:\n\n- **Data files** under **CC0-1.0** (<https://creativecommons.org/publicdomain/zero/1.0/>)\n- **optimap-main.zip** (code snapshot) under **GPL-3.0** (<https://opensource.org/licenses/GPL-3.0>)\n\n**Note:** Data are CC0; the software snapshot is GPLv3.",
+  "upload_type": "dataset",
+  "publication_date": "2025-11-03",
+  "creators": [
+    {
+      "name": "OPTIMAP Contributors",
+      "affiliation": "OPTIMAP Project"
     }
   ]
 }

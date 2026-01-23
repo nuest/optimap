@@ -1,13 +1,13 @@
 # OPTIMAP FAIR Data Package
 
-**Version:** v17
+**Version:** v23
 
-**Generated on:** 2025-09-24
+**Generated on:** 2025-11-03
 
 
 ## Dataset Summary
 
-- **Total articles:** 1
+- **Total articles:** 22
 - **Articles with spatial data:** 0
 - **Articles with temporal coverage:** 0
 - **Earliest publication date:** 2010-10-10
@@ -16,8 +16,7 @@
 
 ## Sources
 
-- [OPTIMAP](http://optimap.science)
-
+- [name](url)- [name](url)- [name](url)
 
 ## Codebook
 

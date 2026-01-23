@@ -210,13 +210,131 @@ class ZenodoFullDepositTest(TestCase):
         This test actually uploads to Zenodo sandbox.
         Run manually with: python manage.py test tests.test_zenodo_integration.ZenodoFullDepositTest --tag=upload
         """
-        # This is a placeholder for full integration testing
-        # Actual implementation would:
-        # 1. Run render_zenodo
-        # 2. Run deposit_zenodo
-        # 3. Verify files were uploaded
-        # 4. Clean up (delete uploaded files)
-        self.skipTest("Full upload test requires manual execution and cleanup")
+        from works.models import ZenodoDepositionLog
+        import tempfile
+        from pathlib import Path
+
+        # Set up temporary data directory
+        with tempfile.TemporaryDirectory() as tmpdir:
+            data_dir = Path(tmpdir) / "data"
+            data_dir.mkdir(parents=True, exist_ok=True)
+
+            # Create required files
+            (data_dir / "README.md").write_text(
+                "# OPTIMAP Integration Test\\n\\nTest deposit cycle.",
+                encoding="utf-8"
+            )
+            (data_dir / "optimap-main.zip").write_bytes(b"TEST_ZIP_CONTENT_INTEGRATION")
+            (data_dir / "last_version.txt").write_text("v1.0.0-integration-test", encoding="utf-8")
+
+            # Create dynamic metadata
+            import json
+            (data_dir / "zenodo_dynamic.json").write_text(json.dumps({
+                "title": "OPTIMAP Integration Test Dataset",
+                "version": "v1.0.0-integration-test",
+                "description": "Integration test deposit",
+                "keywords": ["test", "integration"],
+                "related_identifiers": [
+                    {
+                        "relation": "describes",
+                        "identifier": "https://optimap.science/test",
+                        "scheme": "url"
+                    }
+                ]
+            }), encoding="utf-8")
+
+            # Override settings to use temporary directory
+            with override_settings(
+                ZENODO_API_TOKEN=self.api_token,
+                ZENODO_SANDBOX_DEPOSITION_ID=self.deposition_id,
+                ZENODO_API_BASE=self.api_base,
+                PROJECT_ROOT=Path(tmpdir)
+            ):
+                # Get initial log count
+                initial_log_count = ZenodoDepositionLog.objects.count()
+
+                # Run deposit command
+                from io import StringIO
+                out = StringIO()
+                err = StringIO()
+
+                call_command(
+                    'deposit_zenodo',
+                    '--deposition-id', self.deposition_id,
+                    stdout=out,
+                    stderr=err
+                )
+
+                # Verify log was created
+                self.assertEqual(
+                    ZenodoDepositionLog.objects.count(),
+                    initial_log_count + 1,
+                    "A deposition log entry should be created"
+                )
+
+                # Get the most recent log entry
+                log_entry = ZenodoDepositionLog.objects.order_by('-deposition_date').first()
+
+                # Verify log entry details
+                self.assertIsNotNone(log_entry, "Log entry should exist")
+                self.assertEqual(log_entry.deposition_id, self.deposition_id)
+                self.assertEqual(log_entry.status, 'success',
+                    f"Deposition should succeed. Error: {log_entry.error_message}")
+                self.assertEqual(log_entry.api_base, self.api_base)
+                self.assertEqual(log_entry.version, "v1.0.0-integration-test")
+                self.assertGreater(log_entry.works_count, 0, "Should track works count")
+                self.assertIsNotNone(log_entry.files_uploaded, "Should track uploaded files")
+                self.assertGreater(len(log_entry.files_uploaded), 0, "Should have uploaded files")
+                self.assertGreater(log_entry.total_size_bytes, 0, "Should track total size")
+                self.assertIsNotNone(log_entry.upload_duration_seconds, "Should track duration")
+                self.assertGreater(log_entry.upload_duration_seconds, 0, "Duration should be positive")
+                self.assertIsNotNone(log_entry.deposition_summary, "Should have summary")
+                self.assertIn("Successfully uploaded", log_entry.deposition_summary)
+
+                # Verify files were tracked
+                file_names = [f['name'] for f in log_entry.files_uploaded]
+                self.assertIn("README.md", file_names, "README.md should be uploaded")
+                self.assertIn("optimap-main.zip", file_names, "ZIP should be uploaded")
+
+                # Verify Zenodo response data (if available)
+                if log_entry.zenodo_url:
+                    self.assertIn("zenodo.org", log_entry.zenodo_url, "Should have Zenodo URL")
+
+                # Verify command output
+                output = out.getvalue()
+                self.assertIn("Updated deposition", output, "Should report success")
+                self.assertIn("Deposition log saved", output, "Should confirm log was saved")
+
+                # Test API to verify deposition
+                import requests
+                headers = {"Authorization": f"Bearer {self.api_token}"}
+                response = requests.get(
+                    f"{self.api_base}/deposit/depositions/{self.deposition_id}",
+                    headers=headers
+                )
+                self.assertEqual(response.status_code, 200, "Should be able to fetch deposition")
+
+                dep_data = response.json()
+                self.assertEqual(
+                    str(dep_data.get('id')),
+                    self.deposition_id,
+                    "Deposition ID should match"
+                )
+
+                # Verify files were actually uploaded to Zenodo
+                files = dep_data.get('files', [])
+                self.assertGreater(len(files), 0, "Deposition should have files")
+
+                zenodo_file_names = [f['filename'] for f in files]
+                self.assertIn("README.md", zenodo_file_names, "README.md should be on Zenodo")
+
+                # Print test success details (using print instead of self.stdout for TestCase)
+                print(
+                    f"\n✅ Full deposit cycle test passed. "
+                    f"Log ID: {log_entry.id}, "
+                    f"Files uploaded: {len(log_entry.files_uploaded)}, "
+                    f"Duration: {log_entry.upload_duration_seconds:.2f}s"
+                )
 
 
 import unittest

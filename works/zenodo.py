@@ -1,0 +1,632 @@
+"""
+Zenodo data archival functionality for OPTIMAP.
+
+This module handles rendering metadata and depositing data to Zenodo.
+"""
+import json
+import os
+import time
+import traceback
+from datetime import date
+from pathlib import Path
+from typing import Iterable
+from urllib.parse import urlparse
+
+import markdown
+import requests
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.core.mail import send_mail
+from jinja2 import Environment, FileSystemLoader
+from zenodo_client import Zenodo
+
+from works.models import Work, Source, ZenodoDepositionLog
+
+User = get_user_model()
+
+
+# ================== URL/Domain Helpers ==================
+
+def _extract_domain(u: str | None) -> str | None:
+    """Extract domain from URL."""
+    if not u:
+        return None
+    try:
+        p = urlparse(u)
+        netloc = p.netloc or p.path
+        return (netloc or "").lower()
+    except Exception:
+        return None
+
+
+def _canonical_url(raw: str | None) -> str | None:
+    """Normalize URL to https://<host>/<path> with lowercase host."""
+    if not raw:
+        return None
+    u = raw.strip()
+    if "://" not in u:
+        u = "https://" + u
+    p = urlparse(u)
+    host = (p.netloc or p.path).lower()
+    if not host:
+        return None
+    if host.startswith("www."):
+        host = host[4:]
+    path = p.path or ""
+    return f"https://{host}{path}"
+
+
+def _label_from_domain(domain: str) -> str:
+    """Return a cleaned label from a domain name."""
+    if domain.startswith("www."):
+        domain = domain[4:]
+    return domain.capitalize() if domain else "Source"
+
+
+def _clean_label(name: str | None, url: str | None) -> str:
+    """Clean source label."""
+    n = (name or "").strip()
+    domain = _extract_domain(url) or ""
+    if n.isdigit() and domain == "optimap.science":
+        return "OPTIMAP"
+    if n and not n.isdigit():
+        return n
+    return _label_from_domain(domain) if domain else "Source"
+
+
+# ================== Rendering ==================
+
+def render_zenodo_package(project_root: Path | None = None, stdout_callback=None) -> dict:
+    """
+    Render Zenodo data package (README, metadata, archive).
+
+    Returns dict with paths to generated files.
+    """
+    def log(msg):
+        if stdout_callback:
+            stdout_callback(msg)
+
+    # Determine project root
+    if project_root is None:
+        project_root = Path(
+            os.getenv("OPTIMAP_PROJECT_ROOT")
+            or getattr(settings, "PROJECT_ROOT", Path(__file__).resolve().parents[1])
+        )
+
+    data_dir = project_root / "data"
+    data_dir.mkdir(exist_ok=True)
+
+    # Version bump
+    version_file = data_dir / "last_version.txt"
+    if version_file.exists():
+        try:
+            last = int((version_file.read_text(encoding="utf-8").strip() or "").lstrip("v") or 0)
+        except ValueError:
+            last = 0
+    else:
+        last = 0
+    version = f"v{last + 1}"
+    version_file.write_text(version, encoding="utf-8")
+
+    # Zip snapshot
+    archive_path = data_dir / "optimap-main.zip"
+    log(f"Generating {archive_path.name}...")
+    try:
+        import subprocess
+        subprocess.run(
+            ["git", "archive", "--format=zip", "HEAD", "-o", str(archive_path)],
+            cwd=str(project_root),
+            check=True,
+        )
+    except Exception:
+        pass
+    if not archive_path.exists():
+        archive_path.write_bytes(b"")
+
+    # Gather statistics
+    article_count = Work.objects.count()
+    spatial_count = Work.objects.exclude(geometry=None).count()
+    temporal_count = Work.objects.exclude(timeperiod_startdate=None).count()
+    earliest_date = (
+        Work.objects.order_by("publicationDate").values_list("publicationDate", flat=True).first() or ""
+    )
+    latest_date = (
+        Work.objects.order_by("-publicationDate").values_list("publicationDate", flat=True).first() or ""
+    )
+
+    # Sources (dedupe by domain)
+    seen = set()
+    sources: list[dict] = []
+    for s in Source.objects.all().only("name", "url_field").values("name", "url_field"):
+        url = _canonical_url(s.get("url_field"))
+        dom = _extract_domain(url)
+        if not dom or dom in seen:
+            continue
+        seen.add(dom)
+        sources.append({"name": _clean_label(s.get("name"), url), "url": url})
+
+    # Render README.md
+    tmpl_dir = project_root / "works" / "templates"
+    env = Environment(loader=FileSystemLoader(str(tmpl_dir)), trim_blocks=True, lstrip_blocks=True)
+    template = env.get_template("README.md.j2")
+    rendered = template.render(
+        version=version,
+        date=date.today().isoformat(),
+        article_count=article_count,
+        sources=sources,
+        spatial_count=spatial_count,
+        temporal_count=temporal_count,
+        earliest_date=earliest_date,
+        latest_date=latest_date,
+    )
+    readme_path = data_dir / "README.md"
+    readme_path.write_text(rendered, encoding="utf-8")
+
+    # Dynamic metadata
+    dyn_path = data_dir / "zenodo_dynamic.json"
+    existing_dyn = {}
+    if dyn_path.exists():
+        try:
+            existing_dyn = json.loads(dyn_path.read_text(encoding="utf-8"))
+        except Exception:
+            existing_dyn = {}
+
+    default_keywords = ["Open Access", "Open Science", "ORI", "Open Data", "FAIR"]
+    default_creators = existing_dyn.get("creators") or [
+        {"name": "OPTIMAP Contributors", "affiliation": "OPTIMAP Project"}
+    ]
+
+    dyn = {
+        **existing_dyn,
+        "title": existing_dyn.get("title") or "OPTIMAP FAIR Data Package",
+        "upload_type": existing_dyn.get("upload_type") or "dataset",
+        "publication_date": date.today().isoformat(),
+        "creators": default_creators,
+        "version": version,
+        "keywords": existing_dyn.get("keywords") or default_keywords,
+        "related_identifiers": existing_dyn.get("related_identifiers") or [],
+        "description_markdown": readme_path.read_text(encoding="utf-8"),
+    }
+    dyn_path.write_text(json.dumps(dyn, indent=2), encoding="utf-8")
+
+    log(f"Generated: {archive_path.name}, {readme_path.name}, {dyn_path.name}")
+
+    return {
+        "version": version,
+        "archive_path": archive_path,
+        "readme_path": readme_path,
+        "metadata_path": dyn_path,
+        "data_dir": data_dir,
+    }
+
+
+# ================== Deposition ==================
+
+_REQ_PRESERVE = {"doi", "prereserve_doi"}  # never overwrite
+
+
+def _markdown_to_html(markdown_text: str) -> str:
+    """Convert README.md markdown to HTML for Zenodo description."""
+    return markdown.markdown(markdown_text, extensions=["tables", "fenced_code"])
+
+
+def _merge_keywords(existing: Iterable[str] | None, incoming: Iterable[str] | None) -> list[str]:
+    """Merge keyword lists without duplicates."""
+    seen, out = set(), []
+    for x in (existing or []):
+        if x not in seen:
+            seen.add(x)
+            out.append(x)
+    for x in (incoming or []):
+        if x not in seen:
+            seen.add(x)
+            out.append(x)
+    return out
+
+
+def _merge_related(existing: Iterable[dict] | None, incoming: Iterable[dict] | None) -> list[dict]:
+    """Merge related_identifiers by (identifier, relation) pair."""
+    def key(d: dict) -> tuple[str, str]:
+        return (d.get("identifier", ""), d.get("relation", ""))
+
+    seen, out = set(), []
+    for d in (existing or []):
+        k = key(d)
+        if k not in seen:
+            seen.add(k)
+            out.append(d)
+    for d in (incoming or []):
+        k = key(d)
+        if k not in seen:
+            seen.add(k)
+            out.append(d)
+    return out
+
+
+def _get_deposition(api_base: str, token: str, deposition_id: str) -> dict:
+    """Fetch existing deposition from Zenodo API."""
+    r = requests.get(
+        f"{api_base}/deposit/depositions/{deposition_id}",
+        params={"access_token": token},
+        timeout=30,
+    )
+    try:
+        r.raise_for_status()
+    except Exception as ex:
+        raise Exception(f"Failed to fetch deposition {deposition_id}: {r.status_code} {r.text}") from ex
+    return r.json()
+
+
+def _build_upload_list(data_dir: Path) -> list[Path]:
+    """Build list of files to upload."""
+    paths = []
+    for name in ("README.md", "optimap-main.zip"):
+        p = data_dir / name
+        if p.exists():
+            paths.append(p)
+    # Include data dumps if present
+    for pat in ("optimap_data_dump_*.geojson", "optimap_data_dump_*.geojson.gz", "optimap_data_dump_*.gpkg"):
+        paths.extend(sorted(data_dir.glob(pat)))
+    return paths
+
+
+def _send_admin_notification(log_entry: ZenodoDepositionLog, stdout_callback=None):
+    """Send email notification to all admin users."""
+    admin_emails = list(User.objects.filter(is_staff=True, is_active=True).values_list('email', flat=True))
+
+    if not admin_emails:
+        if stdout_callback:
+            stdout_callback("No admin users found to notify")
+        return
+
+    # Build email
+    if log_entry.status == 'success':
+        subject = f'✅ Zenodo Deposition Successful - {log_entry.version or log_entry.deposition_id}'
+        status_emoji = '✅'
+        status_text = 'SUCCESS'
+    else:
+        subject = f'❌ Zenodo Deposition Failed - {log_entry.deposition_id}'
+        status_emoji = '❌'
+        status_text = 'FAILED'
+
+    files_text = "\n".join([
+        f"  • {f['name']} ({f['size']:,} bytes)"
+        for f in log_entry.files_uploaded
+    ]) if log_entry.files_uploaded else "  (none)"
+
+    duration_text = "N/A"
+    if log_entry.upload_duration_seconds:
+        minutes = int(log_entry.upload_duration_seconds // 60)
+        seconds = int(log_entry.upload_duration_seconds % 60)
+        duration_text = f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s"
+
+    message_parts = [
+        f"{status_emoji} ZENODO DEPOSITION {status_text}",
+        "=" * 70,
+        "",
+        f"Deposition ID: {log_entry.deposition_id}",
+        f"Version: {log_entry.version or 'N/A'}",
+        f"API Base: {log_entry.api_base}",
+        f"Date: {log_entry.deposition_date.strftime('%Y-%m-%d %H:%M:%S')} UTC",
+        f"Duration: {duration_text}",
+        "",
+    ]
+
+    if log_entry.status == 'success':
+        message_parts.extend([
+            f"Works Included: {log_entry.works_count:,}",
+            f"Files Uploaded: {len(log_entry.files_uploaded) if log_entry.files_uploaded else 0}",
+            f"Total Size: {log_entry.total_size_bytes:,} bytes",
+            "",
+            "Files:",
+            files_text,
+            "",
+        ])
+
+        if log_entry.zenodo_url:
+            message_parts.extend([
+                "⚠️  ACTION REQUIRED ⚠️",
+                "",
+                "The deposition is in DRAFT state and not yet published.",
+                "Please review and publish manually:",
+                "",
+                f"  {log_entry.zenodo_url}",
+                "",
+                "⚠️  Publishing cannot be undone!",
+                "",
+            ])
+
+        if log_entry.doi:
+            message_parts.append(f"DOI: {log_entry.doi}")
+
+        if log_entry.deposition_summary:
+            message_parts.extend(["", "Summary:", f"  {log_entry.deposition_summary}"])
+    else:
+        message_parts.extend([
+            "ERROR:",
+            f"  {log_entry.error_message or 'Unknown error'}",
+            "",
+        ])
+
+        if log_entry.error_details:
+            message_parts.extend([
+                "Error Details:",
+                f"  Type: {log_entry.error_details.get('exception_type', 'N/A')}",
+                "",
+            ])
+
+            if 'traceback' in log_entry.error_details:
+                message_parts.extend([
+                    "Traceback:",
+                    log_entry.error_details['traceback'],
+                ])
+
+    message_parts.extend([
+        "",
+        "=" * 70,
+        "",
+    ])
+
+    site_url = getattr(settings, 'SITE_URL', None)
+    if site_url:
+        message_parts.append(f"View full log: {site_url}/admin/works/zenododepositionlog/{log_entry.id}/change/")
+    else:
+        message_parts.append(f"View full log in admin: /admin/works/zenododepositionlog/{log_entry.id}/change/")
+
+    message_parts.extend([
+        "",
+        "This is an automated message from OPTIMAP.",
+    ])
+
+    message = "\n".join(message_parts)
+
+    try:
+        send_mail(
+            subject=subject,
+            message=message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=admin_emails,
+            fail_silently=False,
+        )
+        if stdout_callback:
+            stdout_callback(f"Admin notification sent to {len(admin_emails)} admin(s)")
+    except Exception as ex:
+        if stdout_callback:
+            stdout_callback(f"Warning: Failed to send admin notification: {ex}")
+
+
+def deposit_to_zenodo(
+    deposition_id: str,
+    api_base: str | None = None,
+    token: str | None = None,
+    patch_fields: str | None = None,
+    merge_keywords: bool = False,
+    merge_related: bool = False,
+    project_root: Path | None = None,
+    stdout_callback=None,
+) -> ZenodoDepositionLog:
+    """
+    Deposit rendered files to Zenodo.
+
+    Args:
+        deposition_id: Zenodo deposition ID
+        api_base: Zenodo API base URL (default: from settings)
+        token: Zenodo API token (default: from settings/env)
+        patch_fields: Comma-separated fields to update (default: description,version,keywords,related_identifiers)
+        merge_keywords: Merge keywords instead of replacing
+        merge_related: Merge related_identifiers instead of replacing
+        project_root: Project root directory
+        stdout_callback: Callback for logging messages
+
+    Returns:
+        ZenodoDepositionLog entry
+    """
+    def log(msg):
+        if stdout_callback:
+            stdout_callback(msg)
+
+    # Resolve API base
+    if api_base is None:
+        api_base = os.getenv("ZENODO_API_BASE") or getattr(settings, "ZENODO_API_BASE", "https://sandbox.zenodo.org/api")
+
+    if api_base.endswith("/"):
+        raise ValueError(f"ZENODO_API_BASE must not end with '/'. Got: {api_base!r}")
+
+    # Resolve token
+    if token is None:
+        token = (
+            os.getenv("ZENODO_API_TOKEN")
+            or os.getenv("ZENODO_SANDBOX_API_TOKEN")
+            or getattr(settings, "ZENODO_API_TOKEN", None)
+            or getattr(settings, "ZENODO_SANDBOX_API_TOKEN", None)
+        )
+
+    if not token:
+        raise ValueError("No Zenodo API token. Set ZENODO_API_TOKEN or provide token parameter.")
+
+    # Determine project root
+    if project_root is None:
+        project_root = Path(
+            os.getenv("OPTIMAP_PROJECT_ROOT")
+            or getattr(settings, "PROJECT_ROOT", Path(__file__).resolve().parents[1])
+        )
+
+    data_dir = project_root / "data"
+
+    # Initialize log
+    log_entry = ZenodoDepositionLog(
+        deposition_id=str(deposition_id),
+        api_base=api_base,
+        status='failed',
+    )
+
+    # Track version
+    version_file = data_dir / "last_version.txt"
+    if version_file.exists():
+        log_entry.version = version_file.read_text(encoding="utf-8").strip()
+
+    log_entry.works_count = Work.objects.count()
+
+    upload_start = time.time()
+
+    try:
+        # Load metadata
+        dyn_path = data_dir / "zenodo_dynamic.json"
+        if not dyn_path.exists():
+            raise FileNotFoundError(f"{dyn_path} not found. Run render_zenodo_package() first.")
+
+        incoming = json.loads(dyn_path.read_text(encoding="utf-8"))
+
+        # Fetch existing deposition
+        dep = _get_deposition(api_base, token, str(deposition_id))
+        existing_meta = dep.get("metadata", {}) or {}
+
+        # Determine fields to patch
+        if patch_fields is None:
+            patch_fields = "description,version,keywords,related_identifiers,title,upload_type,publication_date,creators"
+
+        fields_to_patch = {x.strip() for x in patch_fields.split(",") if x.strip()}
+
+        merged = dict(existing_meta)
+
+        # Remove protected fields from incoming
+        for req in _REQ_PRESERVE:
+            if req in incoming and req not in fields_to_patch:
+                incoming.pop(req, None)
+
+        # Update description from README
+        if "description" in fields_to_patch:
+            readme_md = (data_dir / "README.md").read_text(encoding="utf-8")
+            merged["description"] = _markdown_to_html(readme_md)
+
+        # Update other fields
+        for key in fields_to_patch - {"description"}:
+            if key == "keywords":
+                if merge_keywords:
+                    merged["keywords"] = _merge_keywords(existing_meta.get("keywords"), incoming.get("keywords"))
+                else:
+                    merged["keywords"] = incoming.get("keywords", [])
+            elif key == "related_identifiers":
+                if merge_related:
+                    merged["related_identifiers"] = _merge_related(
+                        existing_meta.get("related_identifiers"), incoming.get("related_identifiers")
+                    )
+                else:
+                    merged["related_identifiers"] = incoming.get("related_identifiers", [])
+            else:
+                if key in incoming:
+                    merged[key] = incoming[key]
+
+        # Track changes
+        changed = [k for k in merged.keys() if existing_meta.get(k) != merged.get(k)]
+        log(f"Metadata fields changed: {', '.join(changed) if changed else '(none)'}")
+
+        log_entry.metadata_merged = {k: merged[k] for k in changed} if changed else {}
+
+        # PUT metadata
+        put_url = f"{api_base}/deposit/depositions/{deposition_id}"
+        res = requests.put(
+            put_url,
+            params={"access_token": token},
+            headers={"Content-Type": "application/json"},
+            data=json.dumps({"metadata": merged}),
+        )
+        res.raise_for_status()
+        log("Metadata updated.")
+
+        # Delete existing files
+        log("Deleting existing files...")
+        existing_files = dep.get("files", [])
+        for file_obj in existing_files:
+            file_id = file_obj.get("id")
+            if file_id:
+                delete_url = f"{api_base}/deposit/depositions/{deposition_id}/files/{file_id}"
+                del_res = requests.delete(delete_url, params={"access_token": token})
+                if del_res.status_code == 204:
+                    log(f" - Deleted: {file_obj.get('filename')}")
+                else:
+                    log(f" - Failed to delete {file_obj.get('filename')}: {del_res.status_code}")
+
+        # Upload files
+        log("Uploading files...")
+        paths = _build_upload_list(data_dir)
+
+        files_info = []
+        total_size = 0
+        for p in paths:
+            try:
+                size = p.stat().st_size
+                total_size += size
+                files_info.append({"name": p.name, "size": size})
+            except Exception:
+                size = 0
+                files_info.append({"name": p.name, "size": 0})
+            log(f" - {p.name} ({size} bytes)")
+
+        log_entry.files_uploaded = files_info
+        log_entry.total_size_bytes = total_size
+
+        # Use zenodo_client for upload
+        z = Zenodo(sandbox=("sandbox." in api_base))
+        z.access_token = token
+        resp = z.update(deposition_id=str(deposition_id), paths=[str(p) for p in paths], publish=False)
+
+        upload_duration = time.time() - upload_start
+        log_entry.upload_duration_seconds = upload_duration
+
+        # Extract response data
+        try:
+            resp_data = resp.json()
+            html = resp_data.get("links", {}).get("html")
+            doi = resp_data.get("doi")
+
+            if html:
+                log_entry.zenodo_url = html
+            if doi:
+                log_entry.doi = doi
+        except Exception:
+            html = None
+
+        # Mark success
+        log_entry.status = 'success'
+        log_entry.deposition_summary = (
+            f"Successfully uploaded {len(files_info)} files "
+            f"({_format_bytes(total_size)}) to Zenodo deposition {deposition_id}. "
+            f"Updated metadata fields: {', '.join(changed) if changed else '(none)'}. "
+            f"Upload duration: {upload_duration:.2f}s"
+        )
+
+        if html:
+            log(f"✅ Updated deposition {deposition_id} at {html}")
+        else:
+            log(f"✅ Updated deposition {deposition_id}")
+
+    except Exception as ex:
+        log_entry.status = 'failed'
+        log_entry.error_message = str(ex)
+        log_entry.error_details = {
+            "exception_type": type(ex).__name__,
+            "traceback": traceback.format_exc(),
+        }
+        log_entry.upload_duration_seconds = time.time() - upload_start
+        log_entry.deposition_summary = f"Failed to upload to Zenodo: {str(ex)}"
+
+        log_entry.save()
+        _send_admin_notification(log_entry, stdout_callback)
+        raise
+
+    # Save and notify
+    log_entry.save()
+    log(f"Deposition log saved (ID: {log_entry.id})")
+    _send_admin_notification(log_entry, stdout_callback)
+
+    return log_entry
+
+
+def _format_bytes(size_bytes: int) -> str:
+    """Format bytes in human-readable format."""
+    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+        if size_bytes < 1024.0:
+            return f"{size_bytes:.2f} {unit}"
+        size_bytes /= 1024.0
+    return f"{size_bytes:.2f} PB"

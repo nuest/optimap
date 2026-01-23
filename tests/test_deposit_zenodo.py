@@ -42,23 +42,16 @@ class DepositZenodoTest(TestCase):
         Work.objects.create(title="A", publicationDate="2010-10-10")
         Source.objects.create(name="OPTIMAP", url_field="https://optimap.science")
 
-        # Command import – prefer deposit_zenodo; fallback to deploy_zenodo if needed
+        # Import zenodo module
         import importlib
-        try:
-            self.deposit_mod = importlib.import_module(
-                "works.management.commands.deposit_zenodo"
-            )
-        except ModuleNotFoundError:
-            self.deposit_mod = importlib.import_module(
-                "works.management.commands.deploy_zenodo"
-            )
+        self.zenodo_mod = importlib.import_module("works.zenodo")
 
         class FakePath(Path):
             _flavour = Path(".")._flavour
             def resolve(self):
                 return self
         self.FakePath = FakePath
-        self.deposit_file = str(self.cmds_dir / "deposit_zenodo.py")
+        self.zenodo_file = str(self.project_root / "works" / "zenodo.py")
 
     def tearDown(self):
         self._tmpdir.cleanup()
@@ -133,13 +126,20 @@ class DepositZenodoTest(TestCase):
                 def json(self): return {"links": {"html": f"https://sandbox.zenodo.org/deposit/{deposition_id}"}}
             return R()
 
-        with patch.object(self.deposit_mod, "__file__", new=self.deposit_file), \
-             patch.object(self.deposit_mod, "Path", self.FakePath), \
-             patch.object(self.deposit_mod.requests, "get", _fake_get), \
-             patch.object(self.deposit_mod.requests, "put", _fake_put), \
-             patch.object(self.deposit_mod, "update_zenodo", _fake_update_zenodo), \
-             patch.object(self.deposit_mod, "_markdown_to_html", lambda s: "<p>HTML</p>"), \
-             override_settings(ZENODO_UPLOADS_ENABLED=True):
+        # Mock Zenodo client
+        mock_zenodo = type('MockZenodo', (), {
+            'access_token': None,
+            'update': lambda *args, **kwargs: _fake_update_zenodo(**kwargs)
+        })()
+
+        with patch.object(self.zenodo_mod, "__file__", new=self.zenodo_file), \
+             patch.object(self.zenodo_mod, "Path", self.FakePath), \
+             patch.object(self.zenodo_mod.requests, "get", _fake_get), \
+             patch.object(self.zenodo_mod.requests, "put", _fake_put), \
+             patch.object(self.zenodo_mod.requests, "delete", lambda *a, **k: type('R', (), {'status_code': 204})()), \
+             patch.object(self.zenodo_mod, "Zenodo", return_value=mock_zenodo), \
+             patch.object(self.zenodo_mod, "_markdown_to_html", lambda s: "<p>HTML</p>"), \
+             override_settings(ZENODO_UPLOADS_ENABLED=True, ZENODO_API_TOKEN="tok", ZENODO_SANDBOX_DEPOSITION_ID="123456"):
 
             call_command(
                 "deposit_zenodo",
@@ -164,3 +164,110 @@ class DepositZenodoTest(TestCase):
         # Uploader called with expected files
         self.assertIn("paths", uploaded)
         self.assertGreater(len(uploaded["paths"]), 0)
+
+    def test_doi_fields_are_protected_from_overwrite(self):
+        """Test that DOI and prereserve_doi fields are never overwritten."""
+        # Existing deposition with reserved DOI
+        existing_with_doi = {
+            "submitted": False,
+            "state": "unsubmitted",
+            "links": {"edit": "http://edit", "bucket": "http://bucket"},
+            "metadata": {
+                "title": "Test Title",
+                "upload_type": "dataset",
+                "publication_date": "2025-01-01",
+                "creators": [{"name": "Test Author"}],
+                "doi": "10.5072/zenodo.123456",
+                "prereserve_doi": {"doi": "10.5072/zenodo.123456", "recid": 123456},
+                "version": "v1",
+                "description": "<p>Old description</p>",
+            },
+        }
+
+        captured_metadata = {}
+
+        def _fake_get(url, params=None, **kwargs):
+            class R:
+                status_code = 200
+                text = "ok"
+                def json(self):
+                    return deepcopy(existing_with_doi)
+                def raise_for_status(self):
+                    return None
+            return R()
+
+        def _fake_put(url, params=None, data=None, headers=None, **kwargs):
+            # Capture the metadata that would be sent to Zenodo
+            if data:
+                captured_metadata.update(json.loads(data))
+            class R:
+                status_code = 200
+                text = "ok"
+                def raise_for_status(self):
+                    return None
+            return R()
+
+        def _fake_update_zenodo(deposition_id, paths, sandbox=True, access_token=None, publish=False):
+            class R:
+                def json(self):
+                    return {"links": {"html": "https://sandbox.zenodo.org/deposit/123456"}}
+            return R()
+
+        # Create dynamic JSON that tries to include a DOI (should be ignored)
+        (self.data_dir / "zenodo_dynamic.json").write_text(json.dumps({
+            "title": "NEW TITLE (should be ignored)",
+            "version": "v999",
+            "doi": "10.9999/fake.doi",  # This should be removed before merging
+            "prereserve_doi": {"doi": "10.9999/fake.doi", "recid": 999},  # This too
+            "description": "New description",
+        }), encoding="utf-8")
+
+        # Mock Zenodo client
+        mock_zenodo2 = type('MockZenodo', (), {
+            'access_token': None,
+            'update': lambda *args, **kwargs: _fake_update_zenodo(**kwargs)
+        })()
+
+        with patch.object(self.zenodo_mod, "__file__", new=self.zenodo_file), \
+             patch.object(self.zenodo_mod, "Path", self.FakePath), \
+             patch.object(self.zenodo_mod.requests, "get", _fake_get), \
+             patch.object(self.zenodo_mod.requests, "put", _fake_put), \
+             patch.object(self.zenodo_mod.requests, "delete", lambda *a, **k: type('R', (), {'status_code': 204})()), \
+             patch.object(self.zenodo_mod, "Zenodo", return_value=mock_zenodo2), \
+             patch.object(self.zenodo_mod, "_markdown_to_html", lambda s: "<p>Updated</p>"), \
+             override_settings(
+                 ZENODO_UPLOADS_ENABLED=True,
+                 ZENODO_API_TOKEN="test_token",
+                 ZENODO_API_BASE="https://sandbox.zenodo.org/api"
+             ):
+
+            call_command(
+                "deposit_zenodo",
+                "--deposition-id", "123456",
+                "--token", "test_token",
+            )
+
+        # Verify captured metadata
+        merged = captured_metadata.get("metadata", {})
+
+        # DOI should be preserved from existing (not overwritten)
+        self.assertEqual(merged.get("doi"), "10.5072/zenodo.123456",
+                        "DOI should be preserved from existing deposition")
+        self.assertNotEqual(merged.get("doi"), "10.9999/fake.doi",
+                           "DOI should NOT be overwritten by incoming data")
+
+        # prereserve_doi should also be preserved
+        self.assertEqual(merged.get("prereserve_doi", {}).get("doi"), "10.5072/zenodo.123456",
+                        "prereserve_doi should be preserved")
+
+        # Non-DOI fields should be updated from incoming data (no longer protected)
+        self.assertEqual(merged["title"], "NEW TITLE (should be ignored)",
+                        "Title should be updated from incoming data")
+        self.assertEqual(merged["upload_type"], "dataset",
+                        "upload_type should be present")
+
+        # Version and description should be updated
+        self.assertEqual(merged["version"], "v999",
+                        "Version should be updated (in default patch list)")
+        self.assertIn("<p>Updated</p>", merged.get("description", ""),
+                     "Description should be updated (in default patch list)")
