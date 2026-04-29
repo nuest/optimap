@@ -70,6 +70,7 @@ urlpatterns = [
     path("work/<path:identifier>/contribute-geometry/", views_geometry.contribute_geometry, name="contribute-geometry"),
     path("work/<path:identifier>/publish/", views_geometry.publish_work, name="publish-work"),
     path("work/<path:identifier>/unpublish/", views_geometry.unpublish_work, name="unpublish-work"),
+    path("work/<path:identifier>/preview.png", work_views.work_preview_png, name="work-preview"),
     path("work/<path:identifier>/", work_views.work_landing, name="work-landing"),
 
     # Authentication/User management

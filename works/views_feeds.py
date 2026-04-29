@@ -133,7 +133,8 @@ def continent_feed_page(request, continent_slug):
         cached_data = cache.get(cache_key)
         if cached_data:
             logger.debug("Serving cached continent page: %s", continent_slug)
-            return render(request, 'feed_page.html', cached_data)
+            return render(request, 'feed_page.html',
+                          _with_feed_seo(request, cached_data, region))
 
     # Generate fresh data
     logger.debug("Generating fresh continent page: %s", continent_slug)
@@ -155,7 +156,7 @@ def continent_feed_page(request, continent_slug):
     cache_hours = getattr(settings, 'FEED_CACHE_HOURS', 24)
     cache.set(cache_key, context, timeout=cache_hours * 3600)
 
-    return render(request, 'feed_page.html', context)
+    return render(request, 'feed_page.html', _with_feed_seo(request, context, region))
 
 
 def ocean_feed_page(request, ocean_slug):
@@ -179,7 +180,8 @@ def ocean_feed_page(request, ocean_slug):
         cached_data = cache.get(cache_key)
         if cached_data:
             logger.debug("Serving cached ocean page: %s", ocean_slug)
-            return render(request, 'feed_page.html', cached_data)
+            return render(request, 'feed_page.html',
+                          _with_feed_seo(request, cached_data, region))
 
     # Generate fresh data
     logger.debug("Generating fresh ocean page: %s", ocean_slug)
@@ -201,4 +203,32 @@ def ocean_feed_page(request, ocean_slug):
     cache_hours = getattr(settings, 'FEED_CACHE_HOURS', 24)
     cache.set(cache_key, context, timeout=cache_hours * 3600)
 
-    return render(request, 'feed_page.html', context)
+    return render(request, 'feed_page.html', _with_feed_seo(request, context, region))
+
+
+def _with_feed_seo(request, context: dict, region) -> dict:
+    """Augment a (possibly cached) feed-page context with the per-request
+    ``meta``/``canonical_url`` keys. Kept out of the cache so the URL is
+    correct for whatever host the request came in on (and so request-bound
+    state is never reused across requests)."""
+    from works.seo import build_feed_page_meta
+
+    bbox = None
+    try:
+        if region and region.geom:
+            extent = region.geom.extent  # (xmin, ymin, xmax, ymax) i.e. west, south, east, north
+            bbox = (extent[0], extent[1], extent[2], extent[3])
+    except Exception:
+        bbox = None
+
+    page_url = request.path
+    meta = build_feed_page_meta(
+        request,
+        region_name=region.name if region else None,
+        region_bbox=bbox,
+        page_url=page_url,
+    )
+    augmented = dict(context)
+    augmented["meta"] = meta
+    augmented["canonical_url"] = request.build_absolute_uri(page_url)
+    return augmented

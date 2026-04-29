@@ -6,8 +6,11 @@ version = 1
 
 [[annotations]]
 path = [
+    "**/__pycache__/**",
+    "**/*.pyc",
     "**/*.md",
     "CITATION.cff",
+    ".zenodo.json",
     "**/.gitignore",
     "**/.gitkeep",
     "**/.dockerignore",

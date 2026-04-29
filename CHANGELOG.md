@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Minimal SEO surface on landing pages** (issue #22) — work landing pages now emit Open Graph, Twitter Card, schema.org `ScholarlyArticle` JSON-LD, and Google Scholar `citation_*` tags. The `ScholarlyArticle` JSON-LD includes `spatialCoverage` and `temporalCoverage` mirroring exactly what we *consume* from harvested Janeway pages, closing the loop. The homepage emits `WebSite` + `SearchAction`, and the regional feed pages emit `CollectionPage` JSON-LD with the region as the `about` `Place`. `<link rel="canonical">` is set on every page that ships SEO context. Built on `django-meta`.
+- **Open Graph preview images for work landing pages** (issue #22) — a new `/work/<id>/preview.png` endpoint renders a 1200×630 PNG showing the work's spatial extent on an OSM basemap with a small "OPTIMAP" wordmark in the bottom-right. Served as `og:image` / `twitter:image`. Cached lazily on disk and invalidated by a `post_save` signal on `Work`. Works without geometry skip the `og:image` tag entirely.
+
+- **`.zenodo.json` deposit metadata** (issue #16) — adds a Zenodo deposit metadata file at the repository root so that GitHub releases archived to Zenodo are populated with a curated title, description, creators, license, keywords, and links to related resources (KOMET/OPTIMETA project pages, the live instance, the GeoJSON/GeoPackage data downloads, the OpenAPI schema, and the OPTIMETA Geo OJS plugin).
+
 <!-- REUSE-IgnoreStart -->
 - **REUSE / SPDX license headers on all source files** (issue #30) — every first-party `.py`/`.js`/`.css`/`.html`/`.sh` file now carries a two-line SPDX header (`SPDX-FileCopyrightText` + `SPDX-License-Identifier: GPL-3.0-or-later`). A `REUSE.toml` covers migrations, fixtures, vendored static assets, and binaries. Run `reuse lint` to verify; the package is in `requirements-dev.txt`.
 <!-- REUSE-IgnoreEnd -->

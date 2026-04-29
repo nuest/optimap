@@ -25,6 +25,23 @@ def update_user_callback(sender, instance, **kwargs):
 @receiver(post_save, sender=User)
 def create_or_update_user_profile(sender, instance, created, **kwargs):
     if created:
-        UserProfile.objects.create(user=instance) 
+        UserProfile.objects.create(user=instance)
     else:
-        instance.userprofile.save()  
+        instance.userprofile.save()
+
+
+# --- SEO preview-image cache invalidation (issue #22) -----------------------
+from works.models import Work as _Work
+
+
+@receiver(post_save, sender=_Work)
+def invalidate_work_preview_cache(sender, instance, **kwargs):
+    """Drop the cached og:image PNG for the work whenever the work is saved.
+    Lazy regeneration on the next request is cheap (a few hundred ms) and
+    keeps stale geometry/title from leaking into social previews."""
+    try:
+        from works.services.preview_image import invalidate_preview
+        invalidate_preview(instance)
+    except Exception as err:  # pragma: no cover — non-critical path
+        logger.debug("preview cache invalidation failed for work %s: %s",
+                     instance.pk, err)

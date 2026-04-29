@@ -91,7 +91,32 @@ INSTALLED_APPS = [
     'drf_spectacular_sidecar',
     'leaflet',
     'import_export',
+    'meta',
 ]
+
+
+# django-meta — emits Open Graph, Twitter Card, and schema.org JSON-LD tags
+# from Meta objects passed in the template context. See works/seo.py for the
+# OPTIMAP-side helpers and base.html for the include site.
+META_SITE_PROTOCOL = env('OPTIMAP_META_SITE_PROTOCOL', default='http')
+META_SITE_DOMAIN = env('OPTIMAP_META_SITE_DOMAIN', default='localhost:8000')
+META_SITE_NAME = 'OPTIMAP'
+META_DEFAULT_KEYWORDS = [
+    'geospatial',
+    'open access',
+    'research articles',
+    'metadata',
+    'OPTIMAP',
+    'KOMET',
+]
+META_USE_OG_PROPERTIES = True
+META_USE_TWITTER_PROPERTIES = True
+META_USE_SCHEMAORG_PROPERTIES = True
+META_USE_JSON_LD_SCHEMA = True  # emit `<script type="application/ld+json">`
+META_DEFAULT_TYPE = 'website'
+META_USE_SITES = False  # we set domain/protocol via META_SITE_* above
+META_USE_TITLE_TAG = False  # templates render their own <title>
+META_INCLUDE_KEYWORDS = ['geospatial', 'OPTIMAP', 'KOMET']
 
 AUTH_USER_MODEL = "works.CustomUser" 
 

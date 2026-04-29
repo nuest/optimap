@@ -2,8 +2,9 @@
 {# SPDX-License-Identifier: GPL-3.0-or-later #}
 
 {% load static %}
+{% load meta %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"{% if meta %} {% meta_namespaces %}{% endif %}>
   <head>
     {% block head %}
     <meta charset="utf-8" />
@@ -11,6 +12,11 @@
 
     <title>{% block title %}{% endblock %}OPTIMAP</title>
     <link rel="icon" type="image/png" href="{% static 'favicon.png' %}" />
+
+    {# SEO: Open Graph, Twitter Card, schema.org JSON-LD — see works/seo.py #}
+    {% if meta %}{% include "meta/meta.html" %}{% endif %}
+    {% block extra_meta %}{% endblock %}
+    {% if canonical_url %}<link rel="canonical" href="{{ canonical_url }}" />{% endif %}
 
     <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}" />
     <link

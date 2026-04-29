@@ -6,6 +6,11 @@
 
 {% block title %}{{ work.title }}{% if work.doi %} ({{ work.doi }}){% endif %} - {% endblock %}
 
+{% block extra_meta %}
+{# Google Scholar citation_* tags. Built in works/seo.py:citation_meta_tags. #}
+{% for t in citation_tags %}<meta name="{{ t.name }}" content="{{ t.content }}" />
+{% endfor %}{% endblock %}
+
 {% block content %}
 <div class="work-landing-page">
 {% csrf_token %}

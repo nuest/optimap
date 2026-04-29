@@ -36,8 +36,13 @@ import geoextent.lib.features
 
 def main(request):
     # Pass the 'next' parameter to template for login redirect
+    from works.seo import build_homepage_meta
     next_url = request.GET.get('next', '')
-    return render(request, "main.html", {'next': next_url})
+    return render(request, "main.html", {
+        'next': next_url,
+        'meta': build_homepage_meta(request),
+        'canonical_url': request.build_absolute_uri(reverse("optimap:main")),
+    })
 
 def about(request):
     return render(request, 'about.html')

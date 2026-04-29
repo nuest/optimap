@@ -22,8 +22,14 @@ from django.core.paginator import Paginator
 from django.views.decorators.cache import never_cache
 from django.conf import settings
 from django.urls import reverse
-from django.http import Http404
+from django.http import Http404, FileResponse
+from django.views.decorators.http import require_GET
 from works.models import Work
+from works.seo import build_work_meta, citation_meta_tags
+from works.services.preview_image import (
+    cache_path_for as _preview_cache_path,
+    render_work_preview,
+)
 from works.utils.statistics import get_cached_statistics
 
 
@@ -279,5 +285,41 @@ def work_landing(request, identifier):
         "all_wikidata_exports": all_wikidata_exports,
         "use_id_urls": use_id_urls,
         "identifier_type": identifier_type,  # Pass to template for debugging/analytics
+        "meta": build_work_meta(request, work),
+        "citation_tags": citation_meta_tags(work, request),
+        "canonical_url": request.build_absolute_uri(
+            reverse("optimap:work-landing", args=[work.get_identifier()])
+        ),
     }
     return render(request, "work_landing_page.html", context)
+
+
+@require_GET
+def work_preview_png(request, identifier):
+    """og:image preview for work landing pages — issue #22.
+
+    Returns a 1200×630 PNG of the work's spatial extent. Cached lazily on
+    disk; invalidated by the post_save signal in ``works/signals.py``.
+    Returns 404 when the work has no geometry — landings for those works
+    don't emit an og:image so this endpoint should not be hit for them.
+    """
+    from works.utils.identifiers import resolve_work_identifier
+
+    work, _ = resolve_work_identifier(identifier)
+    if not (request.user.is_authenticated and request.user.is_staff) and work.status != 'p':
+        raise Http404("Work not found.")
+    if not work.geometry or work.geometry.empty:
+        raise Http404("Work has no geometry — no preview available.")
+
+    cache_file = _preview_cache_path(work)
+    if not cache_file.exists():
+        try:
+            data = render_work_preview(work)
+        except Exception as err:
+            logger.warning("preview render failed for work %s: %s", work.id, err)
+            raise Http404("Preview unavailable.") from err
+        cache_file.write_bytes(data)
+
+    response = FileResponse(open(cache_file, "rb"), content_type="image/png")
+    response["Cache-Control"] = "public, max-age=3600"
+    return response
