@@ -1,0 +1,112 @@
+{
+  "title": "OPTIMAP: Geospatial discovery of research articles based on open metadata",
+  "description": "<p>OPTIMAP is a geospatial discovery portal for research articles based on open metadata. Built with Django/GeoDjango and PostgreSQL/PostGIS, it enables users to discover scientific publications through map-based search, temporal filtering, and spatial metadata. Publications are harvested from OAI-PMH and RSS/Atom sources, optionally enriched via OpenAlex, and exposed through a REST API, GeoRSS/GeoAtom feeds, and downloadable GeoJSON/GeoPackage data dumps.</p><p>OPTIMAP is part of the KOMET project (<a href=\"https://projects.tib.eu/komet\">https://projects.tib.eu/komet</a>), a joint initiative of <a href=\"https://ror.org/042aqky30\">TUD Dresden University of Technology</a> and the <a href=\"https://ror.org/04aj4c181\">TIB – Leibniz Information Centre for Science and Technology</a>. It continues work from the OPTIMETA project (<a href=\"https://projects.tib.eu/optimeta\">https://projects.tib.eu/optimeta</a>), a joint initiative of the Institute for Geoinformatics (ifgi) at the <a href=\"https://ror.org/00pd74e08\">University of Münster</a> and the <a href=\"https://ror.org/04aj4c181\">TIB – Leibniz Information Centre for Science and Technology</a>. A live instance is operated at <a href=\"https://optimap.geo.tu-dresden.de\">https://optimap.geo.tu-dresden.de</a>.</p>",
+  "upload_type": "software",
+  "access_right": "open",
+  "license": "GPL-3.0-or-later",
+  "creators": [
+    {
+      "name": "Nüst, Daniel",
+      "affiliation": "TUD Dresden University of Technology, Chair of Geoinformatics",
+      "orcid": "0000-0002-0024-5046"
+    },
+    {
+      "name": "Veauli, Bharat"
+    },
+    {
+      "name": "Nanjappan, Kirubamohan"
+    },
+    {
+      "name": "Ibrar, Uzair"
+    }
+  ],
+  "contributors": [
+    {
+      "name": "KOMET project",
+      "type": "ProjectLeader",
+      "affiliation": "TUD Dresden University of Technology (Chair of Geoinformatics) and TIB – Leibniz Information Centre for Science and Technology"
+    },
+    {
+      "name": "OPTIMETA project",
+      "type": "Other",
+      "affiliation": "Institute for Geoinformatics (ifgi), University of Münster, and TIB – Leibniz Information Centre for Science and Technology"
+    }
+  ],
+  "keywords": [
+    "geospatial",
+    "discovery",
+    "research articles",
+    "scientific publications",
+    "open metadata",
+    "OAI-PMH",
+    "harvesting",
+    "GeoDjango",
+    "PostGIS",
+    "spatial metadata",
+    "temporal metadata",
+    "GeoRSS",
+    "GeoJSON",
+    "GeoPackage",
+    "Django",
+    "REST API",
+    "open science",
+    "geoinformatics"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/GeoinformationSystems/optimap",
+      "relation": "isSupplementTo",
+      "scheme": "url",
+      "resource_type": "software"
+    },
+    {
+      "identifier": "https://optimap.geo.tu-dresden.de",
+      "relation": "isVariantFormOf",
+      "scheme": "url",
+      "resource_type": "other"
+    },
+    {
+      "identifier": "https://optimap.science",
+      "relation": "isVariantFormOf",
+      "scheme": "url",
+      "resource_type": "other"
+    },
+    {
+      "identifier": "https://optimap.geo.tu-dresden.de/download/geojson/",
+      "relation": "isSourceOf",
+      "scheme": "url",
+      "resource_type": "dataset"
+    },
+    {
+      "identifier": "https://optimap.geo.tu-dresden.de/download/geopackage/",
+      "relation": "isSourceOf",
+      "scheme": "url",
+      "resource_type": "dataset"
+    },
+    {
+      "identifier": "https://optimap.geo.tu-dresden.de/api/schema/ui/",
+      "relation": "isDocumentedBy",
+      "scheme": "url",
+      "resource_type": "other"
+    },
+    {
+      "identifier": "https://projects.tib.eu/komet",
+      "relation": "isPartOf",
+      "scheme": "url",
+      "resource_type": "other"
+    },
+    {
+      "identifier": "https://projects.tib.eu/optimeta",
+      "relation": "isPartOf",
+      "scheme": "url",
+      "resource_type": "other"
+    },
+    {
+      "identifier": "https://github.com/TIBHannover/optimetaGeo",
+      "relation": "isSupplementedBy",
+      "scheme": "url",
+      "resource_type": "software"
+    }
+  ],
+  "language": "eng"
+}
