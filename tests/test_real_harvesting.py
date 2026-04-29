@@ -172,6 +172,74 @@ class RealHarvestingTest(TestCase):
         pub_count = self._assert_successful_harvest(source, min_publications=5)
         print(f"\n✓ GEO-LEO: Harvested {pub_count} publications")
 
+    def test_harvest_eartharxiv_with_openalex_enrichment(self):
+        """
+        Test harvesting from EarthArXiv preprint repository, including a
+        smoke check that OpenAlex enrichment runs.
+
+        Issue: harvesting Janeway-based preprint servers (#18 follow-up).
+        Repository: https://eartharxiv.org/
+
+        Validates:
+          - The OAI-PMH endpoint is reachable and returns parseable records.
+          - Bibliographic metadata (title, authors) is populated.
+          - OpenAlex enrichment runs and at least one work picks up
+            ``topics`` (which OPTIMAP only ever derives from OpenAlex —
+            original sources don't carry research-topic classifications).
+
+        Kept short (5 records) so the live OpenAlex round-trips don't
+        dominate the suite. If OpenAlex itself is unreachable this run, the
+        topics assertion is soft-skipped — the test only fails if EarthArXiv
+        OAI-PMH is broken or our enrichment plumbing regresses.
+        """
+        source = self._create_source(
+            name="EarthArXiv",
+            url="https://eartharxiv.org/api/oai/?verb=ListRecords&metadataPrefix=oai_dc",
+            collection_name="EarthArXiv",
+        )
+
+        harvest_oai_endpoint(source.id, user=self.user, max_records=5)
+
+        pub_count = self._assert_successful_harvest(source, min_publications=3)
+
+        pubs = list(Work.objects.filter(job__source=source))
+
+        # Bibliographic basics — these come from EarthArXiv directly and
+        # don't depend on OpenAlex.
+        self.assertTrue(
+            any(p.authors for p in pubs),
+            "Expected at least one EarthArXiv work to have authors"
+        )
+
+        # OpenAlex enrichment was attempted on every work; we look for the
+        # provenance marker that the matcher actually ran successfully.
+        enriched = [p for p in pubs if 'openalex' in (p.provenance or '').lower()]
+        if not enriched:
+            self.skipTest(
+                "OpenAlex did not return any matches during this run "
+                "(possible rate-limit / network); rerun later"
+            )
+
+        # `topics` is OpenAlex-only — its presence on any work proves the
+        # enrichment pipeline produced substantive output, not just a
+        # provenance line.
+        with_topics = [p for p in enriched if p.topics]
+        self.assertTrue(
+            with_topics,
+            f"Of {len(enriched)} OpenAlex-enriched works, none have topics "
+            f"populated — enrichment plumbing may have regressed"
+        )
+        # Sanity check on the topics array shape.
+        sample_topics = with_topics[0].topics
+        self.assertIsInstance(sample_topics, list)
+        self.assertTrue(all(isinstance(t, str) and t.strip() for t in sample_topics))
+
+        print(
+            f"\n✓ EarthArXiv: harvested {pub_count} preprints, "
+            f"{len(enriched)} with OpenAlex enrichment, "
+            f"{len(with_topics)} with topics"
+        )
+
     @skipIf(True, "EssOAr OAI-PMH endpoint not yet confirmed")
     def test_harvest_essoar(self):
         """

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **OAI-PMH harvester is now hardened against transient and content-type errors.** `harvest_oai_endpoint` uses a `requests.Session` with retries (3 attempts, exponential back-off, on 429/500/502/503/504 and connection/timeout errors), a 30-second timeout, and an `OPTIMAP-harvester/1.0` User-Agent. The response is now sniffed before being passed to the XML parser — non-XML 200 responses (e.g. an HTML maintenance page) are rejected with a body preview in the error log, so operators can diagnose upstream changes without spelunking. The two live-endpoint tests against Copernicus (`test_real_journal_harvesting_essd` / `_geo_leo`) now skip cleanly when the upstream is unreachable.
+
 ### Added
 
 <!-- REUSE-IgnoreStart -->

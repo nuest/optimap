@@ -19,6 +19,8 @@ from urllib.parse import urlsplit, urlunsplit, quote, urljoin
 import xml.dom.minidom
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from pathlib import Path
 from bs4 import BeautifulSoup
 from xml.dom import minidom
@@ -824,6 +826,57 @@ def parse_oai_xml_and_save_works(content, event: HarvestingEvent, max_records=No
 
     logger.info("OAI-PMH parsing completed for source %s: processed %d records, saved %d publications",
                 source.name, processed_count, saved_count)
+OAI_HTTP_TIMEOUT = 30  # seconds; per-request, applies to both connect and read
+OAI_RETRY_TOTAL = 3
+OAI_USER_AGENT = "OPTIMAP-harvester/1.0 (+https://optimap.science)"
+
+
+def _oai_session() -> requests.Session:
+    """`requests.Session` configured with retries for transient errors and a
+    descriptive User-Agent so upstream operators can identify our traffic.
+    Retries cover GET only; 4xx (other than 429) are not retried because they
+    almost always indicate a permanent problem (bad URL, removed set)."""
+    session = requests.Session()
+    retry = Retry(
+        total=OAI_RETRY_TOTAL,
+        connect=OAI_RETRY_TOTAL,
+        read=OAI_RETRY_TOTAL,
+        backoff_factor=1.5,  # 0s, 1.5s, 3s, 6s
+        status_forcelist=(429, 500, 502, 503, 504),
+        allowed_methods=frozenset(["GET"]),
+        respect_retry_after_header=True,
+        raise_on_status=False,
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    session.headers.update({"User-Agent": OAI_USER_AGENT,
+                            "Accept": "text/xml, application/xml, */*"})
+    return session
+
+
+def _looks_like_oai_xml(body: bytes) -> bool:
+    """Cheap content sniff so we fail fast and clearly when an upstream
+    'helpfully' returns an HTML 200 error page instead of an OAI-PMH
+    response."""
+    if not body:
+        return False
+    head = body.lstrip()[:512].lower()
+    if head.startswith(b"<?xml"):
+        return True
+    # Some endpoints omit the XML declaration; accept the OAI-PMH root as well.
+    return b"<oai-pmh" in head
+
+
+def _short_body(resp: requests.Response, n: int = 240) -> str:
+    """Trim a response body for use in error messages."""
+    text = resp.text or ""
+    text = " ".join(text.split())  # collapse whitespace for log readability
+    if len(text) > n:
+        return text[:n] + "…"
+    return text
+
+
 def harvest_oai_endpoint(source_id, user=None, max_records=None):
     source = Source.objects.get(id=source_id)
     event  = HarvestingEvent.objects.create(source=source, status="in_progress")
@@ -845,8 +898,36 @@ def harvest_oai_endpoint(source_id, user=None, max_records=None):
             oai_url = source.url_field
 
         logger.info("Fetching from OAI-PMH URL: %s", oai_url)
-        response = requests.get(oai_url)
-        response.raise_for_status()
+        session = _oai_session()
+        try:
+            response = session.get(oai_url, timeout=OAI_HTTP_TIMEOUT)
+        except requests.exceptions.Timeout as e:
+            raise RuntimeError(
+                f"OAI-PMH endpoint timed out after {OAI_HTTP_TIMEOUT}s "
+                f"(after {OAI_RETRY_TOTAL} retries): {oai_url}"
+            ) from e
+        except requests.exceptions.ConnectionError as e:
+            raise RuntimeError(
+                f"OAI-PMH endpoint unreachable (after {OAI_RETRY_TOTAL} retries): "
+                f"{oai_url}: {e}"
+            ) from e
+
+        if not response.ok:
+            content_type = response.headers.get("Content-Type", "?")
+            raise RuntimeError(
+                f"OAI-PMH endpoint returned HTTP {response.status_code} "
+                f"({content_type}) for {oai_url}. "
+                f"This usually means the URL is outdated or the upstream is "
+                f"down. Body preview: {_short_body(response)}"
+            )
+
+        if not _looks_like_oai_xml(response.content):
+            content_type = response.headers.get("Content-Type", "?")
+            raise RuntimeError(
+                f"OAI-PMH endpoint returned non-XML content "
+                f"(HTTP {response.status_code}, Content-Type: {content_type}) "
+                f"for {oai_url}. Body preview: {_short_body(response)}"
+            )
 
         parse_oai_xml_and_save_works(response.content, event, max_records=max_records, warning_collector=warning_collector)
 
