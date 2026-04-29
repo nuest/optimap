@@ -116,7 +116,6 @@
                 {% if work.doi %}
                   <a href="https://doi.org/{{ work.doi }}" target="_blank" rel="noopener noreferrer">
                     {{ work.title|truncatechars:120 }}
-                    <i class="fas fa-external-link-alt fa-xs"></i>
                   </a>
                 {% else %}
                   <span>{{ work.title|truncatechars:120 }}</span>
