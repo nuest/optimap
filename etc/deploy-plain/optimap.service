@@ -1,0 +1,38 @@
+# Systemd service file for OPTIMAP Django application
+# Copy to: /etc/systemd/system/optimap.service
+# Enable with: sudo systemctl enable optimap
+
+[Unit]
+Description=OPTIMAP Django Application (Gunicorn)
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=notify
+User=optimap
+Group=optimap
+WorkingDirectory=/opt/optimap/app
+Environment="PATH=/opt/optimap/venv/bin"
+EnvironmentFile=/opt/optimap/app/optimap/.env
+ExecStart=/opt/optimap/venv/bin/gunicorn \
+    --config /opt/optimap/gunicorn.conf.py \
+    optimap.wsgi:application
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=30
+PrivateTmp=true
+Restart=on-failure
+RestartSec=10
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/optimap/logs /opt/optimap/cache /opt/optimap/static
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+[Install]
+WantedBy=multi-user.target

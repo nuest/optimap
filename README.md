@@ -532,10 +532,48 @@ For future use, optional colours for variation, e.g., for different map features
 
 The **logos** and favicon are in the repository in the folder [`publications/static/`](https://github.com/nuest/optimap/tree/main/publications/static).
 
-## Deploy
+## Deployment
 
-The app is deployed in the TUD Enterprise Cloud.
-HTTPS certificate is retrieved via `certbot`, see `docker-compose.deploy.yml` for the configuration and documentation links.
+OPTIMAP supports two deployment approaches:
+
+### Docker deployment (recommended)
+
+Containerized deployment using Docker Compose with nginx, Gunicorn, and PostgreSQL/PostGIS.
+
+| File | Purpose |
+|------|---------|
+| `docker-compose.yml` | Development configuration |
+| `docker-compose.deploy.yml` | Production configuration with SSL |
+| `etc/nginx.deploy.conf` | nginx reverse proxy with HTTPS |
+| `etc/manage-and-run.sh` | Container startup script |
+
+```bash
+# Production deployment
+docker compose -f docker-compose.deploy.yml up -d
+```
+
+HTTPS certificates are managed via certbot container.
+
+### Native deployment
+
+Run OPTIMAP directly on the host system with systemd services, nginx, and a native PostgreSQL/PostGIS database.
+
+| File | Purpose |
+|------|---------|
+| `docs/deployment-plain.md` | Comprehensive deployment guide |
+| `etc/deploy-plain/` | Configuration templates (systemd, nginx, Gunicorn) |
+| `etc/deploy-plain/install.sh` | Automated installation script |
+
+```bash
+# Run the installation script
+sudo ./etc/deploy-plain/install.sh
+```
+
+See `docs/deployment-plain.md` for detailed instructions including database setup, SSL configuration, and maintenance procedures.
+
+### Production instance
+
+The app is deployed in the TUD Enterprise Cloud at <https://optimap.geo.tu-dresden.de>.
 
 ## Operation
 
