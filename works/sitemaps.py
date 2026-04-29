@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2023 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 from django.contrib.sitemaps import Sitemap
 from .models import Work, GlobalRegion
 from django.urls import reverse

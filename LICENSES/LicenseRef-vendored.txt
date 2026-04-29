@@ -1,0 +1,26 @@
+Vendored third-party assets in works/static/
+============================================
+
+This is a placeholder license identifier used for unmodified third-party
+JavaScript and CSS libraries vendored into works/static/. These files retain
+their original upstream licenses (Apache-2.0, BSD-2-Clause, BSD-3-Clause, MIT,
+OFL-1.1, etc.) as documented in their own file headers and in the upstream
+projects.
+
+The libraries currently vendored are:
+
+  - Bootstrap (MIT) -- https://getbootstrap.com/
+  - bootstrap-datepicker (Apache-2.0) -- https://github.com/uxsolutions/bootstrap-datepicker
+  - Font Awesome (OFL-1.1 fonts, MIT code, CC-BY-4.0 icons) -- https://fontawesome.com/
+  - jQuery (MIT) -- https://jquery.com/
+  - Leaflet (BSD-2-Clause) -- https://leafletjs.com/
+  - Leaflet.draw (MIT) -- https://github.com/Leaflet/Leaflet.draw
+  - Leaflet.fullscreen (ISC) -- https://github.com/Leaflet/Leaflet.fullscreen
+  - leaflet-control-geocoder (BSD-2-Clause) -- https://github.com/perliedman/leaflet-control-geocoder
+  - Popper (MIT) -- https://popper.js.org/
+
+When a vendored library is updated, the upstream notice in its file header
+takes precedence over this aggregate annotation.
+
+Issue https://github.com/komet-project/optimap/issues/30 tracks moving each
+vendored library to a per-file SPDX declaration.

@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+<!-- REUSE-IgnoreStart -->
+- **REUSE / SPDX license headers on all source files** (issue #30) — every first-party `.py`/`.js`/`.css`/`.html`/`.sh` file now carries a two-line SPDX header (`SPDX-FileCopyrightText` + `SPDX-License-Identifier: GPL-3.0-or-later`). A `REUSE.toml` covers migrations, fixtures, vendored static assets, and binaries. Run `reuse lint` to verify; the package is in `requirements-dev.txt`.
+<!-- REUSE-IgnoreEnd -->
 - **Janeway harvesting and `janeway_geometadata` plugin support** (issues #15, #18) — OAI-PMH harvesting now picks up geospatial and temporal metadata published by Janeway journals running the [`janeway_geometadata`](https://github.com/GeoinformationSystems/janeway_geometadata) plugin (e.g., DQJ, EarthArxiv, EcoEvoArxiv). The HTML extractor tries, in priority order:
   1. schema.org JSON-LD `spatialCoverage` / `temporalCoverage` (supports GeoJSON `geo`, schema.org `GeoShape` `box`, and `GeoCoordinates`),
   2. `<link rel="alternate" type="application/geo+json">` — fetched and merged when present,

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2022 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """OPTIMAP URL Configuration
 
 The `urlpatterns` list routes URLs to views. For more information please see:

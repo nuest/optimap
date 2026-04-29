@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2022 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 from bs4 import BeautifulSoup
 from django.test import TestCase
 from works.tasks import extract_geometry_from_html, extract_timeperiod_from_html

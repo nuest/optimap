@@ -1,4 +1,7 @@
 #!/bin/bash
+# SPDX-FileCopyrightText: 2025 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 set -e
 
 # Avoid database not being ready

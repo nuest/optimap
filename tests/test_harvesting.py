@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2023 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 import os
 import django
 import time
@@ -913,4 +916,3 @@ class JanewayGeometadataExtractionTests(TestCase):
         starts, ends = extract_timeperiod_from_html(soup)
         self.assertEqual(starts, [None])
         self.assertEqual(ends, [None])
-

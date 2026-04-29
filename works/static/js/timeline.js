@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2022 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 const container = document.getElementById("timeline");
     
 // Create a DataSet (allows two way data-binding)
@@ -42,7 +45,6 @@ const options = {
 // Create a Timeline
 timeline = new vis.Timeline(container, articles, options);
 //timeline.setWindow('2010-05-01', '2019-04-01');
-
 
 
 

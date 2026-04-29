@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2022 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 import logging
 logger = logging.getLogger(__name__)
 
@@ -384,4 +387,3 @@ class UserAdmin(admin.ModelAdmin):
 @admin.register(GlobalRegion)
 class GlobalRegionAdmin(admin.ModelAdmin):
     """GlobalRegion Admin."""
-

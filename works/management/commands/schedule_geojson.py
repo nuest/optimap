@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 from django.core.management.base import BaseCommand
 from django_q.tasks    import schedule
 from django_q.models   import Schedule

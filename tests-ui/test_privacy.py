@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2022 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 import unittest
 from django.test import TestCase
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
@@ -27,4 +30,3 @@ class PrivacypageTests(StaticLiveServerTestCase):
     def test_template_content(self):
         response = self.client.get(reverse("optimap:privacy"))
         self.assertContains(response, "Privacy policy")
-

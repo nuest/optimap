@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Tests to verify publication status workflow compliance."""
 from django.test import TestCase
 from django.contrib.gis.geos import Point, GeometryCollection

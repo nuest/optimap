@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Tests for ID-based geometry contribution (publications without DOI)."""
 import json
 from django.test import TestCase, Client

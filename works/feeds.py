@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """
 Improved feed implementation for OPTIMAP with caching, validation fixes, and regional feeds.
 """

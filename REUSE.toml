@@ -1,0 +1,123 @@
+version = 1
+
+# Files in this project that do not (and should not) carry an inline SPDX
+# header are covered here, per the REUSE 3.3 specification. First-party source
+# files use inline headers — see any .py / .js / .css / .html in works/.
+
+[[annotations]]
+path = [
+    "**/*.md",
+    "CITATION.cff",
+    "**/.gitignore",
+    "**/.gitkeep",
+    "**/.dockerignore",
+    "**/.claude*",
+    ".claude/**",
+    "Dockerfile",
+    "**/Dockerfile",
+    "docker-compose*.yml",
+    "Makefile",
+    "package.json",
+    "package-lock.json",
+    ".github/**",
+    "docs/**",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2022 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>"
+SPDX-License-Identifier = "GPL-3.0-or-later"
+
+# Auto-generated Django migrations — covered by blanket so we don't have to
+# touch them on every makemigrations run.
+[[annotations]]
+path = ["**/migrations/**"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2022 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>"
+SPDX-License-Identifier = "GPL-3.0-or-later"
+
+# Project test data — fixtures and harvested-article snapshots are not source
+# code we author; they are test inputs used to drive the harvester.
+[[annotations]]
+path = [
+    "fixtures/**",
+    "tests/fixtures/**",
+    "tests/harvesting/**",
+    "tests/reference/**",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2022 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>"
+SPDX-License-Identifier = "GPL-3.0-or-later"
+
+# Configuration / dotfiles / requirements lists — small text files where an
+# inline header would be noise.
+[[annotations]]
+path = [
+    "**/*.cfg",
+    "**/*.ini",
+    "**/*.toml",
+    "**/*.yml",
+    "**/*.yaml",
+    "**/.env*",
+    "requirements*.txt",
+    "pytest.ini",
+    "manage-and-run.sh",
+    "release_command.sh",
+    "etc/**",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2022 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>"
+SPDX-License-Identifier = "GPL-3.0-or-later"
+
+# First-party binary assets (logos, icons, screenshots, PDFs) — REUSE forbids
+# inline headers in binaries; declare licensing here.
+[[annotations]]
+path = [
+    "**/*.png",
+    "**/*.jpg",
+    "**/*.jpeg",
+    "**/*.gif",
+    "**/*.ico",
+    "**/*.svg",
+    "**/*.pdf",
+    "**/*.docx",
+    "**/*.woff",
+    "**/*.woff2",
+    "**/*.ttf",
+    "**/*.eot",
+    "**/*.otf",
+    "**/*.map",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2022 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>"
+SPDX-License-Identifier = "GPL-3.0-or-later"
+
+# Vendored third-party static assets in works/static/. These are unmodified
+# upstream copies; their original licenses (Apache-2.0, MIT, OFL-1.1, BSD-2-
+# Clause) are documented in the upstream projects. We aggregate-license here so
+# `reuse lint` succeeds; this is a pragmatic compromise — see issue #30 follow-
+# ups for switching to per-file SPDX where upstream provides it.
+[[annotations]]
+path = [
+    "works/static/js/bootstrap*",
+    "works/static/js/jquery*",
+    "works/static/js/leaflet*",
+    "works/static/js/popper*",
+    "works/static/js/bootstrap-datepicker*",
+    "works/static/css/bootstrap*",
+    "works/static/css/leaflet*",
+    "works/static/css/font-awesome*",
+    "works/static/css/bootstrap-datepicker*",
+    "works/static/css/fonts/**",
+    "works/static/css/images/**",
+    "works/static/fontawesome/**",
+    "works/static/webfonts/**",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "Various third-party authors"
+SPDX-License-Identifier = "LicenseRef-vendored"
+
+# The LICENSE file itself.
+[[annotations]]
+path = "LICENSE"
+precedence = "override"
+SPDX-FileCopyrightText = "2007 Free Software Foundation, Inc."
+SPDX-License-Identifier = "CC0-1.0"

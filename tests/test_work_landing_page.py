@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 from django.test import TestCase, Client
 from django.urls import reverse
 from works.models import Work, Source

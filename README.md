@@ -505,6 +505,60 @@ Change the argument `tests` to `tests-ui` to run the UI tests.
 
 See also documentation at <https://code.visualstudio.com/docs/python/tutorial-django>.
 
+<!-- REUSE-IgnoreStart -->
+
+### License headers (REUSE)
+
+OPTIMAP follows the [REUSE 3.3 specification](https://reuse.software/spec/) for licensing.
+Every first-party source file carries a two-line SPDX header; vendored, generated, and binary files are blanket-licensed via [`REUSE.toml`](REUSE.toml).
+
+**Header template** (use the file's first-commit year for the copyright year):
+
+```text
+SPDX-FileCopyrightText: <year> OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
+SPDX-License-Identifier: GPL-3.0-or-later
+```
+
+Adapted to the file's comment style:
+
+| Extension | Comment style |
+| --- | --- |
+| `.py`, `.sh`, `.toml`, `.cfg` | `# …` |
+| `.js` | `// …` |
+| `.css` | `/* … */` block |
+| `.html` (Django template) | `{# … #}` |
+
+**Workflow when adding a new file:**
+
+1. Add the two SPDX lines at the top (after a shebang or `<!DOCTYPE>` if present).
+2. Run `reuse lint` to confirm the project is still compliant.
+
+**Useful commands** (the tool ships in [`requirements-dev.txt`](requirements-dev.txt)):
+
+```bash
+# Verify all files carry copyright + license info (must exit 0 on main)
+reuse lint
+
+# Inspect the license/copyright tree as REUSE sees it
+reuse spdx | less
+
+# Add a header to a single file (interactive)
+reuse annotate \
+    --copyright "OPTIMETA and KOMET projects <https://projects.tib.eu/komet>" \
+    --license   GPL-3.0-or-later \
+    --year      "$(git log --diff-filter=A --follow --format=%ad --date=format:%Y -- <path> | tail -1)" \
+    <path>
+
+# Fetch any new SPDX license text into LICENSES/
+reuse download --all
+```
+
+If a file should not carry an inline header (auto-generated, binary, or
+vendored), add it to a matching path pattern in [`REUSE.toml`](REUSE.toml)
+rather than committing an unheadered file.
+
+<!-- REUSE-IgnoreEnd -->
+
 ### Issues during development
 
 - If you get a message during login that there is an issue with the CSRF token, e.g. `WARNING:django.security.csrf:Forbidden (CSRF token from POST incorrect.): /loginres/` in the log and also i nthe UI, then switch to using `localhost:8000` as the domain, not the localhost IP used in the examples in this README file.
@@ -582,5 +636,9 @@ python manage.py qinfo
 
 ## License
 
-This software is published under the GNU General Public License v3.0 (see file `LICENSE`).
-For licenses of used libraries and dependencies, e.g., scripts and CSS files in `publications/static/`, see respective files and projects.
+This software is published under the GNU General Public License v3.0 (see file [`LICENSE`](LICENSE)).
+<!-- REUSE-IgnoreStart -->
+Licensing is declared per-file following the [REUSE 3.3 specification](https://reuse.software/spec/) — every first-party source file carries an inline `SPDX-License-Identifier: GPL-3.0-or-later` header, and [`REUSE.toml`](REUSE.toml) covers generated files (Django migrations), test fixtures, binary assets (logos, PDFs, fonts), and vendored third-party libraries in `works/static/` (their own upstream licenses apply — see [`LICENSES/LicenseRef-vendored.txt`](LICENSES/LicenseRef-vendored.txt) for the inventory).
+<!-- REUSE-IgnoreEnd -->
+
+To verify compliance, run `reuse lint` — see [License headers (REUSE)](#license-headers-reuse) above for the workflow when adding new files.

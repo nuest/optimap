@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2022 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // publications/static/js/main.js
 
 // Leaflet map initialization and popup rendering for publication points

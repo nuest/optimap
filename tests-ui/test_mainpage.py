@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2022 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 import os
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from helium import start_chrome, get_driver, kill_browser

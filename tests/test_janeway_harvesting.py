@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """End-to-end harvest of a Janeway journal exposing the janeway_geometadata
 plugin (issues #18 + #15). Hits the local development server at
 http://localhost:8000/dqj/ and is skipped automatically when that server is not

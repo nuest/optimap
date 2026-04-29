@@ -87,6 +87,21 @@ Here is the gist of it:
 - Try to make context-aware commit messages. For example, "Fix typo in README" is better than "Fix typo".
 - Collect related changes in one commit. For example, "Fix typo in README and add more examples" is better than "Fix typo in README" and "Add more examples".
 
+<!-- REUSE-IgnoreStart -->
+
+### License headers
+
+Every new first-party source file (`.py`, `.js`, `.css`, `.html`, `.sh`, …) must start with the project's two-line REUSE/SPDX header, using the comment style of that file type:
+
+```text
+SPDX-FileCopyrightText: <year-the-file-is-first-committed> OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
+SPDX-License-Identifier: GPL-3.0-or-later
+```
+
+Files that should not carry an inline header (auto-generated migrations, fixtures, binaries, vendored third-party assets) are blanket-licensed in [`REUSE.toml`](REUSE.toml). Run `reuse lint` before opening a pull request — it must exit cleanly. See the [License headers (REUSE) section in the README](README.md#license-headers-reuse) for the full workflow and helper commands.
+
+<!-- REUSE-IgnoreEnd -->
+
 ## Pull requests
 
 ### Open a pull request
