@@ -4,15 +4,25 @@
 # publications/management/commands/harvest_journals.py
 
 """
-Django management command to harvest publications from real OAI-PMH journal sources.
+Django management command to harvest publications from real journal sources.
 
-This command harvests from live OAI-PMH endpoints and saves publications to the
-current database. It's designed for production use and testing against real sources.
+Supports OAI-PMH, RSS/Atom and (since the Copernicus OAI-PMH endpoint went
+404 between Dec 2025 and Apr 2026) Crossref-prefix harvesting. Sources can
+be marked ``enabled: False`` to keep their config visible but skip them on
+``--all`` runs — useful for documenting upstream outages.
 
 Usage:
+    # all currently-enabled sources
     python manage.py harvest_journals --all
-    python manage.py harvest_journals --journal essd --max-records 50
-    python manage.py harvest_journals --journal geo-leo --journal agile-giss
+
+    # explicit selection
+    python manage.py harvest_journals --journal copernicus --max-records 50
+    python manage.py harvest_journals --journal geo-leo --journal eartharxiv
+
+    # narrow a Crossref-prefix source to specific journals
+    python manage.py harvest_journals --journal copernicus \
+        --journal-title "Earth System Science Data" \
+        --journal-title "Atmospheric Chemistry and Physics"
 """
 
 import logging
@@ -20,13 +30,38 @@ from django.core.management.base import BaseCommand, CommandError
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from works.models import Source, HarvestingEvent, Work
-from works.tasks import harvest_oai_endpoint, harvest_rss_endpoint
+from works.tasks import (
+    harvest_oai_endpoint,
+    harvest_rss_endpoint,
+    harvest_crossref_prefix,
+)
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
-# Source configurations with OAI-PMH and RSS/Atom endpoints
+# Source configurations.
+#
+# `feed_type` selects the harvester implementation. When a source has
+# `enabled: False` it stays in this config (so the config is the
+# documentation) but `--all` skips it with a warning. Use `disabled_reason`
+# to explain why for `--list`.
 SOURCE_CONFIG = {
+    'copernicus': {
+        'name': 'Copernicus Publications (Crossref fallback)',
+        # The DOI prefix is the source-of-truth filter; the URL is just a
+        # display value because the Crossref task builds its own params.
+        'url': 'https://api.crossref.org/works?filter=prefix:10.5194',
+        'collection_name': 'Copernicus Publications',
+        'homepage_url': 'https://publications.copernicus.org/',
+        'publisher_name': 'Copernicus Publications',
+        'feed_type': 'crossref-prefix',
+        'crossref_prefix': '10.5194',
+        # Default behaviour: fetch the full abstract from the journal
+        # landing page rather than the Crossref-supplied <jats:p> render.
+        'fetch_abstract_from_publisher': True,
+        'is_oa': True,
+        'default_work_type': 'article',
+    },
     'essd': {
         'name': 'Earth System Science Data',
         'url': 'https://oai-pmh.copernicus.org/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=essd',
@@ -35,7 +70,17 @@ SOURCE_CONFIG = {
         'publisher_name': 'Copernicus Publications',
         'feed_type': 'oai-pmh',
         'is_oa': True,
-        'default_work_type': 'dataset',  # Data journal publishing datasets
+        'default_work_type': 'dataset',
+        # Disabled: oai-pmh.copernicus.org/oai.php has been HTTP 404 since
+        # at least Dec 2025 (last Wayback success: 2025-12-15). Use the
+        # `copernicus` source above (Crossref prefix 10.5194) to reach the
+        # same content while the upstream is dark, and narrow with
+        # `--journal-title "Earth System Science Data"` if needed.
+        'enabled': False,
+        'disabled_reason': (
+            'Upstream OAI-PMH endpoint returns HTTP 404 since 2025-12. '
+            'Use --journal copernicus --journal-title "Earth System Science Data" instead.'
+        ),
     },
     'agile-giss': {
         'name': 'AGILE-GISS',
@@ -45,7 +90,12 @@ SOURCE_CONFIG = {
         'publisher_name': 'Copernicus Publications',
         'feed_type': 'oai-pmh',
         'is_oa': True,
-        'default_work_type': 'proceedings-article',  # Conference proceedings
+        'default_work_type': 'proceedings-article',
+        'enabled': False,
+        'disabled_reason': (
+            'Upstream OAI-PMH endpoint returns HTTP 404 since 2025-12. '
+            'Use --journal copernicus --journal-title "AGILE GIScience Series" instead.'
+        ),
     },
     'geo-leo': {
         'name': 'GEO-LEO e-docs',
@@ -55,7 +105,7 @@ SOURCE_CONFIG = {
         'publisher_name': 'GEO-LEO',
         'feed_type': 'oai-pmh',
         'is_oa': True,
-        'default_work_type': 'article',  # Repository with mixed scholarly articles
+        'default_work_type': 'article',
     },
     'eartharxiv': {
         'name': 'EarthArXiv',
@@ -66,7 +116,7 @@ SOURCE_CONFIG = {
         'feed_type': 'oai-pmh',
         'is_oa': True,
         'is_preprint': True,
-        'default_work_type': 'preprint',  # Preprint repository
+        'default_work_type': 'preprint',
     },
     'scientific-data': {
         'name': 'Scientific Data',
@@ -76,31 +126,65 @@ SOURCE_CONFIG = {
         'publisher_name': 'Nature Publishing Group',
         'feed_type': 'rss',
         'is_oa': True,
-        'default_work_type': 'dataset',  # Data journal publishing data descriptors
+        'default_work_type': 'dataset',
     },
 }
 
 
+def _is_enabled(config):
+    """Sources without an `enabled` key default to True for back-compat."""
+    return config.get('enabled', True)
+
+
 class Command(BaseCommand):
-    help = 'Harvest publications from real OAI-PMH journal sources into the current database'
+    help = 'Harvest publications from real journal sources into the current database'
 
     def add_arguments(self, parser):
         parser.add_argument(
             '--journal',
             action='append',
             choices=list(SOURCE_CONFIG.keys()),
-            help=f'Journal to harvest (choices: {", ".join(SOURCE_CONFIG.keys())}). Can be specified multiple times.',
+            help=(
+                f'Journal to harvest (choices: {", ".join(SOURCE_CONFIG.keys())}). '
+                'Can be specified multiple times.'
+            ),
+        )
+        parser.add_argument(
+            '--journal-title',
+            action='append',
+            default=None,
+            help=(
+                'For Crossref-prefix sources, narrow the harvest to specific '
+                'container-title strings. Repeat the flag for multiple titles. '
+                'Ignored for OAI-PMH and RSS sources.'
+            ),
         )
         parser.add_argument(
             '--all',
             action='store_true',
-            help='Harvest from all configured journals',
+            help='Harvest from all enabled journals (skips entries marked enabled: False)',
+        )
+        parser.add_argument(
+            '--include-disabled',
+            action='store_true',
+            help='When combined with --all, also attempt disabled sources (rarely useful — disabled means upstream is broken)',
         )
         parser.add_argument(
             '--max-records',
             type=int,
             default=None,
             help='Maximum number of records to harvest per journal (default: unlimited)',
+        )
+        parser.add_argument(
+            '--no-publisher-abstract',
+            action='store_true',
+            help=(
+                'For Crossref-prefix sources, skip the publisher-side '
+                'landing-page fetch and use the Crossref-supplied abstract '
+                'as-is (faster, but loses formatting and is sometimes '
+                'incomplete). Default: fetch the canonical abstract from '
+                'the publisher.'
+            ),
         )
         parser.add_argument(
             '--create-sources',
@@ -127,18 +211,37 @@ class Command(BaseCommand):
                 feed_type = config.get('feed_type', 'oai-pmh').upper()
                 is_preprint = ' (preprint)' if config.get('is_preprint', False) else ''
                 work_type = config.get('default_work_type', 'article')
-                self.stdout.write(f"  {key:15} - {config['name']}{is_preprint}")
-                self.stdout.write(f"                  Type: {feed_type}, Work Type: {work_type}, URL: {config['homepage_url']}")
+                marker = '' if _is_enabled(config) else ' [DISABLED]'
+                self.stdout.write(f"  {key:15} - {config['name']}{is_preprint}{marker}")
+                self.stdout.write(
+                    f"                  Type: {feed_type}, Work Type: {work_type}, URL: {config['homepage_url']}"
+                )
+                if not _is_enabled(config) and config.get('disabled_reason'):
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f"                  Reason: {config['disabled_reason']}"
+                        )
+                    )
             return
+
+        include_disabled = options['include_disabled']
+        journal_titles = options['journal_title']
+        no_publisher_abstract = options['no_publisher_abstract']
 
         # Determine which journals to harvest
         if options['all']:
-            journals_to_harvest = list(SOURCE_CONFIG.keys())
+            if include_disabled:
+                journals_to_harvest = list(SOURCE_CONFIG.keys())
+            else:
+                journals_to_harvest = [
+                    k for k, c in SOURCE_CONFIG.items() if _is_enabled(c)
+                ]
         elif options['journal']:
             journals_to_harvest = options['journal']
         else:
             raise CommandError(
-                'Please specify --all to harvest all journals, or --journal <name> for specific journals.\n'
+                'Please specify --all to harvest all enabled journals, or '
+                '--journal <name> for specific journals.\n'
                 'Use --list to see available journals.'
             )
 
@@ -157,6 +260,7 @@ class Command(BaseCommand):
         # Summary statistics
         total_harvested = 0
         total_failed = 0
+        total_skipped = 0
         results = []
 
         self.stdout.write(self.style.SUCCESS(f'\n{"="*70}'))
@@ -166,6 +270,21 @@ class Command(BaseCommand):
         # Harvest each journal
         for journal_key in journals_to_harvest:
             config = SOURCE_CONFIG[journal_key]
+
+            # Skip explicitly-disabled sources unless the operator opted in.
+            if not _is_enabled(config) and not include_disabled:
+                self.stdout.write(self.style.WARNING(
+                    f'\n--- Skipping disabled source: {config["name"]} ---'
+                ))
+                if config.get('disabled_reason'):
+                    self.stdout.write(f'  Reason: {config["disabled_reason"]}')
+                total_skipped += 1
+                results.append({
+                    'journal': config['name'],
+                    'status': 'skipped',
+                    'count': 0,
+                })
+                continue
 
             self.stdout.write(self.style.WARNING(f'\n--- Harvesting: {config["name"]} ---'))
             self.stdout.write(f'URL: {config["url"]}')
@@ -181,10 +300,32 @@ class Command(BaseCommand):
                 feed_type = config.get('feed_type', 'oai-pmh')
 
                 if feed_type == 'rss':
-                    self.stdout.write(f'Feed type: RSS/Atom')
+                    self.stdout.write('Feed type: RSS/Atom')
                     harvest_rss_endpoint(source.id, user=user, max_records=max_records)
+                elif feed_type == 'crossref-prefix':
+                    self.stdout.write('Feed type: Crossref by DOI prefix')
+                    if journal_titles:
+                        self.stdout.write(
+                            f'  Filtering to titles: {", ".join(journal_titles)}'
+                        )
+                    fetch_abstract = (
+                        config.get('fetch_abstract_from_publisher', True)
+                        and not no_publisher_abstract
+                    )
+                    self.stdout.write(
+                        f'  Fetch abstract from publisher landing page: '
+                        f'{"yes" if fetch_abstract else "no"}'
+                    )
+                    harvest_crossref_prefix(
+                        source.id,
+                        user=user,
+                        max_records=max_records,
+                        journal_titles=journal_titles,
+                        prefix=config.get('crossref_prefix'),
+                        fetch_abstract_from_publisher=fetch_abstract,
+                    )
                 else:
-                    self.stdout.write(f'Feed type: OAI-PMH')
+                    self.stdout.write('Feed type: OAI-PMH')
                     harvest_oai_endpoint(source.id, user=user, max_records=max_records)
 
                 # Get results
@@ -249,23 +390,30 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f'{"="*70}\n'))
 
         for result in results:
-            status_symbol = '✓' if result['status'] == 'success' else '✗'
-            status_style = self.style.SUCCESS if result['status'] == 'success' else self.style.ERROR
-
             if result['status'] == 'success':
-                self.stdout.write(status_style(
-                    f"{status_symbol} {result['journal']:30} {result['count']:5} publications "
+                symbol, style = '✓', self.style.SUCCESS
+                self.stdout.write(style(
+                    f"{symbol} {result['journal']:30} {result['count']:5} publications "
                     f"({result['duration']:.1f}s)"
+                ))
+            elif result['status'] == 'skipped':
+                self.stdout.write(self.style.WARNING(
+                    f"⊘ {result['journal']:30} skipped (disabled)"
                 ))
             else:
                 error_msg = result.get('error', result['status'])
-                self.stdout.write(status_style(
-                    f"{status_symbol} {result['journal']:30} Failed: {error_msg}"
+                self.stdout.write(self.style.ERROR(
+                    f"✗ {result['journal']:30} Failed: {error_msg}"
                 ))
 
         self.stdout.write(f'\nTotal publications harvested: {total_harvested}')
         if total_failed > 0:
             self.stdout.write(self.style.WARNING(f'Failed journals: {total_failed}'))
+        if total_skipped > 0:
+            self.stdout.write(self.style.WARNING(
+                f'Skipped (disabled) journals: {total_skipped}. '
+                'Use --include-disabled to attempt them anyway.'
+            ))
 
         self.stdout.write(self.style.SUCCESS(f'\n{"="*70}\n'))
 
