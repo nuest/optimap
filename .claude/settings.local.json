@@ -23,7 +23,7 @@
       "Bash(docker compose:*)",
       "Bash(OPTIMAP_LOGGING_LEVEL=WARNING python manage.py test tests.test_geoextent)",
       "Bash(OPTIMAP_LOGGING_LEVEL=WARNING python manage.py test tests.test_geoextent.GeoextentRemoteGetTest)",
-      "Bash(geoextent:*)"
+      "Bash(geoextent:*)",
       "Bash(node --check:*)",
       "Bash(find:*)",
       "Bash(OPTIMAP_LOGGING_LEVEL=WARNING python manage.py test:*)",
@@ -34,7 +34,7 @@
       "Bash(./create_wikibase_property.sh:*)",
       "Bash(python3:*)",
       "Bash(pkill:*)",
-      "Bash(wget:*)"
+      "Bash(wget:*)",
       "Bash(geoextent:*)",
       "Bash(curl:*)",
       "Bash(python3:*)",
@@ -42,7 +42,8 @@
       "Bash(gh pr list:*)",
       "Bash(gh pr view:*)",
       "Bash(OPTIMAP_LOGGING_LEVEL=WARNING python manage.py test tests)",
-      "Bash(export OPTIMAP_LOGGING_LEVEL=WARNING)"
+      "Bash(export OPTIMAP_LOGGING_LEVEL=WARNING)",
+      "WebFetch(domain:github.com)"
     ],
     "deny": [],
     "ask": []

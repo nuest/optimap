@@ -1,0 +1,13 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[119.0, -5.7], [125.0, -5.7], [125.0, 1.7], [119.0, 1.7], [119.0, -5.7]]]
+      },
+      "properties": {"place_name": "Sulawesi, Indonesia"}
+    }
+  ]
+}

@@ -14,8 +14,11 @@ from works.tasks import (
     parse_oai_xml_and_save_works,
     harvest_oai_endpoint,
     parse_rss_feed_and_save_publications,
-    harvest_rss_endpoint
+    harvest_rss_endpoint,
+    extract_geometry_from_html,
+    extract_timeperiod_from_html,
 )
+from bs4 import BeautifulSoup
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -719,4 +722,195 @@ class RSSFeedHarvestingTests(TestCase):
         # Should handle gracefully and return zero
         self.assertEqual(processed, 0)
         self.assertEqual(saved, 0)
+
+
+JANEWAY_FIXTURES = BASE_TEST_DIR / 'harvesting' / 'janeway'
+
+
+def _load_soup(name):
+    return BeautifulSoup((JANEWAY_FIXTURES / name).read_text(), "html.parser")
+
+
+class JanewayGeometadataExtractionTests(TestCase):
+    """Covers the JSON-LD / geo+json link / DC.SpatialCoverage / DC.box fallback
+    chain emitted by the janeway_geometadata plugin and used by issue #15.
+    """
+
+    SULAWESI_BBOX = (119.0, -5.7, 125.0, 1.7)  # west, south, east, north
+
+    def assertEnvelope(self, geom, west, south, east, north, places=4):
+        self.assertIsNotNone(geom)
+        ext = geom.extent  # (xmin, ymin, xmax, ymax)
+        self.assertAlmostEqual(ext[0], west, places=places)
+        self.assertAlmostEqual(ext[1], south, places=places)
+        self.assertAlmostEqual(ext[2], east, places=places)
+        self.assertAlmostEqual(ext[3], north, places=places)
+
+    def test_jsonld_polygon_preferred(self):
+        soup = _load_soup("article_jsonld.html")
+        geom, label = extract_geometry_from_html(soup)
+        self.assertEqual(label, "schema.org JSON-LD")
+        self.assertEnvelope(geom, *self.SULAWESI_BBOX)
+
+    def test_jsonld_geoshape_box(self):
+        soup = _load_soup("article_jsonld_geoshape.html")
+        geom, label = extract_geometry_from_html(soup)
+        self.assertEqual(label, "schema.org JSON-LD")
+        self.assertEnvelope(geom, 11.27, 51.36, 14.77, 53.56)
+
+    def test_jsonld_multipoint_wrapped_as_collection(self):
+        # Regression: Django's MultiPoint subclasses GeometryCollection, so a
+        # naive isinstance check left it unwrapped and a GeometryCollectionField
+        # save would fail with "Geometry type (MultiPoint) does not match
+        # column type (GeometryCollection)".
+        soup = _load_soup("article_jsonld_multipoint.html")
+        geom, label = extract_geometry_from_html(soup)
+        self.assertEqual(label, "schema.org JSON-LD")
+        self.assertEqual(geom.geom_type, "GeometryCollection")
+        self.assertEqual(geom[0].geom_type, "MultiPoint")
+        self.assertEqual(len(geom[0]), 4)
+
+    def test_jsonld_geocoordinates_point(self):
+        soup = _load_soup("article_jsonld_geocoordinates.html")
+        geom, label = extract_geometry_from_html(soup)
+        self.assertEqual(label, "schema.org JSON-LD")
+        # GeometryCollection wrapping a single point — coords are at the lon/lat
+        self.assertEqual(geom.geom_type, "GeometryCollection")
+        self.assertEqual(geom[0].geom_type, "Point")
+        self.assertAlmostEqual(geom[0].x, 13.405)
+        self.assertAlmostEqual(geom[0].y, 52.52)
+
+    @responses.activate
+    def test_geojson_link_branch(self):
+        href = "http://janeway.test/dqj/plugins/geometadata/download/article/53/geojson/"
+        body = (JANEWAY_FIXTURES / "article_geojson_link.geojson").read_text()
+        responses.add(responses.GET, href, body=body,
+                      content_type="application/geo+json", status=200)
+        soup = _load_soup("article_geojson_link.html")
+        # base_url forces the relative href in the fixture to resolve to the mocked absolute URL
+        geom, label = extract_geometry_from_html(
+            soup, base_url="http://janeway.test/dqj/article/id/53/",
+        )
+        self.assertEqual(label, "link rel=alternate geo+json")
+        self.assertEnvelope(geom, *self.SULAWESI_BBOX)
+        # confirm the absolute URL was used (not the relative href)
+        self.assertEqual(responses.calls[0].request.url, href)
+
+    @responses.activate
+    def test_geojson_link_falls_through_on_http_error(self):
+        # The fixture has the link AND a DC.SpatialCoverage fallback.
+        href = "https://example.invalid/feature_collection.geojson"
+        responses.add(responses.GET, href, status=500)
+        soup = _load_soup("article_link_and_dc.html")
+        geom, label = extract_geometry_from_html(soup)
+        self.assertEqual(label, "DC.SpatialCoverage")
+        # Holy Roman Empire bbox from the DC.SpatialCoverage feature
+        self.assertEnvelope(geom, 5.0, 46.0, 17.0, 55.0)
+
+    @responses.activate
+    def test_geojson_link_falls_through_on_malformed_body(self):
+        href = "https://example.invalid/feature_collection.geojson"
+        responses.add(responses.GET, href, body="not json",
+                      content_type="application/geo+json", status=200)
+        soup = _load_soup("article_link_and_dc.html")
+        geom, label = extract_geometry_from_html(soup)
+        self.assertEqual(label, "DC.SpatialCoverage")
+
+    def test_dc_spatial_coverage_feature(self):
+        soup = _load_soup("article_dc_spatial.html")
+        geom, label = extract_geometry_from_html(soup)
+        self.assertEqual(label, "DC.SpatialCoverage")
+        self.assertEnvelope(geom, 5.0, 46.0, 17.0, 55.0)
+
+    def test_dc_box_polygon(self):
+        soup = _load_soup("article_dc_box.html")
+        geom, label = extract_geometry_from_html(soup)
+        self.assertEqual(label, "DC.box")
+        self.assertEnvelope(geom, 100.1, 13.9, 107.7, 22.5)
+
+    def test_dc_box_rejects_non_wgs84(self):
+        soup = _load_soup("article_dc_box_non_wgs84.html")
+        geom, label = extract_geometry_from_html(soup)
+        self.assertIsNone(geom)
+        self.assertIsNone(label)
+
+    @responses.activate
+    def test_priority_jsonld_wins_over_other_signals(self):
+        # The geo+json link target points to an invalid host and is mocked to fail
+        # so we can also assert that, when JSON-LD wins, the link is not even fetched.
+        responses.add(
+            responses.GET,
+            "https://example.invalid/should-not-be-fetched.geojson",
+            status=500,
+        )
+        soup = _load_soup("article_all_signals.html")
+        geom, label = extract_geometry_from_html(soup)
+        self.assertEqual(label, "schema.org JSON-LD")
+        self.assertEnvelope(geom, *self.SULAWESI_BBOX)
+        self.assertEqual(len(responses.calls), 0,
+                         "geo+json link should not be fetched when JSON-LD matches first")
+
+    @responses.activate
+    def test_priority_geojson_link_beats_dc_when_no_jsonld(self):
+        href = "https://example.invalid/feature_collection.geojson"
+        body = (JANEWAY_FIXTURES / "article_geojson_link.geojson").read_text()
+        responses.add(responses.GET, href, body=body,
+                      content_type="application/geo+json", status=200)
+        soup = _load_soup("article_link_and_dc.html")
+        geom, label = extract_geometry_from_html(soup)
+        self.assertEqual(label, "link rel=alternate geo+json")
+        self.assertEnvelope(geom, *self.SULAWESI_BBOX)
+
+    def test_temporal_jsonld_open_start(self):
+        soup = _load_soup("article_jsonld.html")
+        starts, ends = extract_timeperiod_from_html(soup)
+        self.assertEqual(starts, [None])
+        self.assertEqual(ends, ["2024-12-31"])
+
+    def test_temporal_jsonld_closed_interval(self):
+        soup = _load_soup("article_jsonld_geoshape.html")
+        starts, ends = extract_timeperiod_from_html(soup)
+        self.assertEqual(starts, ["2008-01-01"])
+        self.assertEqual(ends, ["2018-12-31"])
+
+    def test_temporal_jsonld_single_instant(self):
+        soup = _load_soup("article_jsonld_geocoordinates.html")
+        starts, ends = extract_timeperiod_from_html(soup)
+        self.assertEqual(starts, ["2020-01-01"])
+        self.assertEqual(ends, ["2020-01-01"])
+
+    def test_temporal_dc_temporal_only(self):
+        # Isolated DC.temporal source — no DC.PeriodOfTime, no JSON-LD.
+        soup = _load_soup("article_dc_temporal_only.html")
+        starts, ends = extract_timeperiod_from_html(soup)
+        self.assertEqual(starts, ["1900-01-01"])
+        self.assertEqual(ends, ["1999-12-31"])
+
+    def test_temporal_dc_periodoftime_only(self):
+        # Isolated DC.PeriodOfTime source — no DC.temporal, no JSON-LD.
+        soup = _load_soup("article_dc_periodoftime_only.html")
+        starts, ends = extract_timeperiod_from_html(soup)
+        self.assertEqual(starts, ["2000-06-01"])
+        self.assertEqual(ends, ["2000-06-30"])
+
+    def test_temporal_dc_open_start(self):
+        # Both DC.temporal and DC.PeriodOfTime present, both with an open start.
+        soup = _load_soup("article_dc_temporal_open.html")
+        starts, ends = extract_timeperiod_from_html(soup)
+        self.assertEqual(starts, [None])
+        self.assertEqual(ends, ["2024-12-31"])
+
+    def test_temporal_priority_jsonld_wins_over_dc(self):
+        # JSON-LD must take precedence; the DC values are deliberately a
+        # different range so a regression that picked DC instead would fail.
+        soup = _load_soup("article_temporal_priority.html")
+        starts, ends = extract_timeperiod_from_html(soup)
+        self.assertEqual(starts, ["2024-01-01"])
+        self.assertEqual(ends, ["2024-12-31"])
+
+    def test_temporal_missing(self):
+        soup = _load_soup("article_dc_box.html")
+        starts, ends = extract_timeperiod_from_html(soup)
+        self.assertEqual(starts, [None])
+        self.assertEqual(ends, [None])
 

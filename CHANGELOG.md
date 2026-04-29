@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Janeway harvesting and `janeway_geometadata` plugin support** (issues #15, #18) — OAI-PMH harvesting now picks up geospatial and temporal metadata published by Janeway journals running the [`janeway_geometadata`](https://github.com/GeoinformationSystems/janeway_geometadata) plugin (e.g., DQJ, EarthArxiv, EcoEvoArxiv). The HTML extractor tries, in priority order:
+  1. schema.org JSON-LD `spatialCoverage` / `temporalCoverage` (supports GeoJSON `geo`, schema.org `GeoShape` `box`, and `GeoCoordinates`),
+  2. `<link rel="alternate" type="application/geo+json">` — fetched and merged when present,
+  3. `DC.SpatialCoverage` GeoJSON `Feature`/`FeatureCollection`,
+  4. `DC.box` (`name=…; northlimit=N; southlimit=S; westlimit=W; eastlimit=E; projection=EPSG4326`).
+  The provenance log records which signal was used per work.
+- **ISO 8601 open intervals** in `DC.temporal` / `DC.PeriodOfTime` and JSON-LD `temporalCoverage` are now parsed correctly: `../2024-12-31` produces `(None, "2024-12-31")` instead of storing `'..'` as a date string. Single instants (no `/`) are stored as `(value, value)`.
 - **Geoextent API** - REST API exposing the [geoextent library](https://github.com/nuest/geoextent) for extracting geospatial and temporal extents from various file formats and remote repositories. Features include:
   - `/api/v1/geoextent/extract/` - Extract from uploaded files (GeoJSON, GeoTIFF, Shapefile, GeoPackage, KML, CSV, etc.)
   - `/api/v1/geoextent/extract-remote/` - Extract from remote repositories (Zenodo, PANGAEA, OSF, Figshare, Dryad, GFZ Data Services, Dataverse)
