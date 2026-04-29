@@ -83,7 +83,7 @@
                 {% if export.wikidata_qid %}
                 <div>
                   <a href="{{ export.wikidata_url }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary">
-                    <i class="fas fa-external-link-alt"></i> {{ export.wikidata_qid }}
+                    {{ export.wikidata_qid }}
                   </a>
                 </div>
                 {% endif %}
@@ -124,22 +124,22 @@
   {% if timeperiod_label %}
     <strong>Time period:</strong> {{ timeperiod_label }} ·
   {% endif %}
-  {% if work.doi %}<strong>DOI:</strong> <a href="https://doi.org/{{ work.doi }}" target="_blank" rel="noopener"><i class="fas fa-external-link-alt"></i> {{ work.doi }}</a> ·{% endif %}
+  {% if work.doi %}<strong>DOI:</strong> <a href="https://doi.org/{{ work.doi }}" target="_blank" rel="noopener">{{ work.doi }}</a> ·{% endif %}
   {% if work.publicationDate %}<strong>Published:</strong> {{ work.publicationDate }} ·{% endif %}
   {% if work.source %}
     <strong>Source:</strong>
     {% if work.source.homepage_url %}
-      <a href="{{ work.source.homepage_url }}" target="_blank" rel="noopener"><i class="fas fa-external-link-alt"></i> {{ work.source.name }}</a>
+      <a href="{{ work.source.homepage_url }}" target="_blank" rel="noopener">{{ work.source.name }}</a>
     {% else %}
       {{ work.source.name }}
     {% endif %}
     ·
   {% endif %}
   {% if work.openalex_id %}
-    <strong>OpenAlex:</strong> <a href="{{ work.openalex_id }}" target="_blank" rel="noopener"><i class="fas fa-external-link-alt"></i> View in OpenAlex</a> ·
+    <strong>OpenAlex:</strong> <a href="{{ work.openalex_id }}" target="_blank" rel="noopener">View in OpenAlex</a> ·
   {% endif %}
   {% if latest_wikidata_export and latest_wikidata_export.wikidata_url %}
-    <strong>Wikidata:</strong> <a href="{{ latest_wikidata_export.wikidata_url }}" target="_blank" rel="noopener"><i class="fas fa-external-link-alt"></i> {{ latest_wikidata_export.wikidata_qid }}</a>
+    <strong>Wikidata:</strong> <a href="{{ latest_wikidata_export.wikidata_url }}" target="_blank" rel="noopener">{{ latest_wikidata_export.wikidata_qid }}</a>
   {% endif %}
 </div>
 
