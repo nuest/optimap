@@ -348,6 +348,11 @@ class HarvestingEvent(models.Model):
 class UserProfile(models.Model):
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
     notify_new_manuscripts = models.BooleanField(default=False)
+    recognition_opt_in = models.BooleanField(default=False)
+    recognition_username = models.CharField(
+        max_length=64, unique=True, null=True, blank=True,
+        help_text="Display name for the public contributor recognition board. Only shown when opt-in is enabled.",
+    )
 
     def __str__(self):
         return f"{self.user.username} - Notifications: {self.notify_new_manuscripts}"
@@ -511,4 +516,46 @@ class WikidataExportLog(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.action.capitalize()} {self.work.title[:50]} on {self.export_date.strftime('%Y-%m-%d')}"  
+        return f"{self.action.capitalize()} {self.work.title[:50]} on {self.export_date.strftime('%Y-%m-%d')}"
+
+
+class Contribution(models.Model):
+    """
+    Per-event audit row for user contributions to a Work's spatial/temporal metadata.
+
+    Always recorded when a user contributes via the contribution endpoint, regardless of
+    Recognition Board opt-in. Drives the public /recognition-board/ page via aggregate queries.
+    `user` is nullable so counts survive account deletion.
+    """
+    SPATIAL = "spatial"
+    TEMPORAL = "temporal"
+    KIND_CHOICES = [
+        (SPATIAL, "Spatial metadata"),
+        (TEMPORAL, "Temporal metadata"),
+    ]
+
+    user = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="contributions",
+    )
+    work = models.ForeignKey(
+        Work,
+        on_delete=models.CASCADE,
+        related_name="contributions",
+    )
+    kind = models.CharField(max_length=16, choices=KIND_CHOICES, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["user", "kind"]),
+        ]
+
+    def __str__(self):
+        who = self.user.username if self.user else "(deleted)"
+        return f"{who} → {self.get_kind_display()} on {self.work_id}"
+

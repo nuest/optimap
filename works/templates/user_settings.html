@@ -29,6 +29,7 @@
           <div class="card-body">
             <form method="post" action="{% url 'optimap:usersettings' %}">
               {% csrf_token %}
+              <input type="hidden" name="form" value="notifications" />
 
               <div class="form-group d-flex align-items-center">
                 <label class="mr-3 mb-0" for="notify_new_manuscripts"
@@ -61,6 +62,79 @@
               <button type="submit" class="btn btn-outline-primary">
                 Save Changes
               </button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header" id="headingRecognition">
+          <h2 class="mb-0">
+            <button
+              class="btn btn-link btn-block text-left collapsed"
+              type="button"
+              data-toggle="collapse"
+              data-target="#collapseRecognition"
+              aria-expanded="false"
+              aria-controls="collapseRecognition"
+            >
+              Recognition Board
+            </button>
+          </h2>
+        </div>
+        <div
+          id="collapseRecognition"
+          class="collapse"
+          aria-labelledby="headingRecognition"
+          data-parent="#user_settings"
+        >
+          <div class="card-body">
+            <p class="small text-muted">
+              Opt in to appear on the public <a href="{% url 'optimap:recognition_board' %}">contributor Recognition Board</a>.
+              Your contributions are always counted internally for project statistics — opting in only controls whether your chosen display name appears publicly.
+            </p>
+            <form method="post" action="{% url 'optimap:usersettings' %}">
+              {% csrf_token %}
+              <input type="hidden" name="form" value="recognition" />
+
+              <div class="form-group d-flex align-items-center">
+                <label class="mr-3 mb-0" for="recognition_opt_in">Show me on the Recognition Board</label>
+                <div class="custom-control custom-switch">
+                  <input
+                    type="checkbox"
+                    class="custom-control-input"
+                    id="recognition_opt_in"
+                    name="recognition_opt_in"
+                    {% if profile.recognition_opt_in %}checked{% endif %}
+                  />
+                  <label class="custom-control-label" for="recognition_opt_in"></label>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="recognition_username">Display name</label>
+                <div class="input-group">
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="recognition_username"
+                    name="recognition_username"
+                    value="{{ profile.recognition_username|default_if_none:'' }}"
+                    pattern="[\-A-Za-z0-9_]{3,64}"
+                    placeholder="Click 'Generate' for a random name"
+                    {% if not profile.recognition_opt_in %}disabled{% endif %}
+                  />
+                  <div class="input-group-append">
+                    <button type="button" class="btn btn-outline-secondary" id="generate_recognition_username"
+                      {% if not profile.recognition_opt_in %}disabled{% endif %}>
+                      Generate
+                    </button>
+                  </div>
+                </div>
+                <small class="form-text text-muted">3–64 characters: letters, digits, '-' or '_'.</small>
+              </div>
+
+              <button type="submit" class="btn btn-outline-primary">Save Changes</button>
             </form>
           </div>
         </div>
@@ -274,6 +348,37 @@
       toggle.checked = true;
     } else {
       toggle.checked = false;
+    }
+
+    // Recognition Board: enable/disable the username field with the opt-in switch,
+    // and auto-fill a default if the user opts in with an empty field.
+    const rbToggle = document.getElementById("recognition_opt_in");
+    const rbInput = document.getElementById("recognition_username");
+    const rbGen = document.getElementById("generate_recognition_username");
+    const csrfToken = document.querySelector("[name=csrfmiddlewaretoken]").value;
+
+    function fetchUsername() {
+      return fetch("{% url 'optimap:random_recognition_username' %}", {
+        method: "GET",
+        headers: { "X-CSRFToken": csrfToken },
+        credentials: "same-origin",
+      })
+        .then((r) => r.json())
+        .then((d) => d.username);
+    }
+
+    if (rbToggle && rbInput && rbGen) {
+      rbToggle.addEventListener("change", function () {
+        const enabled = rbToggle.checked;
+        rbInput.disabled = !enabled;
+        rbGen.disabled = !enabled;
+        if (enabled && !rbInput.value) {
+          fetchUsername().then((name) => { rbInput.value = name; });
+        }
+      });
+      rbGen.addEventListener("click", function () {
+        fetchUsername().then((name) => { rbInput.value = name; });
+      });
     }
   });
 </script>

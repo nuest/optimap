@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 from django.contrib.auth import login, logout
 from django.shortcuts import render, redirect, get_object_or_404
 from django.core.cache import cache
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from urllib.parse import unquote
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_GET
@@ -33,7 +33,7 @@ import imaplib
 import time
 from math import floor
 from django.conf import settings
-from works.models import BlockedEmail, BlockedDomain, Subscription, UserProfile, GlobalRegion
+from works.models import BlockedEmail, BlockedDomain, Contribution, Subscription, UserProfile, GlobalRegion
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -180,16 +180,99 @@ def customlogout(request):
     return render(request, "logout.html")
 
 @never_cache
-
 def user_settings(request):
+    from works.recognition import USERNAME_REGEX, generate_random_username, is_offensive
+
+    if not request.user.is_authenticated:
+        return render(request, "error.html", {
+            "error": {
+                "class": "warning",
+                "title": "Login required.",
+                "text": "Please log in using the menu in the top-right to access your settings.",
+            },
+        })
+
     profile, created = UserProfile.objects.get_or_create(user=request.user)
     if request.method == "POST":
-        profile.notify_new_manuscripts = request.POST.get("notify_new_manuscripts") == "on"
-        profile.save()
+        form = request.POST.get("form", "notifications")
+        if form == "recognition":
+            opt_in = request.POST.get("recognition_opt_in") == "on"
+            raw_username = (request.POST.get("recognition_username") or "").strip()
+
+            if opt_in:
+                # Auto-generate a default if the user enabled the toggle without supplying one.
+                if not raw_username:
+                    raw_username = generate_random_username()
+                if not USERNAME_REGEX.match(raw_username):
+                    messages.error(
+                        request,
+                        "Recognition Board username must be 3–64 characters of letters, digits, '-' or '_'.",
+                    )
+                    return redirect(reverse("optimap:usersettings"))
+                if is_offensive(raw_username):
+                    messages.error(request, "Please choose a different username.")
+                    return redirect(reverse("optimap:usersettings"))
+                if (UserProfile.objects.filter(recognition_username=raw_username)
+                        .exclude(pk=profile.pk).exists()):
+                    messages.error(request, "That Recognition Board username is already taken.")
+                    return redirect(reverse("optimap:usersettings"))
+                profile.recognition_opt_in = True
+                profile.recognition_username = raw_username
+            else:
+                profile.recognition_opt_in = False
+                # Keep the stored username so opting back in doesn't lose it.
+            profile.save()
+            messages.success(request, "Recognition Board settings saved.")
+        else:
+            profile.notify_new_manuscripts = request.POST.get("notify_new_manuscripts") == "on"
+            profile.save()
         return redirect(reverse("optimap:usersettings"))
     return render(request, "user_settings.html", {
         "profile": profile,
         "delete_token": request.session.get(USER_DELETE_TOKEN_PREFIX, None),
+    })
+
+
+@never_cache
+@login_required
+@require_GET
+def random_recognition_username(request):
+    """Return a freshly generated random username as JSON.
+
+    Used by the settings page to populate the username field when a user opts in
+    or clicks "Generate". The returned name is a candidate — uniqueness is
+    re-validated when the form is submitted.
+    """
+    from works.recognition import generate_random_username
+    return JsonResponse({"username": generate_random_username()})
+
+
+def recognition_board(request):
+    """Public contributor recognition board, grouped into 5 explorer-named tiers."""
+    from django.db.models import Count, Q
+    from works.recognition import RECOGNITION_TIERS, group_by_tier
+
+    profiles = (
+        UserProfile.objects
+        .filter(recognition_opt_in=True, recognition_username__isnull=False)
+        .annotate(
+            total=Count("user__contributions"),
+            spatial_count=Count(
+                "user__contributions",
+                filter=Q(user__contributions__kind=Contribution.SPATIAL),
+            ),
+            temporal_count=Count(
+                "user__contributions",
+                filter=Q(user__contributions__kind=Contribution.TEMPORAL),
+            ),
+        )
+        .filter(total__gt=0)
+        .order_by("-total", "recognition_username")
+    )
+    grouped = group_by_tier(profiles)
+    return render(request, "recognition_board.html", {
+        "tiers": grouped,
+        "all_tiers": RECOGNITION_TIERS,
     })
 
 @login_required

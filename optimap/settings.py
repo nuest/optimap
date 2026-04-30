@@ -295,6 +295,15 @@ GEOEXTENT_GAZETTEER_TIMEOUT_SECONDS = int(os.getenv("OPTIMAP_GEOEXTENT_GAZETTEER
 # GeoNames API configuration (if using geonames gazetteer)
 GEOEXTENT_GEONAMES_USERNAME = os.getenv("OPTIMAP_GEOEXTENT_GEONAMES_USERNAME", "")
 
+# Browser Referrer-Policy. Django's SecurityMiddleware defaults this to
+# "same-origin", which strips the Referer on cross-origin requests — and the
+# OpenStreetMap standard tile server (used by every map on this site) blocks
+# clients with no Referer per https://wiki.openstreetmap.org/wiki/Referer .
+# "strict-origin-when-cross-origin" sends just the origin to third parties
+# (enough for OSM's identification requirement, no path leakage) and matches
+# modern browser defaults.
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+
 MIDDLEWARE = [
     'django.middleware.cache.UpdateCacheMiddleware',
     'django.middleware.common.CommonMiddleware',

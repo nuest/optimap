@@ -205,6 +205,9 @@ python manage.py runserver
 # Start the app with specific configurations for development
 OPTIMAP_CACHE=dummy OPTIMAP_DEBUG=True python manage.py runserver
 
+# Start the app with specific configurations for development at a different port
+OPTIMAP_CACHE=dummy OPTIMAP_DEBUG=True python manage.py runserver 8002
+
 # Manually regenerating data export files (GeoJSON / GeoPackage cache)
 ## Via Django-Q cluster: if you already have a Q cluster running (e.g. `python manage.py qcluster`), you can simply add the job to the schedule table (once) by running:
 python manage.py schedule_geojson

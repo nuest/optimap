@@ -13,7 +13,7 @@ from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.gis.geos import GEOSGeometry
 from django.utils import timezone
-from works.models import Work
+from works.models import Work, Contribution
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +58,8 @@ def contribute_geometry_by_id(request, work_id):
         old_provenance = work.provenance or ''
         contribution_parts = []
         changes_made = []
+        spatial_contributed = False
+        temporal_contributed = False
 
         # Handle geometry contribution
         if geojson:
@@ -72,6 +74,7 @@ def contribute_geometry_by_id(request, work_id):
             geometry = GEOSGeometry(json.dumps(geojson))
             work.geometry = geometry
             changes_made.append(f"Changed geometry from empty to {geometry.geom_type}")
+            spatial_contributed = True
 
         # Handle temporal extent contribution
         if temporal_extent:
@@ -81,9 +84,11 @@ def contribute_geometry_by_id(request, work_id):
             if start_date:
                 work.timeperiod_startdate = [start_date]
                 changes_made.append(f"Set start date to {start_date}")
+                temporal_contributed = True
             if end_date:
                 work.timeperiod_enddate = [end_date]
                 changes_made.append(f"Set end date to {end_date}")
+                temporal_contributed = True
 
         # Create provenance note
         contribution_note = (
@@ -96,6 +101,13 @@ def contribute_geometry_by_id(request, work_id):
         work.status = 'c'  # Contributed
         work.provenance = old_provenance + contribution_note
         work.save()
+
+        # Record structured contribution rows for the Recognition Board / statistics.
+        # Always recorded regardless of Recognition Board opt-in.
+        if spatial_contributed:
+            Contribution.objects.create(user=request.user, work=work, kind=Contribution.SPATIAL)
+        if temporal_contributed:
+            Contribution.objects.create(user=request.user, work=work, kind=Contribution.TEMPORAL)
 
         logger.info(
             "User %s contributed to work %s (ID: %s): %s",

@@ -11,7 +11,7 @@ from django.core.mail import send_mail
 from leaflet.admin import LeafletGeoAdmin
 from works.models import Work, Source, HarvestingEvent, BlockedEmail, BlockedDomain, GlobalRegion
 from import_export.admin import ImportExportModelAdmin
-from works.models import EmailLog, Subscription, UserProfile, WikidataExportLog
+from works.models import Contribution, EmailLog, Subscription, UserProfile, WikidataExportLog
 from works.tasks import harvest_oai_endpoint, schedule_subscription_email_task, send_monthly_email, schedule_monthly_email_task
 from django_q.models import Schedule
 from django.utils.timezone import now
@@ -365,8 +365,21 @@ class SubscriptionAdmin(admin.ModelAdmin):
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ("user", "notify_new_manuscripts")  
-    search_fields = ("user__email",)
+    list_display = ("user", "notify_new_manuscripts", "recognition_opt_in", "recognition_username")
+    list_filter = ("recognition_opt_in",)
+    search_fields = ("user__email", "recognition_username")
+
+
+@admin.register(Contribution)
+class ContributionAdmin(admin.ModelAdmin):
+    list_display = ("created_at", "user", "kind", "work")
+    list_filter = ("kind", "created_at")
+    search_fields = ("user__email", "work__title", "work__doi")
+    readonly_fields = ("user", "work", "kind", "created_at")
+    date_hierarchy = "created_at"
+
+    def has_add_permission(self, request):
+        return False
 
 @admin.register(BlockedEmail)
 class BlockedEmailAdmin(admin.ModelAdmin):

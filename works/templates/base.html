@@ -135,6 +135,18 @@
     </nav>
 
     <main id="main-content" class="container-fluid main">
+      {% if messages %}
+        <div class="container pt-3" id="flash-messages">
+          {% for message in messages %}
+            <div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible fade show m-3" role="alert">
+              {{ message }}
+              <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+              </button>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
       {% block alert %}{% endblock %} {% block content %}{% endblock %}
     </main>
 
