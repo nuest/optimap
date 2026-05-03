@@ -878,6 +878,10 @@ def _short_body(resp: requests.Response, n: int = 240) -> str:
 
 
 def harvest_oai_endpoint(source_id, user=None, max_records=None):
+    # Admin actions enqueue with a user id rather than a pickled User instance.
+    if isinstance(user, int):
+        user = User.objects.filter(pk=user).first()
+
     source = Source.objects.get(id=source_id)
     event  = HarvestingEvent.objects.create(source=source, status="in_progress")
 
@@ -931,13 +935,17 @@ def harvest_oai_endpoint(source_id, user=None, max_records=None):
 
         parse_oai_xml_and_save_works(response.content, event, max_records=max_records, warning_collector=warning_collector)
 
-        event.status      = "completed"
-        event.completed_at = timezone.now()
-        event.save()
-
         new_count      = Work.objects.filter(job=event).count()
         spatial_count  = Work.objects.filter(job=event).exclude(geometry__isnull=True).count()
         temporal_count = Work.objects.filter(job=event).exclude(timeperiod_startdate=[]).count()
+
+        event.status                = "completed"
+        event.completed_at          = timezone.now()
+        event.records_added         = new_count
+        event.records_with_spatial  = spatial_count
+        event.records_with_temporal = temporal_count
+        event.log_text              = warning_collector.get_summary()
+        event.save()
 
         subject = f"✅ Harvesting Completed for {source.collection_name}"
         completed_str = event.completed_at.strftime('%Y-%m-%d %H:%M:%S')
@@ -966,8 +974,10 @@ def harvest_oai_endpoint(source_id, user=None, max_records=None):
     
     except Exception as e:
         logger.error("Harvesting failed for source %s: %s", source.url_field, str(e))
-        event.status = "failed"
-        event.completed_at = timezone.now()
+        event.status        = "failed"
+        event.completed_at  = timezone.now()
+        event.error_message = str(e)[:1000]
+        event.log_text      = warning_collector.get_summary()
         event.save()
 
         # Send failure notification email to user

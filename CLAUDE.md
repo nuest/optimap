@@ -8,6 +8,13 @@ OPTIMAP is a geospatial discovery portal for research articles based on open met
 
 Part of the KOMET project (<https://projects.tib.eu/komet>), continuing from OPTIMETA (<https://projects.tib.eu/optimeta>).
 
+## Companion docs
+
+- [README.md](README.md) — developer / deployer setup, local dev, harvesting CLI.
+- [MANAGE.md](MANAGE.md) — admin / operator handbook (Django admin workflows, harvesting management, suggested sections for the rest of the admin surface). When the user asks about how to run, monitor, or troubleshoot a feature **as an admin**, read this first and update it as features change.
+- [CHANGELOG.md](CHANGELOG.md) — Keep-a-Changelog-formatted release notes; update on every user-visible change.
+- [docs/geoextent_response_formats.md](docs/geoextent_response_formats.md) — geoextent API response shapes.
+
 ## Core Architecture
 
 ### Django Apps Structure
@@ -188,6 +195,12 @@ python manage.py sync_source_metadata
 python manage.py update_openalex_journals
 # Fetches and updates journal metadata from OpenAlex API
 # Enriches Source records with additional journal information
+
+# Reset harvest schedules
+python manage.py reset_harvest_schedules
+# Rebuilds the recurring `Harvest Source <id>` schedules with a deferred
+# next_run (and stagger by default), recovering from a state where every
+# source's schedule fires at once. Flags: --dry-run, --no-stagger, --clear-manual.
 ```
 
 #### Django-Q Task Management

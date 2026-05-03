@@ -2,11 +2,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import logging
+from datetime import timedelta
 
 from django.contrib.auth.models import AbstractUser, Group, Permission
 from django.contrib.gis.db import models
 from django.contrib.postgres.fields import ArrayField
 from django.conf import settings
+from django.utils import timezone
 from django_currentuser.db.models import CurrentUserField
 from django_q.models import Schedule
 from django.utils.timezone import now
@@ -341,6 +343,16 @@ class HarvestingEvent(models.Model):
         ],
         default='pending'
     )
+    error_message = models.TextField(blank=True, default="")
+    log_text = models.TextField(blank=True, default="")
+    records_added = models.IntegerField(null=True, blank=True)
+    records_with_spatial = models.IntegerField(null=True, blank=True)
+    records_with_temporal = models.IntegerField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['source', '-started_at']),
+        ]
 
     def __str__(self):
         return f"Harvesting Event ({self.status}) for {self.source.url_field} at {self.started_at}"
@@ -445,13 +457,21 @@ class Source(models.Model):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
-        Schedule.objects.filter(name=f"Harvest Source {self.id}").delete()
+        # Defer first run by one full interval; preserve existing schedule if interval is unchanged.
+        schedule_name = f"Harvest Source {self.id}"
+        desired_minutes = self.harvest_interval_minutes
+        existing = Schedule.objects.filter(name=schedule_name).first()
+        if existing and existing.minutes == desired_minutes:
+            return
+        if existing:
+            existing.delete()
         Schedule.objects.create(
             func='works.tasks.harvest_oai_endpoint',
             args=str(self.id),
             schedule_type=Schedule.MINUTES,
-            minutes=self.harvest_interval_minutes,
-            name=f"Harvest Source {self.id}",
+            minutes=desired_minutes,
+            next_run=timezone.now() + timedelta(minutes=desired_minutes),
+            name=schedule_name,
         )
         
 Journal = Source

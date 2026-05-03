@@ -202,6 +202,17 @@ class Command(BaseCommand):
             action='store_true',
             help='List available journals and exit',
         )
+        parser.add_argument(
+            '--insert-sources',
+            action='store_true',
+            help=(
+                'Insert all journals from SOURCE_CONFIG as Source rows (so they '
+                'show up in the Django admin and can be triggered from there) '
+                'and exit without harvesting. Existing rows (matched by name or '
+                'URL) are left untouched. Disabled journals are skipped unless '
+                '--include-disabled is also given.'
+            ),
+        )
 
     def handle(self, *args, **options):
         # List journals and exit
@@ -227,6 +238,11 @@ class Command(BaseCommand):
         include_disabled = options['include_disabled']
         journal_titles = options['journal_title']
         no_publisher_abstract = options['no_publisher_abstract']
+
+        # Bulk-insert sources and exit (no harvesting)
+        if options['insert_sources']:
+            self._insert_sources(include_disabled=include_disabled)
+            return
 
         # Determine which journals to harvest
         if options['all']:
@@ -415,6 +431,79 @@ class Command(BaseCommand):
                 'Use --include-disabled to attempt them anyway.'
             ))
 
+        self.stdout.write(self.style.SUCCESS(f'\n{"="*70}\n'))
+
+    def _insert_sources(self, include_disabled=False):
+        """Create Source rows for every entry in SOURCE_CONFIG without harvesting.
+
+        Existing rows (matched by name or URL) are reported and left untouched.
+        Note: Source.save() always schedules harvest_oai_endpoint, so RSS and
+        Crossref-prefix sources still need the --journal CLI route to harvest
+        correctly — they will appear in the admin but the auto-schedule will
+        not work for them until the dispatch logic is generalised.
+        """
+        self.stdout.write(self.style.SUCCESS(f'\n{"="*70}'))
+        self.stdout.write(self.style.SUCCESS('Inserting journal sources into the database'))
+        self.stdout.write(self.style.SUCCESS(f'{"="*70}\n'))
+
+        created = 0
+        existed = 0
+        skipped = 0
+        non_oai = []
+
+        for key, config in SOURCE_CONFIG.items():
+            if not _is_enabled(config) and not include_disabled:
+                self.stdout.write(self.style.WARNING(
+                    f"⊘ {key:15} skipped (disabled — pass --include-disabled to insert)"
+                ))
+                if config.get('disabled_reason'):
+                    self.stdout.write(f"                  Reason: {config['disabled_reason']}")
+                skipped += 1
+                continue
+
+            existing = (
+                Source.objects.filter(name=config['name']).first()
+                or Source.objects.filter(url_field=config['url']).first()
+            )
+            if existing:
+                self.stdout.write(
+                    f"= {key:15} already exists (id={existing.id}, name={existing.name!r})"
+                )
+                existed += 1
+                continue
+
+            source = Source.objects.create(
+                name=config['name'],
+                url_field=config['url'],
+                collection_name=config.get('collection_name'),
+                homepage_url=config.get('homepage_url'),
+                publisher_name=config.get('publisher_name'),
+                is_oa=config.get('is_oa', False),
+                is_preprint=config.get('is_preprint', False),
+                default_work_type=config.get('default_work_type', 'article'),
+                harvest_interval_minutes=60 * 24 * 7,
+            )
+            self.stdout.write(self.style.SUCCESS(
+                f"+ {key:15} created (id={source.id}, name={source.name!r})"
+            ))
+            created += 1
+            if config.get('feed_type', 'oai-pmh') != 'oai-pmh':
+                non_oai.append((key, config['feed_type']))
+
+        self.stdout.write('')
+        self.stdout.write(self.style.SUCCESS(
+            f'Done. Created: {created}, already existed: {existed}, skipped: {skipped}.'
+        ))
+        if non_oai:
+            self.stdout.write(self.style.WARNING(
+                '\nNote: the following inserted sources are not OAI-PMH. '
+                'The Source.save() auto-schedule and the admin "Trigger harvesting" '
+                'actions both call works.tasks.harvest_oai_endpoint, so these will '
+                'fail when triggered from the admin. Use the CLI route '
+                '(python manage.py harvest_journals --journal <key>) for them:'
+            ))
+            for key, feed_type in non_oai:
+                self.stdout.write(f"  - {key} ({feed_type})")
         self.stdout.write(self.style.SUCCESS(f'\n{"="*70}\n'))
 
     def _get_or_create_source(self, config, create_if_missing):

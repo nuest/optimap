@@ -211,7 +211,7 @@ OPTIMAP_CACHE=dummy OPTIMAP_DEBUG=True python manage.py runserver 8002
 # Manually regenerating data export files (GeoJSON / GeoPackage cache)
 ## Via Django-Q cluster: if you already have a Q cluster running (e.g. `python manage.py qcluster`), you can simply add the job to the schedule table (once) by running:
 python manage.py schedule_geojson
-## One‐off via the Django shell: if you just want a “right‐now” rebuild (without waiting for the next 6-hour tick), drop into a one-liner:
+## One‐off via the Django shell: if python manage.py harvest_journalsyou just want a “right‐now” rebuild (without waiting for the next 6-hour tick), drop into a one-liner:
 python manage.py shell -c "from publications.tasks import regenerate_geojson_cache; regenerate_geojson_cache()"
 ```
 
@@ -328,6 +328,18 @@ python manage.py harvest_journals --journal essd --journal geo-leo --journal agi
 python manage.py harvest_journals --journal essd --create-sources
 ```
 
+**Bulk-insert all configured journals as Source rows (no harvesting)**:
+
+```bash
+# Insert every enabled journal from SOURCE_CONFIG so it appears in /admin/works/source/
+python manage.py harvest_journals --insert-sources
+
+# Also insert journals whose upstream is currently disabled
+python manage.py harvest_journals --insert-sources --include-disabled
+```
+
+This is the fastest way to bootstrap a fresh deployment so the journal list shows up in the Django admin and can be triggered from there. Existing rows (matched by name or URL) are left untouched; the command is idempotent. RSS and Crossref-prefix entries are inserted as plain `Source` rows; the auto-schedule and the admin "Trigger harvesting" action call `works.tasks.harvest_oai_endpoint`, so those non-OAI sources still need the CLI route (`--journal <key>`) to harvest until the dispatch logic is generalised — the command prints a warning naming each affected source.
+
 **Associate with specific user**:
 
 ```bash
@@ -360,6 +372,7 @@ python manage.py harvest_journals --journal eartharxiv --journal essd --journal 
 ```
 
 EarthArxiv provides comprehensive coverage of Earth Science preprints via its OAI-PMH API endpoint. Each publication is automatically matched with OpenAlex to retrieve:
+
 - Author information
 - Keywords and subject classification
 - Citation data
@@ -612,6 +625,30 @@ The app is deployed in the TUD Enterprise Cloud.
 HTTPS certificate is retrieved via `certbot`, see `docker-compose.deploy.yml` for the configuration and documentation links.
 
 ## Operation
+
+### Manage harvesting
+
+Sources and harvesting events are managed entirely through the Django admin. The Django-Q cluster (`python manage.py qcluster`) must be running for triggers to execute.
+
+**Configure sources** at `/admin/works/source/`:
+
+- Edit a `Source` to change its OAI-PMH URL, collection, harvest interval, default work type, and OpenAlex metadata. Each `Source.save()` (re)creates a recurring Django-Q `Schedule` named `Harvest Source <id>` that fires every `harvest_interval_minutes` minutes.
+- The list page shows the latest event status and the total event count per source. The change page lists the five most recent harvesting events inline.
+
+**Trigger or schedule a harvest from the admin** by selecting one or more sources in the changelist and choosing one of:
+
+- **Trigger harvesting for selected sources** — enqueues an immediate `async_task` per selected source.
+- **Trigger harvesting for all sources** — same, for every source in the database.
+- **Schedule harvesting for selected sources** — creates a one-off Django-Q `Schedule` named `Manual Harvest Source <id>` that runs at the next cluster tick.
+
+All three are non-blocking (they enqueue and return); progress is visible at `/admin/works/harvestingevent/`. CLI alternatives — `python manage.py harvest_journals` and direct `Schedule` rows — are documented in the [Harvest Publications from real journals](#harvest-publications-from-real-journals) section above.
+
+**Explore harvesting logs** at `/admin/works/harvestingevent/`:
+
+- Each event records `status`, `started_at`/`completed_at`, `records_added`, `records_with_spatial`, `records_with_temporal`, the `error_message` (on failure), and the full `log_text` summary captured by `HarvestWarningCollector` during the run (errors 🔴, warnings 🟡, notable info 🔵).
+- Filter by `status`, `source`, or date hierarchy. Free-text search runs over `source__name`, `source__url_field`, `error_message`, and `log_text`.
+- Open an event to see the full log in a scrollable `<pre>` block on the change form. Use the **Retry selected harvesting events** action to re-enqueue failed runs.
+- Events are machine-created; manual creation is disabled in the admin.
 
 ### Block Emails/Domains
 

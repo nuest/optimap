@@ -36,13 +36,17 @@ class HarvestRegularMetadataTestCase(TestCase):
             tags="test,harvest"
         )
 
-    @patch("works.tasks.requests.get")
+    @patch("works.tasks._oai_session")
     @patch("works.tasks.parse_oai_xml_and_save_works")
-    def test_harvest_regular_metadata_sends_email(self, mock_parser, mock_get):
+    def test_harvest_regular_metadata_sends_email(self, mock_parser, mock_session_factory):
         fake_response = Mock()
-        fake_response.raise_for_status = Mock()
+        fake_response.ok = True
+        fake_response.status_code = 200
+        fake_response.headers = {"Content-Type": "application/xml"}
         fake_response.content = b"<OAI-PMH><ListRecords></ListRecords></OAI-PMH>"
-        mock_get.return_value = fake_response
+        mock_session = Mock()
+        mock_session.get.return_value = fake_response
+        mock_session_factory.return_value = mock_session
 
         def fake_parser_func(content, event, max_records=None, warning_collector=None):
             Work.objects.create(

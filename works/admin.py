@@ -5,6 +5,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 from django.contrib import admin, messages
+from django.urls import reverse
 from django.utils.html import format_html
 from django.conf import settings
 from django.core.mail import send_mail
@@ -14,6 +15,7 @@ from import_export.admin import ImportExportModelAdmin
 from works.models import Contribution, EmailLog, Subscription, UserProfile, WikidataExportLog
 from works.tasks import harvest_oai_endpoint, schedule_subscription_email_task, send_monthly_email, schedule_monthly_email_task
 from django_q.models import Schedule
+from django_q.tasks import async_task
 from django.utils.timezone import now
 from works.models import CustomUser
 from works.tasks import regenerate_geojson_cache
@@ -68,39 +70,49 @@ def make_public(modeladmin, request, queryset):
 def make_draft(modeladmin, request, queryset):
     queryset.update(status="d")
 
+def _enqueue_harvest(sources, request, modeladmin):
+    user_id = request.user.id if request.user.is_authenticated else None
+    count = 0
+    for source in sources:
+        async_task('works.tasks.harvest_oai_endpoint', source.id, user_id)
+        count += 1
+    if count:
+        modeladmin.message_user(
+            request,
+            f"Queued {count} harvest(s); watch the HarvestingEvent admin for progress.",
+            level=messages.SUCCESS,
+        )
+
 @admin.action(description="Trigger harvesting for selected sources")
 def trigger_harvesting_for_specific(modeladmin, request, queryset):
-    return trigger_harvesting_for_set(queryset, request)
-    
+    _enqueue_harvest(queryset, request, modeladmin)
+
 @admin.action(description="Trigger harvesting for all sources")
 def trigger_harvesting_for_all(modeladmin, request, queryset):
-    all_sources = Source.objects.all()
-    return trigger_harvesting_for_set(all_sources, request)
-    
-def trigger_harvesting_for_set(sources, request):
-    user = request.user
-
-    for source in sources:
-        added, spatial, temporal = harvest_oai_endpoint(source.id, user)
-        logger.info(f"Harvested {added} publications from source {source.id} ({source.url_field}) of which {spatial} have spatial data and {temporal} have temporal data.")
+    _enqueue_harvest(Source.objects.all(), request, modeladmin)
 
 @admin.action(description="Schedule harvesting for selected sources")
 def schedule_harvesting(modeladmin, request, queryset):
-    """Admin action to manually schedule harvesting via Django-Q."""
+    """Admin action to schedule a one-off harvest via Django-Q."""
+    scheduled = 0
+    skipped = 0
     for source in queryset:
-        existing_schedule = Schedule.objects.filter(name=f"Manual Harvest Source {source.id}")
-        if existing_schedule.exists():
-            modeladmin.message_user(request, f"Harvesting is already scheduled for Source {source.id}. Skipping.")
-            continue  # Skip if already scheduled
-
+        name = f"Manual Harvest Source {source.id}"
+        if Schedule.objects.filter(name=name).exists():
+            skipped += 1
+            continue
         Schedule.objects.create(
-            func='publications.tasks.harvest_oai_endpoint',
+            func='works.tasks.harvest_oai_endpoint',
             args=str(source.id),
             schedule_type=Schedule.ONCE,
             next_run=now(),
-            name=f"Manual Harvest Source {source.id}",
+            name=name,
         )
-        modeladmin.message_user(request, f"Harvesting scheduled for {queryset.count()} sources!")
+        scheduled += 1
+    if scheduled:
+        modeladmin.message_user(request, f"Scheduled {scheduled} one-off harvest(s).", level=messages.SUCCESS)
+    if skipped:
+        modeladmin.message_user(request, f"Skipped {skipped} source(s) — already scheduled.", level=messages.WARNING)
 
 @admin.action(description="Send Monthly Manuscript Email")
 def trigger_monthly_email(modeladmin, request, queryset):
@@ -253,11 +265,143 @@ class WorkAdmin(LeafletGeoAdmin, ImportExportModelAdmin):
         self.message_user(request, f"Emailed preview to {request.user.email}.", level=messages.INFO)
     email_permalinks_preview.short_description = "Email permalinks preview to me"
     
+@admin.action(description="Retry selected harvesting events")
+def retry_event(modeladmin, request, queryset):
+    user_id = request.user.id if request.user.is_authenticated else None
+    count = 0
+    for event in queryset:
+        async_task('works.tasks.harvest_oai_endpoint', event.source_id, user_id)
+        count += 1
+    if count:
+        modeladmin.message_user(
+            request,
+            f"Re-queued {count} harvest(s); a new HarvestingEvent will appear per source.",
+            level=messages.SUCCESS,
+        )
+
+
+class RecentHarvestingEventInline(admin.TabularInline):
+    model = HarvestingEvent
+    extra = 0
+    max_num = 0
+    can_delete = False
+    show_change_link = True
+    fields = ("status", "started_at", "completed_at", "records_added", "error_message")
+    readonly_fields = fields
+    ordering = ("-started_at",)
+    verbose_name_plural = "Recent harvesting events"
+
+    def get_queryset(self, request):
+        # Only show the 5 most recent events on the source change form.
+        qs = super().get_queryset(request).order_by("-started_at")
+        recent_ids = list(qs.values_list("id", flat=True)[:5])
+        return qs.filter(id__in=recent_ids)
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(Source)
+class SourceAdmin(admin.ModelAdmin):
+    list_display = (
+        "name",
+        "is_oa",
+        "is_preprint",
+        "last_harvest",
+        "harvest_interval_minutes",
+        "latest_event_status",
+        "events_count",
+    )
+    list_filter = ("is_oa", "is_preprint", "default_work_type")
+    search_fields = ("name", "url_field", "issn_l", "publisher_name", "openalex_id")
+    actions = [trigger_harvesting_for_specific, trigger_harvesting_for_all, schedule_harvesting]
+    inlines = [RecentHarvestingEventInline]
+
+    @admin.display(description="Latest event")
+    def latest_event_status(self, obj):
+        latest = obj.harvesting_events.order_by("-started_at").first()
+        if latest is None:
+            return "—"
+        url = reverse("admin:works_harvestingevent_change", args=[latest.id])
+        when = latest.started_at.strftime("%Y-%m-%d %H:%M") if latest.started_at else ""
+        return format_html('<a href="{}">{} ({})</a>', url, latest.status, when)
+
+    @admin.display(description="# events")
+    def events_count(self, obj):
+        return obj.harvesting_events.count()
+
+
 @admin.register(HarvestingEvent)
 class HarvestingEventAdmin(admin.ModelAdmin):
-    list_display = ("id", "source", "status", "started_at", "completed_at")
-    list_filter = ("status", "started_at", "completed_at")
-    search_fields = ("source__url",)
+    list_display = (
+        "id",
+        "source_link",
+        "status",
+        "started_at",
+        "duration_display",
+        "records_added",
+        "records_with_spatial",
+        "records_with_temporal",
+        "error_message_short",
+    )
+    list_filter = ("status", "source", "started_at")
+    search_fields = ("source__name", "source__url_field", "error_message", "log_text")
+    date_hierarchy = "started_at"
+    actions = [retry_event]
+    fields = (
+        "source",
+        "user",
+        "status",
+        "started_at",
+        "completed_at",
+        "records_added",
+        "records_with_spatial",
+        "records_with_temporal",
+        "error_message",
+        "log_text_pretty",
+    )
+    readonly_fields = (
+        "source",
+        "user",
+        "status",
+        "started_at",
+        "completed_at",
+        "records_added",
+        "records_with_spatial",
+        "records_with_temporal",
+        "error_message",
+        "log_text_pretty",
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    @admin.display(description="Source", ordering="source__name")
+    def source_link(self, obj):
+        url = reverse("admin:works_source_change", args=[obj.source_id])
+        return format_html('<a href="{}">{}</a>', url, obj.source.name)
+
+    @admin.display(description="Duration")
+    def duration_display(self, obj):
+        if obj.completed_at and obj.started_at:
+            delta = obj.completed_at - obj.started_at
+            total = int(delta.total_seconds())
+            if total < 60:
+                return f"{total}s"
+            return f"{total // 60}m {total % 60}s"
+        return "—"
+
+    @admin.display(description="Error")
+    def error_message_short(self, obj):
+        if not obj.error_message:
+            return ""
+        return (obj.error_message[:80] + "…") if len(obj.error_message) > 80 else obj.error_message
+
+    @admin.display(description="Log")
+    def log_text_pretty(self, obj):
+        if not obj.log_text:
+            return "—"
+        return format_html('<pre style="white-space: pre-wrap; max-height: 600px; overflow: auto;">{}</pre>', obj.log_text)
 
 
 @admin.register(EmailLog)
