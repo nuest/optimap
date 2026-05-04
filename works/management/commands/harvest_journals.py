@@ -35,6 +35,7 @@ from works.tasks import (
     harvest_oai_endpoint,
     harvest_rss_endpoint,
     harvest_crossref_prefix,
+    harvest_mountain_wetlands,
 )
 
 logger = logging.getLogger(__name__)
@@ -128,6 +129,16 @@ SOURCE_CONFIG = {
         'source_type': 'rss',
         'is_oa': True,
         'default_work_type': 'dataset',
+    },
+    'mountain-wetlands': {
+        'name': 'Mountain Wetlands Repository',
+        'url': 'https://andes.mountain-wetlands-repository.info/api/v1/items/',
+        'collection_name': 'Mountain Wetlands',
+        'homepage_url': 'https://andes.mountain-wetlands-repository.info/',
+        'publisher_name': 'Mountain Wetlands Repository (MaRESS)',
+        'source_type': 'mountain-wetlands',
+        'is_oa': True,
+        'default_work_type': 'article',
     },
 }
 
@@ -337,6 +348,9 @@ class Command(BaseCommand):
                 if source_type == 'rss':
                     self.stdout.write('Source type: RSS/Atom')
                     harvest_rss_endpoint(source.id, user=user, max_records=max_records)
+                elif source_type == 'mountain-wetlands':
+                    self.stdout.write('Source type: Mountain Wetlands Repository (MaRESS)')
+                    harvest_mountain_wetlands(source.id, user=user, max_records=max_records)
                 elif source_type == 'crossref-prefix':
                     self.stdout.write('Source type: Crossref by DOI prefix')
                     if journal_titles:

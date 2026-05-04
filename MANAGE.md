@@ -156,9 +156,23 @@ The `Source.source_type` choice field selects the harvester pipeline:
 | `janeway` | `harvest_oai_endpoint` | Janeway journal (typically with the [geometadata Janeway plugin](https://github.com/GeoinformationSystems/janeway_geometadata/)) |
 | `rss` | `harvest_rss_endpoint` | RSS / Atom feed |
 | `crossref-prefix` | `harvest_crossref_prefix` | Crossref `works` API filtered by DOI prefix |
-| `mountain-wetlands` | `harvest_mountain_wetlands` | Bespoke harvester for the Mountain Wetlands Repository (added in commit 2 of this feature) |
+| `mountain-wetlands` | `harvest_mountain_wetlands` | Bespoke harvester for the Mountain Wetlands Repository (MaRESS) |
 
 `oai-pmh`, `ojs`, and `janeway` share the same harvester today; the distinction captures the platform so the metadata extractor's priority order (schema.org JSON-LD → `geo+json` link → `DC.SpatialCoverage` → `DC.box`) and admin UI can branch in future without another migration.
+
+#### Mountain Wetlands Repository (MaRESS) — `mountain-wetlands` source type
+
+The MaRESS harvester is bespoke because the API is Zotero-shaped, not OAI-PMH/RSS/Crossref:
+
+- **Run it manually:** `python manage.py harvest_journals --journal mountain-wetlands` (also available as a one-click admin action on the Source). Auto-scheduling is intentionally off — `harvest_interval_minutes` defaults to 0 for this source type and the issue (#192) requires the harvest to be manual.
+- **Geometry:** built from each item's `study_sites[].location.{latitude, longitude}`. One Point per site, wrapped in a `GeometryCollection`. Records without sites get an empty geometry.
+- **Dates:** the API's `date` field is free-text and often year-only (e.g. `"1993"`). The harvester parses the four-digit prefix and stores Jan 1 of that year; both `timeperiod_startdate` and `_enddate` are set to the year string.
+- **DOI / OpenAlex enrichment:** every MaRESS record currently has `DOI=null` and an empty `url`, so OpenAlex is the *only* path to a DOI. The harvester calls `build_openalex_fields(title, doi=None, author=<first author surname>)`. Results land in `Work.provenance.openalex_match.status`:
+  - `verified` — strong title+author match; DOI extracted from `openalex_ids` and saved on the Work,
+  - `candidate` — only partial matches; top hits stored in `Work.openalex_match_info` for curator follow-up,
+  - `none` — no plausible match; the Work is still saved with the API metadata.
+- **Idempotency:** the harvester uses each item's stable API URL (`<source.url_field>/<item-uuid>`) as `Work.url`. Re-running on the same payload is a no-op.
+- **Provenance:** `Work.provenance.harvest.original_record` stashes the verbatim API record so curators can re-run enrichment without re-fetching upstream.
 
 ### Where things live in code
 

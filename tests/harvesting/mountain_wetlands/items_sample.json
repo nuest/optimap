@@ -1,0 +1,65 @@
+{
+  "count": 3,
+  "data": [
+    {
+      "id": "a88d9783-0606-4bb9-a6ec-35610f9172e5",
+      "title": "Evolution of High Andean Puna Ecosystems: Environment, Climate, and Culture Change over the Last 12,000 Years in the Central Andes",
+      "abstractNote": "Pollen analysis of late-Pleistocene/early Holocene Laguna Seca in the Lauca National Park records two crucial events in the evolution of high Andean puna ecosystems.",
+      "itemType": "journalArticle",
+      "publicationTitle": "",
+      "date": "1993",
+      "DOI": null,
+      "url": "",
+      "creators": [
+        {"creatorType": "author", "firstName": null, "lastName": "Baied", "id": 3, "item_id": "a88d9783-0606-4bb9-a6ec-35610f9172e5"},
+        {"creatorType": "author", "firstName": null, "lastName": "Wheeler", "id": 4, "item_id": "a88d9783-0606-4bb9-a6ec-35610f9172e5"}
+      ],
+      "study_sites": [
+        {
+          "id": "4927322c-da27-48b1-a1c9-f61a01136a22",
+          "item_id": "a88d9783-0606-4bb9-a6ec-35610f9172e5",
+          "is_manual": true,
+          "location": {
+            "id": "289f620e-5a4e-4756-bdca-16716679b9a8",
+            "latitude": -18.188672848013784,
+            "longitude": -69.22392099735556,
+            "cluster_label": null
+          }
+        }
+      ],
+      "tags": [9, 10, 15, 16]
+    },
+    {
+      "id": "8fb5e365-e877-49b9-aa53-f2f6643a6039",
+      "title": "Short-Term Effects of Pack Animal Grazing Exclusion from Andean Alpine Meadows",
+      "abstractNote": "Vegetation responded rapidly to the removal of grazing.",
+      "itemType": "journalArticle",
+      "publicationTitle": "",
+      "date": "2014",
+      "DOI": null,
+      "url": "",
+      "creators": [
+        {"creatorType": "author", "firstName": null, "lastName": "Barros", "id": 5, "item_id": "8fb5e365-e877-49b9-aa53-f2f6643a6039"},
+        {"creatorType": "author", "firstName": null, "lastName": "et al.", "id": 6, "item_id": "8fb5e365-e877-49b9-aa53-f2f6643a6039"}
+      ],
+      "study_sites": [
+        {"id": "s1", "item_id": "8fb5e365-e877-49b9-aa53-f2f6643a6039", "is_manual": true, "location": {"id": "l1", "latitude": -32.64, "longitude": -69.83}},
+        {"id": "s2", "item_id": "8fb5e365-e877-49b9-aa53-f2f6643a6039", "is_manual": true, "location": {"id": "l2", "latitude": -32.63, "longitude": -69.89}}
+      ],
+      "tags": null
+    },
+    {
+      "id": "no-sites-record-uuid-0001",
+      "title": "Record Without Study Sites",
+      "abstractNote": "This record has no spatial data — exercises the empty-geometry path.",
+      "itemType": "journalArticle",
+      "publicationTitle": "",
+      "date": null,
+      "DOI": null,
+      "url": "",
+      "creators": [],
+      "study_sites": [],
+      "tags": null
+    }
+  ]
+}
