@@ -76,10 +76,10 @@ gdal-config --version
 
 ```bash
 # Install PostgreSQL and PostGIS
-sudo apt install -y postgresql postgresql-contrib postgis postgresql-14-postgis-3
+sudo apt install -y postgresql postgresql-contrib postgis postgresql-postgis
 
 # Or for Ubuntu 24.04 with PostgreSQL 16:
-# sudo apt install -y postgresql postgresql-contrib postgis postgresql-16-postgis-3
+# sudo apt install -y postgresql postgresql-contrib postgis postgresql-postgis
 ```
 
 Start and enable PostgreSQL:
@@ -121,7 +121,7 @@ Edit `/etc/postgresql/14/main/pg_hba.conf` (adjust version number as needed):
 sudo nano /etc/postgresql/14/main/pg_hba.conf
 ```
 
-Add or modify the line for local connections:
+(Optional) Add or modify the line for local connections to only allow this user, not "all":
 
 ```txt
 # IPv4 local connections:
@@ -156,13 +156,13 @@ sudo chown -R optimap:optimap /opt/optimap
 ### Clone the repository
 
 ```bash
-sudo -u optimap git clone https://github.com/52North/OPTIMAP.git /opt/optimap/app
+sudo -u optimap git clone https://github.com/GeoinformationSystems/optimap /opt/optimap/app
 ```
 
 ### Create virtual environment
 
 ```bash
-sudo -u optimap python3 -m venv /opt/optimap/venv
+sudo -u optimap python3 -m venv /opt/optimap/venv`
 ```
 
 ### Install Python dependencies

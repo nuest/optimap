@@ -600,7 +600,7 @@ The **logos** and favicon are in the repository in the folder [`publications/sta
 OPTIMAP supports two deployment approaches: The app is deployed in the TUD Enterprise Cloud via Docker Compose; see [docs/deploy-docker-compose.md](docs/deploy-docker-compose.md) for the recipe and the `certbot`-based HTTPS setup.
 The app is deployed in the TUD Enterprise Cloud via Docker Compose; see [docs/deploy-docker-compose.md](docs/deploy-docker-compose.md) for the recipe and the `certbot`-based HTTPS setup.
 
-### Docker deployment (recommended)
+### Docker deployment
 
 Containerized deployment using Docker Compose with nginx, Gunicorn, and PostgreSQL/PostGIS.
 
