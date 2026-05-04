@@ -114,11 +114,11 @@ from works.harvesting.sessions import (  # noqa: F401
     _short_body,
 )
 
+from django.contrib.auth import get_user_model
+
 logger = logging.getLogger(__name__)
 BASE_URL = settings.BASE_URL
 CACHE_DIR = Path(tempfile.gettempdir()) / 'optimap_cache'
-User = settings.AUTH_USER_MODEL  # str path; for ORM use, import get_user_model lazily
-from django.contrib.auth import get_user_model
 User = get_user_model()
 
 

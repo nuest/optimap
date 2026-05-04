@@ -9,6 +9,8 @@ works filtered by region.
 """
 
 import os
+import xml.etree.ElementTree as ET
+
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "optimap.settings")
 import django
 django.setup()

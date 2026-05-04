@@ -36,7 +36,8 @@ Part of the KOMET project (<https://projects.tib.eu/komet>), continuing from OPT
     - `WikidataExportLog` - Wikidata/Wikibase export tracking
     - `BlockedEmail`/`BlockedDomain` - Anti-spam mechanisms
   - **Views** ([views.py](works/views.py)) - Handles passwordless login, subscriptions, data downloads
-  - **Tasks** ([tasks.py](works/tasks.py)) - Django-Q async tasks for harvesting and data export
+  - **Harvesting** ([harvesting/](works/harvesting/)) — one module per source type (`oai.py`, `rss.py`, `crossref.py`, `mountain_wetlands.py`) plus shared helpers (`common.py`, `sessions.py`, `metadata_html.py`, `openalex.py`). Public entry points are re-exported from [tasks.py](works/tasks.py) so Django-Q dotted-path schedules keep working.
+  - **Other tasks** ([tasks.py](works/tasks.py)) — non-harvest Django-Q tasks: monthly email digest, subscription emails, GeoJSON / GeoPackage cache regeneration, schedule helpers.
   - **API** ([api.py](works/api.py), [viewsets.py](works/viewsets.py), [serializers.py](works/serializers.py)) - DRF REST API at `/api/v1/`
   - **Feeds** ([feeds.py](works/feeds.py), [feeds_geometry.py](works/feeds_geometry.py)) - GeoRSS/GeoAtom feed generation
 
