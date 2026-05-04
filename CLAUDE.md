@@ -116,19 +116,57 @@ All tests are always run using the virtual environment defined in `.venv/`; the 
 # Install test dependencies
 pip install -r requirements-dev.txt
 
-# Run unit tests
-python manage.py test tests
+# Run unit tests (fast — excludes network-dependent tests)
+python manage.py test tests --exclude-tag=online
 
 # Run UI tests
 python -Wa manage.py test tests-ui
 
 # Test with clean output
-OPTIMAP_LOGGING_LEVEL=WARNING python manage.py test tests
+OPTIMAP_LOGGING_LEVEL=WARNING python manage.py test tests --exclude-tag=online
 
 # Coverage
 coverage run --source='publications' --omit='*/migrations/**' manage.py test tests
 coverage report --show-missing --fail-under=70
 coverage html  # generates htmlcov/
+```
+
+#### `online`-tagged tests (network required)
+
+Tests decorated with `@tag('online')` make real HTTP requests to external
+services (Copernicus OAI-PMH, GEO-LEO, AGILE-GISS, Zenodo, PANGAEA, etc.).
+They live in [tests/test_harvesting.py](tests/test_harvesting.py) and
+[tests/test_geoextent.py](tests/test_geoextent.py), and add ~150s+ to a run.
+They self-skip when the endpoint is unreachable, but they still spend the
+network round-trip, so exclude them by default during iterative development:
+
+```bash
+python manage.py test tests --exclude-tag=online   # default dev loop
+python manage.py test tests --tag=online           # only the online ones
+python manage.py test tests                        # everything (CI does this)
+```
+
+**Run the online tests when you change:**
+
+- Anything under [works/harvesting/](works/harvesting/) — OAI-PMH parsing, RSS/Atom,
+  Crossref, mountain-wetlands, OpenAlex enrichment, or `common.py`/`sessions.py`/
+  `metadata_html.py` helpers. Real endpoints catch schema drift and parser
+  regressions that fixtures don't.
+- The `harvest_*` task entry points re-exported from [works/tasks.py](works/tasks.py).
+- The geoextent remote-extraction code path
+  ([works/views.py](works/views.py) `geoextent_extract_remote`, related
+  serializers, and the `extract-remote` / `extract-batch` endpoints) — these
+  exercise live DOI resolvers and repository APIs.
+- HTTP session / retry / timeout configuration shared by the above.
+
+**Separately:** [tests/test_harvesting_online.py](tests/test_harvesting_online.py)
+uses `@unittest.skipIf(settings.TEST_HARVESTING_ONLINE != True, …)` instead of
+the `online` tag and is gated by the `OPTIMAP_TEST_HARVESTING_ONLINE=True`
+environment variable. Set it when you want those legacy live-harvest checks
+too:
+
+```bash
+OPTIMAP_TEST_HARVESTING_ONLINE=True python manage.py test tests.test_harvesting_online
 ```
 
 ### Django Management Commands

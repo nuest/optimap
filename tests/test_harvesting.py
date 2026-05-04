@@ -7,7 +7,7 @@ import django
 import time
 import responses
 from pathlib import Path
-from django.test import Client, TestCase
+from django.test import Client, TestCase, tag
 
 # bootstrap Django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'optimap.settings')
@@ -247,6 +247,7 @@ class SimpleTest(TestCase):
                 f"upstream is down/moved, skipping live test"
             )
 
+    @tag('online')
     def test_real_journal_harvesting_essd(self):
         """Test harvesting from actual ESSD Copernicus endpoint"""
         from works.tasks import harvest_oai_endpoint
@@ -282,6 +283,7 @@ class SimpleTest(TestCase):
             if pub.doi:
                 self.assertIn("10.5194", pub.doi, "ESSD DOIs should contain Copernicus prefix")
 
+    @tag('online')
     def test_real_journal_harvesting_geo_leo(self):
         """Test harvesting from actual GEO-LEO e-docs endpoint"""
         from works.tasks import harvest_oai_endpoint
@@ -314,6 +316,7 @@ class SimpleTest(TestCase):
             self.assertIsNotNone(pub.title, f"Publication {pub.id} missing title")
             self.assertIsNotNone(pub.url, f"Publication {pub.id} missing URL")
 
+    @tag('online')
     def test_real_journal_harvesting_agile_giss(self):
         """Test harvesting from actual AGILE-GISS endpoint"""
         from works.tasks import harvest_oai_endpoint

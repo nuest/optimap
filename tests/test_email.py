@@ -24,18 +24,19 @@ django.setup()
     BASE_URL='http://testserver'
 )
 class EmailIntegrationTest(TestCase):
-    def setUp(self):
-        """Setup test data before each test"""
-        Work.objects.all().delete()
-        EmailLog.objects.all().delete()
-        User.objects.all().delete()
+    """Class-level user fixture via ``setUpTestData`` — Django's per-test
+    transaction rollback already handles cross-test isolation, so the
+    ``Work / EmailLog / User .objects.all().delete()`` lines that this test
+    used to run on every setUp were both redundant and slow."""
 
-        self.user = User.objects.create_user(
-            username="testuser1", email="test@example.com", password="testpass"
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(
+            username="testuser1", email="test@example.com", password="testpass",
         )
-        self.user_profile = UserProfile.objects.get(user=self.user)
-        self.user_profile.notify_new_manuscripts = True
-        self.user_profile.save()
+        cls.user_profile = UserProfile.objects.get(user=cls.user)
+        cls.user_profile.notify_new_manuscripts = True
+        cls.user_profile.save()
 
     def test_send_monthly_email_with_publications(self):
         """Sends email and includes site-local permalink when DOI exists."""

@@ -18,84 +18,73 @@ User = get_user_model()
 
 
 class SubscriptionEmailTests(TestCase):
-    """Tests for regional subscription email notifications"""
+    """Tests for regional subscription email notifications.
 
-    def setUp(self):
-        """Set up test data"""
-        # Create test user
-        self.user = User.objects.create_user(
+    Heavy fixture is built once per class via ``setUpTestData`` (Django 5.x
+    deepcopies the instances per test, so tests can mutate ``self.user`` etc.
+    without polluting siblings) — saves ~80% of the per-test wall-clock that
+    the previous per-test ``setUp`` was eating.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(
             username="testuser",
             email="test@example.com",
-            password="testpass123"
+            password="testpass123",
         )
-
-        # Create test source
-        self.source = Source.objects.create(
+        cls.source = Source.objects.create(
             name="Test Journal",
             url_field="https://example.com/test",
-            issn_l="1234-5678"
+            issn_l="1234-5678",
         )
-
-        # Create test regions
         # Africa region (simple polygon around coordinates 0,0 to 10,10)
         africa_polygon = Polygon(((0, 0), (0, 10), (10, 10), (10, 0), (0, 0)))
-        self.africa = GlobalRegion.objects.create(
+        cls.africa = GlobalRegion.objects.create(
             name="Africa",
             region_type=GlobalRegion.CONTINENT,
             source_url="https://example.com/africa",
             license="CC0",
-            geom=MultiPolygon(africa_polygon)
+            geom=MultiPolygon(africa_polygon),
         )
-
         # Asia region (simple polygon around coordinates 20,20 to 30,30)
         asia_polygon = Polygon(((20, 20), (20, 30), (30, 30), (30, 20), (20, 20)))
-        self.asia = GlobalRegion.objects.create(
+        cls.asia = GlobalRegion.objects.create(
             name="Asia",
             region_type=GlobalRegion.CONTINENT,
             source_url="https://example.com/asia",
             license="CC0",
-            geom=MultiPolygon(asia_polygon)
+            geom=MultiPolygon(asia_polygon),
         )
-
         # Pacific Ocean region (simple polygon around coordinates 40,40 to 50,50)
         pacific_polygon = Polygon(((40, 40), (40, 50), (50, 50), (50, 40), (40, 40)))
-        self.pacific = GlobalRegion.objects.create(
+        cls.pacific = GlobalRegion.objects.create(
             name="Pacific Ocean",
             region_type=GlobalRegion.OCEAN,
             source_url="https://example.com/pacific",
             license="CC0",
-            geom=MultiPolygon(pacific_polygon)
+            geom=MultiPolygon(pacific_polygon),
         )
-
-        # Create test publications in different regions
-        # Publication in Africa
-        africa_point = Point(5, 5)
-        self.pub_africa = Work.objects.create(
+        cls.pub_africa = Work.objects.create(
             title="African Study on Climate Change",
             doi="10.1234/africa.2024",
-            status="p",  # Published
-            source=self.source,
-            geometry=GeometryCollection(africa_point)
+            status="p",
+            source=cls.source,
+            geometry=GeometryCollection(Point(5, 5)),
         )
-
-        # Publication in Asia
-        asia_point = Point(25, 25)
-        self.pub_asia = Work.objects.create(
+        cls.pub_asia = Work.objects.create(
             title="Asian Biodiversity Research",
             doi="10.1234/asia.2024",
-            status="p",  # Published
-            source=self.source,
-            geometry=GeometryCollection(asia_point)
+            status="p",
+            source=cls.source,
+            geometry=GeometryCollection(Point(25, 25)),
         )
-
-        # Publication in Pacific Ocean
-        pacific_point = Point(45, 45)
-        self.pub_pacific = Work.objects.create(
+        cls.pub_pacific = Work.objects.create(
             title="Pacific Ocean Current Patterns",
             doi="10.1234/pacific.2024",
-            status="p",  # Published
-            source=self.source,
-            geometry=GeometryCollection(pacific_point)
+            status="p",
+            source=cls.source,
+            geometry=GeometryCollection(Point(45, 45)),
         )
 
     def test_globalregion_get_slug(self):

@@ -10,7 +10,7 @@ Reference values are pre-computed and hardcoded for reliability and speed.
 
 import json
 import os
-from django.test import Client, TestCase
+from django.test import Client, TestCase, tag
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.contrib.auth import get_user_model
 
@@ -441,6 +441,7 @@ class GeoextentBatchTest(TestCase):
         self.assertEqual(data['individual_results'][0]['type'], 'FeatureCollection')
 
 
+@tag('online')
 class GeoextentRemoteTest(TestCase):
     """Tests for /api/v1/geoextent/extract-remote/ endpoint
 
@@ -448,6 +449,10 @@ class GeoextentRemoteTest(TestCase):
     - No internet connection
     - Repository is unavailable
     - DOI resolver is down
+
+    Tagged ``online`` so the default test run (``--exclude-tag=online``)
+    skips them — they collectively account for ~150s of the suite's
+    wall-clock when network is reachable.
     """
 
     # Reference value from Zenodo dataset 10.5281/zenodo.4593540
@@ -578,8 +583,12 @@ class GeoextentRemoteTest(TestCase):
         self.assertIn('geoextent_extraction', data)
 
 
+@tag('online')
 class GeoextentRemoteGetTest(TestCase):
-    """Tests for /api/v1/geoextent/extract-remote/ GET endpoint"""
+    """Tests for /api/v1/geoextent/extract-remote/ GET endpoint.
+
+    Tagged ``online`` — see ``GeoextentRemoteTest`` above.
+    """
 
     # Reference value from Zenodo dataset 10.5281/zenodo.4593540
     # NOTE: geoextent.fromRemote() has a bug where it returns coordinates in

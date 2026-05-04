@@ -18,34 +18,32 @@ User = get_user_model()
     BASE_URL='http://testserver'
 )
 class SubscriptionEmailTest(TestCase):
-    def setUp(self):
-        self.user = User.objects.create_user(
-            username="subuser", email="subuser@example.com", password="testpass"
-        )
-        UserProfile.objects.get_or_create(user=self.user)
+    """Class-level fixture (``setUpTestData``) so the user/region/subscription
+    seed runs once instead of once per test method — see the matching note in
+    ``tests/test_subscription_emails.py``."""
 
-        # Create a test region covering Dresden area (13.7373, 51.0504)
-        # Create a bounding box around Dresden and convert to MultiPolygon
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(
+            username="subuser", email="subuser@example.com", password="testpass",
+        )
+        UserProfile.objects.get_or_create(user=cls.user)
         dresden_bbox = Polygon.from_bbox((13.5, 50.9, 13.9, 51.2))
-        dresden_multipolygon = MultiPolygon(dresden_bbox)
-        self.test_region = GlobalRegion.objects.create(
+        cls.test_region = GlobalRegion.objects.create(
             name="Test Dresden Region",
-            region_type=GlobalRegion.CONTINENT,  # Use CONTINENT type for test
-            geom=dresden_multipolygon,
+            region_type=GlobalRegion.CONTINENT,
+            geom=MultiPolygon(dresden_bbox),
             source_url="http://test.example.com",
-            license="Test License"
+            license="Test License",
         )
-
-        # Create subscription with the new regions field
-        self.subscription = Subscription.objects.create(
-            user=self.user,
+        cls.subscription = Subscription.objects.create(
+            user=cls.user,
             name="Test Subscription",
             search_term="AI",
-            region=GeometryCollection(Point(13.7373, 51.0504)),  # Dresden coordinates, keep for backward compatibility
-            subscribed=True
+            region=GeometryCollection(Point(13.7373, 51.0504)),
+            subscribed=True,
         )
-        # Add the region to the ManyToMany field
-        self.subscription.regions.add(self.test_region)
+        cls.subscription.regions.add(cls.test_region)
 
     def test_subscription_email_sent_when_publication_matches(self):
         """Email is sent and includes site-local permalink when a pub with DOI matches."""
