@@ -13,11 +13,10 @@ These tests mock the Wikibase API to verify:
 """
 
 from django.test import TestCase, Client, override_settings
-from django.urls import reverse
 from django.contrib.gis.geos import Point, GeometryCollection
 from django.utils.timezone import now
-from datetime import date, timedelta
-from unittest.mock import patch, Mock, MagicMock, call
+from datetime import date
+from unittest.mock import patch, Mock
 import json
 
 from works.models import Work, Source, WikidataExportLog, CustomUser

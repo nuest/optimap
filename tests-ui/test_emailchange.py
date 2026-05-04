@@ -8,14 +8,11 @@ from helium import *
 from time import sleep
 from django.core.cache import cache
 from django.contrib.auth import get_user_model
-
-# Ensure Django settings are configured
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "optimap.settings")
-django.setup()
+from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 
 User = get_user_model()
 
-class EmailChangeUITest(unittest.StaticLiveServerTestCase):
+class EmailChangeUITest(StaticLiveServerTestCase):
     def setUp(self):
         """Set up the test user and start browser"""
         self.old_email = "testuser@example.com"
@@ -35,19 +32,19 @@ class EmailChangeUITest(unittest.StaticLiveServerTestCase):
             timeout=600
         )
 
-        self.browser = start_firefox("http://localhost:8000", headless=True)
+        self.browser = start_chrome(f"{self.live_server_url}/", headless=True)
 
     def test_email_change_process(self):
         """Test the full email change UI process"""
 
-        click(S('#navbarDarkDropdown1'))
+        click(S('#unifiedMenuDropdown'))
 
         write(self.old_email,  into='email')
         click(S('button[type="submit"]'))
 
         sleep(1)
-        
-        go_to(ff"{self.live_server_url}/login/{self.token}")  
+
+        go_to(f"{self.live_server_url}/login/{self.token}")  
         sleep(3)
 
         go_to(f"{self.live_server_url}/usersettings/")
@@ -64,7 +61,7 @@ class EmailChangeUITest(unittest.StaticLiveServerTestCase):
 
         if stored_data and "token" in stored_data:
             correct_token = stored_data["token"]
-            confirmation_url = ff"{self.live_server_url}/confirm-email/{correct_token}/{self.new_email}"
+            confirmation_url = f"{self.live_server_url}/confirm-email/{correct_token}/{self.new_email}"
             go_to(confirmation_url)
             sleep(5)
         else:

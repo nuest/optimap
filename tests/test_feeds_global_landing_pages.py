@@ -17,9 +17,6 @@ from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 
-import json
-from xml.etree import ElementTree as ET
-
 from works.models import Work, GlobalRegion
 
 

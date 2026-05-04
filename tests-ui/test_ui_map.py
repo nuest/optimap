@@ -6,10 +6,9 @@ import os
 import django
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from helium import *
-from datetime import date
 
 from works.models import Work
-from django.contrib.gis.geos import Point, MultiPoint, LineString, Polygon, GeometryCollection
+from django.contrib.gis.geos import Point, GeometryCollection
 from django.contrib.auth import get_user_model
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'optimap.settings')

@@ -3,7 +3,6 @@
 
 import unittest
 import os
-import tempfile
 from django.test import TestCase
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.urls import reverse
@@ -105,14 +104,13 @@ class GeoextentUIInteractionTests(StaticLiveServerTestCase):
     def setUpClass(cls):
         """Set up test fixtures."""
         super().setUpClass()
-        cls.base_url = 'localhost:8000'
         cls.screenshot_dir = os.path.join(os.getcwd(), 'tests-ui', 'screenshots')
         os.makedirs(cls.screenshot_dir, exist_ok=True)
 
     def test_geoextent_page_loads(self):
         """Test that the geoextent page loads correctly in browser."""
         try:
-            start_chrome(f'{self.base_url}/geoextent/', headless=True)
+            start_chrome(f'{self.live_server_url}/geoextent/', headless=True)
 
             # Check page title
             driver = get_driver()
@@ -131,7 +129,7 @@ class GeoextentUIInteractionTests(StaticLiveServerTestCase):
     def test_tab_navigation(self):
         """Test switching between Upload Files and Remote Resource tabs."""
         try:
-            start_chrome(f'{self.base_url}/geoextent/', headless=True)
+            start_chrome(f'{self.live_server_url}/geoextent/', headless=True)
 
             # Check default tab is Upload files
             self.assertTrue(Text("Browse files...").exists())
@@ -155,7 +153,7 @@ class GeoextentUIInteractionTests(StaticLiveServerTestCase):
     def test_browse_files_button_exists(self):
         """Test that browse files button exists and is clickable."""
         try:
-            start_chrome(f'{self.base_url}/geoextent/', headless=True)
+            start_chrome(f'{self.live_server_url}/geoextent/', headless=True)
 
             # Check browse button exists
             self.assertTrue(Button("Browse files...").exists())
@@ -171,7 +169,7 @@ class GeoextentUIInteractionTests(StaticLiveServerTestCase):
     def test_remote_form_validation(self):
         """Test that remote form shows validation when submitted empty."""
         try:
-            start_chrome(f'{self.base_url}/geoextent/', headless=True)
+            start_chrome(f'{self.live_server_url}/geoextent/', headless=True)
 
             # Switch to Remote resources tab
             click("Remote resources")
@@ -191,7 +189,7 @@ class GeoextentUIInteractionTests(StaticLiveServerTestCase):
     def test_extraction_options_visible(self):
         """Test that all extraction options are visible after clicking on the options link."""
         try:
-            start_chrome(f'{self.base_url}/geoextent/', headless=True)
+            start_chrome(f'{self.live_server_url}/geoextent/', headless=True)
 
             self.assertFalse(Text("Bounding box").exists())
             self.assertFalse(Text("Bounding box").exists())
@@ -221,7 +219,7 @@ class GeoextentUIInteractionTests(StaticLiveServerTestCase):
     def test_documentation_section_visible(self):
         """Test that documentation section is visible and scrollable."""
         try:
-            start_chrome(f'{self.base_url}/geoextent/', headless=True)
+            start_chrome(f'{self.live_server_url}/geoextent/', headless=True)
 
             # Scroll to bottom to see documentation
             driver = get_driver()
@@ -242,7 +240,7 @@ class GeoextentUIInteractionTests(StaticLiveServerTestCase):
     def test_sitemap_link_navigates_to_geoextent(self):
         """Test that clicking geoextent link on the user sitemap navigates to the page."""
         try:
-            start_chrome(f'{self.base_url}/pages/', headless=True)
+            start_chrome(f'{self.live_server_url}/pages/', headless=True)
 
             # Click geoextent link in footer
             click("Geoextent")

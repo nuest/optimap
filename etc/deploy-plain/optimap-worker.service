@@ -1,0 +1,35 @@
+# Systemd service file for OPTIMAP Django-Q background worker
+# Copy to: /etc/systemd/system/optimap-worker.service
+# Enable with: sudo systemctl enable optimap-worker
+
+[Unit]
+Description=OPTIMAP Django-Q Background Worker
+After=network.target postgresql.service optimap.service
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=optimap
+Group=optimap
+WorkingDirectory=/opt/optimap/app
+Environment="PATH=/opt/optimap/venv/bin"
+EnvironmentFile=/opt/optimap/app/optimap/.env
+ExecStart=/opt/optimap/venv/bin/python manage.py qcluster
+KillMode=mixed
+TimeoutStopSec=60
+PrivateTmp=true
+Restart=on-failure
+RestartSec=10
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/optimap/logs /opt/optimap/cache
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+[Install]
+WantedBy=multi-user.target

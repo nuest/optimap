@@ -8,14 +8,11 @@ from helium import *
 from time import sleep
 from django.core.cache import cache
 from django.contrib.auth import get_user_model
-
-# Ensure Django settings are configured
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "optimap.settings")
-django.setup()
+from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 
 User = get_user_model()
 
-class AccountDeletionUITest(unittest.StaticLiveServerTestCase):
+class AccountDeletionUITest(StaticLiveServerTestCase):
     def setUp(self):
         """Set up the test user and start browser"""
         self.email = "testuser@example.com"
@@ -30,16 +27,16 @@ class AccountDeletionUITest(unittest.StaticLiveServerTestCase):
         cache.set(f"user_delete_token_{self.delete_token}", self.user.id, timeout=600)  
 
         # Start browser
-        self.browser = start_firefox("http://localhost:8000", headless=True)
+        self.browser = start_chrome(f"{self.live_server_url}/", headless=True)
 
     def test_delete_account(self):
 
-        click(S('#navbarDarkDropdown1'))
+        click(S('#unifiedMenuDropdown'))
 
         write(self.email,  into='email')
         click(S('button[type="submit"]'))
 
-        go_to(ff"{self.live_server_url}/login/{self.token}")  
+        go_to(f"{self.live_server_url}/login/{self.token}")  
         sleep(3)
 
         go_to(f"{self.live_server_url}/usersettings/")
@@ -51,7 +48,7 @@ class AccountDeletionUITest(unittest.StaticLiveServerTestCase):
         click("Delete")
         sleep(3)
 
-        go_to(ff"{self.live_server_url}/confirm-delete/{self.delete_token}")
+        go_to(f"{self.live_server_url}/confirm-delete/{self.delete_token}")
         sleep(3)
 
         click("Permanently Delete Account")

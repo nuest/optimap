@@ -3,7 +3,6 @@
 
 import os
 import django
-import subprocess
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "optimap.settings")
 django.setup()
 from django.test import TestCase, Client

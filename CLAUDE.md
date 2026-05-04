@@ -26,10 +26,14 @@ Part of the KOMET project (<https://projects.tib.eu/komet>), continuing from OPT
 - **works/** - Main application containing all models, views, and business logic
   - **Models** ([models.py](works/models.py)):
     - `Work` - Core model with spatial (`GeometryCollectionField`) and temporal metadata
-    - `Source` - OAI-PMH harvesting sources
+    - `Source` - OAI-PMH and RSS/Atom harvesting sources with metadata
     - `HarvestingEvent` - Tracks harvesting jobs
-    - `Subscription` - User subscriptions with spatial/temporal filters
+    - `Subscription` - User subscriptions with regional filters (continents/oceans)
+    - `GlobalRegion` - Predefined geographic regions (continents and oceans) for feeds and subscriptions
     - `CustomUser` - Extended Django user model
+    - `UserProfile` - User preferences (notifications, etc.)
+    - `EmailLog` - Email notification tracking
+    - `WikidataExportLog` - Wikidata/Wikibase export tracking
     - `BlockedEmail`/`BlockedDomain` - Anti-spam mechanisms
   - **Views** ([views.py](works/views.py)) - Handles passwordless login, subscriptions, data downloads
   - **Tasks** ([tasks.py](works/tasks.py)) - Django-Q async tasks for harvesting and data export
@@ -105,6 +109,8 @@ Access at http://127.0.0.1:8000/
 
 ### Testing
 
+All tests are always run using the virtual environment defined in `.venv/`; the Docker config is only for deployment of the the app.
+
 ```bash
 # Install test dependencies
 pip install -r requirements-dev.txt
@@ -112,7 +118,7 @@ pip install -r requirements-dev.txt
 # Run unit tests
 python manage.py test tests
 
-# Run UI tests (requires docker compose up or runserver)
+# Run UI tests
 python -Wa manage.py test tests-ui
 
 # Test with clean output
@@ -179,12 +185,21 @@ Located in [works/management/commands/](works/management/commands/)
 # Global regions setup
 python manage.py load_global_regions
 # Loads predefined continent and ocean geometries into GlobalRegion model
-# Required for global feeds functionality - run once after initial setup
+# Required for global feeds and regional subscriptions - run once after initial setup
 
 # Data export scheduling
 python manage.py schedule_geojson
 # Adds GeoJSON/GeoPackage regeneration task to Django-Q schedule
 # Creates recurring task to refresh data dumps every 6 hours
+
+# Harvest from real journals
+python manage.py harvest_journals --list
+# Lists all available journal sources (OAI-PMH and RSS/Atom)
+python manage.py harvest_journals --all --max-records 50
+# Harvests from all configured journals with record limit
+python manage.py harvest_journals --journal essd --journal geo-leo
+# Harvests from specific journals by identifier
+# Supports: essd, agile-giss, geo-leo, eartharxiv, scientific-data
 
 # Source synchronization
 python manage.py sync_source_metadata
@@ -252,10 +267,12 @@ All deployment-specific config uses `OPTIMAP_*` environment variables loaded fro
 
 ### Harvesting Flow
 
-1. Create/configure `Source` in admin with OAI-PMH URL
-2. Django-Q task creates `HarvestingEvent`
-3. Fetch XML → parse → extract DOI, spatial, temporal metadata → save `Work` records
+1. Create/configure `Source` in admin with OAI-PMH URL or RSS/Atom feed URL
+2. Django-Q task creates `HarvestingEvent` (or use `harvest_journals` command for direct harvesting)
+3. Fetch XML/RSS → parse → extract DOI, spatial, temporal metadata → save `Work` records with status `h` (Harvested)
 4. Track status in `HarvestingEvent.status` (pending/in_progress/completed/failed)
+5. Works with spatial/temporal metadata can be published directly, or users can contribute missing metadata
+6. OpenAlex enrichment: Automatically fetches additional metadata (authors, keywords, topics) when DOI is available
 
 ### Authentication
 
@@ -267,6 +284,8 @@ All deployment-specific config uses `OPTIMAP_*` environment variables loaded fro
 ### Testing Notes
 
 - UI tests use Helium/Selenium (set `headless=False` for debugging)
+- UI tests use Django cache for token management (see test_emailchange.py, test_accountdeletion.py, test_loginresponse.py)
+- Tests create mock tokens in `setUp()` and retrieve them from cache during test execution
 - Test data fixtures in `fixtures/` directory
 - Use `-Wa` flag to show deprecation warnings
 
@@ -296,6 +315,41 @@ optimap/
 └── docker-compose.yml / docker-compose.deploy.yml
 ```
 
+## Key Features & UI Components
+
+### Navigation
+
+- **Burger Menu** - Unified hamburger menu (☰) in top bar with links to all main pages
+- **User Menu** - User icon in top bar with login/logout and user settings
+- **Footer** - Sitemap, About/Contact, Privacy, Data License links
+
+### Map Features
+
+- **Interactive Map** - Main map with publication markers using Leaflet
+- **Zoom-to-All Control** - Quick button to fit all publications in view (available on all maps)
+- **Gazetteer/Geocoding Search** - Search for locations by name (Nominatim, GeoNames, Photon support)
+- **Global Regions Layer** - Toggle-able overlay showing continent and ocean boundaries
+- **Paginated Popups** - Cycle through multiple overlapping publications with Previous/Next navigation
+- **Geometry Highlighting** - Visual feedback when selecting publications (gold/orange colors)
+
+### Pages
+
+- `/` - Main map and timeline of publications
+- `/works/list/` - Browse all works with pagination (configurable page size)
+- `/work/<id>/` or `/work/<doi>/` - Individual work landing page
+- `/contribute/` - Crowdsourced spatial/temporal metadata contribution (paginated)
+- `/subscriptions/` - Regional subscription management (continents and oceans)
+- `/geoextent/` - Geoextent extraction web UI
+- `/pages` - Human-readable sitemap with organized page list
+- `/feeds/` - Feed landing pages for global and regional RSS/Atom feeds
+
+### Workflows
+
+- **Publication Status**: Draft → Harvested → Contributed → Published (with Testing and Withdrawn states)
+- **User Contribution**: Users can add spatial and/or temporal extent to harvested publications
+- **Regional Subscriptions**: Users receive email notifications for new publications in selected regions
+- **Admin Publishing**: Admins review contributions and publish works
+
 ## API & Endpoints
 
 - `/api/v1/` - REST API root (see `/api/schema/ui/` for OpenAPI docs)
@@ -303,7 +357,9 @@ optimap/
 - `/download/geojson/` - Download full publication dataset as GeoJSON
 - `/download/geopackage/` - Download as GeoPackage
 - `/feed/georss/` - Global GeoRSS feed
-- `/feeds/georss/<slug>/` - Region-filtered GeoRSS feed
+- `/feeds/georss/<slug>/` - Region-filtered GeoRSS feed (continents and oceans)
+- `/sitemap-works.xml` - Sitemap for all published works
+- `/sitemap-feeds.xml` - Sitemap for all regional feeds
 - `/geoextent/` - Geoextent extraction web UI (interactive tool for file upload and remote resource extraction)
 
 ### Geoextent API Endpoints

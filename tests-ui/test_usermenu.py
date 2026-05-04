@@ -10,7 +10,7 @@ class UsermenuTest(StaticLiveServerTestCase):
         """Test user menu dropdown navigation."""
         start_chrome(f'{self.live_server_url}/', headless=True)
         try:
-            click(S("#navbarDarkDropdown"))
+            click(S("#unifiedMenuDropdown"))
             get_driver().save_screenshot(os.path.join(os.getcwd(), 'tests-ui', 'screenshots', 'UserMenu.png'))
         finally:
             kill_browser()
