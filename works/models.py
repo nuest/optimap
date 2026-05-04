@@ -7,6 +7,7 @@ from datetime import timedelta
 from django.contrib.auth.models import AbstractUser, Group, Permission
 from django.contrib.gis.db import models
 from django.contrib.postgres.fields import ArrayField
+from django.db.models import Q
 from django.conf import settings
 from django.utils import timezone
 from django_currentuser.db.models import CurrentUserField
@@ -145,6 +146,18 @@ class Work(models.Model):
         ordering = ['-id']
         constraints = [
             models.UniqueConstraint(fields=['doi', 'url'], name='unique_work_entry'),
+        ]
+        # Note: GeometryCollectionField auto-creates a GIST index on `geometry`
+        # via GeoDjango's default `spatial_index=True`, so no explicit index here.
+        indexes = [
+            models.Index(fields=['status'], name='work_status_idx'),
+            models.Index(fields=['-creationDate', '-id'], name='work_creationdate_id_idx'),
+            models.Index(fields=['publicationDate'], name='work_publicationdate_idx'),
+            models.Index(
+                fields=['-creationDate', '-id'],
+                name='work_published_recent_idx',
+                condition=Q(status='p'),
+            ),
         ]
 
     def __str__(self):
