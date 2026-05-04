@@ -45,7 +45,8 @@
       "Bash(export OPTIMAP_LOGGING_LEVEL=WARNING)",
       "WebFetch(domain:github.com)",
       "Read(//tmp/**)",
-      "Bash(git mv *)"
+      "Bash(git mv *)",
+      "Bash(gh issue *)"
     ],
     "deny": [],
     "ask": []

@@ -268,8 +268,15 @@ class ProvenanceHelperTests(TestCase):
 
 
 class SourceCollectionPropagationTests(TestCase):
-    """Source.collection is optional. When set, harvested works are auto-added;
-    when None, harvesting still succeeds and works simply aren't in a collection."""
+    """When ``Source.collection`` is set, every harvested Work is auto-added to it.
+
+    The "no collection set" path on OAI-PMH sources no longer applies — the
+    harvester's entry point (``harvest_oai_endpoint``) always calls
+    ``ensure_collection_for_source`` first, see
+    ``tests/test_oai_collection_auto_create.py``. Source types that aren't
+    auto-created (``rss``, ``crossref-prefix``, ``mountain-wetlands``) get
+    their Collection from ``harvest_journals --insert-sources``.
+    """
 
     def setUp(self):
         from pathlib import Path
@@ -281,18 +288,6 @@ class SourceCollectionPropagationTests(TestCase):
             Path(__file__).resolve().parent / 'harvesting' / 'source_1' / 'oai_dc.xml'
         ).read_bytes()
         self.event_cls = HarvestingEvent
-
-    def test_no_collection_set_is_not_an_error(self):
-        src = Source.objects.create(name='S', url_field='https://example.com/oai')
-        self.assertIsNone(src.collection)
-        event = self.event_cls.objects.create(source=src, status='in_progress')
-
-        self.parse_oai(self.xml_bytes, event)
-
-        works = Work.objects.filter(job=event)
-        self.assertGreater(works.count(), 0, 'expected harvest to create works even without a collection')
-        for w in works:
-            self.assertEqual(w.collections.count(), 0, 'no collection set on source → no membership added')
 
     def test_source_collection_propagates_to_harvested_works(self):
         col = Collection.objects.create(identifier='auto', name='Auto', is_published=True)

@@ -28,9 +28,12 @@ class HarvestRegularMetadataTestCase(TestCase):
             email="testuser@example.com", 
             password="password123"
         )
-        # No Collection is created here on purpose: this test exercises the
-        # "Source.collection is unset" path. Harvesting must succeed and
-        # produce works whose collections membership is empty.
+        # No Collection is pre-assigned here on purpose: this test exercises
+        # the unset-collection branch of harvest_oai_endpoint, which now
+        # auto-creates one on first run via ensure_collection_for_source.
+        # The completion email asserts below verify that the email's
+        # "Collection used:" line falls back to the source name when the
+        # auto-create has just produced a same-named Collection.
         self.source = Source.objects.create(
             name="Test Source",
             url_field="https://example.com/oai?verb=ListRecords&metadataPrefix=oai_dc",

@@ -124,6 +124,59 @@ def get_or_create_admin_command_user():
     return user
 
 
+def ensure_collection_for_source(source):
+    """Make sure ``source.collection`` is set, creating a Collection on first
+    harvest if needed.
+
+    Called by the OAI-PMH / OJS / Janeway harvest entry point — issue #192
+    explicitly asks the generic OAI-PMH harvester to "create a collection for
+    each endpoint based on the provided metadata". The Collection is keyed by
+    a slug derived from the source's name (with a numeric suffix if the slug
+    already exists under a different source) and starts ``is_published=False``
+    so admins can review name/description before exposing it on
+    ``/collections/``.
+
+    Returns the (possibly newly-created) ``Collection``, or ``None`` when the
+    source has no usable name to derive a slug from. No-op when
+    ``source.collection`` is already set.
+    """
+    # Avoid a circular import: works.models imports works.harvesting via tasks.
+    from django.utils.text import slugify
+    from works.models import Collection
+
+    if source.collection_id is not None:
+        return source.collection
+    base_name = (source.name or '').strip()
+    if not base_name:
+        logger.warning(
+            "Source id=%s has no name — cannot auto-create a Collection.",
+            source.id,
+        )
+        return None
+    base_slug = slugify(base_name)[:100] or f"source-{source.id}"
+    identifier = base_slug
+    suffix = 2
+    while Collection.objects.filter(identifier=identifier).exists():
+        identifier = f"{base_slug}-{suffix}"[:100]
+        suffix += 1
+    collection = Collection.objects.create(
+        identifier=identifier,
+        name=base_name,
+        description='',
+        homepage_url=source.homepage_url or None,
+        # Start unpublished — admins curate name/description and flip the
+        # toggle when the collection is ready to be public.
+        is_published=False,
+    )
+    source.collection = collection
+    source.save(update_fields=['collection'])
+    logger.info(
+        "Auto-created Collection %r (id=%s) for source id=%s (%s)",
+        identifier, collection.id, source.id, base_name,
+    )
+    return collection
+
+
 def _get_article_link(work):
     """Prefer our site permalink if DOI exists, else fallback to original URL."""
     if getattr(work, "doi", None):

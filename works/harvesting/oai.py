@@ -27,6 +27,7 @@ from .common import (
     HarvestWarningCollector,
     _save_or_update_work,
     complete_harvest,
+    ensure_collection_for_source,
     fail_harvest,
     get_or_create_admin_command_user,
     parse_publication_date,
@@ -283,6 +284,12 @@ def parse_oai_xml_and_save_works(content, event: HarvestingEvent, max_records=No
 def harvest_oai_endpoint(source_id, user=None, max_records=None, update_existing=False):
     user = resolve_user(user)
     source = Source.objects.get(id=source_id)
+    # Issue #192: the generic OAI-PMH harvester creates a Collection for each
+    # endpoint on first run if the admin hasn't pre-assigned one. The new
+    # Collection starts unpublished so the admin can review the auto-derived
+    # name/description before flipping it on. No-op when source.collection is
+    # already set (e.g. via harvest_journals --insert-sources).
+    ensure_collection_for_source(source)
     event  = HarvestingEvent.objects.create(source=source, status="in_progress")
 
     new_count = None
