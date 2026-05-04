@@ -292,7 +292,7 @@ class RecentHarvestingEventInline(admin.TabularInline):
     max_num = 0
     can_delete = False
     show_change_link = True
-    fields = ("status", "started_at", "completed_at", "records_added", "error_message")
+    fields = ("status", "started_at", "completed_at", "records_added", "records_updated", "error_message")
     readonly_fields = fields
     ordering = ("-started_at",)
     verbose_name_plural = "Recent harvesting events"
@@ -348,6 +348,7 @@ class HarvestingEventAdmin(admin.ModelAdmin):
         "started_at",
         "duration_display",
         "records_added",
+        "records_updated",
         "records_with_spatial",
         "records_with_temporal",
         "error_message_short",
@@ -363,6 +364,7 @@ class HarvestingEventAdmin(admin.ModelAdmin):
         "started_at",
         "completed_at",
         "records_added",
+        "records_updated",
         "records_with_spatial",
         "records_with_temporal",
         "error_message",
@@ -375,6 +377,7 @@ class HarvestingEventAdmin(admin.ModelAdmin):
         "started_at",
         "completed_at",
         "records_added",
+        "records_updated",
         "records_with_spatial",
         "records_with_temporal",
         "error_message",

@@ -353,6 +353,7 @@ class HarvestingEvent(models.Model):
     error_message = models.TextField(blank=True, default="")
     log_text = models.TextField(blank=True, default="")
     records_added = models.IntegerField(null=True, blank=True)
+    records_updated = models.IntegerField(null=True, blank=True)
     records_with_spatial = models.IntegerField(null=True, blank=True)
     records_with_temporal = models.IntegerField(null=True, blank=True)
 

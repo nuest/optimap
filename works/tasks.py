@@ -55,6 +55,33 @@ DOI_REGEX = re.compile(r'10\.\d{4,9}/[-._;()/:A-Z0-9]+', re.IGNORECASE)
 CACHE_DIR = Path(tempfile.gettempdir()) / 'optimap_cache'
 
 
+class HarvestStats:
+    """Tally of `_save_or_update_work` outcomes for one harvest run.
+
+    Each parser increments the matching counter at the call site. The harvester
+    then persists `created` to `HarvestingEvent.records_added`, `updated` to
+    `records_updated`, and uses the totals in the completion email.
+    """
+
+    __slots__ = ("created", "updated", "skipped_same_source", "skipped_cross_source")
+
+    def __init__(self):
+        self.created = 0
+        self.updated = 0
+        self.skipped_same_source = 0
+        self.skipped_cross_source = 0
+
+    def record(self, action):
+        if action == "created":
+            self.created += 1
+        elif action == "updated":
+            self.updated += 1
+        elif action == "skipped_same_source":
+            self.skipped_same_source += 1
+        elif action == "skipped_cross_source":
+            self.skipped_cross_source += 1
+
+
 class HarvestWarningCollector(logging.Handler):
     """
     Custom logging handler to collect warning and error messages during harvesting.
@@ -719,10 +746,12 @@ def _save_or_update_work(work_kwargs, source, event, update_existing=False):
     return work, 'created'
 
 
-def parse_oai_xml_and_save_works(content, event: HarvestingEvent, max_records=None, warning_collector=None, update_existing=False):
+def parse_oai_xml_and_save_works(content, event: HarvestingEvent, max_records=None, warning_collector=None, update_existing=False, stats=None):
     source = event.source
     logger.info("Starting OAI-PMH parsing for source: %s", source.name)
     parsed = urlsplit(source.url_field)
+    if stats is None:
+        stats = HarvestStats()
 
     if content and len(content.strip()) > 0:
         logger.debug("Parsing XML content from response")
@@ -940,6 +969,9 @@ def parse_oai_xml_and_save_works(content, event: HarvestingEvent, max_records=No
                     work, action = _save_or_update_work(
                         work_kwargs, source, event, update_existing=update_existing,
                     )
+                    stats.record(action)
+                    if action == 'created':
+                        saved_count += 1
                     if action in ('created', 'updated'):
                         # Propagate the harvest's source collection to the work
                         # (no-op when the source has no collection set). The
@@ -949,7 +981,6 @@ def parse_oai_xml_and_save_works(content, event: HarvestingEvent, max_records=No
                         if source and source.collection_id:
                             work.collections.add(source.collection_id)
                     if action == 'created':
-                        saved_count += 1
                         logger.info("Saved work id=%s: %s", work.id, title_value[:80] if title_value else 'No title')
                     elif action == 'updated':
                         logger.info("Updated work id=%s: %s", work.id, title_value[:80] if title_value else 'No title')
@@ -1070,20 +1101,24 @@ def harvest_oai_endpoint(source_id, user=None, max_records=None, update_existing
                 f"for {oai_url}. Body preview: {_short_body(response)}"
             )
 
+        stats = HarvestStats()
         parse_oai_xml_and_save_works(
             response.content, event,
             max_records=max_records,
             warning_collector=warning_collector,
             update_existing=update_existing,
+            stats=stats,
         )
 
-        new_count      = Work.objects.filter(job=event).count()
+        new_count      = stats.created
+        updated_count  = stats.updated
         spatial_count  = Work.objects.filter(job=event).exclude(geometry__isnull=True).count()
         temporal_count = Work.objects.filter(job=event).exclude(timeperiod_startdate=[]).count()
 
         event.status                = "completed"
         event.completed_at          = timezone.now()
         event.records_added         = new_count
+        event.records_updated       = updated_count
         event.records_with_spatial  = spatial_count
         event.records_with_temporal = temporal_count
         event.log_text              = warning_collector.get_summary()
@@ -1095,6 +1130,7 @@ def harvest_oai_endpoint(source_id, user=None, max_records=None, update_existing
         message = (
             f"Harvesting job details:\n\n"
             f"Number of added articles: {new_count}\n"
+            f"Number of updated articles: {updated_count}\n"
             f"Number of articles with spatial metadata: {spatial_count}\n"
             f"Number of articles with temporal metadata: {temporal_count}\n"
             f"Collection used: {collection_label}\n"
@@ -1447,7 +1483,7 @@ def regenerate_geopackage_cache():
 # RSS/Atom Feed Harvesting
 # ============================================================================
 
-def parse_rss_feed_and_save_publications(feed_url, event: 'HarvestingEvent', max_records=None, warning_collector=None, update_existing=False):
+def parse_rss_feed_and_save_publications(feed_url, event: 'HarvestingEvent', max_records=None, warning_collector=None, update_existing=False, stats=None):
     """
     Parse RSS/Atom feed and save publications.
 
@@ -1456,6 +1492,9 @@ def parse_rss_feed_and_save_publications(feed_url, event: 'HarvestingEvent', max
         event: HarvestingEvent instance
         max_records: Maximum number of records to process (optional)
         warning_collector: HarvestWarningCollector instance (optional)
+        stats: HarvestStats accumulator (optional). If provided, the parser
+            increments .created / .updated / .skipped_* on it; the harvester
+            then reads .updated to populate ``HarvestingEvent.records_updated``.
 
     Returns:
         tuple: (processed_count, saved_count)
@@ -1464,6 +1503,8 @@ def parse_rss_feed_and_save_publications(feed_url, event: 'HarvestingEvent', max
 
     source = event.source
     logger.info("Starting RSS/Atom feed parsing for source: %s", source.name)
+    if stats is None:
+        stats = HarvestStats()
 
     try:
         # Parse the feed
@@ -1615,6 +1656,7 @@ def parse_rss_feed_and_save_publications(feed_url, event: 'HarvestingEvent', max
                 work, action = _save_or_update_work(
                     work_kwargs, source, event, update_existing=update_existing,
                 )
+                stats.record(action)
                 if action in ('created', 'updated') and source and source.collection_id:
                     work.collections.add(source.collection_id)
                 if action == 'created':
@@ -1660,26 +1702,35 @@ def harvest_rss_endpoint(source_id, user=None, max_records=None, update_existing
         feed_url = source.url_field
         logger.info("Fetching from RSS feed: %s", feed_url)
 
+        stats = HarvestStats()
         processed, saved = parse_rss_feed_and_save_publications(
             feed_url, event,
             max_records=max_records,
             warning_collector=warning_collector,
             update_existing=update_existing,
+            stats=stats,
         )
+
+        new_count = stats.created
+        updated_count = stats.updated
+        spatial_count = Work.objects.filter(job=event).exclude(geometry__isnull=True).count()
+        temporal_count = Work.objects.filter(job=event).exclude(timeperiod_startdate=[]).count()
 
         event.status = "completed"
         event.completed_at = timezone.now()
+        event.records_added = new_count
+        event.records_updated = updated_count
+        event.records_with_spatial = spatial_count
+        event.records_with_temporal = temporal_count
+        event.log_text = warning_collector.get_summary()
         event.save()
-
-        new_count = Work.objects.filter(job=event).count()
-        spatial_count = Work.objects.filter(job=event).exclude(geometry__isnull=True).count()
-        temporal_count = Work.objects.filter(job=event).exclude(timeperiod_startdate=[]).count()
 
         subject = f"✅ RSS Feed Harvesting Completed for {source.name}"
         completed_str = event.completed_at.strftime('%Y-%m-%d %H:%M:%S')
         message = (
             f"RSS/Atom feed harvesting job details:\n\n"
             f"Number of added articles: {new_count}\n"
+            f"Number of updated articles: {updated_count}\n"
             f"Number of articles with spatial metadata: {spatial_count}\n"
             f"Number of articles with temporal metadata: {temporal_count}\n"
             f"Source: {source.name}\n"
@@ -1916,7 +1967,7 @@ def _crossref_item_to_work_kwargs(
 def parse_crossref_response_and_save_works(
     source, event, prefix, journal_titles=None,
     fetch_abstract_from_publisher=True, max_records=None,
-    warning_collector=None, update_existing=False,
+    warning_collector=None, update_existing=False, stats=None,
 ):
     """Page through Crossref's ``works`` API and persist matched works.
 
@@ -1929,6 +1980,8 @@ def parse_crossref_response_and_save_works(
     cursor = "*"
     saved = 0
     seen = 0
+    if stats is None:
+        stats = HarvestStats()
 
     filter_value = _build_crossref_filter(prefix, journal_titles=journal_titles)
 
@@ -1972,6 +2025,7 @@ def parse_crossref_response_and_save_works(
                 work, action = _save_or_update_work(
                     kwargs, source, event, update_existing=update_existing,
                 )
+                stats.record(action)
                 if action in ('created', 'updated') and source and source.collection_id:
                     work.collections.add(source.collection_id)
                 if action == 'created':
@@ -2030,6 +2084,7 @@ def harvest_crossref_prefix(
             "Starting Crossref harvest: prefix=%s titles=%s max_records=%s",
             resolved_prefix, journal_titles, max_records,
         )
+        stats = HarvestStats()
         saved, seen = parse_crossref_response_and_save_works(
             source, event,
             prefix=resolved_prefix,
@@ -2038,10 +2093,19 @@ def harvest_crossref_prefix(
             max_records=max_records,
             warning_collector=warning_collector,
             update_existing=update_existing,
+            stats=stats,
         )
+
+        spatial_count = Work.objects.filter(job=event).exclude(geometry__isnull=True).count()
+        temporal_count = Work.objects.filter(job=event).exclude(timeperiod_startdate=[]).count()
 
         event.status = "completed"
         event.completed_at = timezone.now()
+        event.records_added = stats.created
+        event.records_updated = stats.updated
+        event.records_with_spatial = spatial_count
+        event.records_with_temporal = temporal_count
+        event.log_text = warning_collector.get_summary()
         event.save()
 
         if user and user.email:
@@ -2053,7 +2117,10 @@ def harvest_crossref_prefix(
                     f"Container-title filters: "
                     f"{', '.join(journal_titles) if journal_titles else '<all>'}\n"
                     f"Records seen: {seen}\n"
-                    f"New works saved: {saved}\n"
+                    f"New works saved: {stats.created}\n"
+                    f"Updated works: {stats.updated}\n"
+                    f"Articles with spatial metadata: {spatial_count}\n"
+                    f"Articles with temporal metadata: {temporal_count}\n"
                     f"Started:   {event.started_at:%Y-%m-%d %H:%M:%S}\n"
                     f"Completed: {event.completed_at:%Y-%m-%d %H:%M:%S}\n"
                     f"\n{warning_collector.get_summary()}"
@@ -2199,13 +2266,20 @@ def _mwr_publication_year(date_str):
 
 def parse_mountain_wetlands_response_and_save_works(
     payload, source, event, max_records=None, processed_so_far=0, warning_collector=None,
-    update_existing=False,
+    update_existing=False, stats=None,
 ):
-    """Save one page of MaRESS items. Returns ``(saved, processed)`` for this page."""
+    """Save one page of MaRESS items. Returns ``(saved, processed)`` for this page.
+
+    When ``stats`` (a HarvestStats) is provided, the parser also accumulates
+    .created / .updated / .skipped_* on it across multiple pages — the
+    harvester then reads .updated to populate ``HarvestingEvent.records_updated``.
+    """
     items = payload.get('data') or []
     saved = 0
     processed = 0
     admin_user = get_or_create_admin_command_user()
+    if stats is None:
+        stats = HarvestStats()
 
     for item in items:
         if max_records and (processed_so_far + processed) >= max_records:
@@ -2310,6 +2384,7 @@ def parse_mountain_wetlands_response_and_save_works(
             work, action = _save_or_update_work(
                 work_kwargs, source, event, update_existing=update_existing,
             )
+            stats.record(action)
             if action in ('created', 'updated') and source.collection_id:
                 work.collections.add(source.collection_id)
             if action == 'created':
@@ -2349,6 +2424,7 @@ def harvest_mountain_wetlands(source_id, user=None, max_records=None, update_exi
 
     total_saved = 0
     total_processed = 0
+    stats = HarvestStats()
     try:
         session = _mwr_session()
         skip = 0
@@ -2376,6 +2452,7 @@ def harvest_mountain_wetlands(source_id, user=None, max_records=None, update_exi
                 processed_so_far=total_processed,
                 warning_collector=warning_collector,
                 update_existing=update_existing,
+                stats=stats,
             )
             total_saved += saved
             total_processed += processed
@@ -2402,7 +2479,8 @@ def harvest_mountain_wetlands(source_id, user=None, max_records=None, update_exi
 
         event.status = 'completed'
         event.completed_at = timezone.now()
-        event.records_added = total_saved
+        event.records_added = stats.created
+        event.records_updated = stats.updated
         event.records_with_spatial = spatial_count
         event.records_with_temporal = temporal_count
         event.log_text = warning_collector.get_summary()
@@ -2417,7 +2495,8 @@ def harvest_mountain_wetlands(source_id, user=None, max_records=None, update_exi
                     f"Source: {source.name}\n"
                     f"URL: {source.url_field}\n"
                     f"Records processed: {total_processed}\n"
-                    f"New works saved: {total_saved}\n"
+                    f"New works saved: {stats.created}\n"
+                    f"Updated works: {stats.updated}\n"
                     f"With spatial extent: {spatial_count}\n"
                     f"With temporal extent: {temporal_count}\n"
                     f"Started:   {event.started_at:%Y-%m-%d %H:%M:%S}\n"

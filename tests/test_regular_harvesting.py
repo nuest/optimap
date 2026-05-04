@@ -49,7 +49,7 @@ class HarvestRegularMetadataTestCase(TestCase):
         mock_session.get.return_value = fake_response
         mock_session_factory.return_value = mock_session
 
-        def fake_parser_func(content, event, max_records=None, warning_collector=None, update_existing=False):
+        def fake_parser_func(content, event, max_records=None, warning_collector=None, update_existing=False, stats=None, **_kw):
             Work.objects.create(
                 title="Test Publication 1",
                 doi="10.1000/1",
@@ -66,7 +66,9 @@ class HarvestRegularMetadataTestCase(TestCase):
                 timeperiod_enddate=[],
                 geometry=None
             )
-            return 2, 0, 0  # Two publications added, no spatial or temporal metadata
+            if stats is not None:
+                stats.created += 2
+            return stats
 
         mock_parser.side_effect = fake_parser_func
 
