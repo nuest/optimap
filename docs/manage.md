@@ -1,6 +1,6 @@
 # Managing OPTIMAP
 
-This document is the admin / operator handbook for an OPTIMAP instance. It is a counterpart to [README.md](README.md) (which targets developers and deployers) and [CLAUDE.md](CLAUDE.md) (which targets coding assistants): everything here assumes you have a running OPTIMAP and are signed in to `/admin/` as a Django superuser.
+This document is the admin / operator handbook for an OPTIMAP instance. It is a counterpart to [README.md](../README.md) (which targets developers and deployers) and [CLAUDE.md](../CLAUDE.md) (which targets coding assistants): everything here assumes you have a running OPTIMAP and are signed in to `/admin/` as a Django superuser.
 
 For a fully working setup, two processes must be live in addition to the web app:
 
@@ -33,7 +33,7 @@ All three actions are **non-blocking**: they queue work and return. Progress is 
 
 > **Why async?** Earlier versions ran the harvest synchronously inside the admin request, which routinely tripped gunicorn's worker timeout on non-trivial sources. The new actions hand off to Django-Q immediately. The cluster must be running for them to actually execute.
 
-CLI alternatives still work and are documented in README §[Harvest Publications from real journals](README.md#harvest-publications-from-real-journals): `python manage.py harvest_journals --journal <slug>` (with `--list`, `--all`, `--create-sources`, `--user-email`, `--max-records`).
+CLI alternatives still work and are documented in README §[Harvest Publications from real journals](../README.md#harvest-publications-from-real-journals): `python manage.py harvest_journals --journal <slug>` (with `--list`, `--all`, `--create-sources`, `--user-email`, `--max-records`).
 
 **Recover from a thundering-herd schedule state:** `python manage.py reset_harvest_schedules` rebuilds every `Harvest Source <id>` recurring schedule with a properly deferred `next_run` and (by default) staggers them across the smallest harvest interval so the cluster doesn't get hit with every source at once. Use this after a bulk `--insert-sources` run on a deployment that pre-dated the `Source.save()` fix, or any time you find every source firing simultaneously. Flags: `--dry-run` (preview), `--no-stagger` (set every `next_run` to `now + its own interval`), `--clear-manual` (also delete leftover `Manual Harvest Source <id>` one-off rows from the admin "Schedule harvesting" action).
 
@@ -58,6 +58,30 @@ Open an event to see the full log in a scrollable `<pre>` block. The log is the 
 
 Events are machine-created — manual `add` is disabled in the admin. To re-run a failed source, select one or more events and choose **Retry selected harvesting events**: this re-enqueues `harvest_oai_endpoint` for each event's source via `async_task`. A new `HarvestingEvent` row will appear per source; the original `failed` event is left in place as history.
 
+### Deduplication and updates
+
+Every harvester (OAI-PMH, RSS, Crossref, MaRESS) routes its inserts through a shared helper that looks up an existing Work by DOI or URL **scoped to the harvest's `Source`** before deciding what to do. Four outcomes:
+
+| Pre-existing match | `--update` flag | Outcome |
+| --- | --- | --- |
+| None | n/a | New Work created. |
+| Same `Source` | off (default) | Duplicate skipped silently. |
+| Same `Source` | on | Existing Work updated in place — see "Careful update" below. |
+| Different `Source` | n/a | Skipped with an info log message. **Cross-source merging is not handled.** |
+
+> **OPTIMAP does not currently merge metadata across sources.** When the same DOI/URL is exposed by two different sources (e.g. a journal article also surfaced via a preprint server), the second source's harvest is logged and skipped — the first source "owns" the Work. There is no automatic union of fields, no cross-source provenance trail, and no way to switch ownership without manual admin intervention. If this becomes a frequent need, open a follow-up issue.
+
+#### Careful update (`--update` flag)
+
+`python manage.py harvest_journals --update` (or `update_existing=True` on the task functions) refreshes existing same-source works in place. The update is deliberately conservative:
+
+- **Preserved when the new harvest brings nothing for them:** `geometry`, `timeperiod_startdate`, `timeperiod_enddate`. These often come from a user contribution through OPTIMAP that the source still does not provide; we don't want to wipe a curator's work because the upstream record is silent on coordinates.
+- **Never overwritten:** `status` (a Published Work stays Published, never flips back to Harvested) and `created_by` (audit trail).
+- **Refreshed from the new harvest:** title, abstract, authors, keywords, topics, OpenAlex enrichment fields, the `provenance.harvest` and `provenance.metadata_sources` and `provenance.openalex_match` sections, and the `Source` FK.
+- **Audit trail:** a `harvest_update` event is appended to `Work.provenance.events` (existing events including user contributions are preserved).
+
+Use `--update` when you want OpenAlex enrichment to re-run on previously-harvested works (e.g. after a matcher change), or when an upstream metadata change should propagate without losing curator additions. Without it, re-running the harvester is a no-op for already-known records.
+
 ### Email notifications on completion / failure
 
 `harvest_oai_endpoint` sends a result email to the user that triggered the run (the user who clicked the action; falls back to silently skipping if there is no user). Subject lines are `✅ Harvesting Completed for <collection>` or `❌ Harvesting Failed for <collection>`. To debug locally, point Django at the console backend in `.env`:
@@ -70,11 +94,11 @@ EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
 
 For maintainers cross-referencing the admin features above:
 
-- Admin classes & actions: [works/admin.py](works/admin.py) — `SourceAdmin`, `HarvestingEventAdmin`, `RecentHarvestingEventInline`, `_enqueue_harvest`, `trigger_harvesting_for_specific`, `trigger_harvesting_for_all`, `schedule_harvesting`, `retry_event`.
-- Task: [works/tasks.py](works/tasks.py) — `harvest_oai_endpoint(source_id, user=None, max_records=None)`. Persists `records_added`, `records_with_spatial`, `records_with_temporal`, `log_text`, and `error_message` (truncated to 1000 chars) on the event.
-- Models: [works/models.py](works/models.py) — `Source`, `HarvestingEvent` (`error_message`, `log_text`, `records_added`, `records_with_spatial`, `records_with_temporal`; index on `(source, -started_at)`).
-- Migration: [works/migrations/0003_harvestingevent_error_message_and_more.py](works/migrations/0003_harvestingevent_error_message_and_more.py).
-- Tests: [tests/test_admin_harvesting.py](tests/test_admin_harvesting.py), [tests/test_regular_harvesting.py](tests/test_regular_harvesting.py).
+- Admin classes & actions: [works/admin.py](../works/admin.py) — `SourceAdmin`, `HarvestingEventAdmin`, `RecentHarvestingEventInline`, `_enqueue_harvest`, `trigger_harvesting_for_specific`, `trigger_harvesting_for_all`, `schedule_harvesting`, `retry_event`.
+- Task: [works/tasks.py](../works/tasks.py) — `harvest_oai_endpoint(source_id, user=None, max_records=None)`. Persists `records_added`, `records_with_spatial`, `records_with_temporal`, `log_text`, and `error_message` (truncated to 1000 chars) on the event.
+- Models: [works/models.py](../works/models.py) — `Source`, `HarvestingEvent` (`error_message`, `log_text`, `records_added`, `records_with_spatial`, `records_with_temporal`; index on `(source, -started_at)`).
+- Migration: [works/migrations/0003_harvestingevent_error_message_and_more.py](../works/migrations/0003_harvestingevent_error_message_and_more.py).
+- Tests: [tests/test_admin_harvesting.py](../tests/test_admin_harvesting.py), [tests/test_regular_harvesting.py](../tests/test_regular_harvesting.py).
 
 ## Manage collections
 
@@ -176,14 +200,68 @@ The MaRESS harvester is bespoke because the API is Zotero-shaped, not OAI-PMH/RS
 
 ### Where things live in code
 
-- Model: [works/models.py](works/models.py) — `Collection`, plus `Work.collections` (M2M) and `Source.{source_type, collection}`.
-- Views: [works/views_collections.py](works/views_collections.py) — index, detail, vanity redirect, publish/unpublish, add/remove work mutations.
-- Templates: [works/templates/collections.html](works/templates/collections.html), [works/templates/collection_page.html](works/templates/collection_page.html), and the curator-button block in [works/templates/work_landing_page.html](works/templates/work_landing_page.html).
-- Provenance helper: [works/utils/provenance.py](works/utils/provenance.py) — `append_event(work, type, **fields)` for contribution / publish / unpublish events.
-- Provenance template tag: [works/templatetags/optimap_extras.py](works/templatetags/optimap_extras.py) — `render_provenance` renders `Work.provenance` JSON readably for admins/curators.
-- Sitemap: [optimap/sitemaps.py](optimap/sitemaps.py) — `CollectionsSitemap`.
-- Migration: [works/migrations/0004_collections.py](works/migrations/0004_collections.py) (`atomic = False`).
-- Tests: [tests/test_collections.py](tests/test_collections.py).
+- Model: [works/models.py](../works/models.py) — `Collection`, plus `Work.collections` (M2M) and `Source.{source_type, collection}`.
+- Views: [works/views_collections.py](../works/views_collections.py) — index, detail, vanity redirect, publish/unpublish, add/remove work mutations.
+- Templates: [works/templates/collections.html](../works/templates/collections.html), [works/templates/collection_page.html](../works/templates/collection_page.html), and the curator-button block in [works/templates/work_landing_page.html](../works/templates/work_landing_page.html).
+- Provenance helper: [works/utils/provenance.py](../works/utils/provenance.py) — `append_event(work, type, **fields)` for contribution / publish / unpublish events.
+- Provenance template tag: [works/templatetags/optimap_extras.py](../works/templatetags/optimap_extras.py) — `render_provenance` renders `Work.provenance` JSON readably for admins/curators.
+- Sitemap: [optimap/sitemaps.py](../optimap/sitemaps.py) — `CollectionsSitemap`.
+- Migration: [works/migrations/0004_collections.py](../works/migrations/0004_collections.py) (`atomic = False`).
+- Tests: [tests/test_collections.py](../tests/test_collections.py).
+
+## Block emails and domains (anti-spam)
+
+OPTIMAP can block specific email addresses and entire domains from registering or attempting to log in.
+
+**What it does:**
+
+- Blocks specific emails and entire domains from registering.
+- Prevents login attempts from blocked users.
+- Lets an admin delete users and instantly block their email and/or domain in a single action.
+
+**Where to manage it:**
+
+- `/admin/works/blockedemail/` — individual addresses.
+- `/admin/works/blockeddomain/` — whole domains.
+
+**How to use it:**
+
+1. **Manually add a blocked email or domain.** Go to `/admin/works/blockedemail/` (or `blockeddomain/`) and add a new entry.
+2. **Block users via an admin action.** Go to `/admin/auth/user/`, select the offending users, and pick **"Delete user and block email"** or **"Delete user and block email and domain"** from the **Action** dropdown. The user row is deleted and the corresponding blocklist entry is created in the same action.
+
+The blocklist is consulted at signup and at magic-link login time; blocked entries are rejected before any email is sent.
+
+## Operate the Django-Q cluster
+
+OPTIMAP uses [Django-Q2](https://django-q2.readthedocs.io/) to schedule and run background work — harvesting, monthly subscription emails, GeoJSON / GeoPackage cache regeneration, and the one-off retry / trigger actions in the harvesting admin. **The cluster must be running for any of those to actually execute.** The admin will accept actions while the cluster is down, but the queued tasks will sit in `django_q_task` until a worker picks them up.
+
+**Run the cluster:**
+
+```bash
+python manage.py qcluster
+```
+
+In Docker the cluster is started by `etc/manage-and-run.sh`; in a manual deployment, run it under `systemd` (or `supervisord`) so it restarts on failure.
+
+**Monitor:**
+
+The Django-Q [monitor docs](https://django-q2.readthedocs.io/en/master/monitor.html) cover this in depth. The two commands worth knowing:
+
+```bash
+python manage.py qmonitor   # live dashboard of cluster activity
+python manage.py qinfo      # one-shot stats: cluster status, queue depth, last successes/failures
+```
+
+**Inspect and prune schedules and tasks** under `/admin/django_q/`:
+
+- **Scheduled tasks** (`/admin/django_q/schedule/`) — every recurring schedule, including the `Harvest Source <id>` rows created by `Source.save()` and the `Manual Harvest Source <id>` one-offs created by the admin "Schedule harvesting" action. Stale or duplicate rows can be deleted here directly.
+- **Successful** / **Failed** tasks (`/admin/django_q/success/`, `/failure/`) — completed task history with full stack traces on failure. Useful for diagnosing harvests that died before their `HarvestingEvent.error_message` could be persisted.
+
+**Common failure modes:**
+
+- **Stale dotted paths.** Pre-v0.12.0 schedules referenced `publications.tasks.*` instead of `works.tasks.*`. Long-lived deployments may still have these — the cluster fails them with `ImportError`. Delete them from `/admin/django_q/schedule/` and re-create them by saving the corresponding `Source` (or run `python manage.py reset_harvest_schedules`).
+- **Thundering herd after `harvest_journals --insert-sources`.** Pre-fix `Source.save()` created Schedule rows with `next_run = now`. Recover with `python manage.py reset_harvest_schedules` (see "Manage harvesting" → "Recover from a thundering-herd schedule state").
+- **Cluster down, queue grows.** Restart `qcluster` and watch `qinfo` — the queue drains in roughly the order tasks were enqueued. To skip the backlog, truncate `django_q_ormq` from the dbshell or via the `/admin/django_q/` views.
 
 ---
 
@@ -195,7 +273,7 @@ The following sections are **suggested, not yet written**. They cover the rest o
 
 `/admin/works/work/` — the core `Work` model.
 
-- The publication status workflow (`d` draft / `p` public) and the `make_public` / `make_draft` admin actions; cross-link to README §[Publication Status Workflow](README.md#publication-status-workflow).
+- The publication status workflow (`d` draft / `p` public) and the `make_public` / `make_draft` admin actions; cross-link to README §[Publication Status Workflow](../README.md#publication-status-workflow).
 - Bulk import / export through `django-import-export` (`WorkAdmin` extends `ImportExportModelAdmin`).
 - Editing geometry on the Leaflet map widget (`LeafletGeoAdmin`); WKT input via <https://wktmap.com/>.
 - The "Email permalinks preview to me" action.
@@ -206,7 +284,7 @@ The following sections are **suggested, not yet written**. They cover the rest o
 `/admin/works/customuser/`, `/admin/works/userprofile/`.
 
 - The passwordless magic-link login (10-minute token expiry); the user-facing flow; how to manually grant superuser/staff in the admin.
-- `createsuperuser` (CLI) — see README §[Create Superusers/Admin](README.md#create-superusersadmin).
+- `createsuperuser` (CLI) — see README §[Create Superusers/Admin](../README.md#create-superusersadmin).
 - `UserProfile` (extended attributes), `EmailLog` (sent-mail audit trail).
 - Why login must use `localhost` not `127.0.0.1` during development (CSRF cookie domain).
 
@@ -217,13 +295,6 @@ The following sections are **suggested, not yet written**. They cover the rest o
 - Spatial + temporal filter fields on `Subscription`; how the subscription monthly email is composed.
 - The `schedule_subscription_email_task` and `schedule_monthly_email_task` Django-Q schedules (and the `Send Monthly Manuscript Email` admin action).
 - How to test the monthly email locally with the console email backend.
-
-### Block emails and domains (anti-spam)
-
-`/admin/works/blockedemail/`, `/admin/works/blockeddomain/`.
-
-- Existing content already in README §[Block Emails/Domains](README.md#block-emailsdomains) — move or summarise here.
-- How the blocklist is consulted at signup / subscription time.
 
 ### Manage the Recognition Board
 
@@ -251,6 +322,11 @@ Cached files in `/tmp/optimap_cache/`; retention controlled by `OPTIMAP_DATA_DUM
 ### Manage global regions and predefined feeds
 
 - `python manage.py load_global_regions` — required once after initial setup; loads continent and ocean polygons into `GlobalRegion`.
+  - On first run, auto-downloads continents (Esri World Continents) and oceans (MarineRegions Global Oceans and Seas v1, ~128 MB GPKG) into the cache directory.
+  - If the simplified ocean GeoJSON is missing, calls `simplify_ocean_geometries` automatically — Shapely tolerance simplify + percentile-based small-hole removal — producing a ~4.7 MB file that gets loaded into `GlobalRegion`.
+  - Tunables (env vars, see `.env.example`): `OPTIMAP_OCEAN_SIMPLIFICATION_TOLERANCE` (default `0.05`), `OPTIMAP_OCEAN_SIMPLIFICATION_PERCENTILE` (default `80.0`), `OPTIMAP_GLOBAL_REGIONS_DATA_DIR` (default: command dir; set to a non-volatile path like `/var/opt/optimap/data` for deployment).
+  - To refresh: delete the relevant cached file(s) in the data dir (`goas_v01.gpkg`, `goas_v01_simplified.geojson`, `world_continents.geojson`) and re-run the command.
+- `python manage.py simplify_ocean_geometries --tolerance <float> --percentile <float>` — re-run the simplification pass standalone (e.g. when retuning); writes `goas_v01_simplified.geojson` from `goas_v01.gpkg` in the data dir.
 - How global feeds (`/feeds/georss/<slug>/`) resolve a slug to a `GlobalRegion`.
 
 ### Sync external metadata
@@ -259,16 +335,9 @@ Cached files in `/tmp/optimap_cache/`; retention controlled by `OPTIMAP_DATA_DUM
 - `python manage.py update_openalex_journals` — enriches `Source` records from the OpenAlex API.
 - When to re-run each (e.g. after adding a new source, on a quarterly cadence).
 
-### Operate the Django-Q cluster
-
-- Starting / stopping (`python manage.py qcluster`); running it under systemd or in Docker.
-- Live monitoring with `qmonitor` and `qinfo`.
-- Inspecting and pruning the `Schedule` and `Task` tables in the admin (`/admin/django_q/`).
-- Common failure modes: stale schedules with the old `publications.tasks.*` dotted path (fixed in v0.12.0 — but legacy rows may still exist on long-lived deployments and should be deleted or recreated).
-
 ### Operate the geoextent service
 
-- Configuration knobs from CLAUDE.md §[Geoextent API Endpoints](CLAUDE.md): `GEOEXTENT_MAX_FILE_SIZE_MB`, `GEOEXTENT_MAX_BATCH_SIZE_MB`, `GEOEXTENT_MAX_DOWNLOAD_SIZE_MB`, `GEOEXTENT_DOWNLOAD_WORKERS`.
+- Configuration knobs from CLAUDE.md §[Geoextent API Endpoints](../CLAUDE.md): `GEOEXTENT_MAX_FILE_SIZE_MB`, `GEOEXTENT_MAX_BATCH_SIZE_MB`, `GEOEXTENT_MAX_DOWNLOAD_SIZE_MB`, `GEOEXTENT_DOWNLOAD_WORKERS`.
 - Known upstream bug (coordinate-order in `geoextent.fromRemote()`); how to detect it in the wild.
 - Where logs surface for failed remote extractions.
 
@@ -280,6 +349,6 @@ Cached files in `/tmp/optimap_cache/`; retention controlled by `OPTIMAP_DATA_DUM
 
 ### Upgrade and migration runbook
 
-- Where the version is bumped ([optimap/\_\_init\_\_.py](optimap/__init__.py)) and how it surfaces in the UI / API.
+- Where the version is bumped ([optimap/\_\_init\_\_.py](../optimap/__init__.py)) and how it surfaces in the UI / API.
 - Running migrations (`migrate` is auto-applied via `etc/manage-and-run.sh` in Docker).
-- Reviewing [CHANGELOG.md](CHANGELOG.md) before each upgrade — especially "Changed" / "Removed" entries that may require admin action (e.g. v0.12.0 bumped the harvest task's dotted path).
+- Reviewing [CHANGELOG.md](../CHANGELOG.md) before each upgrade — especially "Changed" / "Removed" entries that may require admin action (e.g. v0.12.0 bumped the harvest task's dotted path).

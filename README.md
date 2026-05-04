@@ -65,6 +65,8 @@ Publications in OPTIMAP follow a status-based workflow with six possible states:
 
 OPTIMAP is based on [Django](https://www.djangoproject.com/) (with [GeoDjango](https://docs.djangoproject.com/en/4.1/ref/contrib/gis/) and [Django REST framework](https://www.django-rest-framework.org/)) with a [PostgreSQL](https://www.postgresql.org/)/[PostGIS](https://postgis.net/) database backend.
 
+This README covers setup, development, and deployment. For day-to-day operation of a running instance — managing harvesting sources, curating collections, blocking users, running the Django-Q cluster — see the operator handbook at [docs/manage.md](docs/manage.md).
+
 The development of OPTIMAP was and is supported by the projects [OPTIMETA](https://projects.tib.eu/optimeta/en/) and [KOMET](https://projects.tib.eu/komet/en/).
 
 [![OPTIMETA Logo](https://projects.tib.eu/fileadmin/_processed_/e/8/csm_Optimeta_Logo_web_98c26141b1.png)](https://projects.tib.eu/optimeta/en/) [![KOMET Logo](https://projects.tib.eu/fileadmin/templates/komet/tib_projects_komet_1150.png)](https://projects.tib.eu/komet/en/)
@@ -79,38 +81,7 @@ A complete list of existing parameters is provided in the file `optimap/.env.exa
 
 ## Run with Docker
 
-The project is containerized using Docker, with services defined in `docker-compose.(deploy.)yml`. To start all services, run:
-
-```bash
-docker compose up
-
-docker compose run --entrypoint python app manage.py loaddata fixtures/test_data.json
-```
-
-The database migrations are applied as part of the startup script, see file `etc/manage-and-run.sh`.
-You can still run the commands below manually if need be, e.g., during development.
-
-```bash
-docker compose run --entrypoint python app manage.py makemigrations # should not detect and changes, otherwise your local config might be outdated
-docker compose run --entrypoint python app manage.py migrate
-docker compose run --entrypoint python app manage.py collectstatic --noinput
-```
-
-Now open a browser at <http://localhost:80/>.
-
-### Services Overview
-
-- db: Runs a PostgreSQL database with PostGIS extensions. Data is persisted in a Docker volume named db_data.
-- app: Our primary Django web application.
-- webserver: An Nginx server for serving static files and test files.
-
-### Ports
-
-Not all of these ports are exposed by default, but they are available for local development - just uncomment the matching lines in the `docker-compose.yml` file.
-
-- `5432`: Database (PostgreSQL/PostGIS)
-- `8000`: App (Django server)
-- `80`: Webserver (Nginx)
+OPTIMAP is containerised. To bring up the full stack (app, PostGIS, Nginx) — for local use or production — see [docs/deploy-docker-compose.md](docs/deploy-docker-compose.md).
 
 ## Development
 
@@ -192,6 +163,11 @@ python manage.py collectstatic --noinput
 python manage.py qcluster
 
 # If you want to use the predefined feeds for continents and oceans we need to load the geometries for global regions
+# On first run this auto-downloads the source data (Esri World Continents and MarineRegions
+# Global Oceans and Seas v1, ~128 MB GPKG) and simplifies the ocean polygons (~4.7 MB GeoJSON)
+# before loading them into the GlobalRegion table. Tune via OPTIMAP_OCEAN_SIMPLIFICATION_TOLERANCE
+# / OPTIMAP_OCEAN_SIMPLIFICATION_PERCENTILE; cache location via OPTIMAP_GLOBAL_REGIONS_DATA_DIR.
+# Delete the cached files in that directory to force a fresh download / re-simplification.
 python manage.py load_global_regions
 
 # Harvest publications from real OAI-PMH journal sources
@@ -293,6 +269,8 @@ OPTIMAP_EMAIL_PORT=5587
 Visit the URL - <http://127.0.0.1:8000/works/>
 
 ### Harvest Publications from real journals
+
+> Triggering harvests from the Django admin (rather than the CLI) and inspecting harvesting events / logs is documented in [docs/manage.md → Manage harvesting](docs/manage.md#manage-harvesting).
 
 The `harvest_journals` management command allows you to harvest publications from real OAI-PMH journal sources directly into your database. This is useful for:
 
@@ -398,7 +376,7 @@ python manage.py createsuperuser --username=optimap --email=nomail@optimap.scien
 
 You will be prompted for a password. After entering one, the superuser will be created immediately. If you omit the --username or --email options, the command will prompt you for those values interactively.
 
-Access the admin interface at <http://127.0.0.1:8000/admin/>.
+Access the admin interface at <http://127.0.0.1:8000/admin/>. Once signed in, see [docs/manage.md](docs/manage.md) for the operator workflows the admin exposes (harvesting, collections, blocked emails, the Django-Q cluster).
 
 #### Running in a Dockerized App
 
@@ -621,73 +599,11 @@ The **logos** and favicon are in the repository in the folder [`publications/sta
 
 ## Deploy
 
-The app is deployed in the TUD Enterprise Cloud.
-HTTPS certificate is retrieved via `certbot`, see `docker-compose.deploy.yml` for the configuration and documentation links.
+The app is deployed in the TUD Enterprise Cloud via Docker Compose; see [docs/deploy-docker-compose.md](docs/deploy-docker-compose.md) for the recipe and the `certbot`-based HTTPS setup.
 
 ## Operation
 
-### Manage harvesting
-
-Sources and harvesting events are managed entirely through the Django admin. The Django-Q cluster (`python manage.py qcluster`) must be running for triggers to execute.
-
-**Configure sources** at `/admin/works/source/`:
-
-- Edit a `Source` to change its OAI-PMH URL, collection, harvest interval, default work type, and OpenAlex metadata. Each `Source.save()` (re)creates a recurring Django-Q `Schedule` named `Harvest Source <id>` that fires every `harvest_interval_minutes` minutes.
-- The list page shows the latest event status and the total event count per source. The change page lists the five most recent harvesting events inline.
-
-**Trigger or schedule a harvest from the admin** by selecting one or more sources in the changelist and choosing one of:
-
-- **Trigger harvesting for selected sources** — enqueues an immediate `async_task` per selected source.
-- **Trigger harvesting for all sources** — same, for every source in the database.
-- **Schedule harvesting for selected sources** — creates a one-off Django-Q `Schedule` named `Manual Harvest Source <id>` that runs at the next cluster tick.
-
-All three are non-blocking (they enqueue and return); progress is visible at `/admin/works/harvestingevent/`. CLI alternatives — `python manage.py harvest_journals` and direct `Schedule` rows — are documented in the [Harvest Publications from real journals](#harvest-publications-from-real-journals) section above.
-
-**Explore harvesting logs** at `/admin/works/harvestingevent/`:
-
-- Each event records `status`, `started_at`/`completed_at`, `records_added`, `records_with_spatial`, `records_with_temporal`, the `error_message` (on failure), and the full `log_text` summary captured by `HarvestWarningCollector` during the run (errors 🔴, warnings 🟡, notable info 🔵).
-- Filter by `status`, `source`, or date hierarchy. Free-text search runs over `source__name`, `source__url_field`, `error_message`, and `log_text`.
-- Open an event to see the full log in a scrollable `<pre>` block on the change form. Use the **Retry selected harvesting events** action to re-enqueue failed runs.
-- Events are machine-created; manual creation is disabled in the admin.
-
-### Block Emails/Domains
-
-#### What It Does
-
-- Blocks specific emails and entire domains from registering.
-- Prevents login attempts from blocked users.
-- Admin can delete users and instantly block their email/domain.
-
-#### How to Use in Django Admin
-
-1. **Manually Add Blocked Emails/Domains**
-   - Go to `/admin/`
-   - Add emails in **Blocked Emails** or domains in **Blocked Domains**.
-2. **Block Users via Admin Action**
-   - Go to `/admin/auth/user/`
-   - Select users → Choose **"Delete user and block email/domain"** → Click **Go**.
-
-### Tasks
-
-We use [Django Q2](https://django-q2.readthedocs.io/) for scheduling (repeated) tasks.
-
-#### Run the cluster
-
-```bash
-python manage.py qcluster
-```
-
-#### Monitor
-
-Details: <https://django-q2.readthedocs.io/en/master/monitor.html>
-
-tl;dr:
-
-```bash
-python manage.py qmonitorq
-
-python manage.py qinfo
-```
+Day-to-day operation of a running OPTIMAP — managing harvesting sources and events, curating collections, blocking abusive users, running the Django-Q cluster, and the rest of the Django-admin surface — is documented in the operator handbook at **[docs/manage.md](docs/manage.md)**.
 
 ## License
 

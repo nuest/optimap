@@ -11,7 +11,7 @@ Part of the KOMET project (<https://projects.tib.eu/komet>), continuing from OPT
 ## Companion docs
 
 - [README.md](README.md) — developer / deployer setup, local dev, harvesting CLI.
-- [MANAGE.md](MANAGE.md) — admin / operator handbook (Django admin workflows, harvesting management, suggested sections for the rest of the admin surface). When the user asks about how to run, monitor, or troubleshoot a feature **as an admin**, read this first and update it as features change.
+- [docs/manage.md](docs/manage.md) — admin / operator handbook (Django admin workflows, harvesting management, suggested sections for the rest of the admin surface). When the user asks about how to run, monitor, or troubleshoot a feature **as an admin**, read this first and update it as features change.
 - [CHANGELOG.md](CHANGELOG.md) — Keep-a-Changelog-formatted release notes; update on every user-visible change.
 - [docs/geoextent_response_formats.md](docs/geoextent_response_formats.md) — geoextent API response shapes.
 

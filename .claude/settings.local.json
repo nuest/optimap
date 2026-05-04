@@ -44,7 +44,8 @@
       "Bash(OPTIMAP_LOGGING_LEVEL=WARNING python manage.py test tests)",
       "Bash(export OPTIMAP_LOGGING_LEVEL=WARNING)",
       "WebFetch(domain:github.com)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(git mv *)"
     ],
     "deny": [],
     "ask": []
