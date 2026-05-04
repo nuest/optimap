@@ -35,11 +35,11 @@ def _mock_response(payload):
 def _patched_session(payload):
     session = MagicMock()
     session.get.return_value = _mock_response(payload)
-    return patch('works.tasks._mwr_session', return_value=session)
+    return patch('works.harvesting.mountain_wetlands._mwr_session', return_value=session)
 
 
 def _no_op_openalex():
-    return patch('works.tasks.build_openalex_fields', return_value=({}, {}))
+    return patch('works.harvesting.mountain_wetlands.build_openalex_fields', return_value=({}, {}))
 
 
 class SameSourceDedupTests(TestCase):

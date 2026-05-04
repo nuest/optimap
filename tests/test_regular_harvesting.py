@@ -37,8 +37,8 @@ class HarvestRegularMetadataTestCase(TestCase):
             tags="test,harvest",
         )
 
-    @patch("works.tasks._oai_session")
-    @patch("works.tasks.parse_oai_xml_and_save_works")
+    @patch("works.harvesting.oai._oai_session")
+    @patch("works.harvesting.oai.parse_oai_xml_and_save_works")
     def test_harvest_regular_metadata_sends_email(self, mock_parser, mock_session_factory):
         fake_response = Mock()
         fake_response.ok = True

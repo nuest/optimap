@@ -51,13 +51,13 @@ class MountainWetlandsHarvesterTests(TestCase):
         """Patch _mwr_session() so the harvester sees one page of the recorded payload."""
         session = MagicMock()
         session.get.return_value = _mock_response(payload)
-        return patch('works.tasks._mwr_session', return_value=session)
+        return patch('works.harvesting.mountain_wetlands._mwr_session', return_value=session)
 
     def _no_op_openalex(self):
         """Force build_openalex_fields() to return ``({}, {})`` — i.e. no match
         and no enrichment. Lets the harvester tests focus on the API-shape
         handling without exercising the live OpenAlex matcher."""
-        return patch('works.tasks.build_openalex_fields', return_value=({}, {}))
+        return patch('works.harvesting.mountain_wetlands.build_openalex_fields', return_value=({}, {}))
 
     def test_creates_one_work_per_item(self):
         with self._patched_session(self.payload), self._no_op_openalex():
@@ -187,7 +187,7 @@ class MountainWetlandsOpenAlexMatchTests(TestCase):
     def _patched_session(self, payload):
         session = MagicMock()
         session.get.return_value = _mock_response(payload)
-        return patch('works.tasks._mwr_session', return_value=session)
+        return patch('works.harvesting.mountain_wetlands._mwr_session', return_value=session)
 
     def test_verified_match_persists_doi_from_openalex(self):
         verified_fields = {
@@ -199,7 +199,7 @@ class MountainWetlandsOpenAlexMatchTests(TestCase):
             'topics': ['Andean Ecology'],
         }
         with self._patched_session(self.payload), \
-             patch('works.tasks.build_openalex_fields',
+             patch('works.harvesting.mountain_wetlands.build_openalex_fields',
                    side_effect=lambda title, doi, author, existing_metadata=None: (
                        (dict(verified_fields), {'authors': 'original_source', 'topics': 'openalex'})
                        if title.startswith('Evolution of High Andean')
@@ -225,7 +225,7 @@ class MountainWetlandsOpenAlexMatchTests(TestCase):
             ],
         }
         with self._patched_session(self.payload), \
-             patch('works.tasks.build_openalex_fields',
+             patch('works.harvesting.mountain_wetlands.build_openalex_fields',
                    side_effect=lambda title, doi, author, existing_metadata=None: (
                        (dict(candidate_fields), {})
                        if title.startswith('Evolution of High Andean')
