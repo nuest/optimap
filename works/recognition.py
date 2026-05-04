@@ -10,11 +10,14 @@ generator used when a user opts into the recognition board for the first time.
 from __future__ import annotations
 
 import re
+import secrets
 from dataclasses import dataclass
 from typing import Iterable, List
 
 from better_profanity import profanity as _profanity
 from coolname import generate_slug
+
+from works.models import UserProfile
 
 # Load the default English profanity word list once at import time.
 _profanity.load_censor_words()
@@ -101,9 +104,6 @@ def generate_random_username(max_attempts: int = 5) -> str:
     to appending a numeric suffix if all attempts collide with existing values
     in `UserProfile.recognition_username`.
     """
-    # Local import to avoid a circular import at module load.
-    from works.models import UserProfile
-
     taken = set(
         UserProfile.objects.exclude(recognition_username__isnull=True)
         .values_list("recognition_username", flat=True)
@@ -115,6 +115,5 @@ def generate_random_username(max_attempts: int = 5) -> str:
                 and not is_offensive(candidate)):
             return candidate
     # Last-resort fallback: tack on a 4-digit suffix.
-    import secrets
     base = generate_slug(2)[:59]
     return f"{base}-{secrets.randbelow(10000):04d}"

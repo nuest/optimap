@@ -24,7 +24,12 @@ import time
 from math import floor
 from urllib.parse import unquote
 from django.conf import settings
+from django.contrib.gis.geos import GeometryCollection
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.db.models import Q
 from works.models import BlockedEmail, BlockedDomain, Subscription, UserProfile, Work, GlobalRegion, Collection
+from works.feeds import normalize_region_slug
+from works.utils.statistics import get_cached_statistics
 from django.contrib.auth import get_user_model
 User = get_user_model()
 import tempfile, os
@@ -138,9 +143,6 @@ def contribute(request):
     Page showing harvested works that need spatial or temporal extent contributions.
     Displays works with harvested status that are missing geometry or temporal extent.
     """
-    from django.contrib.gis.geos import GeometryCollection
-    from django.db.models import Q
-
     # Get publications that are harvested and missing spatial OR temporal extent
     publications_query = Work.objects.filter(
         status='h',  # Harvested status
@@ -637,7 +639,6 @@ def finalize_account_deletion(request):
             request.session.modified = True
 
 def feeds(request):
-    from .feeds import normalize_region_slug
 
     global_feeds = [
         { "title": "Geo RSS",     "url": reverse("optimap:api-feed-georss")   },
@@ -702,8 +703,7 @@ def geoextent(request):
 class RobotsView(View):
     http_method_names = ['get']
     def get(self, request):
-        from .feeds import normalize_region_slug
-
+    
         # Build robots.txt content
         lines = [
             "User-Agent: *",
@@ -816,9 +816,6 @@ def works_list(request):
 
     Supports pagination with user-selectable page size.
     """
-    from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-    from works.utils.statistics import get_cached_statistics
-
     is_admin = request.user.is_authenticated and request.user.is_staff
 
     # Get page size from request or use default

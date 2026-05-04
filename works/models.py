@@ -6,7 +6,10 @@ from datetime import timedelta
 
 from django.contrib.auth.models import AbstractUser, Group, Permission
 from django.contrib.gis.db import models
+from django.contrib.gis.db.models.functions import Centroid, Envelope
+from django.contrib.gis.geos import Point
 from django.contrib.postgres.fields import ArrayField
+from django.db import connection
 from django.db.models import Q
 from django.conf import settings
 from django.utils import timezone
@@ -19,7 +22,7 @@ from django.urls import reverse
 from import_export.widgets import ForeignKeyWidget
 from django.core.exceptions import ValidationError
 from stdnum.issn import is_valid as is_valid_issn
-from django.contrib.gis.db import models as gis_models 
+from django.contrib.gis.db import models as gis_models
 
 logger = logging.getLogger(__name__)
 
@@ -213,9 +216,6 @@ class Work(models.Model):
             return None
 
         try:
-            from django.contrib.gis.db.models.functions import Centroid, Envelope
-            from django.contrib.gis.geos import Point
-
             # Use database query to calculate centroid of bounding box
             # ST_Centroid(ST_Envelope(geometry)) gives us the center of the bounding box
             result = Work.objects.filter(pk=self.pk).annotate(
@@ -255,8 +255,6 @@ class Work(models.Model):
             return None
 
         try:
-            from django.db import connection
-
             # Raw SQL query to get all extreme points
             # For each direction, we dump all points, order by coordinate, and take the first
             with connection.cursor() as cursor:

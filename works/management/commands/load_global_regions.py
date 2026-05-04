@@ -9,8 +9,10 @@ import urllib.request
 import urllib.parse
 from django.conf import settings
 from works.models import GlobalRegion
-from django.core.management.base import BaseCommand
 from django.contrib.gis.gdal import DataSource
+from django.contrib.gis.geos import MultiPolygon, Polygon
+from django.core.management import call_command
+from django.core.management.base import BaseCommand
 
 # Use configurable data directory if set, otherwise fall back to command directory
 COMMAND_DIR = os.path.dirname(__file__)
@@ -131,7 +133,6 @@ class Command(BaseCommand):
             self.stdout.write(f"Using tolerance={tolerance}, percentile={percentile}")
 
             # Call the simplify_ocean_geometries command
-            from django.core.management import call_command
             call_command('simplify_ocean_geometries',
                         tolerance=tolerance,
                         percentile=percentile)
@@ -164,7 +165,6 @@ class Command(BaseCommand):
             geom = feat.geom.geos
 
             # Convert Polygon to MultiPolygon if needed (GlobalRegion expects MultiPolygon)
-            from django.contrib.gis.geos import MultiPolygon, Polygon
             if isinstance(geom, Polygon):
                 geom = MultiPolygon([geom])
 

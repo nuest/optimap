@@ -15,6 +15,7 @@ from django.core.serializers import serialize
 from django.urls import reverse
 from .models import Work, GlobalRegion
 from .feeds import get_region_from_slug
+from .seo import build_feed_page_meta
 
 logger = logging.getLogger(__name__)
 
@@ -211,8 +212,6 @@ def _with_feed_seo(request, context: dict, region) -> dict:
     ``meta``/``canonical_url`` keys. Kept out of the cache so the URL is
     correct for whatever host the request came in on (and so request-bound
     state is never reused across requests)."""
-    from works.seo import build_feed_page_meta
-
     bbox = None
     try:
         if region and region.geom:

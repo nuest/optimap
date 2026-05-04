@@ -1,14 +1,18 @@
 # SPDX-FileCopyrightText: 2025 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import os
-import logging
-import requests
-import traceback
+import calendar
 import json
+import logging
+import os
+import traceback
 from datetime import datetime
+
+import requests
 from django.conf import settings
 from django.db import transaction
+
+from works.models import WikidataExportLog
 
 from wikibaseintegrator.wbi_exceptions import ModificationFailed
 from wikibaseintegrator import WikibaseIntegrator
@@ -826,8 +830,6 @@ def normalize_date_and_precision(date_str, is_end_date=False):
       - precision 10 = month
       - precision 11 = day
     """
-    import calendar
-
     parts = date_str.split("-")
     if len(parts) == 1 and parts[0].isdigit():
         # "YYYY"
@@ -1183,8 +1185,6 @@ def create_export_log(work, action, qid=None, exported_fields=None, error_messag
     """
     Create a WikidataExportLog entry for this export.
     """
-    from works.models import WikidataExportLog
-
     wikidata_url = None
     if qid:
         wikidata_url = f"{WIKIBASE_URL}{qid}"

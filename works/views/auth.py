@@ -33,7 +33,15 @@ import imaplib
 import time
 from math import floor
 from django.conf import settings
+from django.db.models import Count, Q
 from works.models import BlockedEmail, BlockedDomain, Contribution, Subscription, UserProfile, GlobalRegion
+from works.recognition import (
+    RECOGNITION_TIERS,
+    USERNAME_REGEX,
+    generate_random_username,
+    group_by_tier,
+    is_offensive,
+)
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -181,8 +189,6 @@ def customlogout(request):
 
 @never_cache
 def user_settings(request):
-    from works.recognition import USERNAME_REGEX, generate_random_username, is_offensive
-
     if not request.user.is_authenticated:
         return render(request, "error.html", {
             "error": {
@@ -243,14 +249,11 @@ def random_recognition_username(request):
     or clicks "Generate". The returned name is a candidate — uniqueness is
     re-validated when the form is submitted.
     """
-    from works.recognition import generate_random_username
     return JsonResponse({"username": generate_random_username()})
 
 
 def recognition_board(request):
     """Public contributor recognition board, grouped into 5 explorer-named tiers."""
-    from django.db.models import Count, Q
-    from works.recognition import RECOGNITION_TIERS, group_by_tier
 
     profiles = (
         UserProfile.objects

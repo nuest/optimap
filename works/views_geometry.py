@@ -8,12 +8,14 @@ import logging
 import json
 from django.contrib.auth.decorators import login_required
 from django.contrib.admin.views.decorators import staff_member_required
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.gis.geos import GEOSGeometry
 from django.utils import timezone
 from works.models import Work, Contribution
+from works.utils.identifiers import get_work_by_identifier
+from works.utils.provenance import append_event
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +90,6 @@ def contribute_geometry_by_id(request, work_id):
                 temporal_contributed = True
 
         work.status = 'c'  # Contributed
-        from works.utils.provenance import append_event
         append_event(
             work,
             "contribution",
@@ -163,7 +164,6 @@ def publish_work_by_id(request, work_id):
 
     try:
         # Update work
-        from works.utils.provenance import append_event
         work.status = 'p'  # Published
         append_event(
             work,
@@ -210,7 +210,6 @@ def unpublish_work_by_id(request, work_id):
 
     try:
         # Update work
-        from works.utils.provenance import append_event
         work.status = 'd'  # Draft
         append_event(
             work,
@@ -251,8 +250,6 @@ def contribute_geometry(request, identifier):
 
     Delegates to contribute_geometry_by_id after resolving the identifier.
     """
-    from works.utils.identifiers import get_work_by_identifier
-    from django.http import Http404
 
     try:
         work = get_work_by_identifier(identifier)
@@ -275,8 +272,6 @@ def publish_work(request, identifier):
 
     Delegates to publish_work_by_id after resolving the identifier.
     """
-    from works.utils.identifiers import get_work_by_identifier
-    from django.http import Http404
 
     try:
         work = get_work_by_identifier(identifier)
@@ -299,8 +294,6 @@ def unpublish_work(request, identifier):
 
     Delegates to unpublish_work_by_id after resolving the identifier.
     """
-    from works.utils.identifiers import get_work_by_identifier
-    from django.http import Http404
 
     try:
         work = get_work_by_identifier(identifier)

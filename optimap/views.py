@@ -27,7 +27,8 @@ from pathlib import Path
 from datetime import datetime
 from django.utils.timezone import get_default_timezone
 import humanize
-from works.models import GlobalRegion
+from works.models import Collection, GlobalRegion
+from works.seo import build_homepage_meta
 from works import views_feeds
 from works.feeds import normalize_region_slug
 from django.urls import reverse
@@ -36,7 +37,6 @@ import geoextent.lib.features
 
 def main(request):
     # Pass the 'next' parameter to template for login redirect
-    from works.seo import build_homepage_meta
     next_url = request.GET.get('next', '')
     return render(request, "main.html", {
         'next': next_url,
@@ -224,7 +224,6 @@ def feeds(request):
 
 def sitemap_page(request):
     """Human-readable sitemap page"""
-    from works.models import Collection
     return render(request, 'sitemap_page.html', {
         'collections': Collection.objects.filter(is_published=True).order_by('name'),
     })

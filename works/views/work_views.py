@@ -18,7 +18,9 @@ from urllib.parse import unquote
 logger = logging.getLogger(__name__)
 
 from django.shortcuts import render, get_object_or_404
-from django.core.paginator import Paginator
+from django.contrib.gis.geos import GeometryCollection
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.db.models import Q
 from django.views.decorators.cache import never_cache
 from django.conf import settings
 from django.urls import reverse
@@ -30,6 +32,7 @@ from works.services.preview_image import (
     cache_path_for as _preview_cache_path,
     render_work_preview,
 )
+from works.utils.identifiers import resolve_work_identifier
 from works.utils.statistics import get_cached_statistics
 
 
@@ -38,10 +41,6 @@ def contribute(request):
     Page showing harvested works that need spatial or temporal extent contributions.
     Supports pagination with user-selectable page size.
     """
-    from django.contrib.gis.geos import GeometryCollection
-    from django.db.models import Q
-    from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-
     # Get page size from request or use default
     page_size = request.GET.get('size', settings.WORKS_PAGE_SIZE_DEFAULT)
     try:
@@ -134,9 +133,6 @@ def works_list(request):
 
     Supports pagination with user-selectable page size.
     """
-    from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-    from works.utils.statistics import get_cached_statistics
-
     is_admin = request.user.is_authenticated and request.user.is_staff
 
     # Get page size from request or use default
@@ -224,7 +220,6 @@ def work_landing(request, identifier):
     Only published works (status='p') are accessible to non-admin users.
     Admin users can view all works with a status label.
     """
-    from works.utils.identifiers import resolve_work_identifier
 
     is_admin = request.user.is_authenticated and request.user.is_staff
 
@@ -303,7 +298,6 @@ def work_preview_png(request, identifier):
     Returns 404 when the work has no geometry — landings for those works
     don't emit an og:image so this endpoint should not be hit for them.
     """
-    from works.utils.identifiers import resolve_work_identifier
 
     work, _ = resolve_work_identifier(identifier)
     if not (request.user.is_authenticated and request.user.is_staff) and work.status != 'p':

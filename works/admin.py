@@ -13,7 +13,7 @@ from leaflet.admin import LeafletGeoAdmin
 from works.models import Work, Source, HarvestingEvent, BlockedEmail, BlockedDomain, GlobalRegion, Collection
 from import_export.admin import ImportExportModelAdmin
 from works.models import Contribution, EmailLog, Subscription, UserProfile, WikidataExportLog
-from works.tasks import harvest_oai_endpoint, schedule_subscription_email_task, send_monthly_email, schedule_monthly_email_task
+from works.tasks import harvest_oai_endpoint, schedule_subscription_email_task, send_monthly_email, schedule_monthly_email_task, send_subscription_based_email
 from django_q.models import Schedule
 from django_q.tasks import async_task
 from django.utils.timezone import now
@@ -141,8 +141,6 @@ def send_subscription_emails(modeladmin, request, queryset):
     """
     Admin action to manually send subscription-based emails to selected users.
     """
-    from works.tasks import send_subscription_based_email
-
     selected_users = queryset.filter(subscribed=True).values_list('user', flat=True)
     if not selected_users:
         messages.warning(request, "No active subscribers selected.")
