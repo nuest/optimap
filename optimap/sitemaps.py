@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from django.contrib.sitemaps import Sitemap
-from works.models import Work, GlobalRegion
+from works.models import Work, GlobalRegion, Collection
 from django.urls import reverse
 
 
@@ -35,6 +35,7 @@ class StaticViewSitemap(Sitemap):
             "main",           # Home page (/)
             "about",          # About page (/about/)
             "accessibility",  # Accessibility statement (/accessibility/)
+            "collections",    # Collections index (/collections/)
             "contribute",     # Contribute page (/contribute/)
             "data",           # Data download page (/data/)
             "feeds",          # RSS/Atom feeds listing (/feeds/)
@@ -64,3 +65,22 @@ class FeedsSitemap(Sitemap):
     def lastmod(self, obj):
         """Return the last modification date."""
         return obj.last_loaded
+
+
+class CollectionsSitemap(Sitemap):
+    """Sitemap for the curated /collections/<identifier>/ pages.
+
+    Only published collections are exposed — unpublished ones are admin-only
+    and must not leak via sitemaps.
+    """
+    priority = 0.6
+    changefreq = "weekly"
+
+    def items(self):
+        return Collection.objects.filter(is_published=True).order_by('name')
+
+    def location(self, obj):
+        return obj.get_absolute_url()
+
+    def lastmod(self, obj):
+        return obj.updated_at

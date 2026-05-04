@@ -87,7 +87,7 @@
       "source": 2000,
       "timeperiod_startdate": "[\"2022\"]",
       "timeperiod_enddate": "[\"2023\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 on 2023-05-15T00:00:00Z.\nHarvestingEvent ID: 3000.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 (URL: https://example.org/oai/source-2000) on 2023-05-15T00:00:00Z.\nHarvestingEvent ID: 3000.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [],
       "keywords": [],
       "topics": [],
@@ -116,7 +116,7 @@
       "source": 2001,
       "timeperiod_startdate": "[\"2020\"]",
       "timeperiod_enddate": "[\"2023\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2001 on 2024-01-10T00:00:00Z.\nHarvestingEvent ID: 3001.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via OAI-PMH from Global Source 2001 (URL: https://example.org/oai/source-2001) on 2024-01-10T00:00:00Z.\nHarvestingEvent ID: 3001.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. Single Author"
       ],
@@ -151,7 +151,7 @@
       "source": 2002,
       "timeperiod_startdate": "[\"2020\"]",
       "timeperiod_enddate": "[\"2023\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2002 on 2023-02-21T00:00:00Z.\nHarvestingEvent ID: 3002.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2002 (URL: https://example.org/oai/source-2002) on 2023-02-21T00:00:00Z.\nHarvestingEvent ID: 3002.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. First Author",
         "Prof. Second Author"
@@ -189,7 +189,7 @@
       "source": 2003,
       "timeperiod_startdate": "[\"2020\"]",
       "timeperiod_enddate": "[\"2022\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2003 on 2023-01-05T00:00:00Z.\nHarvestingEvent ID: 3003.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2003 (URL: https://example.org/oai/source-2003) on 2023-01-05T00:00:00Z.\nHarvestingEvent ID: 3003.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. Alice Smith",
         "Prof. Bob Jones",
@@ -230,7 +230,7 @@
       "source": 2000,
       "timeperiod_startdate": "[\"2022\"]",
       "timeperiod_enddate": "[\"2023\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2000 on 2023-08-29T00:00:00Z.\nHarvestingEvent ID: 3004.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via OAI-PMH from Global Source 2000 (URL: https://example.org/oai/source-2000) on 2023-08-29T00:00:00Z.\nHarvestingEvent ID: 3004.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. Maria Garcia",
         "Prof. John Smith",
@@ -269,7 +269,7 @@
       "source": 2001,
       "timeperiod_startdate": "[\"2019\"]",
       "timeperiod_enddate": "[\"2020\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2001 on 2020-11-03T00:00:00Z.\nHarvestingEvent ID: 3005.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2001 (URL: https://example.org/oai/source-2001) on 2020-11-03T00:00:00Z.\nHarvestingEvent ID: 3005.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
       "authors": [
         "Prof. A",
         "Dr. B",
@@ -314,7 +314,7 @@
       "source": 2002,
       "timeperiod_startdate": "[\"2019\"]",
       "timeperiod_enddate": "[\"2020\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2002 on 2020-04-10T00:00:00Z.\nHarvestingEvent ID: 3006.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2002 (URL: https://example.org/oai/source-2002) on 2020-04-10T00:00:00Z.\nHarvestingEvent ID: 3006.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. Zhang Wei",
         "Prof. Sarah Johnson",
@@ -354,7 +354,7 @@
       "source": 2000,
       "timeperiod_startdate": "[\"2020\"]",
       "timeperiod_enddate": "[\"2023\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2000 on 2023-09-01T00:00:00Z.\nHarvestingEvent ID: 3007.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via OAI-PMH from Global Source 2000 (URL: https://example.org/oai/source-2000) on 2023-09-01T00:00:00Z.\nHarvestingEvent ID: 3007.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [],
       "keywords": [
         "single keyword"
@@ -389,7 +389,7 @@
       "source": 2001,
       "timeperiod_startdate": "[\"2017\"]",
       "timeperiod_enddate": "[\"2020\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2001 on 2020-02-16T00:00:00Z.\nHarvestingEvent ID: 3008.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2001 (URL: https://example.org/oai/source-2001) on 2020-02-16T00:00:00Z.\nHarvestingEvent ID: 3008.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. Single Author"
       ],
@@ -423,7 +423,7 @@
       "source": 2002,
       "timeperiod_startdate": "[\"2020\"]",
       "timeperiod_enddate": "[\"2022\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2002 on 2022-10-14T00:00:00Z.\nHarvestingEvent ID: 3009.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2002 (URL: https://example.org/oai/source-2002) on 2022-10-14T00:00:00Z.\nHarvestingEvent ID: 3009.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. First Author",
         "Prof. Second Author"
@@ -461,7 +461,7 @@
       "source": 2003,
       "timeperiod_startdate": "[\"2022\"]",
       "timeperiod_enddate": "[\"2024\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2003 on 2024-01-26T00:00:00Z.\nHarvestingEvent ID: 3010.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2003 (URL: https://example.org/oai/source-2003) on 2024-01-26T00:00:00Z.\nHarvestingEvent ID: 3010.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. Alice Smith",
         "Prof. Bob Jones",
@@ -502,7 +502,7 @@
       "source": 2000,
       "timeperiod_startdate": "[\"2019\"]",
       "timeperiod_enddate": "[\"2021\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2000 on 2021-12-08T00:00:00Z.\nHarvestingEvent ID: 3011.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
+      "provenance": "Harvested via OAI-PMH from Global Source 2000 (URL: https://example.org/oai/source-2000) on 2021-12-08T00:00:00Z.\nHarvestingEvent ID: 3011.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
       "authors": [
         "Dr. Maria Garcia",
         "Prof. John Smith",
@@ -547,7 +547,7 @@
       "source": 2001,
       "timeperiod_startdate": "[\"2019\"]",
       "timeperiod_enddate": "[\"2021\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2001 on 2021-05-02T00:00:00Z.\nHarvestingEvent ID: 3012.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2001 (URL: https://example.org/oai/source-2001) on 2021-05-02T00:00:00Z.\nHarvestingEvent ID: 3012.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
       "authors": [
         "Prof. A",
         "Dr. B",
@@ -583,7 +583,7 @@
       "source": 2002,
       "timeperiod_startdate": "[\"2020\"]",
       "timeperiod_enddate": "[\"2021\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2002 on 2021-09-18T00:00:00Z.\nHarvestingEvent ID: 3013.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2002 (URL: https://example.org/oai/source-2002) on 2021-09-18T00:00:00Z.\nHarvestingEvent ID: 3013.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. Zhang Wei",
         "Prof. Sarah Johnson",
@@ -624,7 +624,7 @@
       "source": 2003,
       "timeperiod_startdate": "[\"2019\"]",
       "timeperiod_enddate": "[\"2021\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2003 on 2021-12-08T00:00:00Z.\nHarvestingEvent ID: 3014.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via OAI-PMH from Global Source 2003 (URL: https://example.org/oai/source-2003) on 2021-12-08T00:00:00Z.\nHarvestingEvent ID: 3014.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [],
       "keywords": [
         "first keyword",
@@ -659,7 +659,7 @@
       "source": 2000,
       "timeperiod_startdate": "[\"2022\"]",
       "timeperiod_enddate": "[\"2024\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 on 2024-10-29T00:00:00Z.\nHarvestingEvent ID: 3015.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 (URL: https://example.org/oai/source-2000) on 2024-10-29T00:00:00Z.\nHarvestingEvent ID: 3015.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
       "authors": [
         "Dr. Single Author"
       ],
@@ -698,7 +698,7 @@
       "source": 2001,
       "timeperiod_startdate": "[\"2018\"]",
       "timeperiod_enddate": "[\"2020\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2001 on 2020-07-23T00:00:00Z.\nHarvestingEvent ID: 3016.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2001 (URL: https://example.org/oai/source-2001) on 2020-07-23T00:00:00Z.\nHarvestingEvent ID: 3016.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
       "authors": [
         "Dr. First Author",
         "Prof. Second Author"
@@ -735,7 +735,7 @@
       "source": 2000,
       "timeperiod_startdate": "[\"2019\"]",
       "timeperiod_enddate": "[\"2021\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2000 on 2021-09-22T00:00:00Z.\nHarvestingEvent ID: 3017.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
+      "provenance": "Harvested via OAI-PMH from Global Source 2000 (URL: https://example.org/oai/source-2000) on 2021-09-22T00:00:00Z.\nHarvestingEvent ID: 3017.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
       "authors": [
         "Dr. Alice Smith",
         "Prof. Bob Jones",
@@ -777,7 +777,7 @@
       "source": 2001,
       "timeperiod_startdate": "[\"2020\"]",
       "timeperiod_enddate": "[\"2022\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2001 on 2022-01-23T00:00:00Z.\nHarvestingEvent ID: 3018.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2001 (URL: https://example.org/oai/source-2001) on 2022-01-23T00:00:00Z.\nHarvestingEvent ID: 3018.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. Maria Garcia",
         "Prof. John Smith",
@@ -814,7 +814,7 @@
       "source": 2002,
       "timeperiod_startdate": "[\"2021\"]",
       "timeperiod_enddate": "[\"2024\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2002 on 2024-07-10T00:00:00Z.\nHarvestingEvent ID: 3019.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2002 (URL: https://example.org/oai/source-2002) on 2024-07-10T00:00:00Z.\nHarvestingEvent ID: 3019.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Prof. A",
         "Dr. B",
@@ -856,7 +856,7 @@
       "source": 2003,
       "timeperiod_startdate": "[\"2021\"]",
       "timeperiod_enddate": "[\"2024\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2003 on 2024-08-23T00:00:00Z.\nHarvestingEvent ID: 3020.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2003 (URL: https://example.org/oai/source-2003) on 2024-08-23T00:00:00Z.\nHarvestingEvent ID: 3020.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. Zhang Wei",
         "Prof. Sarah Johnson",
@@ -896,7 +896,7 @@
       "source": 2000,
       "timeperiod_startdate": "[\"2023\"]",
       "timeperiod_enddate": "[\"2024\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 on 2024-07-22T00:00:00Z.\nHarvestingEvent ID: 3021.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 (URL: https://example.org/oai/source-2000) on 2024-07-22T00:00:00Z.\nHarvestingEvent ID: 3021.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
       "authors": [],
       "keywords": [
         "climate change",
@@ -931,7 +931,7 @@
       "source": 2000,
       "timeperiod_startdate": "[\"2018\"]",
       "timeperiod_enddate": "[\"2021\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 on 2021-12-04T00:00:00Z.\nHarvestingEvent ID: 3022.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 (URL: https://example.org/oai/source-2000) on 2021-12-04T00:00:00Z.\nHarvestingEvent ID: 3022.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
       "authors": [
         "Dr. Single Author"
       ],
@@ -970,7 +970,7 @@
       "source": 2001,
       "timeperiod_startdate": "[\"2017\"]",
       "timeperiod_enddate": "[\"2020\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2001 on 2020-04-24T00:00:00Z.\nHarvestingEvent ID: 3023.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2001 (URL: https://example.org/oai/source-2001) on 2020-04-24T00:00:00Z.\nHarvestingEvent ID: 3023.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. First Author",
         "Prof. Second Author"
@@ -1013,7 +1013,7 @@
       "source": 2002,
       "timeperiod_startdate": "[\"2019\"]",
       "timeperiod_enddate": "[\"2020\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2002 on 2020-12-19T00:00:00Z.\nHarvestingEvent ID: 3024.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2002 (URL: https://example.org/oai/source-2002) on 2020-12-19T00:00:00Z.\nHarvestingEvent ID: 3024.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
       "authors": [
         "Dr. Alice Smith",
         "Prof. Bob Jones",
@@ -1046,7 +1046,7 @@
       "source": 2003,
       "timeperiod_startdate": "[\"2021\"]",
       "timeperiod_enddate": "[\"2024\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2003 on 2024-10-13T00:00:00Z.\nHarvestingEvent ID: 3025.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via OAI-PMH from Global Source 2003 (URL: https://example.org/oai/source-2003) on 2024-10-13T00:00:00Z.\nHarvestingEvent ID: 3025.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. Maria Garcia",
         "Prof. John Smith",
@@ -1084,7 +1084,7 @@
       "source": 2000,
       "timeperiod_startdate": "[\"2020\"]",
       "timeperiod_enddate": "[\"2022\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 on 2022-11-29T00:00:00Z.\nHarvestingEvent ID: 3026.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 (URL: https://example.org/oai/source-2000) on 2022-11-29T00:00:00Z.\nHarvestingEvent ID: 3026.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Prof. A",
         "Dr. B",
@@ -1126,7 +1126,7 @@
       "source": 2001,
       "timeperiod_startdate": "[\"2021\"]",
       "timeperiod_enddate": "[\"2023\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2001 on 2023-04-10T00:00:00Z.\nHarvestingEvent ID: 3027.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
+      "provenance": "Harvested via OAI-PMH from Global Source 2001 (URL: https://example.org/oai/source-2001) on 2023-04-10T00:00:00Z.\nHarvestingEvent ID: 3027.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
       "authors": [
         "Dr. Zhang Wei",
         "Prof. Sarah Johnson",
@@ -1171,7 +1171,7 @@
       "source": 2002,
       "timeperiod_startdate": "[\"2019\"]",
       "timeperiod_enddate": "[\"2022\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2002 on 2022-04-02T00:00:00Z.\nHarvestingEvent ID: 3028.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
+      "provenance": "Harvested via OAI-PMH from Global Source 2002 (URL: https://example.org/oai/source-2002) on 2022-04-02T00:00:00Z.\nHarvestingEvent ID: 3028.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
       "authors": [],
       "keywords": [
         "biodiversity",
@@ -1205,7 +1205,7 @@
       "source": 2000,
       "timeperiod_startdate": "[\"2021\"]",
       "timeperiod_enddate": "[\"2022\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 on 2023-01-17T00:00:00Z.\nHarvestingEvent ID: 3029.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 (URL: https://example.org/oai/source-2000) on 2023-01-17T00:00:00Z.\nHarvestingEvent ID: 3029.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
       "authors": [
         "Dr. Single Author"
       ],
@@ -1245,7 +1245,7 @@
       "source": 2001,
       "timeperiod_startdate": "[\"2022\"]",
       "timeperiod_enddate": "[\"2024\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2001 on 2024-06-09T00:00:00Z.\nHarvestingEvent ID: 3030.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
+      "provenance": "Harvested via OAI-PMH from Global Source 2001 (URL: https://example.org/oai/source-2001) on 2024-06-09T00:00:00Z.\nHarvestingEvent ID: 3030.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
       "authors": [
         "Dr. First Author",
         "Prof. Second Author"
@@ -1280,7 +1280,7 @@
       "source": 2002,
       "timeperiod_startdate": "[\"2021\"]",
       "timeperiod_enddate": "[\"2022\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2002 on 2022-03-12T00:00:00Z.\nHarvestingEvent ID: 3031.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via OAI-PMH from Global Source 2002 (URL: https://example.org/oai/source-2002) on 2022-03-12T00:00:00Z.\nHarvestingEvent ID: 3031.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. Alice Smith",
         "Prof. Bob Jones",
@@ -1319,7 +1319,7 @@
       "source": 2003,
       "timeperiod_startdate": "[\"2019\"]",
       "timeperiod_enddate": "[\"2020\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2003 on 2020-05-22T00:00:00Z.\nHarvestingEvent ID: 3032.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via OAI-PMH from Global Source 2003 (URL: https://example.org/oai/source-2003) on 2020-05-22T00:00:00Z.\nHarvestingEvent ID: 3032.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. Maria Garcia",
         "Prof. John Smith",
@@ -1356,7 +1356,7 @@
       "source": 2000,
       "timeperiod_startdate": "[\"2017\"]",
       "timeperiod_enddate": "[\"2020\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2000 on 2020-02-02T00:00:00Z.\nHarvestingEvent ID: 3033.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via OAI-PMH from Global Source 2000 (URL: https://example.org/oai/source-2000) on 2020-02-02T00:00:00Z.\nHarvestingEvent ID: 3033.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Prof. A",
         "Dr. B",
@@ -1398,7 +1398,7 @@
       "source": 2001,
       "timeperiod_startdate": "[\"2020\"]",
       "timeperiod_enddate": "[\"2021\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2001 on 2021-02-24T00:00:00Z.\nHarvestingEvent ID: 3034.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via OAI-PMH from Global Source 2001 (URL: https://example.org/oai/source-2001) on 2021-02-24T00:00:00Z.\nHarvestingEvent ID: 3034.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. Zhang Wei",
         "Prof. Sarah Johnson",
@@ -1443,7 +1443,7 @@
       "source": 2002,
       "timeperiod_startdate": "[\"2019\"]",
       "timeperiod_enddate": "[\"2021\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2002 on 2021-04-04T00:00:00Z.\nHarvestingEvent ID: 3035.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
+      "provenance": "Harvested via OAI-PMH from Global Source 2002 (URL: https://example.org/oai/source-2002) on 2021-04-04T00:00:00Z.\nHarvestingEvent ID: 3035.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
       "authors": [],
       "keywords": [
         "urban planning",
@@ -1483,7 +1483,7 @@
       "source": 2003,
       "timeperiod_startdate": "[\"2019\"]",
       "timeperiod_enddate": "[\"2020\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2003 on 2020-11-21T00:00:00Z.\nHarvestingEvent ID: 3036.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2003 (URL: https://example.org/oai/source-2003) on 2020-11-21T00:00:00Z.\nHarvestingEvent ID: 3036.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
       "authors": [
         "Dr. Single Author"
       ],
@@ -1514,7 +1514,7 @@
       "source": 2000,
       "timeperiod_startdate": "[\"2022\"]",
       "timeperiod_enddate": "[\"2023\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2000 on 2023-12-13T00:00:00Z.\nHarvestingEvent ID: 3037.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via OAI-PMH from Global Source 2000 (URL: https://example.org/oai/source-2000) on 2023-12-13T00:00:00Z.\nHarvestingEvent ID: 3037.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. First Author",
         "Prof. Second Author"
@@ -1550,7 +1550,7 @@
       "source": 2001,
       "timeperiod_startdate": "[\"2018\"]",
       "timeperiod_enddate": "[\"2021\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2001 on 2021-08-27T00:00:00Z.\nHarvestingEvent ID: 3038.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2001 (URL: https://example.org/oai/source-2001) on 2021-08-27T00:00:00Z.\nHarvestingEvent ID: 3038.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
       "authors": [
         "Dr. Alice Smith",
         "Prof. Bob Jones",
@@ -1589,7 +1589,7 @@
       "source": 2002,
       "timeperiod_startdate": "[\"2022\"]",
       "timeperiod_enddate": "[\"2023\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2002 on 2023-01-30T00:00:00Z.\nHarvestingEvent ID: 3039.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via OAI-PMH from Global Source 2002 (URL: https://example.org/oai/source-2002) on 2023-01-30T00:00:00Z.\nHarvestingEvent ID: 3039.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. Maria Garcia",
         "Prof. John Smith",
@@ -1631,7 +1631,7 @@
       "source": 2003,
       "timeperiod_startdate": "[\"2021\"]",
       "timeperiod_enddate": "[\"2023\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2003 on 2023-09-23T00:00:00Z.\nHarvestingEvent ID: 3040.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2003 (URL: https://example.org/oai/source-2003) on 2023-09-23T00:00:00Z.\nHarvestingEvent ID: 3040.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
       "authors": [
         "Prof. A",
         "Dr. B",
@@ -1672,7 +1672,7 @@
       "source": 2000,
       "timeperiod_startdate": "[\"2019\"]",
       "timeperiod_enddate": "[\"2022\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2000 on 2022-08-08T00:00:00Z.\nHarvestingEvent ID: 3041.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via OAI-PMH from Global Source 2000 (URL: https://example.org/oai/source-2000) on 2022-08-08T00:00:00Z.\nHarvestingEvent ID: 3041.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. Zhang Wei",
         "Prof. Sarah Johnson",
@@ -1718,7 +1718,7 @@
       "source": 2001,
       "timeperiod_startdate": "[\"2019\"]",
       "timeperiod_enddate": "[\"2022\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2001 on 2022-12-31T00:00:00Z.\nHarvestingEvent ID: 3042.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via OAI-PMH from Global Source 2001 (URL: https://example.org/oai/source-2001) on 2022-12-31T00:00:00Z.\nHarvestingEvent ID: 3042.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [],
       "keywords": [],
       "topics": [
@@ -1750,7 +1750,7 @@
       "source": 2002,
       "timeperiod_startdate": "[\"2018\"]",
       "timeperiod_enddate": "[\"2021\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2002 on 2021-05-23T00:00:00Z.\nHarvestingEvent ID: 3043.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2002 (URL: https://example.org/oai/source-2002) on 2021-05-23T00:00:00Z.\nHarvestingEvent ID: 3043.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. Single Author"
       ],
@@ -1787,7 +1787,7 @@
       "source": 2003,
       "timeperiod_startdate": "[\"2021\"]",
       "timeperiod_enddate": "[\"2024\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2003 on 2024-12-05T00:00:00Z.\nHarvestingEvent ID: 3044.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
+      "provenance": "Harvested via OAI-PMH from Global Source 2003 (URL: https://example.org/oai/source-2003) on 2024-12-05T00:00:00Z.\nHarvestingEvent ID: 3044.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
       "authors": [
         "Dr. First Author",
         "Prof. Second Author"
@@ -1822,7 +1822,7 @@
       "source": 2000,
       "timeperiod_startdate": "[\"2021\"]",
       "timeperiod_enddate": "[\"2023\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 on 2023-02-11T00:00:00Z.\nHarvestingEvent ID: 3045.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 (URL: https://example.org/oai/source-2000) on 2023-02-11T00:00:00Z.\nHarvestingEvent ID: 3045.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
       "authors": [
         "Dr. Alice Smith",
         "Prof. Bob Jones",
@@ -1861,7 +1861,7 @@
       "source": 2001,
       "timeperiod_startdate": "[\"2018\"]",
       "timeperiod_enddate": "[\"2020\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2001 on 2020-07-10T00:00:00Z.\nHarvestingEvent ID: 3046.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2001 (URL: https://example.org/oai/source-2001) on 2020-07-10T00:00:00Z.\nHarvestingEvent ID: 3046.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. Maria Garcia",
         "Prof. John Smith",
@@ -1903,7 +1903,7 @@
       "source": 2002,
       "timeperiod_startdate": "[\"2017\"]",
       "timeperiod_enddate": "[\"2020\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2002 on 2020-03-18T00:00:00Z.\nHarvestingEvent ID: 3047.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via OAI-PMH from Global Source 2002 (URL: https://example.org/oai/source-2002) on 2020-03-18T00:00:00Z.\nHarvestingEvent ID: 3047.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Prof. A",
         "Dr. B",
@@ -1950,7 +1950,7 @@
       "source": 2003,
       "timeperiod_startdate": "[\"2019\"]",
       "timeperiod_enddate": "[\"2021\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2003 on 2021-08-20T00:00:00Z.\nHarvestingEvent ID: 3048.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via OAI-PMH from Global Source 2003 (URL: https://example.org/oai/source-2003) on 2021-08-20T00:00:00Z.\nHarvestingEvent ID: 3048.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. Zhang Wei",
         "Prof. Sarah Johnson",
@@ -1987,7 +1987,7 @@
       "source": 2000,
       "timeperiod_startdate": "[\"2022\"]",
       "timeperiod_enddate": "[\"2023\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 on 2023-07-04T00:00:00Z.\nHarvestingEvent ID: 3049.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 (URL: https://example.org/oai/source-2000) on 2023-07-04T00:00:00Z.\nHarvestingEvent ID: 3049.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
       "authors": [],
       "keywords": [
         "single keyword"
@@ -2020,7 +2020,7 @@
       "source": 2001,
       "timeperiod_startdate": "[\"2020\"]",
       "timeperiod_enddate": "[\"2023\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2001 on 2023-02-25T00:00:00Z.\nHarvestingEvent ID: 3050.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
+      "provenance": "Harvested via OAI-PMH from Global Source 2001 (URL: https://example.org/oai/source-2001) on 2023-02-25T00:00:00Z.\nHarvestingEvent ID: 3050.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
       "authors": [
         "Dr. Single Author"
       ],
@@ -2057,7 +2057,7 @@
       "source": 2002,
       "timeperiod_startdate": "[\"2020\"]",
       "timeperiod_enddate": "[\"2023\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2002 on 2023-09-06T00:00:00Z.\nHarvestingEvent ID: 3051.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2002 (URL: https://example.org/oai/source-2002) on 2023-09-06T00:00:00Z.\nHarvestingEvent ID: 3051.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
       "authors": [
         "Dr. First Author",
         "Prof. Second Author"
@@ -2097,7 +2097,7 @@
       "source": 2003,
       "timeperiod_startdate": "[\"2017\"]",
       "timeperiod_enddate": "[\"2020\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2003 on 2020-06-01T00:00:00Z.\nHarvestingEvent ID: 3052.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2003 (URL: https://example.org/oai/source-2003) on 2020-06-01T00:00:00Z.\nHarvestingEvent ID: 3052.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
       "authors": [
         "Dr. Alice Smith",
         "Prof. Bob Jones",
@@ -2135,7 +2135,7 @@
       "source": 2000,
       "timeperiod_startdate": "[\"2017\"]",
       "timeperiod_enddate": "[\"2020\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 on 2020-12-28T00:00:00Z.\nHarvestingEvent ID: 3053.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 (URL: https://example.org/oai/source-2000) on 2020-12-28T00:00:00Z.\nHarvestingEvent ID: 3053.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. Maria Garcia",
         "Prof. John Smith",
@@ -2178,7 +2178,7 @@
       "source": 2001,
       "timeperiod_startdate": "[\"2021\"]",
       "timeperiod_enddate": "[\"2022\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2001 on 2022-12-28T00:00:00Z.\nHarvestingEvent ID: 3054.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via OAI-PMH from Global Source 2001 (URL: https://example.org/oai/source-2001) on 2022-12-28T00:00:00Z.\nHarvestingEvent ID: 3054.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Prof. A",
         "Dr. B",
@@ -2217,7 +2217,7 @@
       "source": 2002,
       "timeperiod_startdate": "[\"2019\"]",
       "timeperiod_enddate": "[\"2020\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2002 on 2020-02-01T00:00:00Z.\nHarvestingEvent ID: 3055.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2002 (URL: https://example.org/oai/source-2002) on 2020-02-01T00:00:00Z.\nHarvestingEvent ID: 3055.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
       "authors": [
         "Dr. Zhang Wei",
         "Prof. Sarah Johnson",
@@ -2260,7 +2260,7 @@
       "source": 2003,
       "timeperiod_startdate": "[\"2017\"]",
       "timeperiod_enddate": "[\"2020\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2003 on 2021-01-02T00:00:00Z.\nHarvestingEvent ID: 3056.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via OAI-PMH from Global Source 2003 (URL: https://example.org/oai/source-2003) on 2021-01-02T00:00:00Z.\nHarvestingEvent ID: 3056.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [],
       "keywords": [
         "first keyword",
@@ -2292,7 +2292,7 @@
       "source": 2000,
       "timeperiod_startdate": "[\"2022\"]",
       "timeperiod_enddate": "[\"2023\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 on 2023-07-18T00:00:00Z.\nHarvestingEvent ID: 3057.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 (URL: https://example.org/oai/source-2000) on 2023-07-18T00:00:00Z.\nHarvestingEvent ID: 3057.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. Single Author"
       ],
@@ -2329,7 +2329,7 @@
       "source": 2001,
       "timeperiod_startdate": "[\"2020\"]",
       "timeperiod_enddate": "[\"2021\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2001 on 2021-02-16T00:00:00Z.\nHarvestingEvent ID: 3058.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via OAI-PMH from Global Source 2001 (URL: https://example.org/oai/source-2001) on 2021-02-16T00:00:00Z.\nHarvestingEvent ID: 3058.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. First Author",
         "Prof. Second Author"
@@ -2369,7 +2369,7 @@
       "source": 2000,
       "timeperiod_startdate": "[\"2018\"]",
       "timeperiod_enddate": "[\"2021\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2000 on 2021-12-30T00:00:00Z.\nHarvestingEvent ID: 3059.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
+      "provenance": "Harvested via OAI-PMH from Global Source 2000 (URL: https://example.org/oai/source-2000) on 2021-12-30T00:00:00Z.\nHarvestingEvent ID: 3059.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
       "authors": [
         "Dr. Alice Smith",
         "Prof. Bob Jones",
@@ -2413,7 +2413,7 @@
       "source": 2001,
       "timeperiod_startdate": "[\"2017\"]",
       "timeperiod_enddate": "[\"2020\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2001 on 2020-10-03T00:00:00Z.\nHarvestingEvent ID: 3060.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2001 (URL: https://example.org/oai/source-2001) on 2020-10-03T00:00:00Z.\nHarvestingEvent ID: 3060.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. Maria Garcia",
         "Prof. John Smith",
@@ -2447,7 +2447,7 @@
       "source": 2002,
       "timeperiod_startdate": "[\"2019\"]",
       "timeperiod_enddate": "[\"2020\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2002 on 2020-08-29T00:00:00Z.\nHarvestingEvent ID: 3061.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
+      "provenance": "Harvested via OAI-PMH from Global Source 2002 (URL: https://example.org/oai/source-2002) on 2020-08-29T00:00:00Z.\nHarvestingEvent ID: 3061.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
       "authors": [
         "Prof. A",
         "Dr. B",
@@ -2487,7 +2487,7 @@
       "source": 2003,
       "timeperiod_startdate": "[\"2023\"]",
       "timeperiod_enddate": "[\"2024\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2003 on 2024-11-16T00:00:00Z.\nHarvestingEvent ID: 3062.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2003 (URL: https://example.org/oai/source-2003) on 2024-11-16T00:00:00Z.\nHarvestingEvent ID: 3062.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
       "authors": [
         "Dr. Zhang Wei",
         "Prof. Sarah Johnson",
@@ -2530,7 +2530,7 @@
       "source": 2000,
       "timeperiod_startdate": "[\"2019\"]",
       "timeperiod_enddate": "[\"2021\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2000 on 2021-05-28T00:00:00Z.\nHarvestingEvent ID: 3063.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
+      "provenance": "Harvested via OAI-PMH from Global Source 2000 (URL: https://example.org/oai/source-2000) on 2021-05-28T00:00:00Z.\nHarvestingEvent ID: 3063.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
       "authors": [],
       "keywords": [
         "climate change",
@@ -2567,7 +2567,7 @@
       "source": 2000,
       "timeperiod_startdate": "[\"2020\"]",
       "timeperiod_enddate": "[\"2023\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2000 on 2023-11-13T00:00:00Z.\nHarvestingEvent ID: 3064.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
+      "provenance": "Harvested via OAI-PMH from Global Source 2000 (URL: https://example.org/oai/source-2000) on 2023-11-13T00:00:00Z.\nHarvestingEvent ID: 3064.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
       "authors": [
         "Dr. Single Author"
       ],
@@ -2603,7 +2603,7 @@
       "source": 2001,
       "timeperiod_startdate": "[\"2017\"]",
       "timeperiod_enddate": "[\"2020\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2001 on 2020-05-08T00:00:00Z.\nHarvestingEvent ID: 3065.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via OAI-PMH from Global Source 2001 (URL: https://example.org/oai/source-2001) on 2020-05-08T00:00:00Z.\nHarvestingEvent ID: 3065.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. First Author",
         "Prof. Second Author"
@@ -2644,7 +2644,7 @@
       "source": 2002,
       "timeperiod_startdate": "[\"2019\"]",
       "timeperiod_enddate": "[\"2021\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2002 on 2021-12-16T00:00:00Z.\nHarvestingEvent ID: 3066.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2002 (URL: https://example.org/oai/source-2002) on 2021-12-16T00:00:00Z.\nHarvestingEvent ID: 3066.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
       "authors": [
         "Dr. Alice Smith",
         "Prof. Bob Jones",
@@ -2680,7 +2680,7 @@
       "source": 2003,
       "timeperiod_startdate": "[\"2021\"]",
       "timeperiod_enddate": "[\"2022\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2003 on 2022-12-06T00:00:00Z.\nHarvestingEvent ID: 3067.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2003 (URL: https://example.org/oai/source-2003) on 2022-12-06T00:00:00Z.\nHarvestingEvent ID: 3067.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. Maria Garcia",
         "Prof. John Smith",
@@ -2720,7 +2720,7 @@
       "source": 2000,
       "timeperiod_startdate": "[\"2020\"]",
       "timeperiod_enddate": "[\"2022\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 on 2022-08-04T00:00:00Z.\nHarvestingEvent ID: 3068.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 (URL: https://example.org/oai/source-2000) on 2022-08-04T00:00:00Z.\nHarvestingEvent ID: 3068.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
       "authors": [
         "Prof. A",
         "Dr. B",
@@ -2759,7 +2759,7 @@
       "source": 2001,
       "timeperiod_startdate": "[\"2019\"]",
       "timeperiod_enddate": "[\"2021\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2001 on 2021-06-02T00:00:00Z.\nHarvestingEvent ID: 3069.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2001 (URL: https://example.org/oai/source-2001) on 2021-06-02T00:00:00Z.\nHarvestingEvent ID: 3069.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. Zhang Wei",
         "Prof. Sarah Johnson",
@@ -2802,7 +2802,7 @@
       "source": 2002,
       "timeperiod_startdate": "[\"2020\"]",
       "timeperiod_enddate": "[\"2021\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2002 on 2021-07-22T00:00:00Z.\nHarvestingEvent ID: 3070.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via OAI-PMH from Global Source 2002 (URL: https://example.org/oai/source-2002) on 2021-07-22T00:00:00Z.\nHarvestingEvent ID: 3070.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [],
       "keywords": [
         "biodiversity",
@@ -2839,7 +2839,7 @@
       "source": 2003,
       "timeperiod_startdate": "[\"2019\"]",
       "timeperiod_enddate": "[\"2022\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2003 on 2022-05-19T00:00:00Z.\nHarvestingEvent ID: 3071.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via OAI-PMH from Global Source 2003 (URL: https://example.org/oai/source-2003) on 2022-05-19T00:00:00Z.\nHarvestingEvent ID: 3071.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. Single Author"
       ],
@@ -2881,7 +2881,7 @@
       "source": 2000,
       "timeperiod_startdate": "[\"2020\"]",
       "timeperiod_enddate": "[\"2021\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2000 on 2021-09-05T00:00:00Z.\nHarvestingEvent ID: 3072.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via OAI-PMH from Global Source 2000 (URL: https://example.org/oai/source-2000) on 2021-09-05T00:00:00Z.\nHarvestingEvent ID: 3072.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. First Author",
         "Prof. Second Author"
@@ -2913,7 +2913,7 @@
       "source": 2001,
       "timeperiod_startdate": "[\"2020\"]",
       "timeperiod_enddate": "[\"2022\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2001 on 2022-01-29T00:00:00Z.\nHarvestingEvent ID: 3073.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
+      "provenance": "Harvested via OAI-PMH from Global Source 2001 (URL: https://example.org/oai/source-2001) on 2022-01-29T00:00:00Z.\nHarvestingEvent ID: 3073.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
       "authors": [
         "Dr. Alice Smith",
         "Prof. Bob Jones",
@@ -2950,7 +2950,7 @@
       "source": 2000,
       "timeperiod_startdate": "[\"2020\"]",
       "timeperiod_enddate": "[\"2022\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2000 on 2022-09-30T00:00:00Z.\nHarvestingEvent ID: 3074.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via OAI-PMH from Global Source 2000 (URL: https://example.org/oai/source-2000) on 2022-09-30T00:00:00Z.\nHarvestingEvent ID: 3074.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. Maria Garcia",
         "Prof. John Smith",
@@ -2990,7 +2990,7 @@
       "source": 2001,
       "timeperiod_startdate": "[\"2021\"]",
       "timeperiod_enddate": "[\"2022\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2001 on 2022-03-26T00:00:00Z.\nHarvestingEvent ID: 3075.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via OAI-PMH from Global Source 2001 (URL: https://example.org/oai/source-2001) on 2022-03-26T00:00:00Z.\nHarvestingEvent ID: 3075.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Prof. A",
         "Dr. B",
@@ -3034,7 +3034,7 @@
       "source": 2000,
       "timeperiod_startdate": "[\"2018\"]",
       "timeperiod_enddate": "[\"2021\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 on 2021-04-18T00:00:00Z.\nHarvestingEvent ID: 3076.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2000 (URL: https://example.org/oai/source-2000) on 2021-04-18T00:00:00Z.\nHarvestingEvent ID: 3076.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. Zhang Wei",
         "Prof. Sarah Johnson",
@@ -3076,7 +3076,7 @@
       "source": 2001,
       "timeperiod_startdate": "[\"2021\"]",
       "timeperiod_enddate": "[\"2022\"]",
-      "provenance": "Harvested via OAI-PMH from Global Source 2001 on 2022-12-18T00:00:00Z.\nHarvestingEvent ID: 3077.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via OAI-PMH from Global Source 2001 (URL: https://example.org/oai/source-2001) on 2022-12-18T00:00:00Z.\nHarvestingEvent ID: 3077.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [],
       "keywords": [
         "urban planning",
@@ -3114,7 +3114,7 @@
       "source": 2002,
       "timeperiod_startdate": "[\"2021\"]",
       "timeperiod_enddate": "[\"2022\"]",
-      "provenance": "Harvested via RSS/Atom feed from Global Source 2002 on 2022-02-16T00:00:00Z.\nHarvestingEvent ID: 3078.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2002 (URL: https://example.org/oai/source-2002) on 2022-02-16T00:00:00Z.\nHarvestingEvent ID: 3078.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
       "authors": [
         "Dr. Single Author"
       ],

@@ -212,10 +212,16 @@ class FetchCopernicusAbstractTests(TestCase):
 class HarvestCrossrefPrefixEndToEndTests(TestCase):
 
     def setUp(self):
+        from works.models import Collection
+        collection, _ = Collection.objects.get_or_create(
+            identifier='copernicus-publications',
+            defaults={'name': 'Copernicus Publications', 'is_published': True},
+        )
         self.source = Source.objects.create(
             name="Copernicus Crossref",
             url_field="https://api.crossref.org/works?filter=prefix:10.5194",
-            collection_name="Copernicus Publications",
+            source_type="crossref-prefix",
+            collection=collection,
             harvest_interval_minutes=60 * 24 * 7,
             publisher_name="Copernicus Publications",
             is_oa=True,

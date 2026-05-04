@@ -51,7 +51,7 @@ class GeometryContributionTests(TestCase):
             publicationDate=timezone.now().date(),
             geometry=GeometryCollection(),  # Empty geometry
             source=self.source,
-            provenance="Harvested via OAI-PMH on 2025-01-01."
+            provenance={"text_log": "Harvested via OAI-PMH from Test Journal (URL: https://example.com/oai) on 2025-01-01."}
         )
 
         # Create harvested publication with existing geometry
@@ -122,10 +122,14 @@ class GeometryContributionTests(TestCase):
         self.assertEqual(self.pub_harvested.status, 'c')  # Contributed
         self.assertFalse(self.pub_harvested.geometry.empty)
 
-        # Verify provenance
-        self.assertIn('contributor@example.com', self.pub_harvested.provenance)
-        self.assertIn('Contribution by user', self.pub_harvested.provenance)
-        self.assertIn('Status changed from Harvested to Contributed', self.pub_harvested.provenance)
+        # Verify provenance event was appended (structured JSON since 0.13.0)
+        events = self.pub_harvested.provenance.get('events', [])
+        self.assertTrue(any(
+            ev.get('type') == 'contribution'
+            and ev.get('user_email') == 'contributor@example.com'
+            and ev.get('status_from') == 'h' and ev.get('status_to') == 'c'
+            for ev in events
+        ), f"contribution event not found in {events!r}")
 
     def test_contribute_geometry_publication_not_found(self):
         """Test contribution to non-existent publication."""
@@ -276,7 +280,7 @@ class PublishWorkTests(TestCase):
             publicationDate=timezone.now().date(),
             geometry=GeometryCollection(Point(13.4050, 52.5200)),
             source=self.source,
-            provenance="Geometry contributed by user@example.com on 2025-01-01."
+            provenance={"text_log": "Geometry contributed by user@example.com on 2025-01-01."}
         )
 
         # Create harvested publication
@@ -317,10 +321,14 @@ class PublishWorkTests(TestCase):
         self.pub_contributed.refresh_from_db()
         self.assertEqual(self.pub_contributed.status, 'p')  # Published
 
-        # Verify provenance
-        self.assertIn('admin@example.com', self.pub_contributed.provenance)
-        self.assertIn('Published by admin', self.pub_contributed.provenance)
-        self.assertIn('Status changed from Contributed to Published', self.pub_contributed.provenance)
+        # Verify provenance event was appended (structured JSON since 0.13.0)
+        events = self.pub_contributed.provenance.get('events', [])
+        self.assertTrue(any(
+            ev.get('type') == 'publish'
+            and ev.get('user_email') == 'admin@example.com'
+            and ev.get('status_from') == 'c' and ev.get('status_to') == 'p'
+            for ev in events
+        ), f"publish event not found in {events!r}")
 
     def test_publish_publication_not_found(self):
         """Test publishing non-existent publication."""
@@ -368,8 +376,11 @@ class PublishWorkTests(TestCase):
         # Verify database changes
         pub_harvested_with_geo.refresh_from_db()
         self.assertEqual(pub_harvested_with_geo.status, 'p')  # Published
-        self.assertIn('Harvested', pub_harvested_with_geo.provenance)
-        self.assertIn('Published by admin', pub_harvested_with_geo.provenance)
+        events = pub_harvested_with_geo.provenance.get('events', []) if isinstance(pub_harvested_with_geo.provenance, dict) else []
+        self.assertTrue(any(
+            ev.get('type') == 'publish' and ev.get('status_from') == 'h' and ev.get('status_to') == 'p'
+            for ev in events
+        ), f"publish event not found in {events!r}")
 
 
 class WorkflowIntegrationTests(TestCase):
@@ -410,7 +421,7 @@ class WorkflowIntegrationTests(TestCase):
             publicationDate=timezone.now().date(),
             geometry=GeometryCollection(),
             source=self.source,
-            provenance="Harvested via OAI-PMH."
+            provenance={"text_log": "Harvested via OAI-PMH from Test Journal (URL: https://example.com/oai) on 2025-01-01."}
         )
 
         self.test_geometry = {
@@ -443,7 +454,11 @@ class WorkflowIntegrationTests(TestCase):
         self.work.refresh_from_db()
         self.assertEqual(self.work.status, 'c')  # Contributed
         self.assertFalse(self.work.geometry.empty)
-        self.assertIn('contributor@example.com', self.work.provenance)
+        events_after_contribute = self.work.provenance.get('events', [])
+        self.assertTrue(any(
+            ev.get('type') == 'contribution' and ev.get('user_email') == 'contributor@example.com'
+            for ev in events_after_contribute
+        ))
 
         # Step 3: Admin publishes the contribution
         self.client.login(username='admin@example.com', password='adminpass123')
@@ -454,15 +469,17 @@ class WorkflowIntegrationTests(TestCase):
         # Verify publication
         self.work.refresh_from_db()
         self.assertEqual(self.work.status, 'p')  # Published
-        self.assertIn('admin@example.com', self.work.provenance)
 
-        # Verify complete provenance trail
-        provenance = self.work.provenance
-        self.assertIn('Harvested via OAI-PMH', provenance)
-        self.assertIn('Contribution by user contributor@example.com', provenance)
-        self.assertIn('Status changed from Harvested to Contributed', provenance)
-        self.assertIn('Published by admin admin@example.com', provenance)
-        self.assertIn('Status changed from Contributed to Published', provenance)
+        # Verify complete provenance trail (legacy text seed + 2 structured events)
+        events = self.work.provenance.get('events', [])
+        self.assertTrue(any(ev.get('type') == 'contribution' for ev in events))
+        self.assertTrue(any(
+            ev.get('type') == 'publish' and ev.get('user_email') == 'admin@example.com'
+            and ev.get('status_from') == 'c' and ev.get('status_to') == 'p'
+            for ev in events
+        ))
+        # Legacy seed text from setUp() preserved under text_log.
+        self.assertIn('Harvested via OAI-PMH', self.work.provenance.get('text_log', ''))
 
 
 class UnpublishWorkTests(TestCase):
@@ -538,10 +555,14 @@ class UnpublishWorkTests(TestCase):
         self.pub_published.refresh_from_db()
         self.assertEqual(self.pub_published.status, 'd')  # Draft
 
-        # Verify provenance
-        self.assertIn('admin@example.com', self.pub_published.provenance)
-        self.assertIn('Unpublished by admin', self.pub_published.provenance)
-        self.assertIn('Status changed from Published to Draft', self.pub_published.provenance)
+        # Verify provenance event was appended (structured JSON since 0.13.0)
+        events = self.pub_published.provenance.get('events', [])
+        self.assertTrue(any(
+            ev.get('type') == 'unpublish'
+            and ev.get('user_email') == 'admin@example.com'
+            and ev.get('status_from') == 'p' and ev.get('status_to') == 'd'
+            for ev in events
+        ), f"unpublish event not found in {events!r}")
 
     def test_unpublish_wrong_status(self):
         """Test that only published publications can be unpublished."""

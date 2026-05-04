@@ -108,7 +108,14 @@ class Work(models.Model):
 
     doi = models.CharField(max_length=1024, unique=True, blank=True, null=True)
     source = models.ForeignKey('Source', on_delete=models.SET_NULL, null=True, related_name='works')
-    provenance = models.TextField(null=True, blank=True)
+    collections = models.ManyToManyField(
+        'Collection', blank=True, related_name='works',
+        help_text='Curated collections this work belongs to (e.g. mountain-wetlands, agile-gi). A work can belong to multiple collections.',
+    )
+    provenance = models.JSONField(
+        default=dict, blank=True,
+        help_text='Structured provenance: harvest details, per-field metadata sources, OpenAlex match, contribution/publish events.'
+    )
     publicationDate = models.DateField(null=True, blank=True)
     abstract = models.TextField(null=True, blank=True)
     url = models.URLField(max_length=1024, null=True, blank=True, unique=True)
@@ -415,11 +422,89 @@ class GlobalRegion(models.Model):
         else:  # OCEAN
             return reverse('optimap:feed-ocean-page', kwargs={'ocean_slug': slug})
 
+class Collection(models.Model):
+    """
+    A curated grouping of Works.
+
+    Concrete examples: a journal (`scientific-data`), a thematic dataset
+    (`mountain-wetlands`), or a community-curated series (`agile-gi`).
+
+    A Work can belong to multiple Collections (`Work.collections`, M2M).
+    A Source can be associated with a default Collection so that newly
+    harvested works are automatically tagged.
+    """
+
+    identifier = models.SlugField(
+        max_length=100, unique=True,
+        help_text='URL-safe identifier (e.g. "mountain-wetlands"). Used in /collections/<identifier>/.',
+    )
+    short_slug = models.SlugField(
+        max_length=100, unique=True, null=True, blank=True,
+        help_text='Optional vanity URL slug. If set, /<short_slug>/ 301-redirects to /collections/<identifier>/.',
+    )
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True, default='')
+    homepage_url = models.URLField(max_length=512, blank=True, null=True)
+    is_published = models.BooleanField(
+        default=False,
+        help_text='Only published collections are visible to anonymous users and listed in sitemaps.',
+    )
+    curators = models.ManyToManyField(
+        settings.AUTH_USER_MODEL, blank=True, related_name='curated_collections',
+        help_text='Users who can add/remove works to/from this collection from the work landing page.',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+    def get_absolute_url(self):
+        return reverse('optimap:collection-page', kwargs={'collection_slug': self.identifier})
+
+
 class Source(models.Model):
+    SOURCE_TYPE_CHOICES = [
+        ('oai-pmh',           'OAI-PMH (generic)'),
+        ('ojs',               'OJS (Open Journal Systems)'),
+        ('janeway',           'Janeway'),
+        ('rss',               'RSS / Atom feed'),
+        ('crossref-prefix',   'Crossref (DOI prefix)'),
+        ('mountain-wetlands', 'Mountain Wetlands Repository'),
+    ]
+
+    # Map source_type → Django-Q task path. Types not listed here cannot be auto-scheduled.
+    SOURCE_TYPE_TASKS = {
+        'oai-pmh':           'works.tasks.harvest_oai_endpoint',
+        'ojs':               'works.tasks.harvest_oai_endpoint',
+        'janeway':           'works.tasks.harvest_oai_endpoint',
+        'rss':               'works.tasks.harvest_rss_endpoint',
+        'crossref-prefix':   'works.tasks.harvest_crossref_prefix',
+        'mountain-wetlands': 'works.tasks.harvest_mountain_wetlands',
+    }
+
     url_field                = models.URLField(max_length=999)
-    harvest_interval_minutes = models.IntegerField(default=60*24*3)
+    source_type              = models.CharField(
+        max_length=32, choices=SOURCE_TYPE_CHOICES, default='oai-pmh', db_index=True,
+        help_text='Platform / API style of this source. Selects which harvester runs.',
+    )
+    harvest_interval_minutes = models.IntegerField(
+        default=0,
+        help_text='Auto-harvest interval in minutes. 0 means manual-only (run via management command or admin action).',
+    )
     last_harvest             = models.DateTimeField(auto_now_add=True, null=True)
-    collection_name          = models.CharField(max_length=255, blank=True, null=True)
+    collection               = models.ForeignKey(
+        'Collection', on_delete=models.SET_NULL, null=True, blank=True, related_name='sources',
+        help_text=(
+            'Default collection added to every work harvested from this source. '
+            'Optional — leaving this blank is not an error: harvesting still '
+            'succeeds, the works are simply not added to any collection (curators '
+            'can add them later from each work landing page).'
+        ),
+    )
     tags                     = models.CharField(max_length=1024, blank=True, null=True)
     is_preprint              = models.BooleanField(default=False)
     name                     = models.CharField(max_length=255)
@@ -457,23 +542,28 @@ class Source(models.Model):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
-        # Defer first run by one full interval; preserve existing schedule if interval is unchanged.
         schedule_name = f"Harvest Source {self.id}"
-        desired_minutes = self.harvest_interval_minutes
         existing = Schedule.objects.filter(name=schedule_name).first()
-        if existing and existing.minutes == desired_minutes:
+        task_func = self.SOURCE_TYPE_TASKS.get(self.source_type)
+        # Manual-only: no task for this source_type, or interval set to 0/negative.
+        if not task_func or self.harvest_interval_minutes <= 0:
+            if existing:
+                existing.delete()
+            return
+        # Existing schedule already matches what we want — leave it alone (preserves next_run).
+        if existing and existing.minutes == self.harvest_interval_minutes and existing.func == task_func:
             return
         if existing:
             existing.delete()
         Schedule.objects.create(
-            func='works.tasks.harvest_oai_endpoint',
+            func=task_func,
             args=str(self.id),
             schedule_type=Schedule.MINUTES,
-            minutes=desired_minutes,
-            next_run=timezone.now() + timedelta(minutes=desired_minutes),
+            minutes=self.harvest_interval_minutes,
+            next_run=timezone.now() + timedelta(minutes=self.harvest_interval_minutes),
             name=schedule_name,
         )
-        
+
 Journal = Source
 
 

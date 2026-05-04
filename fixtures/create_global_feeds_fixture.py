@@ -44,10 +44,10 @@ TOPIC_SAMPLES = [
 OPENALEX_STATUS_SAMPLES = [None, "green", "gold", "hybrid", "bronze", "closed", "diamond"]
 
 PROVENANCE_TEMPLATES = [
-    "Harvested via OAI-PMH from {source_name} on {timestamp}.\nHarvestingEvent ID: {event_id}.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
-    "Harvested via RSS/Atom feed from {source_name} on {timestamp}.\nHarvestingEvent ID: {event_id}.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
-    "Harvested via OAI-PMH from {source_name} on {timestamp}.\nHarvestingEvent ID: {event_id}.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
-    "Harvested via RSS/Atom feed from {source_name} on {timestamp}.\nHarvestingEvent ID: {event_id}.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
+    "Harvested via OAI-PMH from {source_name} (URL: {source_url}) on {timestamp}.\nHarvestingEvent ID: {event_id}.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+    "Harvested via RSS/Atom feed from {source_name} (URL: {source_url}) on {timestamp}.\nHarvestingEvent ID: {event_id}.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+    "Harvested via OAI-PMH from {source_name} (URL: {source_url}) on {timestamp}.\nHarvestingEvent ID: {event_id}.\n\nNo authors or keywords found in original source. OpenAlex matching found partial matches but no exact match.",
+    "Harvested via RSS/Atom feed from {source_name} (URL: {source_url}) on {timestamp}.\nHarvestingEvent ID: {event_id}.\n\nMetadata Sources:\n  - authors: original_source\n  - keywords: original_source\n  - topics: (none - OpenAlex match not found)",
 ]
 
 # Global region definitions with representative geometries
@@ -260,12 +260,14 @@ def create_publication(pk, source_pk, title, abstract, geometry_wkt, region_desc
 
     # Generate provenance
     source_name = f"Global Source {source_pk}"
+    source_url = f"https://example.org/oai/source-{source_pk}"
     timestamp = creation_date.isoformat() + "Z"
     provenance_template = random.choice(PROVENANCE_TEMPLATES)
     provenance = provenance_template.format(
         source_name=source_name,
+        source_url=source_url,
         timestamp=timestamp,
-        event_id=event_id + pk
+        event_id=event_id + pk,
     )
 
     return {

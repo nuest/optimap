@@ -2,7 +2,7 @@
 {# SPDX-License-Identifier: GPL-3.0-or-later #}
 
 {% extends "base.html" %}
-{% load static %}
+{% load static optimap_extras %}
 
 {% block title %}{{ work.title }}{% if work.doi %} ({{ work.doi }}){% endif %} - {% endblock %}
 
@@ -61,8 +61,8 @@
         <a class="btn btn-sm btn-outline-secondary mb-2" data-toggle="collapse" href="#provenance-details" role="button" aria-expanded="false" aria-controls="provenance-details">
           <i class="fas fa-history"></i> Show provenance information
         </a>
-        <div class="collapse mt-2 mb-3" id="provenance-details">
-          <pre style="white-space: pre-wrap; margin: 0; font-size: 0.85rem; background: rgba(255,255,255,0.5); padding: 10px; border-radius: 4px;">{{ work.provenance }}</pre>
+        <div class="collapse mt-2 mb-3" id="provenance-details" style="background: rgba(255,255,255,0.5); padding: 10px; border-radius: 4px;">
+          {% render_provenance work.provenance %}
         </div>
         {% endif %}
 
@@ -119,6 +119,45 @@
         {% endif %}
       </div>
     {% endif %}
+  </div>
+{% endif %}
+
+{% if is_curator and curator_collections %}
+  <div class="alert alert-light border" id="curator-collection-actions">
+    <div class="d-flex justify-content-between align-items-center flex-wrap">
+      <div>
+        <strong><i class="fas fa-user-edit"></i> Curator actions:</strong>
+        {% with all_memberships=work.collections.all %}
+          {% if all_memberships %}
+            currently in
+            {% for c in all_memberships %}<a href="{% url 'optimap:collection-page' c.identifier %}">{{ c.name }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}.
+          {% else %}
+            not in any collection.
+          {% endif %}
+        {% endwith %}
+      </div>
+      <div class="mt-2">
+        {% for entry in curator_collections %}
+          {% if entry.is_member %}
+            <button class="btn btn-outline-warning btn-sm collection-membership-btn"
+                    data-action="remove"
+                    data-work-id="{{ work.id }}"
+                    data-collection-id="{{ entry.collection.id }}"
+                    data-csrf="{{ csrf_token }}">
+              <i class="fas fa-minus-circle"></i> Remove from {{ entry.collection.name }}
+            </button>
+          {% else %}
+            <button class="btn btn-outline-success btn-sm collection-membership-btn"
+                    data-action="add"
+                    data-work-id="{{ work.id }}"
+                    data-collection-id="{{ entry.collection.id }}"
+                    data-csrf="{{ csrf_token }}">
+              <i class="fas fa-plus-circle"></i> Add to {{ entry.collection.name }}
+            </button>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
   </div>
 {% endif %}
 
@@ -566,6 +605,25 @@
       });
       console.log('Gazetteer search enabled on work landing page');
     }
+
+    // Curator collection-membership buttons (Add/Remove a work to/from a collection).
+    document.querySelectorAll('.collection-membership-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var action = btn.getAttribute('data-action');           // 'add' | 'remove'
+        var workId = btn.getAttribute('data-work-id');
+        var collectionId = btn.getAttribute('data-collection-id');
+        var csrf = btn.getAttribute('data-csrf');
+        btn.disabled = true;
+        fetch('/work/' + workId + '/collection/' + collectionId + '/' + action + '/', {
+          method: 'POST',
+          headers: {'X-CSRFToken': csrf, 'Accept': 'application/json'},
+          credentials: 'same-origin',
+        }).then(function (r) { return r.json(); }).then(function (data) {
+          if (data && data.success) { location.reload(); }
+          else { alert('Action failed: ' + (data && data.error ? data.error : 'unknown error')); btn.disabled = false; }
+        }).catch(function (err) { alert('Action failed: ' + err); btn.disabled = false; });
+      });
+    });
   </script>
 
 <p class="muted">

@@ -10,7 +10,7 @@ from django.utils.html import format_html
 from django.conf import settings
 from django.core.mail import send_mail
 from leaflet.admin import LeafletGeoAdmin
-from works.models import Work, Source, HarvestingEvent, BlockedEmail, BlockedDomain, GlobalRegion
+from works.models import Work, Source, HarvestingEvent, BlockedEmail, BlockedDomain, GlobalRegion, Collection
 from import_export.admin import ImportExportModelAdmin
 from works.models import Contribution, EmailLog, Subscription, UserProfile, WikidataExportLog
 from works.tasks import harvest_oai_endpoint, schedule_subscription_email_task, send_monthly_email, schedule_monthly_email_task
@@ -197,10 +197,11 @@ def regenerate_all_exports(modeladmin, request, queryset):
 class WorkAdmin(LeafletGeoAdmin, ImportExportModelAdmin):
     list_display  = ("title", "type", "doi", "has_permalink", "permalink_link",
                      "creationDate", "lastUpdate", "created_by", "updated_by",
-                     "status", "provenance", "source", "openalex_id")
-    search_fields = ("title", "doi", "abstract", "source__name", "openalex_id")
-    list_filter   = ("type", "status", "creationDate", "openalex_is_retracted", "openalex_open_access_status")
-    fields        = ("title", "type", "doi", "status", "source", "abstract",
+                     "status", "source", "collections_label", "openalex_id")
+    search_fields = ("title", "doi", "abstract", "source__name", "collections__name", "openalex_id")
+    list_filter   = ("type", "status", "creationDate", "collections", "openalex_is_retracted", "openalex_open_access_status")
+    filter_horizontal = ("collections",)
+    fields        = ("title", "type", "doi", "status", "source", "collections", "abstract",
                      "geometry", "timeperiod_startdate", "timeperiod_enddate",
                      "created_by", "updated_by", "provenance",
                      "authors", "keywords", "topics",
@@ -220,6 +221,11 @@ class WorkAdmin(LeafletGeoAdmin, ImportExportModelAdmin):
     def permalink_link(self, obj):
         url = obj.permalink()
         return format_html('<a href="{}" target="_blank">{}</a>', url, url) if url else "—"
+
+    @admin.display(description="Collections")
+    def collections_label(self, obj):
+        names = list(obj.collections.values_list('name', flat=True))
+        return ", ".join(names) if names else "—"
 
     @admin.display(description="OpenAlex Link")
     def openalex_link(self, obj):
@@ -305,6 +311,8 @@ class RecentHarvestingEventInline(admin.TabularInline):
 class SourceAdmin(admin.ModelAdmin):
     list_display = (
         "name",
+        "source_type",
+        "collection",
         "is_oa",
         "is_preprint",
         "last_harvest",
@@ -312,8 +320,8 @@ class SourceAdmin(admin.ModelAdmin):
         "latest_event_status",
         "events_count",
     )
-    list_filter = ("is_oa", "is_preprint", "default_work_type")
-    search_fields = ("name", "url_field", "issn_l", "publisher_name", "openalex_id")
+    list_filter = ("source_type", "is_oa", "is_preprint", "default_work_type", "collection")
+    search_fields = ("name", "url_field", "issn_l", "publisher_name", "openalex_id", "collection__name")
     actions = [trigger_harvesting_for_specific, trigger_harvesting_for_all, schedule_harvesting]
     inlines = [RecentHarvestingEventInline]
 
@@ -544,3 +552,49 @@ class UserAdmin(admin.ModelAdmin):
 @admin.register(GlobalRegion)
 class GlobalRegionAdmin(admin.ModelAdmin):
     """GlobalRegion Admin."""
+
+
+@admin.register(Collection)
+class CollectionAdmin(admin.ModelAdmin):
+    """Curated grouping of Works (e.g. mountain-wetlands, agile-gi)."""
+
+    list_display = ("name", "identifier", "short_slug", "is_published", "work_count", "curator_count", "source_count")
+    list_filter = ("is_published",)
+    search_fields = ("name", "identifier", "short_slug", "description")
+    prepopulated_fields = {"identifier": ("name",)}
+    filter_horizontal = ("curators",)
+    fields = (
+        "identifier",
+        "short_slug",
+        "name",
+        "description",
+        "homepage_url",
+        "is_published",
+        "curators",
+        "created_at",
+        "updated_at",
+    )
+    readonly_fields = ("created_at", "updated_at")
+    actions = ["publish_collections", "unpublish_collections"]
+
+    @admin.display(description="# works")
+    def work_count(self, obj):
+        return obj.works.count()
+
+    @admin.display(description="# curators")
+    def curator_count(self, obj):
+        return obj.curators.count()
+
+    @admin.display(description="# sources")
+    def source_count(self, obj):
+        return obj.sources.count()
+
+    @admin.action(description="Publish selected collections")
+    def publish_collections(self, request, queryset):
+        n = queryset.update(is_published=True)
+        self.message_user(request, f"Published {n} collection(s).", level=messages.SUCCESS)
+
+    @admin.action(description="Unpublish selected collections")
+    def unpublish_collections(self, request, queryset):
+        n = queryset.update(is_published=False)
+        self.message_user(request, f"Unpublished {n} collection(s).", level=messages.SUCCESS)

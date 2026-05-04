@@ -30,10 +30,13 @@ class HarvestRegularMetadataTestCase(TestCase):
             email="testuser@example.com", 
             password="password123"
         )
+        # No Collection is created here on purpose: this test exercises the
+        # "Source.collection is unset" path. Harvesting must succeed and
+        # produce works whose collections membership is empty.
         self.source = Source.objects.create(
+            name="Test Source",
             url_field="https://example.com/oai?verb=ListRecords&metadataPrefix=oai_dc",
-            collection_name="TestCollection",
-            tags="test,harvest"
+            tags="test,harvest",
         )
 
     @patch("works.tasks._oai_session")
@@ -90,6 +93,7 @@ class HarvestRegularMetadataTestCase(TestCase):
         self.assertIn("Number of added articles: 2", email.body)
         self.assertIn("Number of articles with spatial metadata: 0", email.body)
         self.assertIn("Number of articles with temporal metadata: 0", email.body)
-        self.assertIn("TestCollection", email.body)
+        # No collection set on this source — email falls back to the source name.
+        self.assertIn(self.source.name, email.body)
         self.assertIn(self.source.url_field, email.body)
         self.assertIn(event.started_at.strftime("%Y-%m-%d"), email.body)

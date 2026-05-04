@@ -134,7 +134,7 @@ class PublicationAPITest(TestCase):
             source=self.src,
             timeperiod_startdate=["2020-01-01"],
             timeperiod_enddate=["2021-01-01"],
-            provenance="Test provenance",
+            provenance={"text_log": "Test provenance"},
             status="p"
         )
 

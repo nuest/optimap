@@ -224,4 +224,7 @@ def feeds(request):
 
 def sitemap_page(request):
     """Human-readable sitemap page"""
-    return render(request, 'sitemap_page.html')
+    from works.models import Collection
+    return render(request, 'sitemap_page.html', {
+        'collections': Collection.objects.filter(is_published=True).order_by('name'),
+    })

@@ -6,14 +6,9 @@ plugin (issues #18 + #15). Hits the local development server at
 http://localhost:8000/dqj/ and is skipped automatically when that server is not
 reachable, so this file is safe to keep in the regular test suite.
 """
-import os
 import unittest
 
-import django
 import requests
-
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'optimap.settings')
-django.setup()
 
 from django.test import TestCase
 
@@ -33,6 +28,10 @@ def _janeway_available() -> bool:
     return resp.status_code == 200
 
 
+@unittest.skipUnless(
+    _janeway_available(),
+    f"Janeway dev server not reachable at {JANEWAY_OAI_URL}; start the local server to run this test",
+)
 class TestJanewayLocal(TestCase):
     """Smoke test against the local DQJ Janeway instance.
 
@@ -43,15 +42,6 @@ class TestJanewayLocal(TestCase):
       * the geo metadata signals emitted by the janeway_geometadata plugin are
         picked up by the upgraded extractor (issue #15).
     """
-
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        if not _janeway_available():
-            raise unittest.SkipTest(
-                f"Janeway dev server not reachable at {JANEWAY_OAI_URL}; "
-                "start the local server to run this test"
-            )
 
     def test_harvest_dqj_picks_up_sulawesi_geometry_and_temporal(self):
         Work.objects.all().delete()
@@ -86,16 +76,18 @@ class TestJanewayLocal(TestCase):
         self.assertEqual(sulawesi.timeperiod_startdate, [None])
         self.assertEqual(sulawesi.timeperiod_enddate, ["2024-12-31"])
 
-        # Provenance should record which signal we used. JSON-LD wins on this
-        # article; if the publisher ever drops it, "DC.SpatialCoverage" or
-        # "DC.box" would be acceptable too.
-        self.assertIn("geometry: ", sulawesi.provenance)
+        # Provenance should record which signal we used (structured JSON since 0.13.0).
+        # JSON-LD wins on this article; if the publisher ever drops it, "DC.SpatialCoverage"
+        # or "DC.box" would be acceptable too.
+        metadata_sources = sulawesi.provenance.get('metadata_sources', {})
+        geometry_label = metadata_sources.get('geometry')
+        self.assertIsNotNone(geometry_label, f"no geometry source label in {sulawesi.provenance!r}")
         self.assertTrue(
-            any(label in sulawesi.provenance for label in (
+            any(label in geometry_label for label in (
                 "schema.org JSON-LD",
                 "link rel=alternate geo+json",
                 "DC.SpatialCoverage",
                 "DC.box",
             )),
-            f"unexpected geometry provenance: {sulawesi.provenance}",
+            f"unexpected geometry provenance: {geometry_label!r}",
         )

@@ -18,11 +18,13 @@ class SimpleTest(TestCase):
         """
 
         soup = BeautifulSoup(html_doc, 'html.parser')
-        geom_object = extract_geometry_from_html(soup)
+        geom_object, source_label = extract_geometry_from_html(soup)
         self.assertEqual(geom_object.geom_type, 'GeometryCollection')
         self.assertEqual(geom_object.num_geom, 1)
         self.assertEqual(geom_object[0].geom_type, 'LineString')
         self.assertEqual(geom_object[0].num_points, 2)
+        # The DC.SpatialCoverage GeoJSON path should be the labelled source.
+        self.assertEqual(source_label, 'DC.SpatialCoverage')
 
     def test_parse_time(self):
         html_doc = """
@@ -55,8 +57,9 @@ class SimpleTest(TestCase):
         """
 
         soup = BeautifulSoup(html_doc, 'html.parser')
-        geom_object = extract_geometry_from_html(soup)
+        geom_object, source_label = extract_geometry_from_html(soup)
         period_start, period_end = extract_timeperiod_from_html(soup)
         self.assertIsNone(geom_object)
+        self.assertIsNone(source_label)
         self.assertEqual(period_start, [None])
         self.assertEqual(period_end, [None])

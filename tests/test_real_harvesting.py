@@ -65,12 +65,20 @@ class RealHarvestingTest(TestCase):
         Source.objects.filter(name__startswith="TEST: ").delete()
 
     def _create_source(self, name, url, collection_name=None):
-        """Helper to create a test source."""
+        """Helper to create a test source. ``collection_name`` arg is kept for caller
+        back-compat but is now stored as a real ``Collection`` FK."""
+        from works.models import Collection
+        from django.utils.text import slugify
+        col_name = collection_name or name
+        col, _ = Collection.objects.get_or_create(
+            identifier=slugify(col_name)[:100] or 'test-collection',
+            defaults={'name': col_name, 'is_published': True},
+        )
         return Source.objects.create(
             name=f"TEST: {name}",
             url_field=url,
-            collection_name=collection_name or name,
-            harvest_interval_minutes=60 * 24 * 7  # Weekly
+            collection=col,
+            harvest_interval_minutes=60 * 24 * 7,  # Weekly
         )
 
     def _assert_successful_harvest(self, source, min_publications=1):
@@ -213,7 +221,12 @@ class RealHarvestingTest(TestCase):
 
         # OpenAlex enrichment was attempted on every work; we look for the
         # provenance marker that the matcher actually ran successfully.
-        enriched = [p for p in pubs if 'openalex' in (p.provenance or '').lower()]
+        enriched = [
+            p for p in pubs
+            if isinstance(p.provenance, dict)
+            and any('openalex' in str(v).lower()
+                    for v in (p.provenance.get('metadata_sources') or {}).values())
+        ]
         if not enriched:
             self.skipTest(
                 "OpenAlex did not return any matches during this run "

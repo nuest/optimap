@@ -69,12 +69,13 @@ class HarvestingProvenanceTest(TestCase):
         self.assertIsNotNone(pub.created_by)
         self.assertEqual(pub.created_by.username, 'django_admin_command')
 
-        # Check provenance is set
-        self.assertIsNotNone(pub.provenance)
-        self.assertIn('Harvested via OAI-PMH', pub.provenance)
-        self.assertIn(self.source.name, pub.provenance)
-        self.assertIn(self.source.url_field, pub.provenance)
-        self.assertIn(f'HarvestingEvent ID: {self.event.id}', pub.provenance)
+        # Check provenance is set (structured JSON since 0.13.0)
+        self.assertIsInstance(pub.provenance, dict)
+        harvest = pub.provenance.get('harvest', {})
+        self.assertEqual(harvest.get('harvester'), 'harvest_oai_endpoint')
+        self.assertEqual(harvest.get('source_name'), self.source.name)
+        self.assertEqual(harvest.get('source_url'), self.source.url_field)
+        self.assertEqual(harvest.get('harvesting_event_id'), self.event.id)
 
     def test_rss_harvesting_sets_provenance(self):
         """Test that RSS/Atom harvesting sets provenance and created_by."""
@@ -94,8 +95,9 @@ class HarvestingProvenanceTest(TestCase):
         self.assertIsNotNone(pub.created_by)
         self.assertEqual(pub.created_by.username, 'django_admin_command')
 
-        # Check provenance is set
-        self.assertIsNotNone(pub.provenance)
-        self.assertIn('Harvested via RSS/Atom', pub.provenance)
-        self.assertIn(self.source.name, pub.provenance)
-        self.assertIn(f'HarvestingEvent ID: {self.event.id}', pub.provenance)
+        # Check provenance is set (structured JSON since 0.13.0)
+        self.assertIsInstance(pub.provenance, dict)
+        harvest = pub.provenance.get('harvest', {})
+        self.assertEqual(harvest.get('harvester'), 'harvest_rss_endpoint')
+        self.assertEqual(harvest.get('source_name'), self.source.name)
+        self.assertEqual(harvest.get('harvesting_event_id'), self.event.id)

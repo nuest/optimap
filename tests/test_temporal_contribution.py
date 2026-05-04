@@ -73,10 +73,16 @@ class TemporalExtentContributionTests(TestCase):
         self.assertEqual(self.pub_without_temporal.timeperiod_startdate, ['2010'])
         self.assertEqual(self.pub_without_temporal.timeperiod_enddate, ['2020'])
 
-        # Verify provenance
-        self.assertIn('contributor@example.com', self.pub_without_temporal.provenance)
-        self.assertIn('Set start date to 2010', self.pub_without_temporal.provenance)
-        self.assertIn('Set end date to 2020', self.pub_without_temporal.provenance)
+        # Verify provenance event was appended (structured JSON since 0.13.0)
+        events = self.pub_without_temporal.provenance.get('events', [])
+        contribution_events = [ev for ev in events if ev.get('type') == 'contribution']
+        self.assertTrue(contribution_events, f"no contribution events in {events!r}")
+        ev = contribution_events[-1]
+        self.assertEqual(ev.get('user_email'), 'contributor@example.com')
+        self.assertIn('temporal', ev.get('kinds') or [])
+        changes = ev.get('changes') or []
+        self.assertTrue(any('2010' in c for c in changes))
+        self.assertTrue(any('2020' in c for c in changes))
 
     def test_contribute_only_start_date(self):
         """Test contributing only start date."""

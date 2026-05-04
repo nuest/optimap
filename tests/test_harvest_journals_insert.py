@@ -77,11 +77,11 @@ class InsertSourcesTest(TestCase):
             stdout=out,
         )
         output = out.getvalue()
-        self.assertIn("not OAI-PMH", output)
+        self.assertIn("non-OAI source types", output)
         # At least one of the non-OAI keys must appear in the warning block.
         non_oai_keys = [
             k for k, c in SOURCE_CONFIG.items()
-            if c.get("feed_type", "oai-pmh") != "oai-pmh"
+            if c.get("source_type", "oai-pmh") != "oai-pmh"
         ]
         self.assertTrue(non_oai_keys, "fixture sanity: SOURCE_CONFIG must have a non-OAI entry")
         self.assertTrue(

@@ -1,12 +1,129 @@
 # SPDX-FileCopyrightText: 2022 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import json
+
 from django import template
+from django.utils.html import escape, format_html, format_html_join
+from django.utils.safestring import mark_safe
 
 register = template.Library()
+
 
 # https://stackoverflow.com/a/23783666/261210
 @register.filter
 def addstr(arg1, arg2):
     """concatenate arg1 & arg2"""
     return str(arg1) + str(arg2)
+
+
+@register.simple_tag
+def render_provenance(provenance):
+    """Render a Work.provenance JSON dict as readable HTML.
+
+    Schema: see ``works/utils/provenance.py``.
+
+    Anything we don't recognize is dumped as pretty-printed JSON at the
+    bottom so curators can still see it.
+    """
+    if not provenance:
+        return ''
+    if not isinstance(provenance, dict):
+        # Tolerate legacy text that escaped the migration.
+        return format_html('<pre class="provenance-pre">{}</pre>', provenance)
+
+    sections = []
+    harvest = provenance.get('harvest')
+    if isinstance(harvest, dict):
+        rows = []
+        for label, key in (
+            ('Harvester', 'harvester'),
+            ('Source name', 'source_name'),
+            ('Source type', 'source_type'),
+            ('Source URL', 'source_url'),
+            ('Harvested at', 'harvested_at'),
+            ('Event ID', 'harvesting_event_id'),
+            ('DOI', 'doi'),
+        ):
+            v = harvest.get(key)
+            if v is None or v == '':
+                continue
+            rows.append((label, str(v)))
+        if rows:
+            sections.append(format_html(
+                '<h6 class="mt-2 mb-1">Harvest</h6><dl class="row mb-2 small">{}</dl>',
+                format_html_join('', '<dt class="col-sm-3 text-muted">{}</dt><dd class="col-sm-9">{}</dd>', rows),
+            ))
+        if isinstance(harvest.get('original_record'), (dict, list)):
+            sections.append(format_html(
+                '<details class="small mb-2"><summary>Original record</summary>'
+                '<pre class="provenance-pre">{}</pre></details>',
+                json.dumps(harvest['original_record'], indent=2, sort_keys=True),
+            ))
+
+    metadata_sources = provenance.get('metadata_sources')
+    if isinstance(metadata_sources, dict) and metadata_sources:
+        rows = [(k, v) for k, v in sorted(metadata_sources.items())]
+        sections.append(format_html(
+            '<h6 class="mt-2 mb-1">Metadata sources</h6><dl class="row mb-2 small">{}</dl>',
+            format_html_join('', '<dt class="col-sm-3 text-muted">{}</dt><dd class="col-sm-9">{}</dd>', rows),
+        ))
+
+    openalex_match = provenance.get('openalex_match')
+    if isinstance(openalex_match, dict) and openalex_match:
+        rows = [(k, json.dumps(v) if not isinstance(v, str) else v)
+                for k, v in openalex_match.items() if k != 'top_candidate']
+        block = format_html(
+            '<h6 class="mt-2 mb-1">OpenAlex match</h6><dl class="row mb-2 small">{}</dl>',
+            format_html_join('', '<dt class="col-sm-3 text-muted">{}</dt><dd class="col-sm-9">{}</dd>', rows),
+        )
+        if openalex_match.get('top_candidate'):
+            block = format_html(
+                '{}<details class="small mb-2"><summary>Top candidate</summary>'
+                '<pre class="provenance-pre">{}</pre></details>',
+                block,
+                json.dumps(openalex_match['top_candidate'], indent=2, sort_keys=True),
+            )
+        sections.append(block)
+
+    events = provenance.get('events')
+    if isinstance(events, list) and events:
+        rows = []
+        for ev in events:
+            if not isinstance(ev, dict):
+                continue
+            kind = escape(ev.get('type', '?'))
+            at = escape(ev.get('at', ''))
+            details = {k: v for k, v in ev.items() if k not in ('type', 'at')}
+            details_html = format_html_join(
+                ' ', '<span class="text-muted">{}</span>=<code>{}</code>',
+                ((k, json.dumps(v) if not isinstance(v, str) else v) for k, v in details.items()),
+            )
+            rows.append(format_html(
+                '<li class="mb-1"><strong>{}</strong> <small class="text-muted">{}</small> {}</li>',
+                kind, at, details_html,
+            ))
+        sections.append(format_html(
+            '<h6 class="mt-2 mb-1">Events</h6><ul class="list-unstyled small">{}</ul>',
+            mark_safe(''.join(rows)),
+        ))
+
+    if 'text_log' in provenance and provenance['text_log']:
+        sections.append(format_html(
+            '<h6 class="mt-2 mb-1">Legacy text log</h6><pre class="provenance-pre">{}</pre>',
+            provenance['text_log'],
+        ))
+
+    # Anything else — show raw JSON so nothing is hidden.
+    known = {'harvest', 'metadata_sources', 'openalex_match', 'events', 'text_log'}
+    leftover = {k: v for k, v in provenance.items() if k not in known}
+    if leftover:
+        sections.append(format_html(
+            '<details class="small"><summary>Other</summary>'
+            '<pre class="provenance-pre">{}</pre></details>',
+            json.dumps(leftover, indent=2, sort_keys=True),
+        ))
+
+    if not sections:
+        return ''
+    return mark_safe('<div class="provenance-rendered">' + ''.join(sections) + '</div>')

@@ -54,9 +54,6 @@ def contribute_geometry_by_id(request, work_id):
             logger.warning("No geometry or temporal extent provided in request")
             return JsonResponse({'error': 'No geometry or temporal extent provided'}, status=400)
 
-        # Build contribution note
-        old_provenance = work.provenance or ''
-        contribution_parts = []
         changes_made = []
         spatial_contributed = False
         temporal_contributed = False
@@ -90,16 +87,18 @@ def contribute_geometry_by_id(request, work_id):
                 changes_made.append(f"Set end date to {end_date}")
                 temporal_contributed = True
 
-        # Create provenance note
-        contribution_note = (
-            f"\n\nContribution by user {request.user.username} "
-            f"({request.user.email}) on {timezone.now().isoformat()}. "
-            + ". ".join(changes_made) + ". "
-            f"Status changed from Harvested to Contributed."
-        )
-
         work.status = 'c'  # Contributed
-        work.provenance = old_provenance + contribution_note
+        from works.utils.provenance import append_event
+        append_event(
+            work,
+            "contribution",
+            user_id=request.user.id,
+            user_email=request.user.email,
+            kinds=[k for k, flag in (("spatial", spatial_contributed), ("temporal", temporal_contributed)) if flag],
+            changes=changes_made,
+            status_from="h",
+            status_to="c",
+        )
         work.save()
 
         # Record structured contribution rows for the Recognition Board / statistics.
@@ -164,15 +163,16 @@ def publish_work_by_id(request, work_id):
 
     try:
         # Update work
-        old_provenance = work.provenance or ''
-        publish_note = (
-            f"\n\nPublished by admin {request.user.username} "
-            f"({request.user.email}) on {timezone.now().isoformat()}. "
-            f"Status changed from {old_status} to Published."
-        )
-
+        from works.utils.provenance import append_event
         work.status = 'p'  # Published
-        work.provenance = old_provenance + publish_note
+        append_event(
+            work,
+            "publish",
+            user_id=request.user.id,
+            user_email=request.user.email,
+            status_from=old_status.lower()[0],
+            status_to="p",
+        )
         work.save()
 
         logger.info(
@@ -210,15 +210,16 @@ def unpublish_work_by_id(request, work_id):
 
     try:
         # Update work
-        old_provenance = work.provenance or ''
-        unpublish_note = (
-            f"\n\nUnpublished by admin {request.user.username} "
-            f"({request.user.email}) on {timezone.now().isoformat()}. "
-            f"Status changed from Published to Draft."
-        )
-
+        from works.utils.provenance import append_event
         work.status = 'd'  # Draft
-        work.provenance = old_provenance + unpublish_note
+        append_event(
+            work,
+            "unpublish",
+            user_id=request.user.id,
+            user_email=request.user.email,
+            status_from="p",
+            status_to="d",
+        )
         work.save()
 
         logger.info(

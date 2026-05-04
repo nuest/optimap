@@ -9,6 +9,7 @@ from django.shortcuts import redirect
 from works import views as work_views
 from works import views_geometry
 from works import views_feeds
+from works import views_collections
 from works import views_gazetteer
 from optimap import views as general_views
 from .feeds import GlobalGeoFeed, RegionalGeoFeed
@@ -57,6 +58,18 @@ urlpatterns = [
     path('feeds/continent/<slug:continent_slug>/', views_feeds.continent_feed_page, name='feed-continent-page'),
     path('feeds/ocean/<slug:ocean_slug>/', views_feeds.ocean_feed_page, name='feed-ocean-page'),
 
+    # Collections
+    path('collections/', views_collections.collections_index, name='collections'),
+    # ID-based URL must precede the slug pattern below — Django's <slug:>
+    # converter matches digits too, so without this ordering numeric URLs
+    # would dispatch into the slug view and 404 on the lookup.
+    path('collections/<int:collection_id>/publish/', views_collections.publish_collection, name='publish-collection'),
+    path('collections/<int:collection_id>/unpublish/', views_collections.unpublish_collection, name='unpublish-collection'),
+    path('collections/<int:collection_id>/', views_collections.collection_by_id_redirect, name='collection-by-id'),
+    path('collections/<slug:collection_slug>/', views_collections.collection_page, name='collection-page'),
+    path('work/<int:work_id>/collection/<int:collection_id>/add/', views_collections.add_work_to_collection, name='add-work-to-collection'),
+    path('work/<int:work_id>/collection/<int:collection_id>/remove/', views_collections.remove_work_from_collection, name='remove-work-from-collection'),
+
     # Data downloads
     path('download/geojson/', work_views.download_geojson, name='download_geojson'),
     path('download/geopackage/', work_views.download_geopackage, name='download_geopackage'),
@@ -101,4 +114,7 @@ urlpatterns = [
     path('feed/georss/', RedirectView.as_view(pattern_name='optimap:api-feed-georss', permanent=True), name='georss_feed'),
     path('feed/w3cgeo/', RedirectView.as_view(pattern_name='optimap:api-feed-georss', permanent=True), name='w3cgeo_feed'),
 
+    # Collection vanity short URL — must be last so the explicit patterns above win.
+    # Resolves only when a Collection has the matching short_slug; otherwise 404.
+    path('<slug:short_slug>/', views_collections.collection_short_redirect, name='collection-short-redirect'),
 ]

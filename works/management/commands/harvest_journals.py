@@ -29,7 +29,8 @@ import logging
 from django.core.management.base import BaseCommand, CommandError
 from django.contrib.auth import get_user_model
 from django.utils import timezone
-from works.models import Source, HarvestingEvent, Work
+from django.utils.text import slugify
+from works.models import Source, HarvestingEvent, Work, Collection
 from works.tasks import (
     harvest_oai_endpoint,
     harvest_rss_endpoint,
@@ -41,7 +42,7 @@ User = get_user_model()
 
 # Source configurations.
 #
-# `feed_type` selects the harvester implementation. When a source has
+# `source_type` selects the harvester implementation. When a source has
 # `enabled: False` it stays in this config (so the config is the
 # documentation) but `--all` skips it with a warning. Use `disabled_reason`
 # to explain why for `--list`.
@@ -54,7 +55,7 @@ SOURCE_CONFIG = {
         'collection_name': 'Copernicus Publications',
         'homepage_url': 'https://publications.copernicus.org/',
         'publisher_name': 'Copernicus Publications',
-        'feed_type': 'crossref-prefix',
+        'source_type': 'crossref-prefix',
         'crossref_prefix': '10.5194',
         # Default behaviour: fetch the full abstract from the journal
         # landing page rather than the Crossref-supplied <jats:p> render.
@@ -68,7 +69,7 @@ SOURCE_CONFIG = {
         'collection_name': 'ESSD',
         'homepage_url': 'https://essd.copernicus.org/',
         'publisher_name': 'Copernicus Publications',
-        'feed_type': 'oai-pmh',
+        'source_type': 'oai-pmh',
         'is_oa': True,
         'default_work_type': 'dataset',
         # Disabled: oai-pmh.copernicus.org/oai.php has been HTTP 404 since
@@ -88,7 +89,7 @@ SOURCE_CONFIG = {
         'collection_name': 'AGILE-GISS',
         'homepage_url': 'https://www.agile-giscience-series.net/',
         'publisher_name': 'Copernicus Publications',
-        'feed_type': 'oai-pmh',
+        'source_type': 'oai-pmh',
         'is_oa': True,
         'default_work_type': 'proceedings-article',
         'enabled': False,
@@ -103,7 +104,7 @@ SOURCE_CONFIG = {
         'collection_name': 'GEO-LEO',
         'homepage_url': 'https://e-docs.geo-leo.de/',
         'publisher_name': 'GEO-LEO',
-        'feed_type': 'oai-pmh',
+        'source_type': 'oai-pmh',
         'is_oa': True,
         'default_work_type': 'article',
     },
@@ -113,7 +114,7 @@ SOURCE_CONFIG = {
         'collection_name': 'EarthArXiv',
         'homepage_url': 'https://eartharxiv.org/',
         'publisher_name': 'California Digital Library',
-        'feed_type': 'oai-pmh',
+        'source_type': 'oai-pmh',
         'is_oa': True,
         'is_preprint': True,
         'default_work_type': 'preprint',
@@ -124,7 +125,7 @@ SOURCE_CONFIG = {
         'collection_name': 'Scientific Data',
         'homepage_url': 'https://www.nature.com/sdata/',
         'publisher_name': 'Nature Publishing Group',
-        'feed_type': 'rss',
+        'source_type': 'rss',
         'is_oa': True,
         'default_work_type': 'dataset',
     },
@@ -134,6 +135,24 @@ SOURCE_CONFIG = {
 def _is_enabled(config):
     """Sources without an `enabled` key default to True for back-compat."""
     return config.get('enabled', True)
+
+
+def _get_or_create_collection(config):
+    """Return the Collection matching ``config['collection_name']``, creating it on first use."""
+    name = config.get('collection_name')
+    if not name:
+        return None
+    identifier = slugify(name)[:100] or 'collection'
+    collection, _ = Collection.objects.get_or_create(
+        identifier=identifier,
+        defaults={
+            'name': name,
+            'description': '',
+            'homepage_url': config.get('homepage_url') or None,
+            'is_published': True,
+        },
+    )
+    return collection
 
 
 class Command(BaseCommand):
@@ -219,13 +238,13 @@ class Command(BaseCommand):
         if options['list']:
             self.stdout.write(self.style.SUCCESS('\nAvailable journals for harvesting:\n'))
             for key, config in SOURCE_CONFIG.items():
-                feed_type = config.get('feed_type', 'oai-pmh').upper()
+                source_type = config.get('source_type', 'oai-pmh').upper()
                 is_preprint = ' (preprint)' if config.get('is_preprint', False) else ''
                 work_type = config.get('default_work_type', 'article')
                 marker = '' if _is_enabled(config) else ' [DISABLED]'
                 self.stdout.write(f"  {key:15} - {config['name']}{is_preprint}{marker}")
                 self.stdout.write(
-                    f"                  Type: {feed_type}, Work Type: {work_type}, URL: {config['homepage_url']}"
+                    f"                  Type: {source_type}, Work Type: {work_type}, URL: {config['homepage_url']}"
                 )
                 if not _is_enabled(config) and config.get('disabled_reason'):
                     self.stdout.write(
@@ -311,15 +330,15 @@ class Command(BaseCommand):
                 # Find or create source
                 source = self._get_or_create_source(config, create_sources)
 
-                # Harvest based on feed type
+                # Harvest based on source type
                 harvest_start = timezone.now()
-                feed_type = config.get('feed_type', 'oai-pmh')
+                source_type = config.get('source_type', 'oai-pmh')
 
-                if feed_type == 'rss':
-                    self.stdout.write('Feed type: RSS/Atom')
+                if source_type == 'rss':
+                    self.stdout.write('Source type: RSS/Atom')
                     harvest_rss_endpoint(source.id, user=user, max_records=max_records)
-                elif feed_type == 'crossref-prefix':
-                    self.stdout.write('Feed type: Crossref by DOI prefix')
+                elif source_type == 'crossref-prefix':
+                    self.stdout.write('Source type: Crossref by DOI prefix')
                     if journal_titles:
                         self.stdout.write(
                             f'  Filtering to titles: {", ".join(journal_titles)}'
@@ -341,7 +360,8 @@ class Command(BaseCommand):
                         fetch_abstract_from_publisher=fetch_abstract,
                     )
                 else:
-                    self.stdout.write('Feed type: OAI-PMH')
+                    # Covers source_type in {oai-pmh, ojs, janeway} — all share the OAI harvester.
+                    self.stdout.write(f'Source type: {source_type}')
                     harvest_oai_endpoint(source.id, user=user, max_records=max_records)
 
                 # Get results
@@ -475,35 +495,35 @@ class Command(BaseCommand):
             source = Source.objects.create(
                 name=config['name'],
                 url_field=config['url'],
-                collection_name=config.get('collection_name'),
+                source_type=config.get('source_type', 'oai-pmh'),
+                collection=_get_or_create_collection(config),
                 homepage_url=config.get('homepage_url'),
                 publisher_name=config.get('publisher_name'),
                 is_oa=config.get('is_oa', False),
                 is_preprint=config.get('is_preprint', False),
                 default_work_type=config.get('default_work_type', 'article'),
-                harvest_interval_minutes=60 * 24 * 7,
+                harvest_interval_minutes=0,
             )
             self.stdout.write(self.style.SUCCESS(
                 f"+ {key:15} created (id={source.id}, name={source.name!r})"
             ))
             created += 1
-            if config.get('feed_type', 'oai-pmh') != 'oai-pmh':
-                non_oai.append((key, config['feed_type']))
+            if config.get('source_type', 'oai-pmh') != 'oai-pmh':
+                non_oai.append((key, config['source_type']))
 
         self.stdout.write('')
         self.stdout.write(self.style.SUCCESS(
             f'Done. Created: {created}, already existed: {existed}, skipped: {skipped}.'
         ))
         if non_oai:
-            self.stdout.write(self.style.WARNING(
-                '\nNote: the following inserted sources are not OAI-PMH. '
-                'The Source.save() auto-schedule and the admin "Trigger harvesting" '
-                'actions both call works.tasks.harvest_oai_endpoint, so these will '
-                'fail when triggered from the admin. Use the CLI route '
-                '(python manage.py harvest_journals --journal <key>) for them:'
-            ))
-            for key, feed_type in non_oai:
-                self.stdout.write(f"  - {key} ({feed_type})")
+            self.stdout.write(
+                '\nNote: the following inserted sources use non-OAI source types '
+                '(Source.save() dispatches to the correct task per source_type, '
+                'and harvest_interval_minutes defaults to 0 so they are not auto-scheduled — '
+                'run them via this management command):'
+            )
+            for key, source_type in non_oai:
+                self.stdout.write(f"  - {key} ({source_type})")
         self.stdout.write(self.style.SUCCESS(f'\n{"="*70}\n'))
 
     def _get_or_create_source(self, config, create_if_missing):
@@ -528,13 +548,14 @@ class Command(BaseCommand):
         source = Source.objects.create(
             name=config['name'],
             url_field=config['url'],
-            collection_name=config['collection_name'],
+            source_type=config.get('source_type', 'oai-pmh'),
+            collection=_get_or_create_collection(config),
             homepage_url=config.get('homepage_url'),
             publisher_name=config.get('publisher_name'),
             is_oa=config.get('is_oa', False),
             is_preprint=config.get('is_preprint', False),
             default_work_type=config.get('default_work_type', 'article'),
-            harvest_interval_minutes=60 * 24 * 7,  # Weekly
+            harvest_interval_minutes=0,
         )
 
         self.stdout.write(self.style.SUCCESS(

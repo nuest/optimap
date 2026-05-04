@@ -778,20 +778,17 @@ def parse_oai_xml_and_save_works(content, event: HarvestingEvent, max_records=No
                     # Get system user for harvested publications
                     admin_user = get_or_create_admin_command_user()
 
-                    # Build structured provenance including metadata sources
-                    harvest_timestamp = timezone.now().isoformat()
-                    provenance_parts = [
-                        f"Harvested via OAI-PMH from {source.name} (URL: {source.url_field}) on {harvest_timestamp}.",
-                        f"HarvestingEvent ID: {event.id}."
-                    ]
-
-                    # Add metadata source tracking
-                    if metadata_provenance:
-                        provenance_parts.append("\nMetadata Sources:")
-                        for field, source_type in metadata_provenance.items():
-                            provenance_parts.append(f"  - {field}: {source_type}")
-
-                    provenance = "\n".join(provenance_parts)
+                    provenance = {
+                        "harvest": {
+                            "harvester": "harvest_oai_endpoint",
+                            "source_url": source.url_field,
+                            "source_type": source.source_type,
+                            "source_name": source.name,
+                            "harvested_at": timezone.now().isoformat(),
+                            "harvesting_event_id": event.id,
+                        },
+                        "metadata_sources": dict(metadata_provenance or {}),
+                    }
 
                     # Set default type if not provided by OpenAlex
                     if 'type' not in openalex_fields:
@@ -814,6 +811,13 @@ def parse_oai_xml_and_save_works(content, event: HarvestingEvent, max_records=No
                         # OpenAlex fields (includes type, may override source default)
                         **openalex_fields
                     )
+                    # Propagate the harvest's source collection to the new work
+                    # (no-op when the source has no collection set). This intentionally
+                    # follows the *event's* source — the per-record ISSN/journal matching
+                    # above only refines Work.source and shouldn't change the collection
+                    # the operator configured for this harvest.
+                    if source and source.collection_id:
+                        work.collections.add(source.collection_id)
                     saved_count += 1
                     logger.info("Saved work id=%s: %s", work.id, title_value[:80] if title_value else 'No title')
             except Exception as save_err:
@@ -947,14 +951,15 @@ def harvest_oai_endpoint(source_id, user=None, max_records=None):
         event.log_text              = warning_collector.get_summary()
         event.save()
 
-        subject = f"✅ Harvesting Completed for {source.collection_name}"
+        collection_label = source.collection.name if source.collection else source.name
+        subject = f"✅ Harvesting Completed for {collection_label}"
         completed_str = event.completed_at.strftime('%Y-%m-%d %H:%M:%S')
         message = (
             f"Harvesting job details:\n\n"
             f"Number of added articles: {new_count}\n"
             f"Number of articles with spatial metadata: {spatial_count}\n"
             f"Number of articles with temporal metadata: {temporal_count}\n"
-            f"Collection used: {source.collection_name or 'N/A'}\n"
+            f"Collection used: {collection_label}\n"
             f"Journal: {source.url_field}\n"
             f"Job started at: {event.started_at.strftime('%Y-%m-%d %H:%M:%S')}\n"
             f"Job completed at: {completed_str}\n"
@@ -982,12 +987,13 @@ def harvest_oai_endpoint(source_id, user=None, max_records=None):
 
         # Send failure notification email to user
         if user and user.email:
-            failure_subject = f"❌ Harvesting Failed for {source.collection_name or source.name}"
+            collection_label = source.collection.name if source.collection else source.name
+            failure_subject = f"❌ Harvesting Failed for {collection_label}"
             failure_message = (
                 f"Unfortunately, the harvesting job failed for the following source:\n\n"
                 f"Source: {source.name}\n"
                 f"URL: {source.url_field}\n"
-                f"Collection: {source.collection_name or 'N/A'}\n"
+                f"Collection: {collection_label}\n"
                 f"Job started at: {event.started_at.strftime('%Y-%m-%d %H:%M:%S')}\n"
                 f"Job failed at: {event.completed_at.strftime('%Y-%m-%d %H:%M:%S')}\n"
                 f"Error details: {str(e)}\n\n"
@@ -1450,20 +1456,17 @@ def parse_rss_feed_and_save_publications(feed_url, event: 'HarvestingEvent', max
                 # Get system user for harvested publications
                 admin_user = get_or_create_admin_command_user()
 
-                # Build structured provenance including metadata sources
-                harvest_timestamp = timezone.now().isoformat()
-                provenance_parts = [
-                    f"Harvested via RSS/Atom feed from {source.name} (URL: {feed_url}) on {harvest_timestamp}.",
-                    f"HarvestingEvent ID: {event.id}."
-                ]
-
-                # Add metadata source tracking
-                if metadata_provenance:
-                    provenance_parts.append("\nMetadata Sources:")
-                    for field, source_type in metadata_provenance.items():
-                        provenance_parts.append(f"  - {field}: {source_type}")
-
-                provenance = "\n".join(provenance_parts)
+                provenance = {
+                    "harvest": {
+                        "harvester": "harvest_rss_endpoint",
+                        "source_url": feed_url,
+                        "source_type": source.source_type,
+                        "source_name": source.name,
+                        "harvested_at": timezone.now().isoformat(),
+                        "harvesting_event_id": event.id,
+                    },
+                    "metadata_sources": dict(metadata_provenance or {}),
+                }
 
                 # Create work
                 work = Work(
@@ -1484,6 +1487,10 @@ def parse_rss_feed_and_save_publications(feed_url, event: 'HarvestingEvent', max
                 )
 
                 work.save()
+                # Propagate the source's default collection to the new work
+                # (no-op when the source has no collection set).
+                if source and source.collection_id:
+                    work.collections.add(source.collection_id)
                 saved_count += 1
                 logger.debug("Saved work: %s", title[:50])
 
@@ -1756,7 +1763,18 @@ def _crossref_item_to_work_kwargs(
         "publicationDate": pub_date,
         "source": source,
         "job": event,
-        "provenance": "crossref:" + doi,
+        "provenance": {
+            "harvest": {
+                "harvester": "harvest_crossref_prefix",
+                "source_url": "https://api.crossref.org/works",
+                "source_type": source.source_type if source else "crossref-prefix",
+                "source_name": source.name if source else None,
+                "harvested_at": timezone.now().isoformat(),
+                "harvesting_event_id": event.id if event else None,
+                "doi": doi,
+            },
+            "metadata_sources": {"crossref": "doi"},
+        },
         "status": "p",
     }
 
@@ -1821,7 +1839,11 @@ def parse_crossref_response_and_save_works(
             if Work.objects.filter(doi=doi).exists():
                 continue
             try:
-                Work.objects.create(**kwargs)
+                work = Work.objects.create(**kwargs)
+                # Propagate the source's default collection to the new work
+                # (no-op when the source has no collection set).
+                if source and source.collection_id:
+                    work.collections.add(source.collection_id)
                 saved += 1
             except Exception as e:
                 logger.warning(

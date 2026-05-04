@@ -24,7 +24,7 @@ import time
 from math import floor
 from urllib.parse import unquote
 from django.conf import settings
-from works.models import BlockedEmail, BlockedDomain, Subscription, UserProfile, Work, GlobalRegion 
+from works.models import BlockedEmail, BlockedDomain, Subscription, UserProfile, Work, GlobalRegion, Collection
 from django.contrib.auth import get_user_model
 User = get_user_model()
 import tempfile, os
@@ -744,6 +744,25 @@ class RobotsView(View):
         response = HttpResponse(content, content_type="text/plain")
         return response
 
+def _curator_context_for(user, work):
+    """Return ``(collections_list, is_curator)`` for rendering curator buttons.
+
+    ``collections_list`` is a list of {'collection': Collection, 'is_member': bool}
+    items, one per collection the user curates. The template uses ``is_member``
+    to render either an Add or a Remove button.
+    """
+    if not user.is_authenticated:
+        return [], False
+    curated = list(user.curated_collections.all())
+    if not curated:
+        return [], False
+    work_collection_ids = set(work.collections.values_list('id', flat=True))
+    return (
+        [{'collection': c, 'is_member': (c.id in work_collection_ids)} for c in curated],
+        True,
+    )
+
+
 def _format_timeperiod(work):
     """
     Work stores timeperiod as arrays of strings.
@@ -916,6 +935,8 @@ def work_landing(request, doi):
     can_publish = is_admin and (work.status == 'c' or (work.status == 'h' and (has_geometry or has_temporal)))
     can_unpublish = is_admin and work.status == 'p'  # Can unpublish published works
 
+    curator_collections, is_curator = _curator_context_for(request.user, work)
+
     # Get most recent successful Wikidata export
     latest_wikidata_export = work.wikidata_exports.filter(
         action__in=['created', 'updated']
@@ -930,13 +951,15 @@ def work_landing(request, doi):
         "timeperiod_label": _format_timeperiod(work),
         "authors_list": _normalize_authors(work),
         "is_admin": is_admin,
+        "is_curator": is_curator,
+        "curator_collections": curator_collections,
         "status_display": work.get_status_display() if is_admin else None,
         "has_geometry": has_geometry,
         "has_temporal": has_temporal,
         "can_contribute": can_contribute,
         "can_publish": can_publish,
         "can_unpublish": can_unpublish,
-        "show_provenance": is_admin,
+        "show_provenance": is_admin or is_curator,
         "latest_wikidata_export": latest_wikidata_export,
         "all_wikidata_exports": all_wikidata_exports,
     }
@@ -985,6 +1008,8 @@ def work_landing_by_id(request, work_id):
     can_publish = is_admin and (work.status == 'c' or (work.status == 'h' and (has_geometry or has_temporal)))
     can_unpublish = is_admin and work.status == 'p'  # Can unpublish published works
 
+    curator_collections, is_curator = _curator_context_for(request.user, work)
+
     # Get most recent successful Wikidata export
     latest_wikidata_export = work.wikidata_exports.filter(
         action__in=['created', 'updated']
@@ -999,13 +1024,15 @@ def work_landing_by_id(request, work_id):
         "timeperiod_label": _format_timeperiod(work),
         "authors_list": _normalize_authors(work),
         "is_admin": is_admin,
+        "is_curator": is_curator,
+        "curator_collections": curator_collections,
         "status_display": work.get_status_display() if is_admin else None,
         "has_geometry": has_geometry,
         "has_temporal": has_temporal,
         "can_contribute": can_contribute,
         "can_publish": can_publish,
         "can_unpublish": can_unpublish,
-        "show_provenance": is_admin,
+        "show_provenance": is_admin or is_curator,
         "use_id_urls": True,  # Flag to use ID-based URLs in template
         "latest_wikidata_export": latest_wikidata_export,
         "all_wikidata_exports": all_wikidata_exports,

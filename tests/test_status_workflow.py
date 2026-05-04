@@ -216,4 +216,8 @@ class StatusWorkflowComplianceTests(TestCase):
         self.assertEqual(response.status_code, 200)
         pub.refresh_from_db()
         self.assertEqual(pub.status, 'd')  # Draft
-        self.assertIn('Status changed from Published to Draft', pub.provenance)
+        events = pub.provenance.get('events', [])
+        self.assertTrue(any(
+            ev.get('type') == 'unpublish' and ev.get('status_from') == 'p' and ev.get('status_to') == 'd'
+            for ev in events
+        ), f"unpublish event not found in {events!r}")

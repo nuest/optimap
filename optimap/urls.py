@@ -19,13 +19,14 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, re_path, include
 from django.contrib.sitemaps import views as sitemaps_views
-from optimap.sitemaps import WorksSitemap, StaticViewSitemap, FeedsSitemap
+from optimap.sitemaps import WorksSitemap, StaticViewSitemap, FeedsSitemap, CollectionsSitemap
 from optimap.views import RobotsView
 
 sitemaps = {
     "static": StaticViewSitemap,
     "works": WorksSitemap,
     "feeds": FeedsSitemap,
+    "collections": CollectionsSitemap,
 }
 
 urlpatterns = [

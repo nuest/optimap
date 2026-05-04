@@ -1,0 +1,129 @@
+{# SPDX-FileCopyrightText: 2026 OPTIMETA and KOMET projects <https://projects.tib.eu/komet> #}
+{# SPDX-License-Identifier: GPL-3.0-or-later #}
+
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Collections | {% endblock %}
+
+{% block content %}
+<div class="container-fluid locate-container">
+  <div class="row justify-content-center">
+    <div class="col-md-10 col-lg-8 py-5">
+      <h1 class="py-2">Collections</h1>
+      <p class="lead">
+        Curated groupings of works — by journal, theme, or community series.
+        Each collection has a dedicated page with map and works list.
+      </p>
+
+      {% if is_admin %}
+        <div class="alert alert-info" role="alert">
+          <i class="fas fa-user-shield"></i>
+          <strong>Admin view:</strong> unpublished collections are visible to you only.
+          Use the inline controls below for quick changes, or
+          <a href="/admin/works/collection/" class="alert-link">manage collections in admin</a>.
+        </div>
+      {% endif %}
+
+      {% if collections %}
+        <div class="list-group" id="collections-list">
+          {% for collection in collections %}
+            <div class="list-group-item" data-collection-id="{{ collection.id }}">
+              <div class="d-flex w-100 justify-content-between align-items-start">
+                <div class="flex-grow-1">
+                  <h3 class="mb-1">
+                    <a href="{% url 'optimap:collection-page' collection.identifier %}">
+                      {{ collection.name }}
+                    </a>
+                    {% if not collection.is_published %}
+                      <span class="badge badge-warning collection-status-badge">Unpublished</span>
+                    {% else %}
+                      <span class="badge badge-success collection-status-badge">Published</span>
+                    {% endif %}
+                  </h3>
+                  {% if collection.description %}
+                    <p class="mb-1 text-muted">{{ collection.description|truncatechars:240 }}</p>
+                  {% endif %}
+                  <small class="text-muted">
+                    <i class="fas fa-fingerprint"></i> {{ collection.identifier }}
+                    &middot; <i class="fas fa-file-alt"></i> {{ collection.work_count }} work{{ collection.work_count|pluralize }}
+                    {% if collection.homepage_url %}
+                      &middot; <a href="{{ collection.homepage_url }}" target="_blank" rel="noopener">homepage <i class="fas fa-external-link-alt fa-xs"></i></a>
+                    {% endif %}
+                  </small>
+                </div>
+
+                {% if is_admin %}
+                  <div class="ml-3 collection-admin-controls" style="min-width: 280px;">
+                    {% if collection.is_published %}
+                      <button class="btn btn-warning btn-sm collection-unpublish-btn"
+                              data-collection-id="{{ collection.id }}"
+                              data-csrf="{{ csrf_token }}">
+                        <i class="fas fa-eye-slash"></i> Unpublish
+                      </button>
+                    {% else %}
+                      <button class="btn btn-success btn-sm collection-publish-btn"
+                              data-collection-id="{{ collection.id }}"
+                              data-csrf="{{ csrf_token }}">
+                        <i class="fas fa-check-circle"></i> Publish
+                      </button>
+                    {% endif %}
+                    <a href="/admin/works/collection/{{ collection.id }}/change/"
+                       class="btn btn-primary btn-sm" target="_blank" rel="noopener"
+                       title="Edit, manage curators, change short slug, …">
+                      <i class="fas fa-edit"></i> Admin
+                    </a>
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="alert alert-warning" role="alert">
+          <i class="fas fa-exclamation-triangle"></i>
+          No collections yet.{% if is_admin %} Create one in <a href="/admin/works/collection/add/" class="alert-link">admin</a>.{% endif %}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock content %}
+
+{% block scripts %}
+{{ block.super }}
+{% if is_admin %}
+<script type="text/javascript">
+// Inline publish/unpublish — minimal vanilla JS, no jQuery dependency.
+(function () {
+  function postToggle(button, action) {
+    var id = button.getAttribute('data-collection-id');
+    var csrf = button.getAttribute('data-csrf');
+    button.disabled = true;
+    fetch('/collections/' + id + '/' + action + '/', {
+      method: 'POST',
+      headers: {'X-CSRFToken': csrf, 'Accept': 'application/json'},
+      credentials: 'same-origin',
+    }).then(function (r) { return r.json(); }).then(function (data) {
+      if (data && data.success) {
+        // Reload to re-render badge and button state.
+        window.location.reload();
+      } else {
+        alert('Action failed: ' + (data && data.error ? data.error : 'unknown error'));
+        button.disabled = false;
+      }
+    }).catch(function (err) {
+      alert('Action failed: ' + err);
+      button.disabled = false;
+    });
+  }
+  document.querySelectorAll('.collection-publish-btn').forEach(function (b) {
+    b.addEventListener('click', function () { postToggle(b, 'publish'); });
+  });
+  document.querySelectorAll('.collection-unpublish-btn').forEach(function (b) {
+    b.addEventListener('click', function () { postToggle(b, 'unpublish'); });
+  });
+})();
+</script>
+{% endif %}
+{% endblock scripts %}

@@ -88,9 +88,12 @@ class GeometryContributionByIdTests(TestCase):
         self.assertEqual(self.pub_without_doi.status, 'c')  # Contributed
         self.assertFalse(self.pub_without_doi.geometry.empty)
 
-        # Verify provenance
-        self.assertIn('contributor@example.com', self.pub_without_doi.provenance)
-        self.assertIn('Contribution by user', self.pub_without_doi.provenance)
+        # Verify provenance event was appended (structured JSON since 0.13.0)
+        events = self.pub_without_doi.provenance.get('events', [])
+        self.assertTrue(any(
+            ev.get('type') == 'contribution' and ev.get('user_email') == 'contributor@example.com'
+            for ev in events
+        ), f"contribution event not found in {events!r}")
 
     def test_contribute_geometry_by_id_requires_authentication(self):
         """Test that contribution by ID requires authentication."""
@@ -117,9 +120,12 @@ class GeometryContributionByIdTests(TestCase):
         self.pub_contributed_no_doi.refresh_from_db()
         self.assertEqual(self.pub_contributed_no_doi.status, 'p')  # Published
 
-        # Verify provenance
-        self.assertIn('admin@example.com', self.pub_contributed_no_doi.provenance)
-        self.assertIn('Published by admin', self.pub_contributed_no_doi.provenance)
+        # Verify provenance event was appended (structured JSON since 0.13.0)
+        events = self.pub_contributed_no_doi.provenance.get('events', [])
+        self.assertTrue(any(
+            ev.get('type') == 'publish' and ev.get('user_email') == 'admin@example.com'
+            for ev in events
+        ), f"publish event not found in {events!r}")
 
     def test_work_landing_by_id_accessible(self):
         """Test that publication landing page is accessible by ID."""
