@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Squashed Django migrations into a single `0001_initial`** in preparation for a clean redeployment. The six in-progress migration files (`0001_initial` … `0006_add_query_indexes`) carried four data-migration steps (legacy text → JSON provenance, `source_type` URL-pattern classification, `collection_name` → `Collection` FK + Work M2M backfill, orphan `Schedule` wipe) that are no-ops on fresh DBs. Local DB drop+recreate, `makemigrations` regenerates the consolidated baseline, fixtures (`test_data_partners`, `test_data_global_feeds`) and `load_global_regions` reseed; full unit-test suite still passes.
+
 ### Added
 
 - **OAI-PMH harvester auto-creates a Collection per endpoint** (issue #192, closes) — when an OAI-PMH / OJS / Janeway source is harvested for the first time and `Source.collection` is unset, the harvester now creates a `Collection` from the source name (slug derived via `slugify`, with a `-2`/`-3` suffix on collisions) and links it on the source. The new Collection starts `is_published=False` so admins can review the auto-derived name and description before exposing it on `/collections/`. Existing same-source duplicates continue to flow into the right Collection on subsequent harvests via the M2M propagation introduced earlier in this release. Lives as `works.harvesting.common.ensure_collection_for_source`.
