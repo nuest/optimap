@@ -51,7 +51,7 @@ class HarvestRegularMetadataTestCase(TestCase):
         mock_session.get.return_value = fake_response
         mock_session_factory.return_value = mock_session
 
-        def fake_parser_func(content, event, max_records=None, warning_collector=None):
+        def fake_parser_func(content, event, max_records=None, warning_collector=None, update_existing=False):
             Work.objects.create(
                 title="Test Publication 1",
                 doi="10.1000/1",

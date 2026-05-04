@@ -587,7 +587,139 @@ def extract_timeperiod_from_html(soup: BeautifulSoup):
     return [start], [end]
 
 
-def parse_oai_xml_and_save_works(content, event: HarvestingEvent, max_records=None, warning_collector=None):
+# -----------------------------------------------------------------------------
+# Harvest dedup + careful-update helpers (used by every harvester).
+#
+# Dedup is per-source: a Work that already exists *under the same Source* is
+# the trigger for either skipping or updating. A Work that exists under a
+# *different* Source is logged and skipped — OPTIMAP does not currently
+# attempt to merge metadata across sources for the same article (see
+# docs/manage.md "Deduplication and updates"). Without per-source scoping, the
+# Source.{url,doi} model uniqueness would still catch the second insert at
+# the DB level, but with an IntegrityError; the explicit pre-check is
+# cleaner and lets the caller distinguish same-source vs cross-source.
+#
+# update_existing=True opts a harvester into in-place updates instead of
+# skipping same-source duplicates. The update is *careful*:
+#   - geometry / timeperiod_startdate / timeperiod_enddate are preserved
+#     if the new harvest delivers nothing for them (the existing values
+#     may be user contributions that the source still does not provide);
+#   - status and created_by are never overwritten (curation state and
+#     audit provenance must survive re-harvest);
+#   - provenance.harvest / metadata_sources / openalex_match are refreshed
+#     from the new harvest, but provenance.events is preserved and gets
+#     a new "harvest_update" entry appended.
+# -----------------------------------------------------------------------------
+
+# Fields where the existing value should be preserved when the new harvest
+# brings nothing — these are typically populated either by the source itself
+# OR by user contributions through OPTIMAP. If the source dropped them this
+# round, we don't want to wipe a curator's contribution.
+_HARVEST_PRESERVE_IF_NEW_EMPTY = ('geometry', 'timeperiod_startdate', 'timeperiod_enddate')
+
+# Never overwritten on re-harvest — these reflect curation state that a
+# fresh harvest has no business touching.
+_HARVEST_NEVER_OVERWRITE = ('status', 'created_by', 'creationDate')
+
+
+def _is_empty_for_update(value):
+    """True when a freshly harvested field value carries no information that
+    should overwrite an existing one."""
+    if value is None:
+        return True
+    if isinstance(value, list) and not value:
+        return True
+    if hasattr(value, 'empty') and getattr(value, 'empty'):
+        return True
+    return False
+
+
+def _find_existing_work(doi=None, url=None):
+    """Return any Work matching ``doi`` or ``url`` (regardless of source).
+
+    Caller decides whether the match is a same-source duplicate (skip or
+    update) or a cross-source conflict (skip with a different log message).
+    """
+    if doi:
+        existing = Work.objects.filter(doi=doi).first()
+        if existing:
+            return existing
+    if url:
+        existing = Work.objects.filter(url=url).first()
+        if existing:
+            return existing
+    return None
+
+
+def _carefully_update_work(work, new_fields, event):
+    """Update ``work`` in place from re-harvested ``new_fields``, preserving
+    curator-added geometry / temporal metadata and the contribution audit
+    trail in ``provenance.events``.
+
+    See the module-level comment above this helper for the exact policy.
+    """
+    new_provenance = new_fields.pop('provenance', None)
+
+    for field, new_value in new_fields.items():
+        if field in _HARVEST_NEVER_OVERWRITE:
+            continue
+        if field in _HARVEST_PRESERVE_IF_NEW_EMPTY and _is_empty_for_update(new_value):
+            continue
+        setattr(work, field, new_value)
+
+    # Provenance: refresh harvest/metadata_sources/openalex_match from the
+    # new harvest, append a harvest_update event, preserve existing events.
+    existing_provenance = work.provenance if isinstance(work.provenance, dict) else {}
+    if isinstance(new_provenance, dict):
+        for key in ('harvest', 'metadata_sources', 'openalex_match'):
+            if key in new_provenance:
+                existing_provenance[key] = new_provenance[key]
+    existing_provenance.setdefault('events', []).append({
+        'type': 'harvest_update',
+        'at': timezone.now().isoformat(),
+        'harvesting_event_id': event.id if event else None,
+    })
+    work.provenance = existing_provenance
+
+    work.job = event
+    work.save()
+    return work
+
+
+def _save_or_update_work(work_kwargs, source, event, update_existing=False):
+    """Create or update a Work, applying per-source dedup.
+
+    Returns ``(work_or_none, action)`` where ``action`` is one of:
+      * ``'created'`` — new Work was inserted,
+      * ``'updated'`` — existing same-source Work was updated in place,
+      * ``'skipped_same_source'`` — same-source duplicate, ``update_existing`` was False,
+      * ``'skipped_cross_source'`` — different-source duplicate (never auto-merged).
+    """
+    doi_value = work_kwargs.get('doi')
+    url_value = work_kwargs.get('url')
+
+    existing = _find_existing_work(doi=doi_value, url=url_value)
+    if existing is not None:
+        if existing.source_id != getattr(source, 'id', None):
+            logger.info(
+                "Skipping cross-source duplicate %s — already harvested under source id=%s",
+                doi_value or url_value, existing.source_id,
+            )
+            return existing, 'skipped_cross_source'
+        if not update_existing:
+            logger.debug(
+                "Skipping same-source duplicate %s (use --update / update_existing=True to refresh)",
+                doi_value or url_value,
+            )
+            return existing, 'skipped_same_source'
+        _carefully_update_work(existing, work_kwargs, event)
+        return existing, 'updated'
+
+    work = Work.objects.create(**work_kwargs)
+    return work, 'created'
+
+
+def parse_oai_xml_and_save_works(content, event: HarvestingEvent, max_records=None, warning_collector=None, update_existing=False):
     source = event.source
     logger.info("Starting OAI-PMH parsing for source: %s", source.name)
     parsed = urlsplit(source.url_field)
@@ -677,13 +809,8 @@ def parse_oai_xml_and_save_works(content, event: HarvestingEvent, max_records=No
                     issn_text = candidate
                     break
 
-            # skip duplicates
-            if doi_text and Work.objects.filter(doi=doi_text).exists():
-                logger.debug("Skipping duplicate (DOI): %s", doi_text)
-                continue
-            if identifier_value and Work.objects.filter(url=identifier_value).exists():
-                logger.debug("Skipping duplicate (URL): %s", identifier_value)
-                continue
+            # Per-source dedup happens later in _save_or_update_work; cheap pre-check
+            # for invalid URLs avoids building unused metadata.
             if not identifier_value or not identifier_value.startswith("http"):
                 logger.debug("Skipping invalid URL: %s", identifier_value)
                 continue
@@ -794,7 +921,7 @@ def parse_oai_xml_and_save_works(content, event: HarvestingEvent, max_records=No
                     if 'type' not in openalex_fields:
                         openalex_fields['type'] = src_obj.default_work_type if src_obj else "article"
 
-                    work = Work.objects.create(
+                    work_kwargs = dict(
                         title                = title_value,
                         abstract             = abstract_text,
                         publicationDate      = date_value,
@@ -808,18 +935,24 @@ def parse_oai_xml_and_save_works(content, event: HarvestingEvent, max_records=No
                         job                  = event,
                         provenance           = provenance,
                         created_by           = admin_user,
-                        # OpenAlex fields (includes type, may override source default)
-                        **openalex_fields
+                        **openalex_fields,
                     )
-                    # Propagate the harvest's source collection to the new work
-                    # (no-op when the source has no collection set). This intentionally
-                    # follows the *event's* source — the per-record ISSN/journal matching
-                    # above only refines Work.source and shouldn't change the collection
-                    # the operator configured for this harvest.
-                    if source and source.collection_id:
-                        work.collections.add(source.collection_id)
-                    saved_count += 1
-                    logger.info("Saved work id=%s: %s", work.id, title_value[:80] if title_value else 'No title')
+                    work, action = _save_or_update_work(
+                        work_kwargs, source, event, update_existing=update_existing,
+                    )
+                    if action in ('created', 'updated'):
+                        # Propagate the harvest's source collection to the work
+                        # (no-op when the source has no collection set). The
+                        # *event's* source wins over the per-record ISSN-matched
+                        # src_obj — the operator's intent for this harvest takes
+                        # precedence over per-record source switching.
+                        if source and source.collection_id:
+                            work.collections.add(source.collection_id)
+                    if action == 'created':
+                        saved_count += 1
+                        logger.info("Saved work id=%s: %s", work.id, title_value[:80] if title_value else 'No title')
+                    elif action == 'updated':
+                        logger.info("Updated work id=%s: %s", work.id, title_value[:80] if title_value else 'No title')
             except Exception as save_err:
                 logger.error("Failed to save work '%s': %s", title_value[:80] if title_value else 'No title', save_err)
                 continue
@@ -881,7 +1014,7 @@ def _short_body(resp: requests.Response, n: int = 240) -> str:
     return text
 
 
-def harvest_oai_endpoint(source_id, user=None, max_records=None):
+def harvest_oai_endpoint(source_id, user=None, max_records=None, update_existing=False):
     # Admin actions enqueue with a user id rather than a pickled User instance.
     if isinstance(user, int):
         user = User.objects.filter(pk=user).first()
@@ -937,7 +1070,12 @@ def harvest_oai_endpoint(source_id, user=None, max_records=None):
                 f"for {oai_url}. Body preview: {_short_body(response)}"
             )
 
-        parse_oai_xml_and_save_works(response.content, event, max_records=max_records, warning_collector=warning_collector)
+        parse_oai_xml_and_save_works(
+            response.content, event,
+            max_records=max_records,
+            warning_collector=warning_collector,
+            update_existing=update_existing,
+        )
 
         new_count      = Work.objects.filter(job=event).count()
         spatial_count  = Work.objects.filter(job=event).exclude(geometry__isnull=True).count()
@@ -1309,7 +1447,7 @@ def regenerate_geopackage_cache():
 # RSS/Atom Feed Harvesting
 # ============================================================================
 
-def parse_rss_feed_and_save_publications(feed_url, event: 'HarvestingEvent', max_records=None, warning_collector=None):
+def parse_rss_feed_and_save_publications(feed_url, event: 'HarvestingEvent', max_records=None, warning_collector=None, update_existing=False):
     """
     Parse RSS/Atom feed and save publications.
 
@@ -1403,16 +1541,7 @@ def parse_rss_feed_and_save_publications(feed_url, event: 'HarvestingEvent', max
 
                 logger.debug("Processing work: %s", title[:50])
 
-                # Check for duplicates by DOI or URL
-                existing_pub = None
-                if doi:
-                    existing_pub = Work.objects.filter(doi=doi).first()
-                if not existing_pub and link:
-                    existing_pub = Work.objects.filter(url=link).first()
-
-                if existing_pub:
-                    logger.debug("Work already exists: %s", title[:50])
-                    continue
+                # Per-source dedup happens in _save_or_update_work below.
 
                 # Extract author metadata from feed
                 author = None
@@ -1468,12 +1597,11 @@ def parse_rss_feed_and_save_publications(feed_url, event: 'HarvestingEvent', max
                     "metadata_sources": dict(metadata_provenance or {}),
                 }
 
-                # Create work
-                work = Work(
+                work_kwargs = dict(
                     title=title,
                     doi=doi,
                     url=link,
-                    abstract=abstract[:5000] if abstract else None,  # Limit abstract length
+                    abstract=abstract[:5000] if abstract else None,
                     publicationDate=published_date,
                     source=source,
                     job=event,
@@ -1482,17 +1610,18 @@ def parse_rss_feed_and_save_publications(feed_url, event: 'HarvestingEvent', max
                     geometry=GeometryCollection(),  # No spatial data from RSS typically
                     provenance=provenance,
                     created_by=admin_user,
-                    # OpenAlex fields
-                    **openalex_fields
+                    **openalex_fields,
                 )
-
-                work.save()
-                # Propagate the source's default collection to the new work
-                # (no-op when the source has no collection set).
-                if source and source.collection_id:
+                work, action = _save_or_update_work(
+                    work_kwargs, source, event, update_existing=update_existing,
+                )
+                if action in ('created', 'updated') and source and source.collection_id:
                     work.collections.add(source.collection_id)
-                saved_count += 1
-                logger.debug("Saved work: %s", title[:50])
+                if action == 'created':
+                    saved_count += 1
+                    logger.debug("Saved work: %s", title[:50])
+                elif action == 'updated':
+                    logger.debug("Updated work: %s", title[:50])
 
             except Exception as e:
                 logger.error("Failed to process entry '%s': %s",
@@ -1508,7 +1637,7 @@ def parse_rss_feed_and_save_publications(feed_url, event: 'HarvestingEvent', max
         return 0, 0
 
 
-def harvest_rss_endpoint(source_id, user=None, max_records=None):
+def harvest_rss_endpoint(source_id, user=None, max_records=None, update_existing=False):
     """
     Harvest publications from an RSS/Atom feed.
 
@@ -1531,7 +1660,12 @@ def harvest_rss_endpoint(source_id, user=None, max_records=None):
         feed_url = source.url_field
         logger.info("Fetching from RSS feed: %s", feed_url)
 
-        processed, saved = parse_rss_feed_and_save_publications(feed_url, event, max_records=max_records, warning_collector=warning_collector)
+        processed, saved = parse_rss_feed_and_save_publications(
+            feed_url, event,
+            max_records=max_records,
+            warning_collector=warning_collector,
+            update_existing=update_existing,
+        )
 
         event.status = "completed"
         event.completed_at = timezone.now()
@@ -1782,7 +1916,7 @@ def _crossref_item_to_work_kwargs(
 def parse_crossref_response_and_save_works(
     source, event, prefix, journal_titles=None,
     fetch_abstract_from_publisher=True, max_records=None,
-    warning_collector=None,
+    warning_collector=None, update_existing=False,
 ):
     """Page through Crossref's ``works`` API and persist matched works.
 
@@ -1834,20 +1968,17 @@ def parse_crossref_response_and_save_works(
             )
             if not kwargs:
                 continue
-            doi = kwargs["doi"]
-            # Idempotency: skip records whose DOI we already have.
-            if Work.objects.filter(doi=doi).exists():
-                continue
             try:
-                work = Work.objects.create(**kwargs)
-                # Propagate the source's default collection to the new work
-                # (no-op when the source has no collection set).
-                if source and source.collection_id:
+                work, action = _save_or_update_work(
+                    kwargs, source, event, update_existing=update_existing,
+                )
+                if action in ('created', 'updated') and source and source.collection_id:
                     work.collections.add(source.collection_id)
-                saved += 1
+                if action == 'created':
+                    saved += 1
             except Exception as e:
                 logger.warning(
-                    "Failed to persist Crossref work %s: %s", doi, e,
+                    "Failed to persist Crossref work %s: %s", kwargs.get("doi"), e,
                 )
             if max_records and seen >= max_records:
                 return saved, seen
@@ -1864,6 +1995,7 @@ def harvest_crossref_prefix(
     source_id, user=None, max_records=None,
     journal_titles=None, prefix=None,
     fetch_abstract_from_publisher=True,
+    update_existing=False,
 ):
     """Harvest publications from Crossref by DOI prefix.
 
@@ -1905,6 +2037,7 @@ def harvest_crossref_prefix(
             fetch_abstract_from_publisher=fetch_abstract_from_publisher,
             max_records=max_records,
             warning_collector=warning_collector,
+            update_existing=update_existing,
         )
 
         event.status = "completed"
@@ -2066,6 +2199,7 @@ def _mwr_publication_year(date_str):
 
 def parse_mountain_wetlands_response_and_save_works(
     payload, source, event, max_records=None, processed_so_far=0, warning_collector=None,
+    update_existing=False,
 ):
     """Save one page of MaRESS items. Returns ``(saved, processed)`` for this page."""
     items = payload.get('data') or []
@@ -2088,9 +2222,7 @@ def parse_mountain_wetlands_response_and_save_works(
             continue
 
         item_url = _mwr_item_url(source.url_field, item_id)
-        if Work.objects.filter(url=item_url).exists():
-            logger.debug("MaRESS item already harvested, skipping: %s", item_id)
-            continue
+        # Per-source dedup happens in _save_or_update_work below.
 
         creators = item.get('creators') or []
         api_authors = _mwr_authors_list(creators)
@@ -2123,17 +2255,12 @@ def parse_mountain_wetlands_response_and_save_works(
 
         # Pull the DOI out of OpenAlex IDs when verified — issue #192 explicitly
         # asks the harvester to recover DOIs from OpenAlex by title.
+        # Per-source dedup on this DOI is handled by _save_or_update_work below.
         doi_value = None
         ids_blob = openalex_fields.get('openalex_ids') or {}
         if match_status == 'verified' and ids_blob.get('doi'):
             raw = ids_blob['doi']
             doi_value = raw.split('doi.org/', 1)[-1].lstrip('/') if 'doi.org/' in raw else raw.lstrip('/')
-            if Work.objects.filter(doi=doi_value).exists():
-                logger.info(
-                    "MaRESS item %s mapped to existing DOI %s — skipping duplicate",
-                    item_id, doi_value,
-                )
-                continue
 
         if not metadata_provenance.get('authors') and api_authors:
             metadata_provenance['authors'] = 'original_source'
@@ -2164,7 +2291,7 @@ def parse_mountain_wetlands_response_and_save_works(
             openalex_fields['type'] = source.default_work_type or 'article'
 
         try:
-            work = Work.objects.create(
+            work_kwargs = dict(
                 title=title,
                 abstract=abstract,
                 publicationDate=pub_date,
@@ -2180,13 +2307,22 @@ def parse_mountain_wetlands_response_and_save_works(
                 created_by=admin_user,
                 **openalex_fields,
             )
-            if source.collection_id:
-                work.collections.add(source.collection_id)
-            saved += 1
-            logger.info(
-                "Saved MaRESS work id=%s (%s) status=%s",
-                work.id, item_id, match_status,
+            work, action = _save_or_update_work(
+                work_kwargs, source, event, update_existing=update_existing,
             )
+            if action in ('created', 'updated') and source.collection_id:
+                work.collections.add(source.collection_id)
+            if action == 'created':
+                saved += 1
+                logger.info(
+                    "Saved MaRESS work id=%s (%s) status=%s",
+                    work.id, item_id, match_status,
+                )
+            elif action == 'updated':
+                logger.info(
+                    "Updated MaRESS work id=%s (%s) status=%s",
+                    work.id, item_id, match_status,
+                )
         except Exception as save_err:
             logger.warning("Failed to save MaRESS item %s: %s", item_id, save_err)
             continue
@@ -2194,7 +2330,7 @@ def parse_mountain_wetlands_response_and_save_works(
     return saved, processed
 
 
-def harvest_mountain_wetlands(source_id, user=None, max_records=None):
+def harvest_mountain_wetlands(source_id, user=None, max_records=None, update_existing=False):
     """Bespoke harvester for the Mountain Wetlands Repository (MaRESS API).
 
     Manual-only — the issue #192 explicitly forbids auto-scheduling. Run via
@@ -2239,6 +2375,7 @@ def harvest_mountain_wetlands(source_id, user=None, max_records=None):
                 max_records=max_records,
                 processed_so_far=total_processed,
                 warning_collector=warning_collector,
+                update_existing=update_existing,
             )
             total_saved += saved
             total_processed += processed

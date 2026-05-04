@@ -206,6 +206,19 @@ class Command(BaseCommand):
             help='Maximum number of records to harvest per journal (default: unlimited)',
         )
         parser.add_argument(
+            '--update',
+            action='store_true',
+            help=(
+                'Update same-source duplicates in place instead of skipping '
+                'them. Geometry and temporal metadata on the existing Work are '
+                'preserved if the new harvest brings nothing for those fields '
+                "(typically because they were contributed by users via "
+                'OPTIMAP, not the source). Status and created_by are never '
+                'overwritten. A "harvest_update" event is appended to '
+                'Work.provenance.events.'
+            ),
+        )
+        parser.add_argument(
             '--no-publisher-abstract',
             action='store_true',
             help=(
@@ -302,6 +315,7 @@ class Command(BaseCommand):
 
         max_records = options['max_records']
         create_sources = options['create_sources']
+        update_existing = options.get('update', False)
 
         # Summary statistics
         total_harvested = 0
@@ -345,12 +359,24 @@ class Command(BaseCommand):
                 harvest_start = timezone.now()
                 source_type = config.get('source_type', 'oai-pmh')
 
+                if update_existing:
+                    self.stdout.write(
+                        '  --update: same-source duplicates will be updated in place '
+                        '(geometry/temporal preserved when new harvest is empty).'
+                    )
+
                 if source_type == 'rss':
                     self.stdout.write('Source type: RSS/Atom')
-                    harvest_rss_endpoint(source.id, user=user, max_records=max_records)
+                    harvest_rss_endpoint(
+                        source.id, user=user, max_records=max_records,
+                        update_existing=update_existing,
+                    )
                 elif source_type == 'mountain-wetlands':
                     self.stdout.write('Source type: Mountain Wetlands Repository (MaRESS)')
-                    harvest_mountain_wetlands(source.id, user=user, max_records=max_records)
+                    harvest_mountain_wetlands(
+                        source.id, user=user, max_records=max_records,
+                        update_existing=update_existing,
+                    )
                 elif source_type == 'crossref-prefix':
                     self.stdout.write('Source type: Crossref by DOI prefix')
                     if journal_titles:
@@ -372,11 +398,15 @@ class Command(BaseCommand):
                         journal_titles=journal_titles,
                         prefix=config.get('crossref_prefix'),
                         fetch_abstract_from_publisher=fetch_abstract,
+                        update_existing=update_existing,
                     )
                 else:
                     # Covers source_type in {oai-pmh, ojs, janeway} — all share the OAI harvester.
                     self.stdout.write(f'Source type: {source_type}')
-                    harvest_oai_endpoint(source.id, user=user, max_records=max_records)
+                    harvest_oai_endpoint(
+                        source.id, user=user, max_records=max_records,
+                        update_existing=update_existing,
+                    )
 
                 # Get results
                 event = HarvestingEvent.objects.filter(source=source).latest('started_at')
