@@ -122,6 +122,14 @@ class Work(models.Model):
     )
     publicationDate = models.DateField(null=True, blank=True)
     abstract = models.TextField(null=True, blank=True)
+    # Journal-citation fields. Strings (not ints) because publishers use roman
+    # numerals, electronic locators like "e12345", and ranges with non-digit
+    # separators. Currently populated only via the OpenAlex matcher; other
+    # harvesters leave them blank.
+    volume = models.CharField(max_length=64, null=True, blank=True)
+    issue = models.CharField(max_length=64, null=True, blank=True)
+    first_page = models.CharField(max_length=64, null=True, blank=True)
+    last_page = models.CharField(max_length=64, null=True, blank=True)
     url = models.URLField(max_length=1024, null=True, blank=True, unique=True)
     geometry = models.GeometryCollectionField(
         verbose_name='Work geometry/ies', srid=4326, null=True, blank=True

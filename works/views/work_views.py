@@ -27,7 +27,7 @@ from django.urls import reverse
 from django.http import Http404, FileResponse
 from django.views.decorators.http import require_GET
 from works.models import Work
-from works.seo import build_work_meta, citation_meta_tags
+from works.seo import build_work_meta, citation_meta_tags, coins_title
 from works.services.preview_image import (
     cache_path_for as _preview_cache_path,
     render_work_preview,
@@ -282,6 +282,7 @@ def work_landing(request, identifier):
         "identifier_type": identifier_type,  # Pass to template for debugging/analytics
         "meta": build_work_meta(request, work),
         "citation_tags": citation_meta_tags(work, request),
+        "coins_ctx": coins_title(work),
         "canonical_url": request.build_absolute_uri(
             reverse("optimap:work-landing", args=[work.get_identifier()])
         ),

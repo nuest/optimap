@@ -12,9 +12,17 @@ The OPTIMAP has the following features:
 - Start page with a full screen map (showing geometries and metadata) and a time line of the areas and time periods of interest for scientific publications
 - Passwordless login via email
 - RESTful API at `/api`
+- **Multi-source harvesting**: OAI-PMH, RSS, Crossref-prefix, Janeway, and Mountain Wetlands Repository — each with per-source deduplication, careful re-harvest updates that preserve user-contributed metadata, and OpenAlex enrichment to fill gaps
+- **Curated collections**: groupings of works under a curator-managed identifier (e.g. `mountain-wetlands`), with public `/collections/<identifier>/` pages, vanity short slugs, and per-collection curator roles to add/remove works from any landing page
 - **Crowdsourced metadata contribution**: Logged-in users can contribute spatial and temporal extent data for publications
 - **Publication workflow**: Harvested → Contributed → Published status transitions with full provenance tracking
 - **Admin controls**: Publish/unpublish functionality with audit trails
+- **Recognition Board** at `/recognition-board/`: opt-in public leaderboard for contributors of spatial/temporal metadata, organised into explorer-named tiers
+- **Subscriptions**: email notifications for new works matching a region (continent / ocean / custom bbox)
+- **Regional feeds and data downloads**: per-region GeoRSS / GeoAtom feeds and full-corpus GeoJSON / GeoPackage exports refreshed every six hours
+- **Reference-manager / Zotero compatibility**: landing and collection pages emit Highwire Press `citation_*` tags, schema.org `ScholarlyArticle` JSON-LD, and a COinS fallback so the Zotero browser connector and similar tools save complete bibliographic records (with PDF when known)
+- **Sharing-friendly metadata**: Open Graph, Twitter Card, schema.org, and Google Scholar tags on landing pages, plus a per-work `og:image` map preview
+- **Geoextent service** at `/geoextent/`: interactive tool to extract spatial/temporal extents from uploaded files or remote repositories (Zenodo, PANGAEA, OSF, Figshare, Dryad, Dataverse, GFZ Data Services)
 
 ## Publication Status Workflow
 

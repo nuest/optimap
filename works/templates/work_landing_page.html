@@ -12,6 +12,8 @@
 {% endfor %}{% endblock %}
 
 {% block content %}
+{# COinS fallback for Zotero / reference-manager browser plugins. #}
+{% if coins_ctx %}<span class="Z3988" title="{{ coins_ctx }}"></span>{% endif %}
 <div class="work-landing-page">
 {% csrf_token %}
 

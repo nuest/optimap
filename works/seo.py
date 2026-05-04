@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 import re
 from typing import Iterable
-from urllib.parse import urljoin
+from urllib.parse import quote, urljoin
 
 from django.conf import settings
 from django.urls import reverse
@@ -135,7 +135,14 @@ def _build_schema_org(work, request, canonical, image, authors, keywords, descri
         payload["description"] = description
     if work.doi:
         payload["identifier"] = f"doi:{work.doi}"
-        payload["sameAs"] = f"https://doi.org/{work.doi}"
+    same_as: list[str] = []
+    if work.doi:
+        same_as.append(f"https://doi.org/{work.doi}")
+    if work.openalex_id:
+        oa = work.openalex_id
+        same_as.append(oa if oa.startswith("http") else f"https://openalex.org/{oa}")
+    if same_as:
+        payload["sameAs"] = same_as if len(same_as) > 1 else same_as[0]
     if work.publicationDate:
         payload["datePublished"] = work.publicationDate.isoformat()
     if authors:
@@ -152,12 +159,32 @@ def _build_schema_org(work, request, canonical, image, authors, keywords, descri
         if getattr(work.source, "homepage_url", None):
             publisher["url"] = work.source.homepage_url
         payload["publisher"] = publisher
-        payload["isPartOf"] = {
-            "@type": "Periodical",
-            "name": str(work.source.name),
-        }
+
+        periodical: dict = {"@type": "Periodical", "name": str(work.source.name)}
         if getattr(work.source, "issn_l", None):
-            payload["isPartOf"]["issn"] = work.source.issn_l
+            periodical["issn"] = work.source.issn_l
+
+        # Nest PublicationVolume / PublicationIssue when we have them so
+        # consumers see the full citation structure; fall back to the flat
+        # Periodical shape when neither is set.
+        is_part_of = periodical
+        if work.volume:
+            is_part_of = {
+                "@type": "PublicationVolume",
+                "volumeNumber": work.volume,
+                "isPartOf": periodical,
+            }
+        if work.issue:
+            is_part_of = {
+                "@type": "PublicationIssue",
+                "issueNumber": work.issue,
+                "isPartOf": is_part_of,
+            }
+        payload["isPartOf"] = is_part_of
+    if work.first_page:
+        payload["pageStart"] = work.first_page
+    if work.last_page:
+        payload["pageEnd"] = work.last_page
     if work.geometry and not work.geometry.empty:
         payload["spatialCoverage"] = {
             "@type": "Place",
@@ -183,11 +210,24 @@ def _format_temporal_iso(work) -> str | None:
     return f"{s or '..'}/{e or '..'}"
 
 
+def _derive_pdf_url(work) -> str | None:
+    """Return ``work.url`` when it confidently points at a PDF, else None.
+
+    Emitting a non-PDF URL as ``citation_pdf_url`` causes Zotero to attach
+    an HTML snapshot as if it were a PDF, so we err strict. (Note:
+    ``Work.openalex_fulltext_origin`` is a *type* string from OpenAlex —
+    e.g. "journal", "repository" — not a URL, so it can't be used here.)
+    """
+    if work.url and work.url.lower().endswith(".pdf"):
+        return work.url
+    return None
+
+
 def citation_meta_tags(work, request) -> list[dict]:
     """List of Google Scholar ``citation_*`` tag dicts ``{name, content}``.
     The template renders these directly because django-meta has no model
-    for Scholar tags. Repeating ``citation_author`` is intentional — Scholar
-    expects one tag per author, in order.
+    for Scholar tags. Repeating ``citation_author`` and ``citation_keywords``
+    is intentional — Scholar expects one tag per item.
     """
     tags: list[dict] = []
     if work.title:
@@ -203,11 +243,73 @@ def citation_meta_tags(work, request) -> list[dict]:
         tags.append({"name": "citation_doi", "content": work.doi})
     canonical = _abs(request, reverse("optimap:work-landing", args=[work.get_identifier()]))
     tags.append({"name": "citation_abstract_html_url", "content": canonical})
+    if work.abstract:
+        tags.append({"name": "citation_abstract", "content": work.abstract})
     if work.source and getattr(work.source, "name", None):
         tags.append({"name": "citation_journal_title", "content": str(work.source.name)})
+        tags.append({"name": "citation_publisher", "content": str(work.source.name)})
     if work.source and getattr(work.source, "issn_l", None):
         tags.append({"name": "citation_issn", "content": work.source.issn_l})
+    if work.volume:
+        tags.append({"name": "citation_volume", "content": work.volume})
+    if work.issue:
+        tags.append({"name": "citation_issue", "content": work.issue})
+    if work.first_page:
+        tags.append({"name": "citation_firstpage", "content": work.first_page})
+    if work.last_page:
+        tags.append({"name": "citation_lastpage", "content": work.last_page})
+    keywords: list[str] = []
+    if work.keywords:
+        keywords.extend(k for k in work.keywords if k)
+    if work.topics:
+        keywords.extend(t for t in work.topics if t)
+    for kw in keywords:
+        tags.append({"name": "citation_keywords", "content": kw})
+    tags.append({"name": "citation_language", "content": "en"})
+    pdf_url = _derive_pdf_url(work)
+    if pdf_url:
+        tags.append({"name": "citation_pdf_url", "content": pdf_url})
     return tags
+
+
+def coins_title(work) -> str | None:
+    """Return the value for a COinS ``<span class="Z3988" title="…">`` for
+    this work, or ``None`` when the work has no title.
+
+    COinS encodes one OpenURL kev/mtx context object as a single URL-encoded
+    query string. Zotero (and other reference managers) read it as a
+    fallback when the richer Embedded Metadata translator finds nothing —
+    or to enable multi-item save on list pages.
+    """
+    if not work.title:
+        return None
+
+    pairs: list[tuple[str, str]] = [
+        ("ctx_ver", "Z39.88-2004"),
+        ("rft_val_fmt", "info:ofi/fmt:kev:mtx:journal"),
+        ("rft.genre", "article"),
+        ("rft.atitle", work.title),
+    ]
+    for author in _normalize_author_list(work):
+        pairs.append(("rft.au", author))
+    if work.publicationDate:
+        pairs.append(("rft.date", work.publicationDate.isoformat()))
+    if work.source and getattr(work.source, "name", None):
+        pairs.append(("rft.jtitle", str(work.source.name)))
+    if work.source and getattr(work.source, "issn_l", None):
+        pairs.append(("rft.issn", work.source.issn_l))
+    if work.volume:
+        pairs.append(("rft.volume", work.volume))
+    if work.issue:
+        pairs.append(("rft.issue", work.issue))
+    if work.first_page:
+        pairs.append(("rft.spage", work.first_page))
+    if work.last_page:
+        pairs.append(("rft.epage", work.last_page))
+    if work.doi:
+        pairs.append(("rft_id", f"info:doi/{work.doi}"))
+
+    return "&".join(f"{k}={quote(v, safe='')}" for k, v in pairs)
 
 
 def build_homepage_meta(request) -> Meta:

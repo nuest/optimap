@@ -22,6 +22,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from .models import Collection, Work
+from .seo import coins_title
 from .views_feeds import _publications_to_geojson
 
 logger = logging.getLogger(__name__)
@@ -76,6 +77,8 @@ def collection_page(request, collection_slug):
     if not is_admin:
         works_qs = works_qs.filter(status='p')
     works = list(works_qs.order_by('-creationDate', '-id')[: settings.FEED_MAX_ITEMS])
+    for w in works:
+        w.coins_ctx = coins_title(w)
 
     context = {
         'collection': collection,

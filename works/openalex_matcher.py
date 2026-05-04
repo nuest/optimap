@@ -194,8 +194,19 @@ class OpenAlexMatcher:
             'keywords': [],
             'openalex_open_access_status': None,
             'topics': [],
-            'authors': []
+            'authors': [],
+            'volume': None,
+            'issue': None,
+            'first_page': None,
+            'last_page': None,
         }
+
+        biblio = work_data.get('biblio') or {}
+        if isinstance(biblio, dict):
+            for k in ('volume', 'issue', 'first_page', 'last_page'):
+                v = biblio.get(k)
+                if v not in (None, ''):
+                    extracted[k] = str(v)[:64]
 
         # Extract authors (display_name from authorships)
         authorships = work_data.get('authorships', [])

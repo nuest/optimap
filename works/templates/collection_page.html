@@ -82,6 +82,7 @@
         <div class="publication-grid">
           {% for work in works %}
             <div class="card locate-card">
+              {% if work.coins_ctx %}<span class="Z3988" title="{{ work.coins_ctx }}"></span>{% endif %}
               <div class="card-body">
                 <h5 class="card-title">
                   {% if work.doi %}

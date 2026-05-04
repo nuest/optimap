@@ -77,6 +77,14 @@ class CollectionDetailPageTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, 'A study')
 
+    def test_collection_renders_coins_span_per_work(self):
+        # Issue #243: per-item COinS spans let Zotero offer multi-item save.
+        resp = self.client.get(reverse('optimap:collection-page', args=['mw']))
+        self.assertEqual(resp.status_code, 200)
+        body = resp.content.decode()
+        self.assertEqual(body.count('class="Z3988"'), 1)
+        self.assertIn(f"rft_id=info%3Adoi%2F{self.work.doi.replace('/', '%2F')}", body)
+
     def test_unpublished_collection_404_for_anonymous(self):
         self.col.is_published = False
         self.col.save(update_fields=['is_published'])

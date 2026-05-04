@@ -1,13 +1,18 @@
 # SPDX-FileCopyrightText: 2026 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""SEO tests for issue #22.
+"""SEO + Zotero / reference-manager compatibility tests (issues #22, #243).
 
 Covers Open Graph / Twitter Card / schema.org JSON-LD / Google Scholar
 ``citation_*`` tags on the work landing page, ``WebSite`` / ``SearchAction``
-JSON-LD on the homepage, ``CollectionPage`` JSON-LD on feed pages, and the
-preview-image generator + cache invalidation. Avoids the network: the
-preview renderer is monkey-patched to skip OSM tile fetches.
+JSON-LD on the homepage, ``CollectionPage`` JSON-LD on feed pages, the
+preview-image generator + cache invalidation, and the Zotero-targeted
+extensions (full ``citation_abstract``, ``citation_publisher``,
+``citation_language``, repeated ``citation_keywords``, ``citation_pdf_url``,
+journal-citation fields, nested ``PublicationIssue`` / ``PublicationVolume``
+JSON-LD, OpenAlex/permalink ``sameAs`` linkbacks, and the COinS Z3988 span).
+Avoids the network: the preview renderer is monkey-patched to skip OSM tile
+fetches.
 """
 
 from __future__ import annotations
@@ -179,6 +184,98 @@ class WorkLandingSEOTests(TestCase):
         ]
         self.assertEqual(len(authors), 2)
         self.assertEqual(authors[0], "Mariana Sontag-Gonzalez")
+
+    def test_citation_meta_tags_for_zotero(self):
+        """Issue #243: tags Zotero's Embedded Metadata translator reads."""
+        # Populate journal-citation fields and re-fetch.
+        self.work.volume = "10"
+        self.work.issue = "2"
+        self.work.first_page = "123"
+        self.work.last_page = "145"
+        self.work.url = "https://example.test/article/1.pdf"
+        self.work.openalex_id = "https://openalex.org/W123456789"
+        self.work.save()
+
+        resp = self.client.get(self.url)
+        soup = BeautifulSoup(resp.content, "html.parser")
+
+        def _content(name: str) -> str | None:
+            tag = soup.find("meta", attrs={"name": name})
+            return tag["content"] if tag else None
+
+        self.assertEqual(_content("citation_abstract"), self.work.abstract)
+        self.assertEqual(_content("citation_publisher"), "SEO Test Journal")
+        self.assertEqual(_content("citation_language"), "en")
+        self.assertEqual(_content("citation_volume"), "10")
+        self.assertEqual(_content("citation_issue"), "2")
+        self.assertEqual(_content("citation_firstpage"), "123")
+        self.assertEqual(_content("citation_lastpage"), "145")
+        self.assertEqual(_content("citation_pdf_url"), self.work.url)
+
+        # Repeated citation_keywords, one per keyword and topic.
+        kw_tags = [
+            t["content"]
+            for t in soup.find_all("meta", attrs={"name": "citation_keywords"})
+        ]
+        self.assertEqual(
+            kw_tags, ["Earth Sciences", "Geomagnetism and Paleomagnetism Studies"]
+        )
+
+    def test_citation_pdf_url_omitted_when_url_is_not_pdf(self):
+        # work.url ends in .../article/1 — no .pdf, so no citation_pdf_url.
+        resp = self.client.get(self.url)
+        soup = BeautifulSoup(resp.content, "html.parser")
+        self.assertIsNone(soup.find("meta", attrs={"name": "citation_pdf_url"}))
+
+    def test_jsonld_nested_publication_volume_and_issue(self):
+        self.work.volume = "10"
+        self.work.issue = "2"
+        self.work.save()
+        resp = self.client.get(self.url)
+        soup = BeautifulSoup(resp.content, "html.parser")
+        article = next(
+            (b for b in _find_jsonld(soup) if b.get("@type") == "ScholarlyArticle"),
+            None,
+        )
+        self.assertIsNotNone(article)
+        is_part_of = article["isPartOf"]
+        self.assertEqual(is_part_of["@type"], "PublicationIssue")
+        self.assertEqual(is_part_of["issueNumber"], "2")
+        self.assertEqual(is_part_of["isPartOf"]["@type"], "PublicationVolume")
+        self.assertEqual(is_part_of["isPartOf"]["volumeNumber"], "10")
+        self.assertEqual(is_part_of["isPartOf"]["isPartOf"]["@type"], "Periodical")
+        self.assertEqual(is_part_of["isPartOf"]["isPartOf"]["name"], "SEO Test Journal")
+
+    def test_jsonld_sameas_includes_openalex_when_set(self):
+        self.work.openalex_id = "https://openalex.org/W123456789"
+        self.work.save()
+        resp = self.client.get(self.url)
+        soup = BeautifulSoup(resp.content, "html.parser")
+        article = next(
+            (b for b in _find_jsonld(soup) if b.get("@type") == "ScholarlyArticle"),
+            None,
+        )
+        same_as = article["sameAs"]
+        # When multiple, sameAs is a list; when only DOI, it's a string.
+        self.assertIsInstance(same_as, list)
+        self.assertIn(f"https://doi.org/{self.work.doi}", same_as)
+        self.assertIn("https://openalex.org/W123456789", same_as)
+
+    def test_coins_span_present(self):
+        resp = self.client.get(self.url)
+        soup = BeautifulSoup(resp.content, "html.parser")
+        spans = soup.find_all("span", class_="Z3988")
+        self.assertEqual(len(spans), 1)
+        title = spans[0].get("title", "")
+        # COinS context object: keys unencoded, values percent-encoded.
+        self.assertTrue(title.startswith("ctx_ver=Z39.88-2004"))
+        self.assertIn("rft_val_fmt=info%3Aofi%2Ffmt%3Akev%3Amtx%3Ajournal", title)
+        self.assertIn("rft.atitle=", title)
+        self.assertIn("rft.au=", title)
+        # DOI encoded as info:doi/<doi> — slashes and colons percent-encoded.
+        self.assertIn(
+            f"rft_id=info%3Adoi%2F{self.work.doi.replace('/', '%2F')}", title
+        )
 
     def test_unpublished_work_returns_404(self):
         # Sanity: SEO context must not leak unpublished works to anonymous users.

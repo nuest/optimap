@@ -71,6 +71,11 @@ def build_openalex_fields(title, doi=None, author=None, existing_metadata=None):
             openalex_fields['openalex_ids'] = openalex_data.get('openalex_ids', {})
             openalex_fields['openalex_open_access_status'] = openalex_data.get('openalex_open_access_status')
 
+            for biblio_key in ('volume', 'issue', 'first_page', 'last_page'):
+                if openalex_data.get(biblio_key):
+                    openalex_fields[biblio_key] = openalex_data[biblio_key]
+                    metadata_provenance[biblio_key] = 'openalex'
+
             metadata_provenance['openalex_metadata'] = 'openalex'
 
         elif partial_matches:

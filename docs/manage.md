@@ -213,6 +213,12 @@ The MaRESS harvester is bespoke because the API is Zotero-shaped, not OAI-PMH/RS
 - Migration: [works/migrations/0004_collections.py](../works/migrations/0004_collections.py) (`atomic = False`).
 - Tests: [tests/test_collections.py](../tests/test_collections.py).
 
+## Reference-manager / Zotero compatibility
+
+Work landing pages (`/work/<id>/` and `/work/<doi>/`) and collection detail pages (`/collections/<id>/`) emit the metadata that the [Zotero browser connector](https://www.zotero.org/download/connectors) and other reference managers (Mendeley, ReadCube, Citation Web Linker, etc.) read. No setup required — when a reader visits a work landing page with the connector installed, the connector recognises it as a journal article and offers "Save to Zotero". On a published collection page it offers "Save to Zotero (multiple items)" so a curator's curated set can be imported in one click.
+
+What populates in the reader's reference manager (when the OPTIMAP record has the data): title, authors, publication date, DOI, journal title, ISSN, abstract, keywords, language, publisher, volume, issue, page range, and a PDF URL when the harvested URL ends in `.pdf`. Volume / issue / page range are populated by the OpenAlex matcher only — the OAI-PMH, RSS, Crossref, and MaRESS harvesters do not currently capture them, so works that never matched against OpenAlex will be missing those four fields. The mechanics are Highwire Press `citation_*` meta tags + `ScholarlyArticle` JSON-LD + a COinS span fallback, all built in [works/seo.py](../works/seo.py) and rendered from [works/templates/work_landing_page.html](../works/templates/work_landing_page.html) and [works/templates/collection_page.html](../works/templates/collection_page.html).
+
 ## Block emails and domains (anti-spam)
 
 OPTIMAP can block specific email addresses and entire domains from registering or attempting to log in.
