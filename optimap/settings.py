@@ -292,6 +292,19 @@ WIKIBASE_CREATE_PROPERTIES_IF_MISSING = env("WIKIBASE_CREATE_PROPERTIES_IF_MISSI
 
 # Import optimap version for user agent
 import optimap
+
+# Single User-Agent string used by every outbound request that doesn't have a
+# specific upstream contract requiring a different shape (the only carve-out
+# today is WIKIBASE_USER_AGENT below, which preserves the wikibase library's
+# expected formatting). Includes the running release version, project URL,
+# and a contact mailto so upstream operators can identify our traffic and
+# reach us if there's a problem. Append a workflow qualifier at the call
+# site (e.g. `f"{settings.OPTIMAP_USER_AGENT} preview"`) when it's useful
+# for log diagnostics.
+OPTIMAP_USER_AGENT = (
+    f"OPTIMAP/{optimap.__version__} "
+    f"(+https://optimap.science; mailto:{CONTACT_EMAIL})"
+)
 WIKIBASE_USER_AGENT = f"OPTIMAP/{optimap.__version__} (https://optimap.science; {CONTACT_EMAIL})"
 
 

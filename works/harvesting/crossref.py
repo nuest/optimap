@@ -104,6 +104,41 @@ def fetch_copernicus_abstract(landing_url, session=None):
     return None
 
 
+def _authors_from_crossref(authors):
+    """Crossref ``author`` → list of ``"Given Family"`` strings.
+
+    Crossref entries occasionally only have ``family`` (corporate authors) or
+    only ``given`` — keep whatever is there rather than dropping the row.
+    """
+    if not authors:
+        return []
+    out = []
+    for a in authors:
+        if not isinstance(a, dict):
+            continue
+        given = (a.get("given") or "").strip()
+        family = (a.get("family") or "").strip()
+        name = a.get("name") or " ".join(p for p in (given, family) if p).strip()
+        if name:
+            out.append(name)
+    return out
+
+
+def _split_crossref_page(page):
+    """``"12-25"`` → ``("12", "25")``; single locator → ``(value, None)``."""
+    if not page:
+        return None, None
+    text = page.strip()
+    if not text:
+        return None, None
+    if "-" in text:
+        first, _, last = text.partition("-")
+        first = first.strip() or None
+        last = last.strip() or None
+        return first, last
+    return text, None
+
+
 def _crossref_item_to_work_kwargs(
     item, source, event, fetch_abstract_from_publisher, abstract_session
 ):
@@ -145,6 +180,17 @@ def _crossref_item_to_work_kwargs(
     if not abstract:
         abstract = _strip_jats(item.get("abstract"))
 
+    authors = _authors_from_crossref(item.get("author"))
+    volume = (item.get("volume") or None) or None
+    issue = (item.get("issue") or None) or None
+    first_page, last_page = _split_crossref_page(item.get("page"))
+
+    metadata_sources = {"crossref": "doi"}
+    if authors:
+        metadata_sources["authors"] = "crossref"
+    if volume or issue or first_page or last_page:
+        metadata_sources["biblio"] = "crossref"
+
     return {
         "title": title,
         "abstract": abstract,
@@ -153,6 +199,12 @@ def _crossref_item_to_work_kwargs(
         "publicationDate": pub_date,
         "source": source,
         "job": event,
+        "authors": authors or None,
+        "volume": volume,
+        "issue": issue,
+        "first_page": first_page,
+        "last_page": last_page,
+        "type": (source.default_work_type if source else None) or "article",
         "provenance": {
             "harvest": {
                 "harvester": "harvest_crossref_prefix",
@@ -163,7 +215,7 @@ def _crossref_item_to_work_kwargs(
                 "harvesting_event_id": event.id if event else None,
                 "doi": doi,
             },
-            "metadata_sources": {"crossref": "doi"},
+            "metadata_sources": metadata_sources,
         },
         "status": "h",
     }
@@ -173,6 +225,7 @@ def parse_crossref_response_and_save_works(
     source, event, prefix, journal_titles=None,
     fetch_abstract_from_publisher=True, max_records=None,
     warning_collector=None, update_existing=False, stats=None,
+    sort=None, order=None,
 ):
     """Page through Crossref's ``works`` API and persist matched works.
 
@@ -180,6 +233,11 @@ def parse_crossref_response_and_save_works(
     page. Stops after ``max_records`` items have been processed (useful for
     smoke tests). Items already present in the DB by DOI are skipped to
     keep the harvest idempotent on re-run.
+
+    ``sort`` / ``order`` map to Crossref's ``sort=`` / ``order=`` query
+    parameters (e.g. ``sort='published', order='desc'``). Default is
+    Crossref's default (relevance/score), which is fine for a steady-state
+    crawl but useless for "most recent first" comparison runs.
     """
     session = _crossref_session()
     cursor = "*"
@@ -197,9 +255,14 @@ def parse_crossref_response_and_save_works(
             "cursor": cursor,
             "select": (
                 "DOI,title,abstract,published-print,published-online,"
-                "published,issued,URL,container-title,publisher"
+                "published,issued,URL,container-title,publisher,"
+                "author,volume,issue,page"
             ),
         }
+        if sort:
+            params["sort"] = sort
+        if order:
+            params["order"] = order
         try:
             resp = session.get(
                 CROSSREF_API_URL, params=params, timeout=CROSSREF_HTTP_TIMEOUT
@@ -255,6 +318,7 @@ def harvest_crossref_prefix(
     journal_titles=None, prefix=None,
     fetch_abstract_from_publisher=True,
     update_existing=False,
+    sort=None, order=None,
 ):
     """Harvest publications from Crossref by DOI prefix.
 
@@ -289,6 +353,7 @@ def harvest_crossref_prefix(
             warning_collector=warning_collector,
             update_existing=update_existing,
             stats=stats,
+            sort=sort, order=order,
         )
 
         spatial_count, temporal_count = complete_harvest(event, stats, warning_collector)

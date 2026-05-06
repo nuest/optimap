@@ -20,7 +20,7 @@ GEOCODING_SERVICES = {
         'search_url': 'https://nominatim.openstreetmap.org/search',
         'reverse_url': 'https://nominatim.openstreetmap.org/reverse',
         'requires_key': False,
-        'user_agent': 'OPTIMAP/1.0',
+        'user_agent': settings.OPTIMAP_USER_AGENT,
     },
     'photon': {
         'search_url': 'https://photon.komoot.io/api/',
@@ -77,7 +77,7 @@ def gazetteer_search(request, provider):
                 'addressdetails': request.GET.get('addressdetails', '1'),
             }
             headers = {
-                'User-Agent': service_config.get('user_agent', 'OPTIMAP/1.0'),
+                'User-Agent': service_config.get('user_agent', settings.OPTIMAP_USER_AGENT),
             }
 
         elif provider == 'photon':
@@ -184,7 +184,7 @@ def gazetteer_reverse(request, provider):
                 'format': request.GET.get('format', 'json'),
             }
             headers = {
-                'User-Agent': service_config.get('user_agent', 'OPTIMAP/1.0'),
+                'User-Agent': service_config.get('user_agent', settings.OPTIMAP_USER_AGENT),
             }
 
         elif provider == 'photon':

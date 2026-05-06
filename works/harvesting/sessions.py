@@ -4,6 +4,7 @@
 """HTTP session factories and response sniffers shared by every harvester."""
 
 import requests
+from django.conf import settings
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
@@ -12,7 +13,7 @@ from urllib3.util.retry import Retry
 
 OAI_HTTP_TIMEOUT = 30  # seconds; per-request, applies to both connect and read
 OAI_RETRY_TOTAL = 3
-OAI_USER_AGENT = "OPTIMAP-harvester/1.0 (+https://optimap.science)"
+OAI_USER_AGENT = f"{settings.OPTIMAP_USER_AGENT} oai-pmh"
 
 
 def _oai_session() -> requests.Session:
@@ -64,11 +65,9 @@ def _short_body(resp: requests.Response, n: int = 240) -> str:
 # Crossref --------------------------------------------------------------------
 
 CROSSREF_API_URL = "https://api.crossref.org/works"
-# Polite-pool User-Agent — Crossref rate-limits anonymous traffic.
-CROSSREF_USER_AGENT = (
-    "OPTIMAP/1.0 (https://github.com/GeoinformationSystems/optimap; "
-    "mailto:info@optimap.science)"
-)
+# Polite-pool User-Agent — Crossref rate-limits anonymous traffic; the mailto
+# in OPTIMAP_USER_AGENT is what puts us in the polite pool.
+CROSSREF_USER_AGENT = settings.OPTIMAP_USER_AGENT
 CROSSREF_HTTP_TIMEOUT = 60
 CROSSREF_PAGE_ROWS = 100
 
@@ -85,6 +84,37 @@ def _crossref_session():
     session.mount("https://", HTTPAdapter(max_retries=retry))
     session.headers.update({
         "User-Agent": CROSSREF_USER_AGENT,
+        "Accept": "application/json",
+    })
+    return session
+
+
+# OpenAlex --------------------------------------------------------------------
+
+OPENALEX_API_URL = "https://api.openalex.org/works"
+# The mailto in OPTIMAP_USER_AGENT puts us in OpenAlex's polite pool
+# (faster + more reliable than anonymous).
+OPENALEX_USER_AGENT = settings.OPTIMAP_USER_AGENT
+OPENALEX_HTTP_TIMEOUT = 60
+OPENALEX_PAGE_SIZE = 200  # OpenAlex max per page
+
+
+def _openalex_session():
+    """Return a `requests.Session` configured with retries and the polite-pool UA.
+
+    The mailto in the User-Agent puts requests in OpenAlex's polite pool
+    (faster + more reliable than anonymous).
+    """
+    session = requests.Session()
+    retry = Retry(
+        total=4,
+        backoff_factor=2,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=frozenset(["GET"]),
+    )
+    session.mount("https://", HTTPAdapter(max_retries=retry))
+    session.headers.update({
+        "User-Agent": OPENALEX_USER_AGENT,
         "Accept": "application/json",
     })
     return session

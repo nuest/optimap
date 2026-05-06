@@ -21,6 +21,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 import cairosvg
+from django.conf import settings
 from PIL import Image, ImageDraw, ImageFont
 from staticmap import StaticMap, Polygon, Line, CircleMarker
 from staticmap.staticmap import _lon_to_x, _lat_to_y
@@ -30,7 +31,7 @@ logger = logging.getLogger(__name__)
 PREVIEW_WIDTH = 1200
 PREVIEW_HEIGHT = 630
 TILE_URL = "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"
-USER_AGENT = "OPTIMAP-preview/1.0 (+https://optimap.science)"
+USER_AGENT = f"{settings.OPTIMAP_USER_AGENT} preview"
 
 # OPTIMAP brand colours — see works/static/css/main.css. The navbar uses
 # #158F9B (teal) and the alerts use rgba(21, 143, 155, 0.2) for the

@@ -14,6 +14,8 @@ import time
 from typing import Dict, Optional, List, Tuple
 from urllib.parse import quote
 
+from django.conf import settings
+
 logger = logging.getLogger(__name__)
 
 OPENALEX_API_BASE = "https://api.openalex.org"
@@ -33,7 +35,7 @@ class OpenAlexMatcher:
     def __init__(self):
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': 'OPTIMAP/1.0 (mailto:login@optimap.science)',
+            'User-Agent': settings.OPTIMAP_USER_AGENT,
             'Accept': 'application/json'
         })
         self.last_request_time = 0

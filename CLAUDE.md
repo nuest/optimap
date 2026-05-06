@@ -36,7 +36,7 @@ Part of the KOMET project (<https://projects.tib.eu/komet>), continuing from OPT
     - `WikidataExportLog` - Wikidata/Wikibase export tracking
     - `BlockedEmail`/`BlockedDomain` - Anti-spam mechanisms
   - **Views** ([views.py](works/views.py)) - Handles passwordless login, subscriptions, data downloads
-  - **Harvesting** ([harvesting/](works/harvesting/)) — one module per source type (`oai.py`, `rss.py`, `crossref.py`, `mountain_wetlands.py`) plus shared helpers (`common.py`, `sessions.py`, `metadata_html.py`, `openalex.py`). Public entry points are re-exported from [tasks.py](works/tasks.py) so Django-Q dotted-path schedules keep working.
+  - **Harvesting** ([harvesting/](works/harvesting/)) — one module per source type (`oai.py`, `rss.py`, `crossref.py`, `mountain_wetlands.py`, `openalex_source.py`) plus shared helpers (`common.py`, `sessions.py`, `metadata_html.py`, `openalex.py` for enrichment). Public entry points are re-exported from [tasks.py](works/tasks.py) so Django-Q dotted-path schedules keep working.
   - **Other tasks** ([tasks.py](works/tasks.py)) — non-harvest Django-Q tasks: monthly email digest, subscription emails, GeoJSON / GeoPackage cache regeneration, schedule helpers.
   - **API** ([api.py](works/api.py), [viewsets.py](works/viewsets.py), [serializers.py](works/serializers.py)) - DRF REST API at `/api/v1/`
   - **Feeds** ([feeds.py](works/feeds.py), [feeds_geometry.py](works/feeds_geometry.py)) - GeoRSS/GeoAtom feed generation
@@ -149,7 +149,8 @@ python manage.py test tests                        # everything (CI does this)
 **Run the online tests when you change:**
 
 - Anything under [works/harvesting/](works/harvesting/) — OAI-PMH parsing, RSS/Atom,
-  Crossref, mountain-wetlands, OpenAlex enrichment, or `common.py`/`sessions.py`/
+  Crossref, mountain-wetlands, OpenAlex (both `openalex.py` enrichment and
+  `openalex_source.py` as-source harvester), or `common.py`/`sessions.py`/
   `metadata_html.py` helpers. Real endpoints catch schema drift and parser
   regressions that fixtures don't.
 - The `harvest_*` task entry points re-exported from [works/tasks.py](works/tasks.py).
@@ -306,12 +307,12 @@ All deployment-specific config uses `OPTIMAP_*` environment variables loaded fro
 
 ### Harvesting Flow
 
-1. Create/configure `Source` in admin with OAI-PMH URL or RSS/Atom feed URL
+1. Create/configure `Source` in admin with OAI-PMH URL, RSS/Atom feed URL, Crossref prefix, MaRESS API URL, or OpenAlex source identifier (`S<digits>` on `openalex_id`/`openalex_url`).
 2. Django-Q task creates `HarvestingEvent` (or use `harvest_journals` command for direct harvesting)
-3. Fetch XML/RSS → parse → extract DOI, spatial, temporal metadata → save `Work` records with status `h` (Harvested)
+3. Fetch XML/RSS/JSON → parse → extract DOI, spatial, temporal metadata → save `Work` records with status `h` (Harvested)
 4. Track status in `HarvestingEvent.status` (pending/in_progress/completed/failed)
 5. Works with spatial/temporal metadata can be published directly, or users can contribute missing metadata
-6. OpenAlex enrichment: Automatically fetches additional metadata (authors, keywords, topics) when DOI is available
+6. OpenAlex enrichment: Automatically fetches additional metadata (authors, keywords, topics) when DOI is available — runs inside the OAI-PMH harvester via `works.harvesting.openalex.build_openalex_fields`. Distinct from the **`openalex` source type** (`works.harvesting.openalex_source`), which uses OpenAlex as the *primary* harvest origin (see [docs/manage.md](docs/manage.md) → "OpenAlex-as-source"). The OpenAlex source harvester does not fetch publisher landing pages — OpenAlex carries no spatial/temporal coverage and the journals it currently targets (e.g. AGILE-GISS) don't expose any in their HTML either.
 
 ### Authentication
 
