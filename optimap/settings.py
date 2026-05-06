@@ -208,13 +208,24 @@ Q_CLUSTER = {
 }
 
 CACHES = {
-    # defaults to database caching to persist across processes, see https://docs.djangoproject.com/en/4.1/topics/cache/#local-memory-caching
+    # Default: persists across processes (login tokens, email confirmations,
+    # GeoRSS feed bodies). See https://docs.djangoproject.com/en/4.1/topics/cache/
     'default': {
         'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
         'LOCATION': 'cache',
     },
 
-    # use for development
+    # Per-process in-memory cache for hot anonymous reads — view-level
+    # @cache_page decorators on static / low-change pages (feeds list,
+    # sitemap, robots, privacy, …) and the work_landing context cache.
+    # Each gunicorn worker keeps its own copy; first hit per worker is a
+    # miss, subsequent hits are pure dict lookups (no DB roundtrip).
+    'memory': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'optimap-locmem',
+    },
+
+    # Use for development to disable caching entirely (OPTIMAP_CACHE=dummy).
     'dummy': {
         'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
     },
@@ -304,25 +315,30 @@ GEOEXTENT_GEONAMES_USERNAME = os.getenv("OPTIMAP_GEOEXTENT_GEONAMES_USERNAME", "
 # modern browser defaults.
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 
+# Per Django's cache-framework docs, the canonical placement is:
+#   UpdateCacheMiddleware  — outermost on the response side; sets
+#                            Cache-Control + Expires headers and stores
+#                            qualifying responses in the default cache.
+#   SessionMiddleware      — must run *before* FetchFromCacheMiddleware
+#                            so the cache key can vary on session.
+#   FetchFromCacheMiddleware — short-circuits the view on cache hit.
+# AuthenticationMiddleware is listed once; previously the file had a
+# stray second copy (and a duplicate UpdateCache/CommonMiddleware/
+# FetchFromCache trio above SessionMiddleware) — both removed.
 MIDDLEWARE = [
     'django.middleware.cache.UpdateCacheMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.cache.FetchFromCacheMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.cache.UpdateCacheMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.cache.FetchFromCacheMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.sites.middleware.CurrentSiteMiddleware",
     "django_currentuser.middleware.ThreadLocalUserMiddleware",
     "django.middleware.gzip.GZipMiddleware",
-
 ]
 
 ROOT_URLCONF = 'optimap.urls'

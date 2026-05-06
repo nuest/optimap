@@ -19,7 +19,8 @@ logger = logging.getLogger(__name__)
 
 from django.shortcuts import render
 from django.http import HttpResponse
-from django.views.decorators.cache import never_cache
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page, never_cache
 from django.views.generic import View
 from django.conf import settings
 import tempfile
@@ -44,12 +45,15 @@ def main(request):
         'canonical_url': request.build_absolute_uri(reverse("optimap:main")),
     })
 
+@cache_page(24 * 3600, cache='memory')
 def about(request):
     return render(request, 'about.html')
 
+@cache_page(24 * 3600, cache='memory')
 def accessibility(request):
     return render(request, 'accessibility.html')
 
+@cache_page(24 * 3600, cache='memory')
 def privacy(request):
     return render(request, 'privacy.html')
 
@@ -148,6 +152,7 @@ def geoextent(request):
 
     return render(request, 'geoextent.html', context)
 
+@method_decorator(cache_page(3600, cache='memory'), name='dispatch')
 class RobotsView(View):
     http_method_names = ['get']
     def get(self, request):
@@ -200,6 +205,7 @@ def custom_500(request):
     """Custom 500 error handler"""
     return render(request, '500.html', status=500)
 
+@cache_page(3600, cache='memory')
 def feeds(request):
 
     global_feeds = [
@@ -222,6 +228,7 @@ def feeds(request):
     })
 
 
+@cache_page(3600, cache='memory')
 def sitemap_page(request):
     """Human-readable sitemap page"""
     return render(request, 'sitemap_page.html', {

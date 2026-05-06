@@ -31,6 +31,9 @@ def create_or_update_user_profile(sender, instance, created, **kwargs):
 
 
 # --- SEO preview-image cache invalidation (issue #22) -----------------------
+# (The landing-page context cache from issue #180 is keyed on
+# ``work.lastUpdate``, which Django auto-bumps to ``now()`` on every save,
+# so it self-invalidates without an explicit signal.)
 from works.models import Work as _Work
 
 

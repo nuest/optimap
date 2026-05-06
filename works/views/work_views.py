@@ -19,15 +19,17 @@ logger = logging.getLogger(__name__)
 
 from django.shortcuts import render, get_object_or_404
 from django.contrib.gis.geos import GeometryCollection
+from django.core.cache import caches
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db.models import Q
+from django.utils.cache import patch_response_headers
 from django.views.decorators.cache import never_cache
 from django.conf import settings
 from django.urls import reverse
 from django.http import Http404, FileResponse
 from django.views.decorators.http import require_GET
 from works.models import Work
-from works.seo import build_work_meta, citation_meta_tags, coins_title
+from works.seo import build_schema_org_for_work, build_work_meta, citation_meta_tags, coins_title
 from works.services.preview_image import (
     cache_path_for as _preview_cache_path,
     render_work_preview,
@@ -206,6 +208,61 @@ def works_list(request):
 
     return render(request, "works.html", context)
 
+_WORK_LANDING_CACHE_TIMEOUT = 24 * 3600
+
+
+def _work_landing_cache_key(work, request) -> str:
+    """Cache key for the anonymous landing-page context.
+
+    Includes:
+    - ``request.get_host()`` so dev (127.0.0.1) and prod entries don't pollute
+      each other — the cached payload contains absolute URLs built from the
+      request host.
+    - ``work.lastUpdate`` (auto-bumped to ``now()`` on every ``Work.save()``)
+      so any edit immediately misses the old entry. No explicit invalidation
+      signal needed; superseded entries age out via TTL.
+    """
+    return (
+        f"work_landing:ctx:{request.get_host()}:{work.id}:"
+        f"{work.lastUpdate.timestamp() if work.lastUpdate else 0}"
+    )
+
+
+def _build_work_landing_cacheable(request, work, identifier_type):
+    """Build the picklable, work-derived bits of the landing-page context.
+
+    Excludes the ``Meta`` object (holds an unpicklable request reference)
+    and the ``Work`` instance itself (re-fetched per request, cheap). The
+    expensive ``schema.org`` JSON-LD dict is cached here; the view
+    rebuilds the lightweight ``Meta`` object on each request and injects
+    the cached schema via ``build_work_meta(request, work, kwargs_schema=...)``.
+    """
+    feature_json = None
+    if work.geometry and not work.geometry.empty:
+        feature = {
+            "type": "Feature",
+            "geometry": json.loads(work.geometry.geojson),
+            "properties": {"title": work.title, "doi": work.doi or None},
+        }
+        feature_json = json.dumps(feature)
+
+    return {
+        "feature_json": feature_json,
+        "timeperiod_label": _format_timeperiod(work),
+        "authors_list": _normalize_authors(work),
+        "has_geometry": bool(work.geometry and not work.geometry.empty),
+        "has_temporal": bool(work.timeperiod_startdate or work.timeperiod_enddate),
+        "use_id_urls": not work.doi,
+        "identifier_type": identifier_type,
+        "schema_org": build_schema_org_for_work(work, request),
+        "citation_tags": citation_meta_tags(work, request),
+        "coins_ctx": coins_title(work),
+        "canonical_url": request.build_absolute_uri(
+            reverse("optimap:work-landing", args=[work.get_identifier()])
+        ),
+    }
+
+
 def work_landing(request, identifier):
     """
     Landing page for a work accessed by various identifier types.
@@ -219,75 +276,79 @@ def work_landing(request, identifier):
 
     Only published works (status='p') are accessible to non-admin users.
     Admin users can view all works with a status label.
+
+    For anonymous requests the work-derived part of the context is cached
+    in the in-memory backend (key ``work_landing:ctx:<host>:<work.id>``)
+    and invalidated by ``works.signals.invalidate_work_caches`` on every
+    ``Work`` save. Authenticated and staff requests always render live to
+    keep status badges, publish buttons, and provenance current.
     """
 
     is_admin = request.user.is_authenticated and request.user.is_staff
 
-    # Resolve identifier to work object
+    # Resolve identifier to work object.
     work, identifier_type = resolve_work_identifier(identifier)
 
-    # Check access permissions
+    # Check access permissions.
     if not is_admin and work.status != 'p':
         raise Http404("Work not found.")
 
-    feature_json = None
-    if work.geometry and not work.geometry.empty:
-        feature = {
-            "type": "Feature",
-            "geometry": json.loads(work.geometry.geojson),
-            "properties": {"title": work.title, "doi": work.doi or None},
-        }
-        feature_json = json.dumps(feature)
+    is_anonymous = not request.user.is_authenticated
+    cache_backend = caches['memory']
+    cache_key = _work_landing_cache_key(work, request) if is_anonymous else None
 
-    # Check if geometry is missing (NULL or empty)
-    has_geometry = work.geometry and not work.geometry.empty
+    cacheable = None
+    if cache_key:
+        cacheable = cache_backend.get(cache_key)
+    if cacheable is None:
+        cacheable = _build_work_landing_cacheable(request, work, identifier_type)
+        if cache_key:
+            cache_backend.set(cache_key, cacheable, timeout=_WORK_LANDING_CACHE_TIMEOUT)
 
-    # Check if temporal extent is missing
-    has_temporal = bool(work.timeperiod_startdate or work.timeperiod_enddate)
+    # Rebuild Meta per request — cheap; the heavy schema dict comes from
+    # the cache.
+    meta = build_work_meta(request, work, kwargs_schema=cacheable["schema_org"])
 
-    # Users can contribute if work is harvested and missing either geometry or temporal extent
-    can_contribute = request.user.is_authenticated and work.status == 'h' and (not has_geometry or not has_temporal)
+    # User-dependent overlay — never cached.
+    can_contribute = (
+        request.user.is_authenticated
+        and work.status == 'h'
+        and (not cacheable["has_geometry"] or not cacheable["has_temporal"])
+    )
+    can_publish = is_admin and (
+        work.status == 'c'
+        or (work.status == 'h' and (cacheable["has_geometry"] or cacheable["has_temporal"]))
+    )
+    can_unpublish = is_admin and work.status == 'p'
 
-    # Can publish if: Contributed status OR (Harvested with at least one extent type)
-    can_publish = is_admin and (work.status == 'c' or (work.status == 'h' and (has_geometry or has_temporal)))
-    can_unpublish = is_admin and work.status == 'p'  # Can unpublish published works
-
-    # Get most recent successful Wikidata export
     latest_wikidata_export = work.wikidata_exports.filter(
         action__in=['created', 'updated']
     ).order_by('-export_date').first()
-
-    # Get all Wikidata exports for admin view
     all_wikidata_exports = work.wikidata_exports.all() if is_admin else []
 
-    # Determine if we should use ID-based URLs (when work has no DOI)
-    use_id_urls = not work.doi
-
     context = {
+        **{k: v for k, v in cacheable.items() if k != "schema_org"},
         "work": work,
-        "feature_json": feature_json,
-        "timeperiod_label": _format_timeperiod(work),
-        "authors_list": _normalize_authors(work),
+        "meta": meta,
         "is_admin": is_admin,
         "status_display": work.get_status_display() if is_admin else None,
-        "has_geometry": has_geometry,
-        "has_temporal": has_temporal,
         "can_contribute": can_contribute,
         "can_publish": can_publish,
         "can_unpublish": can_unpublish,
         "show_provenance": is_admin,
         "latest_wikidata_export": latest_wikidata_export,
         "all_wikidata_exports": all_wikidata_exports,
-        "use_id_urls": use_id_urls,
-        "identifier_type": identifier_type,  # Pass to template for debugging/analytics
-        "meta": build_work_meta(request, work),
-        "citation_tags": citation_meta_tags(work, request),
-        "coins_ctx": coins_title(work),
-        "canonical_url": request.build_absolute_uri(
-            reverse("optimap:work-landing", args=[work.get_identifier()])
-        ),
     }
-    return render(request, "work_landing_page.html", context)
+    response = render(request, "work_landing_page.html", context)
+    if is_anonymous:
+        # Mirror the server-side TTL into ``Cache-Control: max-age=…`` and
+        # ``Expires`` so browsers and intermediaries can co-cache. Saves
+        # served from the cache key for ``Work.lastUpdate`` change as soon
+        # as the work is edited, but downstream caches won't see that —
+        # so they'll keep serving the stale entry until ``max-age`` expires.
+        # 24h matches the server cache TTL.
+        patch_response_headers(response, cache_timeout=_WORK_LANDING_CACHE_TIMEOUT)
+    return response
 
 
 @require_GET

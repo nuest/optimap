@@ -59,10 +59,38 @@ def _normalize_author_list(work) -> list[str]:
     return out
 
 
-def build_work_meta(request, work) -> Meta:
+def build_schema_org_for_work(work, request) -> dict:
+    """Just the schema.org ``ScholarlyArticle`` JSON-LD dict — the heavy
+    part of ``build_work_meta``. Pulled out so callers (e.g. the
+    landing-page cache in ``works/views/work_views.py``) can cache the
+    expensive output and pass it back into ``build_work_meta`` to skip
+    the rebuild."""
+    description = _truncate_for_description(work.abstract, n=200)
+    canonical = _abs(request, reverse("optimap:work-landing", args=[work.get_identifier()]))
+    has_geom = bool(work.geometry and not work.geometry.empty)
+    image = None
+    if has_geom:
+        image = _abs(
+            request,
+            reverse("optimap:work-preview", args=[work.get_identifier()]),
+        )
+    keywords: list[str] = []
+    if work.keywords:
+        keywords.extend(k for k in work.keywords if k)
+    if work.topics:
+        keywords.extend(t for t in work.topics if t)
+    authors = _normalize_author_list(work)
+    return _build_schema_org(work, request, canonical, image, authors, keywords, description)
+
+
+def build_work_meta(request, work, *, kwargs_schema: dict | None = None) -> Meta:
     """``Meta`` for a work landing page. Includes Open Graph, Twitter Card,
     and schema.org ``ScholarlyArticle`` JSON-LD. Image is omitted when the
-    work has no geometry (per Q3)."""
+    work has no geometry (per Q3).
+
+    ``kwargs_schema``: when set, used in place of recomputing the
+    schema.org dict. Callers caching the heavy schema between requests
+    pass it here to skip the PostGIS roundtrip."""
     title = work.title or "Untitled work"
     description = _truncate_for_description(work.abstract, n=200)
     canonical = _abs(request, reverse("optimap:work-landing", args=[work.get_identifier()]))
@@ -83,7 +111,13 @@ def build_work_meta(request, work) -> Meta:
 
     authors = _normalize_author_list(work)
 
-    schema = _build_schema_org(work, request, canonical, image, authors, keywords, description)
+    # ``schema`` is the heavy bit (PostGIS roundtrip for the geojson dump
+    # plus nested dict construction). Callers may pass in a precomputed
+    # value to skip the rebuild — see issue #180 for the work_landing
+    # context cache that uses this hook.
+    schema = kwargs_schema if kwargs_schema is not None else _build_schema_org(
+        work, request, canonical, image, authors, keywords, description
+    )
 
     meta = Meta(
         request=request,
