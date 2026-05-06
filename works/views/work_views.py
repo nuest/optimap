@@ -327,6 +327,15 @@ def work_landing(request, identifier):
     ).order_by('-export_date').first()
     all_wikidata_exports = work.wikidata_exports.all() if is_admin else []
 
+    # Collections this work belongs to — hidden unpublished collections from
+    # anonymous users so visibility rules match /collections/ and the
+    # collection detail page. Computed per request (not cached) because
+    # collection.is_published can flip without bumping Work.lastUpdate.
+    visible_collections_qs = work.collections.all().order_by('name')
+    if not is_admin:
+        visible_collections_qs = visible_collections_qs.filter(is_published=True)
+    visible_collections = list(visible_collections_qs)
+
     context = {
         **{k: v for k, v in cacheable.items() if k != "schema_org"},
         "work": work,
@@ -339,6 +348,7 @@ def work_landing(request, identifier):
         "show_provenance": is_admin,
         "latest_wikidata_export": latest_wikidata_export,
         "all_wikidata_exports": all_wikidata_exports,
+        "visible_collections": visible_collections,
     }
     response = render(request, "work_landing_page.html", context)
     if is_anonymous:

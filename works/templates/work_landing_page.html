@@ -192,6 +192,14 @@
   {% endif %}
 </div>
 
+{% if visible_collections %}
+  <p class="meta muted" id="work-collections">
+    <i class="fas fa-layer-group"></i>
+    <strong>{% if visible_collections|length == 1 %}Collection:{% else %}Collections:{% endif %}</strong>
+    {% for c in visible_collections %}<a href="{% url 'optimap:collection-page' c.identifier %}">{{ c.name }}</a>{% if is_admin and not c.is_published %} <span class="badge badge-warning" title="Unpublished — visible to admins only">unpublished</span>{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}
+  </p>
+{% endif %}
+
 {% if work.abstract %}
   <p>{{ work.abstract }}</p>
 {% endif %}

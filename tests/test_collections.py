@@ -347,6 +347,64 @@ class CuratorAddRemoveTests(TestCase):
         self.assertEqual(self.work.collections.count(), 1)
 
 
+class WorkLandingPageCollectionBacklinksTests(TestCase):
+    """Work landing pages link back to the collections the work belongs to."""
+
+    def setUp(self):
+        self.client = Client()
+        self.published_a = Collection.objects.create(
+            identifier='pub-a', name='Pub A', is_published=True,
+        )
+        self.published_b = Collection.objects.create(
+            identifier='pub-b', name='Pub B', is_published=True,
+        )
+        self.hidden = Collection.objects.create(
+            identifier='hidden-c', name='Hidden C', is_published=False,
+        )
+        self.work = Work.objects.create(
+            title='W', status='p', doi='10.1234/wbacklinks',
+            geometry=GeometryCollection(Point(0, 0)),
+        )
+        self.work.collections.add(self.published_a, self.published_b, self.hidden)
+        self.admin = User.objects.create_user(
+            username='admin@x.com', email='admin@x.com', password='p123', is_staff=True,
+        )
+
+    def _landing_url(self):
+        return reverse('optimap:work-landing', args=[self.work.get_identifier()])
+
+    def test_anonymous_sees_only_published_collections(self):
+        resp = self.client.get(self._landing_url())
+        self.assertEqual(resp.status_code, 200)
+        body = resp.content.decode()
+        self.assertIn('id="work-collections"', body)
+        self.assertIn(f'href="/collections/{self.published_a.identifier}/"', body)
+        self.assertIn(f'href="/collections/{self.published_b.identifier}/"', body)
+        # Unpublished collection backlink hidden from the public.
+        self.assertNotIn(f'href="/collections/{self.hidden.identifier}/"', body)
+        self.assertNotIn('Hidden C', body)
+
+    def test_admin_also_sees_unpublished_collections(self):
+        self.client.login(username='admin@x.com', password='p123')
+        resp = self.client.get(self._landing_url())
+        self.assertEqual(resp.status_code, 200)
+        body = resp.content.decode()
+        self.assertIn(f'href="/collections/{self.hidden.identifier}/"', body)
+        # Tagged as unpublished so admins can tell them apart.
+        self.assertIn('unpublished', body)
+
+    def test_no_backlinks_block_when_work_has_no_collections(self):
+        lonely = Work.objects.create(
+            title='Lonely', status='p', doi='10.1234/lonely',
+            geometry=GeometryCollection(),
+        )
+        url = reverse('optimap:work-landing', args=[lonely.get_identifier()])
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200)
+        body = resp.content.decode()
+        self.assertNotIn('id="work-collections"', body)
+
+
 class CollectionsSitemapTests(TestCase):
     def setUp(self):
         Collection.objects.create(identifier='a', name='A', is_published=True)
