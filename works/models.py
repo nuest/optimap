@@ -518,7 +518,18 @@ class Source(models.Model):
         'openalex':          'works.tasks.harvest_openalex_source',
     }
 
-    url_field                = models.URLField(max_length=999)
+    url_field                = models.URLField(
+        max_length=999,
+        help_text=(
+            'Source endpoint URL. What goes here depends on source_type — see '
+            'docs/manage.md → "Source field cheatsheet". OAI-PMH: full '
+            'ListRecords URL incl. metadataPrefix. RSS: feed URL. '
+            'Crossref-prefix: display-only (the prefix is hard-coded to '
+            '10.5194 today, change requires code edit). Mountain-wetlands: '
+            'API base URL. OpenAlex: any URL containing the S<id> works, '
+            'or set openalex_id instead and put a placeholder here.'
+        ),
+    )
     source_type              = models.CharField(
         max_length=32, choices=SOURCE_TYPE_CHOICES, default='oai-pmh', db_index=True,
         help_text='Platform / API style of this source. Selects which harvester runs.',
@@ -537,19 +548,66 @@ class Source(models.Model):
             'can add them later from each work landing page).'
         ),
     )
-    tags                     = models.CharField(max_length=1024, blank=True, null=True)
-    is_preprint              = models.BooleanField(default=False)
-    name                     = models.CharField(max_length=255)
-    issn_l                   = models.CharField(max_length=9, blank=True, null=True)
-    openalex_id              = models.CharField(max_length=50, blank=True, null=True)
-    openalex_url             = models.URLField(max_length=512, blank=True, null=True)
-    publisher_name           = models.CharField(max_length=255, blank=True, null=True)
-    works_count              = models.IntegerField(blank=True, null=True)
-    homepage_url             = models.URLField(max_length=512, blank=True, null=True)
-    abbreviated_title        = models.CharField(max_length=255, blank=True, null=True)
+    tags                     = models.CharField(
+        max_length=1024, blank=True, null=True,
+        help_text='Free-form comma-separated tags for admin filtering. Display only.',
+    )
+    is_preprint              = models.BooleanField(
+        default=False,
+        help_text='Display flag — marks works from this source as preprints. Does not affect harvesting.',
+    )
+    name                     = models.CharField(
+        max_length=255,
+        help_text='Display name shown in the admin source list and on /pages, /sitemap.',
+    )
+    issn_l                   = models.CharField(
+        max_length=9, blank=True, null=True,
+        help_text='Linking ISSN (display only).',
+    )
+    openalex_id              = models.CharField(
+        max_length=50, blank=True, null=True,
+        help_text=(
+            'OpenAlex Source identifier (e.g. "S4210203054"). REQUIRED when '
+            'source_type=openalex (the harvester resolves it from openalex_id '
+            'first, then openalex_url, then url_field — whichever contains an '
+            'S<digits> token wins). Optional metadata for other source types.'
+        ),
+    )
+    openalex_url             = models.URLField(
+        max_length=512, blank=True, null=True,
+        help_text=(
+            'OpenAlex Source display URL (e.g. https://openalex.org/sources/S4210203054). '
+            'Redundant for the harvester when openalex_id is filled — kept '
+            'because the public Source API exposes it as the human-facing '
+            'OpenAlex page link. Leave blank for a clean row; the harvester '
+            'will not complain.'
+        ),
+    )
+    publisher_name           = models.CharField(
+        max_length=255, blank=True, null=True,
+        help_text='Display only — shown on the admin source detail page.',
+    )
+    works_count              = models.IntegerField(
+        blank=True, null=True,
+        help_text='Auto-populated statistic (display only).',
+    )
+    homepage_url             = models.URLField(
+        max_length=512, blank=True, null=True,
+        help_text='Public homepage of the journal/repository. Display only.',
+    )
+    abbreviated_title        = models.CharField(
+        max_length=255, blank=True, null=True,
+        help_text='Abbreviated journal title (display only).',
+    )
 
-    is_oa                    = models.BooleanField(default=False)
-    cited_by_count           = models.IntegerField(blank=True, null=True)
+    is_oa                    = models.BooleanField(
+        default=False,
+        help_text='Display flag — marks the source as Open Access in admin lists. Does not affect harvesting.',
+    )
+    cited_by_count           = models.IntegerField(
+        blank=True, null=True,
+        help_text='Auto-populated statistic (display only).',
+    )
 
     # Default work type for harvested works from this source
     default_work_type        = models.CharField(

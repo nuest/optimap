@@ -15,7 +15,77 @@ Sources and harvesting events are managed entirely through the Django admin unde
 
 At `/admin/works/source/`, the changelist shows each source's name, OA / preprint flags, last harvest time, harvest interval, latest event status (linked to the event), and total event count. Search runs over `name`, `url_field`, `issn_l`, `publisher_name`, and `openalex_id`. Filter by `is_oa`, `is_preprint`, and `default_work_type`.
 
-Open a source to edit its OAI-PMH URL, source type (`oai-pmh` / `ojs` / `janeway` / `rss` / `crossref-prefix` / `mountain-wetlands` / `openalex`), collection (FK to a `Collection`), harvest interval, default work type, and OpenAlex metadata. **A `Source` is auto-scheduled only when both `source_type` is a schedulable kind *and* `harvest_interval_minutes > 0`** — saving creates a recurring Django-Q `Schedule` named `Harvest Source <id>` that calls the right task per source type. The default for new sources is `harvest_interval_minutes = 0` (manual-only); set it to a positive number to enable auto-scheduling. The change page also lists the five most recent `HarvestingEvent`s for the source inline, with links into each event.
+#### Source field cheatsheet
+
+The change form is grouped into five fieldsets, mirrored below. **Only the three "Identification" fields are mandatory at the model level** — everything else is optional (or has a sensible default). What you actually need to fill depends on `source_type`; see the per-type walkthrough that follows.
+
+| Fieldset | Field | Mandatory? | What it does |
+|----------|-------|-----------|---------------|
+| **Identification** | `name` | **Yes** | Display name in admin / `/pages` / `/sitemap`. Free-form. |
+| | `source_type` | **Yes** (defaulted to `oai-pmh`) | Selects which harvester runs. See `SOURCE_TYPE_TASKS` in [works/models.py](../works/models.py). |
+| | `url_field` | **Yes** | Source endpoint URL. **Meaning depends on `source_type`** — see below. |
+| **Harvesting configuration** | `harvest_interval_minutes` | Defaulted to `0` | `0` = manual-only. `>0` = auto-schedule via Django-Q (`Harvest Source <id>`). |
+| | `collection` | Optional | Default `Collection` for harvested works. Blank is fine — works are simply not auto-added; OAI-PMH/OJS/Janeway also auto-create one if blank. |
+| | `default_work_type` | Defaulted to `article` | Default `Work.type` for harvested works (overridden by OpenAlex metadata when present). |
+| **OpenAlex / external IDs** | `openalex_id` | **Yes for `source_type=openalex`**, optional otherwise | OpenAlex Source identifier (`S<digits>`). |
+| | `openalex_url` | Optional | OpenAlex Source URL. Optional fallback for `openalex_id` when `source_type=openalex`. |
+| | `issn_l`, `abbreviated_title` | Optional | Display only. |
+| **Display metadata** | `publisher_name`, `homepage_url`, `is_oa`, `is_preprint`, `tags` | Optional | Display only — none of these affect harvesting. |
+| **Statistics (auto-populated)** | `works_count`, `cited_by_count`, `last_harvest` | Read-only | Auto-populated. |
+
+> **Auto-scheduling rule:** A `Source` runs on a Django-Q schedule only when *both* `source_type` is a schedulable kind (i.e. listed in `Source.SOURCE_TYPE_TASKS`, which today covers all current types) *and* `harvest_interval_minutes > 0`. Saving the source creates / updates the `Schedule` named `Harvest Source <id>`. Setting the interval back to `0` removes the schedule. The change page also lists the five most recent `HarvestingEvent`s inline.
+
+#### What to enter per `source_type`
+
+For each type, only mandatory and type-specific fields are listed; defaults / display fields are optional everywhere.
+
+##### OAI-PMH (`oai-pmh`, `ojs`, `janeway`)
+
+- **`url_field`** — full ListRecords URL with `verb=ListRecords&metadataPrefix=oai_dc` (and `&set=…` if needed). Example: `https://e-docs.geo-leo.de/server/oai/request?verb=ListRecords&metadataPrefix=oai_dc`.
+- That's it. The harvester (`works.tasks.harvest_oai_endpoint`) reads only `url_field` from the Source row. Leaving `collection` blank causes the first successful harvest to auto-create one (slugged from `name`, `is_published=False` until you review it).
+
+##### RSS / Atom feed (`rss`)
+
+- **`url_field`** — feed URL. Example: `https://www.nature.com/sdata.rss`.
+- The harvester (`works.tasks.harvest_rss_endpoint`) does a plain GET; no auth, no API key.
+
+##### Crossref by DOI prefix (`crossref-prefix`)
+
+- **`url_field`** — currently **display only**. The harvester ignores it.
+- ⚠️ **The DOI prefix is hard-coded to `10.5194` (Copernicus).** [`works/harvesting/crossref.py:335-339`](../works/harvesting/crossref.py) falls back to `"10.5194"` because `Source` has no `crossref_prefix` field today. **Adding a non-Copernicus crossref-prefix source through the admin alone will not work** — open an issue / extend the model if you need this.
+- For the Copernicus path, leave `url_field` as something representative (e.g. `https://api.crossref.org/works?filter=prefix:10.5194`); harvest with `python manage.py harvest_journals --journal copernicus [--journal-title "<journal name>"]` to filter to a specific Copernicus journal.
+
+##### Mountain Wetlands Repository (`mountain-wetlands`)
+
+- **`url_field`** — MaRESS API endpoint. Example: `https://andes.mountain-wetlands-repository.info/api/v1/items/`.
+- Bespoke harvester (`works.tasks.harvest_mountain_wetlands`); see [works/harvesting/mountain_wetlands.py](../works/harvesting/mountain_wetlands.py).
+
+##### OpenAlex source (`openalex`)
+
+The harvester (`works.tasks.harvest_openalex_source`) needs the OpenAlex Source identifier `S<digits>`. It looks for an `S<digits>` substring in three fields, in this order — **first match wins**, so set whichever is most readable:
+
+1. `openalex_id` — recommended. Set to the bare ID, e.g. `S4210203054`.
+2. `openalex_url` — fallback. Set to the canonical URL, e.g. `https://openalex.org/sources/S4210203054`.
+3. `url_field` — last fallback. Any URL containing the ID works (e.g. `https://api.openalex.org/sources/S4210203054`).
+
+Concrete example for **AGILE GIScience Series** (the one that just bit you):
+
+| Field | Value |
+|-------|-------|
+| `name` | `AGILE GIScience Series (OpenAlex)` |
+| `source_type` | `openalex` |
+| `url_field` | `https://api.openalex.org/sources/S4210203054` |
+| `openalex_id` | `S4210203054` |
+| `openalex_url` | `https://openalex.org/sources/S4210203054` |
+| `publisher_name` | `Copernicus Publications` *(display)* |
+| `homepage_url` | `https://www.agile-giscience-series.net/articles/index.html` *(display)* |
+| `default_work_type` | `proceedings-article` |
+| `is_oa` | ✓ |
+| `harvest_interval_minutes` | `0` *(start manual, raise once a smoke run succeeds)* |
+| `collection` | optional — pick or create `agile-giss` |
+
+> **Common error:** if you create the source with `source_type=oai-pmh` and the AGILE-GISS OAI URL (`https://oai-pmh.copernicus.org/oai.php?…&set=agile-giss`), the harvester will fail with HTTP 404 — Copernicus's OAI-PMH endpoint has been dark since 2025-12. Switch `source_type` to `openalex` and fill the OpenAlex fields above.
+> **Faster than typing it in:** `python manage.py harvest_journals --insert-sources` creates this exact AGILE-GISS-OpenAlex row (and every other built-in entry from `SOURCE_CONFIG`) idempotently — see "Bootstrap the admin from the journal config" below. Only do the manual admin route when you need a source that's not in `SOURCE_CONFIG`.
 
 > **Source.collection is optional at create time, but always populated by the time the first harvest finishes.** Leaving the collection field blank when you create a Source is **not** an error:
 > - **OAI-PMH / OJS / Janeway sources** auto-create a Collection on first harvest, slugged from the source name (e.g. `"Earth System Science Data"` → identifier `earth-system-science-data`). The new Collection starts **unpublished** so it does not show up on `/collections/` until you review the auto-derived name and description and flip `is_published`. Review auto-created collections at `/admin/works/collection/?is_published__exact=0` before publishing.
@@ -364,11 +434,41 @@ The following sections are **suggested, not yet written**. They cover the rest o
 
 ### Manage data dumps and caches
 
+#### Data dump cache
+
 Cached files in `/tmp/optimap_cache/`; retention controlled by `OPTIMAP_DATA_DUMP_RETENTION` (default: 3).
 
 - The `regenerate_geojson_cache` task and the `schedule_geojson` management command (recurring every 6 hours).
 - How to force a regenerate from the Django shell (`async_task('works.tasks.regenerate_geojson_cache')`).
 - Public download endpoints `/download/geojson/` and `/download/geopackage/`.
+
+#### Django caches (`memory`, `default`)
+
+OPTIMAP runs two cache backends — see `optimap/settings.py` (`CACHES =`):
+
+| Alias | Backend | Persists across restarts? | Used for |
+|-------|---------|---------------------------|----------|
+| `memory` | `LocMemCache` (per Gunicorn worker) | No | `@cache_page` on static-ish views (about / privacy / accessibility / feeds_list / sitemap / robots.txt), the work-landing context cache (24 h, keyed on `work.lastUpdate`), and the per-coordinate reverse-geocode cache (30 day TTL). |
+| `default` | `DatabaseCache` (table `cache`) | **Yes** | Login-magic tokens, email-change confirmations, GeoRSS feed bodies. |
+
+**Clearing caches.** Use the `clear_caches` management command (Django itself ships no `clearcache` — see [SO #5942759](https://stackoverflow.com/questions/5942759/best-place-to-clear-cache-when-restarting-django-server)):
+
+```bash
+python manage.py clear_caches                    # all configured caches
+python manage.py clear_caches --cache memory     # one cache (repeatable)
+python manage.py clear_caches --exclude default  # all except default
+python manage.py clear_caches --dry-run          # preview, no writes
+```
+
+When to clear which:
+
+- **After a deploy that changes templates / context-builders / cached pages** — `clear_caches` (or just `--cache memory`, since the Gunicorn restart already wipes per-process state on its own; the explicit clear is belt-and-braces and safe to run).
+- **When users report stale page content but a hard refresh fixes it** — that's a browser-cache problem, not a server one. `Cache-Control: max-age` is set on cached responses; the only server-side fix is to wait it out or change URLs (see "Static files / browser cache" below).
+- **When you need to invalidate a specific work's cached landing page without waiting 24 h** — bump the work (any `Work.save()` updates `lastUpdate`, which is part of the cache key, so the next request misses), or clear the `memory` cache.
+- **When cleaning up a stuck token state during testing** — `--cache default` (note: this also drops cached GeoRSS feed bodies, which auto-regenerate on the next hit).
+- **Routine deploys that should not invalidate active login-magic / email-confirmation tokens** — `clear_caches --exclude default`. The deployment update script ([`docs/deployment-plain.md`](deployment-plain.md)) clears all caches by default; switch to `--exclude default` if mid-flow tokens matter for your operator base.
+
+**Static files / browser cache.** nginx serves `/static/` with `expires 30 d` + `Cache-Control: public, immutable`, and `collectstatic` writes new content at the **same URL**. So even after a server-side clear, browsers can serve a stale CSS/JS bundle for up to 30 days. Hard refresh (Ctrl+Shift+R / Cmd+Shift+R) bypasses this on a single page; the proper fix is filename-hashing via Django's `ManifestStaticFilesStorage` (not currently enabled).
 
 ### Manage global regions and predefined feeds
 

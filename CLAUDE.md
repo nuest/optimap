@@ -256,6 +256,17 @@ python manage.py reset_harvest_schedules
 # Rebuilds the recurring `Harvest Source <id>` schedules with a deferred
 # next_run (and stagger by default), recovering from a state where every
 # source's schedule fires at once. Flags: --dry-run, --no-stagger, --clear-manual.
+
+# Clear Django caches
+python manage.py clear_caches
+# Clears all configured Django cache backends (`memory`, `default`, `dummy`).
+# Django ships no built-in `clearcache` (see SO #5942759); this command
+# makes the operation explicit, idempotent, and scriptable for deploy hooks.
+# Flags: --cache <alias> (repeatable, clear only those), --exclude <alias>
+# (repeatable, clear all except those — `--exclude default` preserves
+# in-flight login-magic / email-confirmation tokens), --dry-run.
+# See docs/manage.md → "Manage data dumps and caches" for which backend
+# stores what and when to clear which.
 ```
 
 #### Django-Q Task Management

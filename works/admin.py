@@ -322,6 +322,49 @@ class SourceAdmin(admin.ModelAdmin):
     search_fields = ("name", "url_field", "issn_l", "publisher_name", "openalex_id", "collection__name")
     actions = [trigger_harvesting_for_specific, trigger_harvesting_for_all, schedule_harvesting]
     inlines = [RecentHarvestingEventInline]
+    # Grouped fieldsets so operators can find which fields belong together —
+    # see docs/manage.md → "Source field cheatsheet" for what to enter where
+    # per source_type.
+    fieldsets = (
+        ("Identification (mandatory)", {
+            "fields": ("name", "source_type", "url_field"),
+            "description": (
+                "<code>name</code>, <code>source_type</code>, and <code>url_field</code> "
+                "are the only mandatory fields. What to put in <code>url_field</code> "
+                "depends on the source type — see docs/manage.md."
+            ),
+        }),
+        ("Harvesting configuration", {
+            "fields": (
+                "harvest_interval_minutes",
+                "collection",
+                "default_work_type",
+            ),
+            "description": (
+                "<code>harvest_interval_minutes = 0</code> means manual-only. "
+                "Set a positive value to enable auto-scheduling. Leaving "
+                "<code>collection</code> blank is fine — harvesting still works."
+            ),
+        }),
+        ("OpenAlex / external identifiers", {
+            "fields": ("openalex_id", "openalex_url", "issn_l", "abbreviated_title"),
+            "description": (
+                "For <code>source_type=openalex</code> the harvester resolves "
+                "the <code>S&lt;id&gt;</code> from <code>openalex_id</code> "
+                "first, then <code>openalex_url</code>, then <code>url_field</code>. "
+                "All three optional for other source types."
+            ),
+        }),
+        ("Display metadata", {
+            "fields": ("publisher_name", "homepage_url", "is_oa", "is_preprint", "tags"),
+            "description": "All optional. Display only — none of these affect harvesting.",
+        }),
+        ("Statistics (auto-populated)", {
+            "fields": ("works_count", "cited_by_count", "last_harvest"),
+            "classes": ("collapse",),
+        }),
+    )
+    readonly_fields = ("last_harvest",)
 
     @admin.display(description="Latest event")
     def latest_event_status(self, obj):

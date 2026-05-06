@@ -850,11 +850,34 @@ python manage.py collectstatic --noinput
 
 # Update global regions if needed
 python manage.py load_global_regions
-'
+
+# Insert / update built-in journal sources from SOURCE_CONFIG.
+python manage.py harvest_journals --insert-sources
+' #end of bash command
 
 # Start services
 echo "Starting services..."
 sudo systemctl start optimap optimap-worker
+
+# Clear Django caches so the next request regenerates content from the new code
+#
+# Notes:
+# - The 'memory' (LocMemCache) backend is already empty after the restart
+#   since each Gunicorn worker starts fresh; re-clearing is harmless.
+# - The 'default' (DatabaseCache) backend persists across restarts and
+#   stores login-magic tokens, email-change confirmations, and GeoRSS feed
+#   bodies. Clearing it invalidates in-flight tokens. To preserve them,
+#   replace the call below with:
+#       python manage.py clear_caches --exclude default
+# - Browsers may still serve their own cached copies of pages
+#   (Cache-Control: max-age=…) and static files (expires 30d on /static/);
+#   a hard refresh (Ctrl+Shift+R / Cmd+Shift+R) bypasses both.
+echo "Clearing Django caches..."
+sudo -u optimap bash -c '
+source /opt/optimap/venv/bin/activate
+cd /opt/optimap/app
+python manage.py clear_caches
+'
 
 # Verify services
 sleep 5
