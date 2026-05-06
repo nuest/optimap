@@ -72,6 +72,24 @@ gdal-config --version
 # Expected: 3.4.x or higher
 ```
 
+### Install Cairo and Pango (preview image rendering)
+
+The preview image service uses `cairosvg` (via `cairocffi`), which dynamically
+loads the system Cairo library. Without these, `manage.py migrate` (and any
+other command that imports the URL conf) fails with
+`OSError: no library called "cairo-2" was found`.
+
+```bash
+sudo apt install -y \
+    libcairo2 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libgdk-pixbuf-2.0-0
+```
+
+> On Ubuntu 22.04 the GdkPixbuf package is named `libgdk-pixbuf2.0-0` (no dash
+> before `2.0`). Use whichever apt resolves on your release.
+
 ### Install PostgreSQL with PostGIS
 
 ```bash
@@ -225,6 +243,9 @@ OPTIMAP_EMAIL_HOST_PASSWORD=your_email_password
 
 # Logging
 OPTIMAP_LOGGING_LEVEL=INFO
+
+# Add admin users here, changes require server restart
+OPTIMAP_SUPERUSER_EMAILS=your@email.url,another@admin.tld
 ```
 
 Set secure permissions:
@@ -260,6 +281,70 @@ python manage.py load_global_regions
 
 # Collect static files (will be collected to /opt/optimap/static via symlink)
 python manage.py collectstatic --noinput
+'
+```
+
+After `collectstatic`, ensure nginx (running as `www-data`) can read and
+traverse the static tree. Depending on the `optimap` user's umask and Django's
+`FILE_UPLOAD_DIRECTORY_PERMISSIONS`, collected subdirectories may end up
+`drwxrwx---` — top-level files load but anything under `static/js/`,
+`static/css/`, `static/leaflet/`, etc. returns `403 Permission denied`:
+
+```bash
+sudo chmod -R a+rX /opt/optimap/static
+```
+
+`a+rX` (capital `X`) adds read for everyone and adds traverse on directories
+only — idempotent, safe to rerun, and the right operation here because the
+files themselves are already world-readable; only directory-execute is
+missing.
+
+#### Resolve errors
+
+**`load_global_regions` fails with `Connection reset by peer`?**
+The command pulls the MarineRegions "Global Oceans and Seas v1" GeoPackage
+from `https://marineregions.org/download_file.php?name=GOaS_v1_20211214_gpkg.zip`,
+and that endpoint is rate-limited and sometimes drops the TLS handshake
+(`urllib.error.URLError: <urlopen error [Errno 104] Connection reset by peer>`).
+The continents step succeeds first, so a partial run is normal — just rerun
+the command; it is idempotent and skips work that's already done.
+
+If retries keep failing, download the ZIP manually and place the extracted
+`.gpkg` at `/opt/optimap/cache/regions/goas_v01.gpkg` (that path matches
+`OPTIMAP_GLOBAL_REGIONS_DATA_DIR` from your `.env` plus the filename the
+loader expects). The MarineRegions endpoint requires a POST with
+registration fields (the same ones the loader sends), so a plain `wget URL`
+will not work — use curl with `--data-urlencode`:
+
+```bash
+sudo install -d -o optimap -g optimap /opt/optimap/cache/regions && \
+  curl -fL -o /tmp/goas.zip \
+    --data-urlencode 'name=OPTIMAP Project TU Dresden' \
+    --data-urlencode 'organisation=TU Dresden' \
+    --data-urlencode 'email=komet@tu-dresden.de' \
+    --data-urlencode 'country=Germany' \
+    --data-urlencode 'user_category=academia' \
+    --data-urlencode 'purpose_category=Research' \
+    --data-urlencode 'agree=1' \
+    'https://marineregions.org/download_file.php?name=GOaS_v1_20211214_gpkg.zip' && \
+  sudo unzip -j -o /tmp/goas.zip '*.gpkg' -d /opt/optimap/cache/regions/ && \
+  sudo mv /opt/optimap/cache/regions/*.gpkg /opt/optimap/cache/regions/goas_v01.gpkg && \
+  sudo chown optimap:optimap /opt/optimap/cache/regions/goas_v01.gpkg
+```
+
+Or fetch it interactively from <https://www.marineregions.org/downloads.php>
+("Global Oceans and Seas v1", GeoPackage) on your laptop and `scp` the
+extracted `.gpkg` into place.
+Make sure the owner of the file is `optimap`.
+
+Either way, rerun the loader once the file is
+present. The loader will see the file and skip the download:
+
+```bash
+sudo -u optimap bash -c '
+source /opt/optimap/venv/bin/activate
+cd /opt/optimap/app
+python manage.py load_global_regions
 '
 ```
 
@@ -413,6 +498,19 @@ sudo systemctl status optimap-worker
 
 ### Create site configuration
 
+This deployment uses an **existing** certbot installation rooted at
+`/var/www/komet/optimap/certbot/`, with `--config-dir
+/var/www/komet/optimap/certbot/conf` and webroot
+`/var/www/komet/optimap/certbot/www`. Certificates already live at:
+
+- `…/certbot/conf/live/optimap.geo.tu-dresden.de/fullchain.pem`
+- `…/certbot/conf/live/optimap.geo.tu-dresden.de/privkey.pem`
+
+If you are deploying a different host, replace `optimap.geo.tu-dresden.de` and
+the `…/certbot/{conf,www}` paths throughout. If certbot's config dir is the
+default (`/etc/letsencrypt/`), see the `## SSL certificate setup` section
+below for how the paths shift back.
+
 Create `/etc/nginx/sites-available/optimap`:
 
 ```bash
@@ -429,11 +527,11 @@ upstream optimap_server {
 server {
     listen 80;
     listen [::]:80;
-    server_name optimap.example.com;
+    server_name optimap.geo.tu-dresden.de;
 
-    # Let's Encrypt ACME challenge
+    # Let's Encrypt ACME challenge (matches certbot --webroot)
     location /.well-known/acme-challenge/ {
-        root /var/www/certbot;
+        root /var/www/komet/optimap/certbot/www;
     }
 
     # Redirect all other traffic to HTTPS
@@ -446,13 +544,20 @@ server {
 server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
-    server_name optimap.example.com;
+    server_name optimap.geo.tu-dresden.de;
 
-    # SSL configuration (will be managed by certbot)
-    ssl_certificate /etc/letsencrypt/live/optimap.example.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/optimap.example.com/privkey.pem;
-    include /etc/letsencrypt/options-ssl-nginx.conf;
-    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+    # SSL configuration — paths point at the custom certbot --config-dir.
+    # Replace with /etc/letsencrypt/live/<domain>/… if certbot uses defaults.
+    ssl_certificate     /var/www/komet/optimap/certbot/conf/live/optimap.geo.tu-dresden.de/fullchain.pem;
+    ssl_certificate_key /var/www/komet/optimap/certbot/conf/live/optimap.geo.tu-dresden.de/privkey.pem;
+
+    # Modern SSL settings (replaces certbot's options-ssl-nginx.conf, which
+    # lives under /etc/letsencrypt and is absent with the custom config dir)
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
 
     # Security headers
     add_header X-Frame-Options "SAMEORIGIN" always;
@@ -522,10 +627,10 @@ server {
 
 ### Enable the site
 
-```bash
-# Create certbot webroot directory
-sudo mkdir -p /var/www/certbot
+The certbot webroot (`/var/www/komet/optimap/certbot/www`) already exists in
+this deployment, so no `mkdir` is needed.
 
+```bash
 # Enable site
 sudo ln -s /etc/nginx/sites-available/optimap /etc/nginx/sites-enabled/
 
@@ -538,56 +643,63 @@ sudo nginx -t
 
 ## SSL certificate setup
 
-### Obtain certificate with Let's Encrypt
+This deployment already has a certbot install at
+`/var/www/komet/optimap/certbot/` with a valid certificate for
+`optimap.geo.tu-dresden.de`, so the initial cert acquisition is **not**
+needed — the nginx config above points straight at the existing files. Skip
+to "Automatic certificate renewal" below.
 
-Before running certbot, temporarily modify the nginx config to work without SSL:
+The rest of this section documents how to (re)issue a certificate against
+the same custom config dir, e.g. for a new host or after a teardown.
 
-```bash
-# Create a temporary HTTP-only config for initial certificate request
-sudo nano /etc/nginx/sites-available/optimap-temp
-```
+### (Optional) Issue a certificate with Let's Encrypt
 
-```nginx
-server {
-    listen 80;
-    server_name optimap.example.com;
-
-    location /.well-known/acme-challenge/ {
-        root /var/www/certbot;
-    }
-
-    location / {
-        return 200 "Setting up SSL...";
-        add_header Content-Type text/plain;
-    }
-}
-```
+If certs do not yet exist, bring nginx up with **only the HTTP server block**
+first (comment out the `listen 443 …` block, since it will fail to start
+without certs), reload nginx, then run certbot pointed at the custom
+directories:
 
 ```bash
-# Enable temporary config
-sudo ln -sf /etc/nginx/sites-available/optimap-temp /etc/nginx/sites-enabled/optimap
-sudo systemctl reload nginx
-
-# Obtain certificate
-sudo certbot certonly --webroot -w /var/www/certbot -d optimap.example.com
-
-# Switch back to full config
-sudo ln -sf /etc/nginx/sites-available/optimap /etc/nginx/sites-enabled/optimap
-sudo rm /etc/nginx/sites-available/optimap-temp
-sudo systemctl reload nginx
+sudo certbot certonly \
+    --webroot -w /var/www/komet/optimap/certbot/www \
+    --config-dir /var/www/komet/optimap/certbot/conf \
+    --work-dir   /var/www/komet/optimap/certbot/work \
+    --logs-dir   /var/www/komet/optimap/certbot/logs \
+    -d optimap.geo.tu-dresden.de
 ```
+
+After this succeeds, restore the HTTPS server block in
+`/etc/nginx/sites-available/optimap` and `sudo systemctl reload nginx`.
+
+> If you are using certbot's default config dir (`/etc/letsencrypt/`), drop
+> the `--config-dir`/`--work-dir`/`--logs-dir` flags and use webroot
+> `/var/www/certbot` (creating it first with `sudo mkdir -p /var/www/certbot`).
 
 ### Automatic certificate renewal
 
-Certbot installs a systemd timer for automatic renewal. Verify it's active:
+Because this deployment uses a non-default config dir, the standard
+`certbot.timer` systemd unit (which runs `certbot renew` against
+`/etc/letsencrypt/`) will **not** renew these certs. Either:
+
+- Run renewals via a custom cron entry / systemd timer that passes the
+  same `--config-dir`/`--work-dir`/`--logs-dir` flags as above, plus
+  `--deploy-hook 'systemctl reload nginx'`.
+- Or, if a hook script in `…/certbot/conf/renewal-hooks/` already takes
+  care of reload, just verify that scheduling is in place.
+
+Test the renewal command end-to-end with `--dry-run` before relying on it:
+
+```bash
+sudo certbot renew --dry-run \
+    --config-dir /var/www/komet/optimap/certbot/conf \
+    --work-dir   /var/www/komet/optimap/certbot/work \
+    --logs-dir   /var/www/komet/optimap/certbot/logs
+```
+
+If you are on certbot defaults, the much simpler form applies:
 
 ```bash
 sudo systemctl status certbot.timer
-```
-
-Test renewal process:
-
-```bash
 sudo certbot renew --dry-run
 ```
 
@@ -612,7 +724,7 @@ Create `/etc/logrotate.d/optimap`:
 sudo nano /etc/logrotate.d/optimap
 ```
 
-```
+```txt
 /opt/optimap/logs/*.log {
     daily
     missingok
@@ -680,7 +792,7 @@ sudo crontab -u optimap -e
 
 Add:
 
-```
+```cron
 # Daily database backup at 2:00 AM
 0 2 * * * /opt/optimap/scripts/backup-db.sh >> /opt/optimap/logs/backup.log 2>&1
 ```
@@ -863,13 +975,18 @@ python manage.py dbshell
 '
 ```
 
-**Static files not loading:**
+**Static files not loading (403 Permission denied in nginx error log):**
 
 ```bash
-# Verify static files are collected
+# Inspect modes — files should be world-readable, directories world-traversable
 ls -la /opt/optimap/static/
 
-# Re-collect if needed
+# Common culprit: subdirs come out 'drwxrwx---' (770) so nginx (www-data)
+# cannot traverse into static/js/, static/css/, static/leaflet/ etc.
+# Fix idempotently — read for all, traverse on directories only:
+sudo chmod -R a+rX /opt/optimap/static
+
+# If files are also missing entirely, re-collect:
 sudo -u optimap bash -c '
 source /opt/optimap/venv/bin/activate
 cd /opt/optimap/app
@@ -976,3 +1093,4 @@ sudo systemctl reload nginx
 | `/opt/optimap/backups/` | Database backups |
 | `/opt/optimap/cache/` | Data dump cache |
 | `/opt/optimap/gunicorn.sock` | Gunicorn Unix socket |
+
