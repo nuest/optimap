@@ -180,7 +180,7 @@ python manage.py load_global_regions
 
 # Harvest publications from real OAI-PMH journal sources
 python manage.py harvest_journals --list  # List available journals
-python manage.py harvest_journals --all --max-records 20  # Harvest all journals (limited to 20 records each)
+python manage.py harvest_journals --all --max-records 20 --create-sources  # Initial harvesting of all journals (limited to 20 records each)
 python manage.py harvest_journals --journal essd --journal geo-leo  # Harvest specific journals
 
 # Start the Django development server
@@ -512,6 +512,7 @@ See also documentation at <https://code.visualstudio.com/docs/python/tutorial-dj
 Work landing pages, the homepage, and the regional feed pages emit Open Graph, Twitter Card, and schema.org JSON-LD via [django-meta](https://github.com/nephila/django-meta). The OPTIMAP-side helpers live in [`works/seo.py`](works/seo.py); each view that wants metadata builds a `Meta` object and passes it as `context['meta']`. The base template (`works/templates/base.html`) renders `meta/meta.html` from django-meta when that key is present.
 
 Per-page extras:
+
 - **Work landing**: schema.org `ScholarlyArticle` (with `spatialCoverage`/`temporalCoverage` mirroring what we consume from Janeway), Google Scholar `citation_*` tags, and an Open Graph image at `/work/<identifier>/preview.png`.
 - **Homepage**: schema.org `WebSite` + `SearchAction`.
 - **Regional feed pages**: schema.org `CollectionPage` with the region as `about` (a `Place` with the bbox).

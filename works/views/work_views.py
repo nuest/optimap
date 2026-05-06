@@ -29,7 +29,7 @@ from django.urls import reverse
 from django.http import Http404, FileResponse
 from django.views.decorators.http import require_GET
 from works.models import Work
-from works.seo import build_schema_org_for_work, build_work_meta, citation_meta_tags, coins_title
+from works.seo import build_schema_org_for_work, build_work_meta, citation_meta_tags, coins_title, geo_meta_tags
 from works.services.preview_image import (
     cache_path_for as _preview_cache_path,
     render_work_preview,
@@ -256,6 +256,7 @@ def _build_work_landing_cacheable(request, work, identifier_type):
         "identifier_type": identifier_type,
         "schema_org": build_schema_org_for_work(work, request),
         "citation_tags": citation_meta_tags(work, request),
+        "geo_tags": geo_meta_tags(work),
         "coins_ctx": coins_title(work),
         "canonical_url": request.build_absolute_uri(
             reverse("optimap:work-landing", args=[work.get_identifier()])

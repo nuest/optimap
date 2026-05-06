@@ -79,7 +79,13 @@ def _find_jsonld(soup: BeautifulSoup) -> list[dict]:
     return blobs
 
 
+@override_settings(GEOCODE_WORKS_ON_SAVE=False)
 class WorkLandingSEOTests(TestCase):
+    """SEO / meta-tag rendering tests. The reverse-geocoding pre_save signal
+    is disabled here so the test suite never hits Nominatim — placename /
+    country_code are exercised by the dedicated tests in test_geocoding.py
+    and assigned directly here to verify the *rendering* path."""
+
     def setUp(self):
         self.client = Client()
         self.work = _make_published_work()
@@ -146,14 +152,15 @@ class WorkLandingSEOTests(TestCase):
         self.assertEqual(article.get("identifier"), f"doi:{self.work.doi}")
         self.assertEqual(article["sameAs"], f"https://doi.org/{self.work.doi}")
         self.assertEqual(len(article["author"]), 2)
-        # spatialCoverage should mirror the input geometry — full circle with what
-        # we *consume* from harvested Janeway pages. Work.geometry stores
-        # everything as a GeometryCollection wrapping the actual shape, so the
-        # JSON-LD reflects that wrapping.
+        # spatialCoverage uses schema.org's spec'd shapes (issue #222):
+        # Polygon → GeoShape with `box` ("south west north east").
         self.assertEqual(article["spatialCoverage"]["@type"], "Place")
-        self.assertEqual(article["spatialCoverage"]["geo"]["type"], "GeometryCollection")
         self.assertEqual(
-            article["spatialCoverage"]["geo"]["geometries"][0]["type"], "Polygon"
+            article["spatialCoverage"]["geo"]["@type"], "GeoShape"
+        )
+        # Sulawesi extent: south=-5.7, west=119.0, north=1.7, east=125.0.
+        self.assertEqual(
+            article["spatialCoverage"]["geo"]["box"], "-5.7 119.0 1.7 125.0"
         )
         # temporalCoverage with open-start interval, matching ISO 8601 "../end".
         self.assertEqual(article["temporalCoverage"], "../2024-12-31")
@@ -276,6 +283,104 @@ class WorkLandingSEOTests(TestCase):
         self.assertIn(
             f"rft_id=info%3Adoi%2F{self.work.doi.replace('/', '%2F')}", title
         )
+
+    def test_geo_meta_tags_present_for_geometry(self):
+        # Issue #222: geo.position + ICBM emitted from the centroid, with the
+        # two conventional separators (semicolon for geo.position, comma+space
+        # for ICBM).
+        resp = self.client.get(self.url)
+        soup = BeautifulSoup(resp.content, "html.parser")
+        geo_pos = soup.find("meta", attrs={"name": "geo.position"})
+        icbm = soup.find("meta", attrs={"name": "ICBM"})
+        self.assertIsNotNone(geo_pos, "geo.position tag missing")
+        self.assertIsNotNone(icbm, "ICBM tag missing")
+        self.assertIn(";", geo_pos["content"])
+        self.assertNotIn(";", icbm["content"])
+        self.assertIn(", ", icbm["content"])
+        # Sulawesi centroid roughly at lat=-2, lon=122.
+        lat_str, lon_str = geo_pos["content"].split(";")
+        self.assertAlmostEqual(float(lat_str), -2.0, places=0)
+        self.assertAlmostEqual(float(lon_str), 122.0, places=0)
+        # And ICBM uses the same centroid in "lat, lon" form.
+        icbm_lat, icbm_lon = (s.strip() for s in icbm["content"].split(","))
+        self.assertAlmostEqual(float(icbm_lat), float(lat_str))
+        self.assertAlmostEqual(float(icbm_lon), float(lon_str))
+
+    def test_geo_meta_tags_absent_without_geometry(self):
+        no_geom = Work.objects.create(
+            title="No-extent work",
+            url="https://example.test/article/3",
+            doi="10.1234/test.geo.none",
+            source=self.work.source,
+            status="p",
+            geometry=GeometryCollection(),
+        )
+        resp = self.client.get(reverse("optimap:work-landing", args=[no_geom.get_identifier()]))
+        soup = BeautifulSoup(resp.content, "html.parser")
+        self.assertIsNone(soup.find("meta", attrs={"name": "geo.position"}))
+        self.assertIsNone(soup.find("meta", attrs={"name": "ICBM"}))
+
+    def test_geo_placename_and_region_tags_when_fields_set(self):
+        # When the denormalized fields are populated (by the pre_save signal
+        # or the backfill command), the corresponding meta tags appear.
+        self.work.placename = "Sulawesi, Indonesia"
+        self.work.country_code = "ID"
+        self.work.save()
+        resp = self.client.get(self.url)
+        soup = BeautifulSoup(resp.content, "html.parser")
+        placename = soup.find("meta", attrs={"name": "geo.placename"})
+        region = soup.find("meta", attrs={"name": "geo.region"})
+        self.assertIsNotNone(placename)
+        self.assertIsNotNone(region)
+        self.assertEqual(placename["content"], "Sulawesi, Indonesia")
+        self.assertEqual(region["content"], "ID")
+
+    def test_geo_placename_and_region_absent_when_fields_unset(self):
+        # The two coordinate-based tags are still there, but the placename /
+        # region tags are omitted when their backing fields are empty.
+        resp = self.client.get(self.url)
+        soup = BeautifulSoup(resp.content, "html.parser")
+        self.assertIsNone(soup.find("meta", attrs={"name": "geo.placename"}))
+        self.assertIsNone(soup.find("meta", attrs={"name": "geo.region"}))
+
+    def test_jsonld_geo_is_geocoordinates_for_single_point(self):
+        # Single-point work → schema.org GeoCoordinates (latitude/longitude).
+        from django.contrib.gis.geos import Point
+        point_work = Work.objects.create(
+            title="Single-point work",
+            url="https://example.test/article/4",
+            doi="10.1234/test.geo.point",
+            source=self.work.source,
+            status="p",
+            geometry=GeometryCollection(Point(10.0, 50.0, srid=4326), srid=4326),
+            publicationDate="2025-01-14",
+        )
+        resp = self.client.get(reverse("optimap:work-landing", args=[point_work.get_identifier()]))
+        soup = BeautifulSoup(resp.content, "html.parser")
+        article = next(
+            (b for b in _find_jsonld(soup) if b.get("@type") == "ScholarlyArticle"),
+            None,
+        )
+        self.assertIsNotNone(article)
+        geo = article["spatialCoverage"]["geo"]
+        self.assertEqual(geo["@type"], "GeoCoordinates")
+        self.assertAlmostEqual(geo["latitude"], 50.0)
+        self.assertAlmostEqual(geo["longitude"], 10.0)
+
+    def test_jsonld_place_includes_placename_and_country_when_set(self):
+        # When the new denormalized fields are populated, the JSON-LD Place
+        # carries the placename + ISO country code as well.
+        self.work.placename = "Sulawesi, Indonesia"
+        self.work.country_code = "ID"
+        self.work.save()
+        resp = self.client.get(self.url)
+        soup = BeautifulSoup(resp.content, "html.parser")
+        article = next(
+            (b for b in _find_jsonld(soup) if b.get("@type") == "ScholarlyArticle"),
+            None,
+        )
+        self.assertEqual(article["spatialCoverage"]["name"], "Sulawesi, Indonesia")
+        self.assertEqual(article["spatialCoverage"]["addressCountry"], "ID")
 
     def test_unpublished_work_returns_404(self):
         # Sanity: SEO context must not leak unpublished works to anonymous users.

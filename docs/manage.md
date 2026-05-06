@@ -219,6 +219,35 @@ Work landing pages (`/work/<id>/` and `/work/<doi>/`) and collection detail page
 
 What populates in the reader's reference manager (when the OPTIMAP record has the data): title, authors, publication date, DOI, journal title, ISSN, abstract, keywords, language, publisher, volume, issue, page range, and a PDF URL when the harvested URL ends in `.pdf`. Volume / issue / page range are populated by the OpenAlex matcher only — the OAI-PMH, RSS, Crossref, and MaRESS harvesters do not currently capture them, so works that never matched against OpenAlex will be missing those four fields. The mechanics are Highwire Press `citation_*` meta tags + `ScholarlyArticle` JSON-LD + a COinS span fallback, all built in [works/seo.py](../works/seo.py) and rendered from [works/templates/work_landing_page.html](../works/templates/work_landing_page.html) and [works/templates/collection_page.html](../works/templates/collection_page.html).
 
+### Geotagging meta tags
+
+Work landing pages also emit the conventional [HTML *Geotagging* meta tags](https://en.wikipedia.org/wiki/Geotagging#HTML_pages) so map-aware crawlers and indexers can discover the work's geographic coverage without parsing the JSON-LD payload:
+
+- `geo.position` — `"lat;lon"` of the geometry's bounding-box centroid.
+- `ICBM` — `"lat, lon"`, the [Yahoo variant](https://en.wikipedia.org/wiki/ICBM_address#Modern_use). Both tags are emitted when geometry is present.
+- `geo.placename` — the human-readable Nominatim hierarchy (e.g. *"Sulawesi, Indonesia"*), only when `Work.placename` is set.
+- `geo.region` — ISO 3166-1 alpha-2 country code (e.g. `ID`), only when `Work.country_code` is set.
+
+The corresponding [schema.org `Place.geo`](https://schema.org/geo) payload follows the spec: single-point geometries are emitted as `GeoCoordinates`, anything else as `GeoShape` with `box="south west north east"` (matching the format already used for region feed pages).
+
+## Reverse geocoding (placename / country backfill)
+
+`Work.placename` and `Work.country_code` are populated by reverse-geocoding the work's geometry via [Nominatim](https://nominatim.openstreetmap.org/). For multi-point geometries — e.g. the Mountain Wetlands harvester emits one `Point` per study site — every representative point is geocoded separately and the result is reduced to the **lowest common ancestor** in the Nominatim address hierarchy. So a work with sites in Berlin and Munich resolves to *"Germany"* / `DE` (state diverges, country shared); a work spanning Germany and France resolves to `(None, None)` rather than the misleading geometric centroid in northern France. Single-Polygon works contribute one interior representative point. The walk is capped at 20 points so a 500-vertex polygon doesn't trigger 500 Nominatim requests.
+
+Reverse geocoding is **off by default** to keep harvest-heavy deployments off the OpenStreetMap rate-limit radar; turn it on by setting `OPTIMAP_GEOCODE_WORKS_ON_SAVE=True` in the deployment environment. With the flag on, every `Work.save()` (creation or geometry edit) calls `works.services.geocoding.geocode_geometry(geom)` from a `pre_save` signal — each per-point lookup is cached in the per-process `LocMemCache` (key `reverse_geocode:<lat>:<lon>` with 3-decimal-place quantisation, ~100 m, 30-day TTL) so popular regions hit memory after the first lookup. On a complete geocoding outage (no point returned an address) the existing fields are preserved; on a real "geometry spans incompatible regions" outcome the fields are honestly cleared.
+
+For an existing deployment that wants to populate the new fields retroactively, run the backfill:
+
+```bash
+python manage.py backfill_placenames                  # all works missing placename
+python manage.py backfill_placenames --limit 200      # batch the first 200
+python manage.py backfill_placenames --dry-run        # preview only, no DB writes
+python manage.py backfill_placenames --force          # re-fetch existing entries too
+python manage.py backfill_placenames --sleep 1.5      # increase courtesy delay
+```
+
+The command sleeps `--sleep` seconds (default 1.1) between cache *misses* to honour Nominatim's [1 req/s usage policy](https://operations.osmfoundation.org/policies/nominatim/). Cache hits are free. Failures (network errors, no result) are logged at WARNING level and leave the existing fields untouched — the meta tags simply omit `geo.placename` / `geo.region` until a successful lookup persists. Customise the User-Agent string via `OPTIMAP_GEOCODER_USER_AGENT`.
+
 ## Block emails and domains (anti-spam)
 
 OPTIMAP can block specific email addresses and entire domains from registering or attempting to log in.

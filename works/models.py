@@ -145,6 +145,16 @@ class Work(models.Model):
     keywords = ArrayField(models.CharField(max_length=255), blank=True, null=True, help_text="Keywords/subjects (from original source or OpenAlex)")
     topics = ArrayField(models.CharField(max_length=255), blank=True, null=True, help_text="Research topics (typically from OpenAlex)")
 
+    # Reverse-geocoded placename + region for the geometry centroid (issue
+    # #222). Populated by ``works.signals.update_work_placename`` on geometry
+    # change and by the ``backfill_placenames`` management command. Used by
+    # ``works.seo.geo_meta_tags`` to emit ``geo.placename`` / ``geo.region``
+    # HTML meta tags and by the JSON-LD ``Place`` payload.
+    placename = models.CharField(max_length=255, null=True, blank=True,
+        help_text="Reverse-geocoded placename for the geometry centroid (Nominatim).")
+    country_code = models.CharField(max_length=8, null=True, blank=True,
+        help_text="ISO 3166-1 alpha-2 country code (or 3166-2 subdivision) for the geometry centroid.")
+
     # OpenAlex-specific fields (only from OpenAlex)
     openalex_id = models.CharField(max_length=255, blank=True, null=True, db_index=True)
     openalex_match_info = models.JSONField(blank=True, null=True, help_text="Information about partial matches found")

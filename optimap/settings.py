@@ -48,6 +48,14 @@ OPTIMAP_SUPERUSER_EMAILS = [i.strip('[]') for i in env('OPTIMAP_SUPERUSER_EMAILS
 
 TEST_HARVESTING_ONLINE = env('OPTIMAP_TEST_HARVESTING_ONLINE', default=False)
 
+# Reverse-geocoding via Nominatim (issue #222) — populates Work.placename and
+# Work.country_code on save when geometry changes. Disabled by default in dev
+# / test runs to keep the test suite offline; enable in deployments where the
+# `geo.placename` / `geo.region` HTML meta tags should be emitted. The 1 req/s
+# Nominatim courtesy rate limit is honoured by the per-process cache in
+# `works.services.geocoding`.
+GEOCODE_WORKS_ON_SAVE = env('OPTIMAP_GEOCODE_WORKS_ON_SAVE', default=False)
+
 ROOT_URLCONF = 'optimap.urls'
 
 DATA_DUMP_RETENTION = int(os.getenv("OPTIMAP_DATA_DUMP_RETENTION", 3))

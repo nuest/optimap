@@ -46,7 +46,8 @@
       "WebFetch(domain:github.com)",
       "Read(//tmp/**)",
       "Bash(git mv *)",
-      "Bash(gh issue *)"
+      "Bash(gh issue *)",
+      "Bash(git add *)"
     ],
     "deny": [],
     "ask": []

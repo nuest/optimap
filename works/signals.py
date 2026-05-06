@@ -48,3 +48,43 @@ def invalidate_work_preview_cache(sender, instance, **kwargs):
     except Exception as err:  # pragma: no cover — non-critical path
         logger.debug("preview cache invalidation failed for work %s: %s",
                      instance.pk, err)
+
+
+# --- Reverse-geocoded placename / country_code (issue #222) -----------------
+
+@receiver(pre_save, sender=_Work)
+def update_work_placename(sender, instance, **kwargs):
+    """Populate ``placename`` + ``country_code`` via per-point reverse geocoding.
+
+    Only fires when ``OPTIMAP_GEOCODE_WORKS_ON_SAVE=True`` (off by default
+    so dev and the test suite never hit Nominatim). Skipped when the work
+    has no geometry.
+
+    Multi-point geometries are geocoded per-site and reduced to the lowest
+    common ancestor in the address hierarchy — a work covering Berlin and
+    Munich becomes ``("Germany", "DE")`` rather than the misleading
+    centroid-of-Berlin-and-Munich result. See
+    ``works.services.geocoding.geocode_geometry``.
+
+    On a complete geocoding failure (no point returned an address — typically
+    a transient Nominatim outage) we leave the existing fields untouched
+    rather than blank a previously-populated placename. A real "geometry
+    spans incompatible regions" result (some addresses, no shared LCA)
+    *does* clear the fields — that's the honest representation.
+    """
+    if not getattr(settings, "GEOCODE_WORKS_ON_SAVE", False):
+        return
+    geom = instance.geometry
+    if not geom or geom.empty:
+        return
+    try:
+        from works.services.geocoding import geocode_geometry
+        placename, country_code, n_geocoded = geocode_geometry(geom)
+    except Exception as err:  # pragma: no cover — geocode_geometry never raises
+        logger.warning("reverse-geocode failed for work %s: %s", instance.pk, err)
+        return
+    if n_geocoded == 0:
+        # All Nominatim calls failed — preserve any populated fields.
+        return
+    instance.placename = placename
+    instance.country_code = country_code

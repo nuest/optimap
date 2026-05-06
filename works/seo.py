@@ -11,7 +11,6 @@ Scholar tags are rendered inline because django-meta does not model them.
 
 from __future__ import annotations
 
-import json
 import re
 from typing import Iterable
 from urllib.parse import quote, urljoin
@@ -220,15 +219,91 @@ def _build_schema_org(work, request, canonical, image, authors, keywords, descri
     if work.last_page:
         payload["pageEnd"] = work.last_page
     if work.geometry and not work.geometry.empty:
-        payload["spatialCoverage"] = {
+        place: dict = {
             "@type": "Place",
-            "geo": json.loads(work.geometry.geojson),
+            "geo": _format_geo_for_schema_org(work),
         }
+        # Wikipedia/HTML geotagging tags work alongside the schema.org Place
+        # — we publish placename + country/region here when known so JSON-LD
+        # consumers (Google Knowledge Graph, etc.) and the meta-tag layer
+        # share the same denormalized values.
+        if getattr(work, "placename", None):
+            place["name"] = work.placename
+        if getattr(work, "country_code", None):
+            place["addressCountry"] = work.country_code
+        payload["spatialCoverage"] = place
     temporal = _format_temporal_iso(work)
     if temporal:
         payload["temporalCoverage"] = temporal
     payload["inLanguage"] = "en"
     return payload
+
+
+def _format_geo_for_schema_org(work) -> dict:
+    """Return a schema.org-compliant ``geo`` value for ``work.geometry``.
+
+    Per https://schema.org/geo, a ``Place.geo`` must be a ``GeoCoordinates``
+    (single point) or a ``GeoShape`` (polygon / line / box / circle).
+    The previous implementation dumped the raw GeoJSON ``GeometryCollection``,
+    which isn't a valid value and was ignored by structured-data consumers.
+
+    Detection rule: when the geometry is a single ``Point`` (either bare or
+    wrapped in a one-child ``GeometryCollection``) we emit ``GeoCoordinates``;
+    otherwise we fall back to ``GeoShape`` with a ``box`` from the envelope.
+    The ``box`` order is ``"south west north east"`` to match
+    ``build_feed_page_meta``.
+    """
+    geom = work.geometry
+    inner = geom
+    # Unwrap a one-Point GeometryCollection so single-point works render as
+    # GeoCoordinates rather than a degenerate zero-area box.
+    if geom.geom_type == "GeometryCollection" and len(geom) == 1:
+        inner = geom[0]
+    if inner.geom_type == "Point":
+        return {
+            "@type": "GeoCoordinates",
+            "latitude": inner.y,
+            "longitude": inner.x,
+        }
+    west, south, east, north = geom.extent
+    return {
+        "@type": "GeoShape",
+        "box": f"{south} {west} {north} {east}",
+    }
+
+
+def geo_meta_tags(work) -> list[dict]:
+    """List of HTML geotagging ``<meta name=… content=…>`` dicts for ``work``.
+
+    Emits the conventional tags from the Wikipedia *Geotagging — HTML pages*
+    article and Yahoo's ICBM variant when a centroid can be computed:
+
+    - ``geo.position``  → ``"lat;lon"`` (semicolon)
+    - ``ICBM``          → ``"lat, lon"`` (comma + space)
+    - ``geo.placename`` → human-readable placename, when ``Work.placename`` is set
+    - ``geo.region``    → ISO 3166-1/-2 code, when ``Work.country_code`` is set
+
+    Returns ``[]`` when the work has no geometry. The two coordinate-based
+    tags use different separators by design — both forms are still consumed
+    by long-tail crawlers and we incur no cost emitting both.
+    """
+    if not work.geometry or work.geometry.empty:
+        return []
+    center = work.get_center_coordinate()
+    if not center:
+        return []
+    lon, lat = center
+    tags: list[dict] = [
+        {"name": "geo.position", "content": f"{lat};{lon}"},
+        {"name": "ICBM", "content": f"{lat}, {lon}"},
+    ]
+    placename = getattr(work, "placename", None)
+    if placename:
+        tags.append({"name": "geo.placename", "content": placename})
+    country_code = getattr(work, "country_code", None)
+    if country_code:
+        tags.append({"name": "geo.region", "content": country_code})
+    return tags
 
 
 def _format_temporal_iso(work) -> str | None:
