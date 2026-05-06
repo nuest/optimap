@@ -9,6 +9,9 @@
 {% block extra_meta %}
 {# Google Scholar citation_* tags. Built in works/seo.py:citation_meta_tags. #}
 {% for t in citation_tags %}<meta name="{{ t.name }}" content="{{ t.content }}" />
+{% endfor %}
+{# HTML geotagging (geo.position, ICBM, geo.placename, geo.region) — issue #222. Built in works/seo.py:geo_meta_tags. #}
+{% for t in geo_tags %}<meta name="{{ t.name }}" content="{{ t.content }}" />
 {% endfor %}{% endblock %}
 
 {% block content %}
@@ -218,7 +221,16 @@
   </div>
 {% endif %}
 
+{% if has_geometry or can_contribute %}
 <div id="mini-map"></div>
+{% else %}
+<div class="alert alert-secondary" role="alert">
+  <strong><i class="fas fa-map-marked-alt"></i> This work does not include geospatial metadata.</strong>
+  No spatial extent is available for this publication, so no map can be shown.
+  Logged-in users can help by contributing missing metadata on the
+  <a href="{% url 'optimap:contribute' %}">contribution page</a>.
+</div>
+{% endif %}
 
 {% if can_contribute %}
 <div class="card mt-3">
@@ -308,13 +320,17 @@
     const useIdUrls = {{ use_id_urls|default:"false"|yesno:"true,false" }};
     const pubId = {{ work.id }};
 
-    const map = L.map('mini-map', {
+    const miniMapEl = document.getElementById('mini-map');
+    const map = miniMapEl ? L.map('mini-map', {
       scrollWheelZoom: true,
       fullscreenControl: true,
       fullscreenControlOptions: {
         position: 'topleft'
       }
-    });
+    }) : null;
+    let drawnItems = null;
+    let featureGroup = null;
+    if (map) {
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
@@ -323,7 +339,7 @@
 
     // Display existing geometry if available
     let layer = null;
-    let featureGroup = new L.FeatureGroup().addTo(map);
+    featureGroup = new L.FeatureGroup().addTo(map);
 
     if (publicationFeature) {
       layer = L.geoJSON(publicationFeature, {
@@ -345,7 +361,6 @@
     }
 
     // Add drawing controls for contributions
-    let drawnItems = null;
     if (canContribute) {
       drawnItems = new L.FeatureGroup();
       map.addLayer(drawnItems);
@@ -399,6 +414,7 @@
         }
       });
     }
+    } // end if (map)
 
     // Unified contribution form handler
     const contributionForm = document.getElementById('contribution-form');
@@ -593,19 +609,21 @@
       }
     }
 
-    // Add zoom to all features control using the shared module
-    if (typeof MapZoomToAllControl !== 'undefined') {
-      const zoomToAllControl = new MapZoomToAllControl(map, featureGroup);
-      console.log('Zoom to all features control enabled on mini-map');
-    }
+    if (map) {
+      // Add zoom to all features control using the shared module
+      if (typeof MapZoomToAllControl !== 'undefined') {
+        const zoomToAllControl = new MapZoomToAllControl(map, featureGroup);
+        console.log('Zoom to all features control enabled on mini-map');
+      }
 
-    // Add gazetteer (location search) control
-    if (typeof MapGazetteerManager !== 'undefined') {
-      const gazetteerManager = new MapGazetteerManager(map, {
-        provider: '{{ gazetteer_provider|default:"nominatim" }}',
-        placeholder: 'Search for a location...'
-      });
-      console.log('Gazetteer search enabled on work landing page');
+      // Add gazetteer (location search) control
+      if (typeof MapGazetteerManager !== 'undefined') {
+        const gazetteerManager = new MapGazetteerManager(map, {
+          provider: '{{ gazetteer_provider|default:"nominatim" }}',
+          placeholder: 'Search for a location...'
+        });
+        console.log('Gazetteer search enabled on work landing page');
+      }
     }
 
     // Curator collection-membership buttons (Add/Remove a work to/from a collection).

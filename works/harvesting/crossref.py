@@ -165,7 +165,7 @@ def _crossref_item_to_work_kwargs(
             },
             "metadata_sources": {"crossref": "doi"},
         },
-        "status": "p",
+        "status": "h",
     }
 
 

@@ -127,7 +127,7 @@ class CrossrefItemConversionTests(TestCase):
         self.assertEqual(out["doi"], "10.5194/essd-14-4681-2022")
         self.assertEqual(out["abstract"], "JATS-rendered fallback abstract.")
         self.assertEqual(out["publicationDate"], date(2022, 12, 1))
-        self.assertEqual(out["status"], "p")
+        self.assertEqual(out["status"], "h")
 
     @responses.activate
     def test_prefers_publisher_abstract_when_available(self):
@@ -280,7 +280,7 @@ class HarvestCrossrefPrefixEndToEndTests(TestCase):
         self.assertEqual(works.count(), 2)
         for w in works:
             self.assertIn("urbanisation", w.abstract.lower())
-            self.assertEqual(w.status, "p")
+            self.assertEqual(w.status, "h")
 
         event = HarvestingEvent.objects.filter(source=self.source).latest("started_at")
         self.assertEqual(event.status, "completed")
