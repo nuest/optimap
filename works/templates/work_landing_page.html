@@ -63,8 +63,12 @@
       <hr class="my-3">
       <div>
         {% if work.provenance %}
-        <a class="btn btn-sm btn-outline-secondary mb-2" data-toggle="collapse" href="#provenance-details" role="button" aria-expanded="false" aria-controls="provenance-details">
-          <i class="fas fa-history"></i> Show provenance information
+        <a class="btn btn-sm btn-outline-secondary mb-2 collapse-toggle"
+           data-toggle="collapse" href="#provenance-details" role="button"
+           aria-expanded="false" aria-controls="provenance-details"
+           data-label-show="Show provenance information"
+           data-label-hide="Hide provenance information">
+          <i class="fas fa-history"></i> <span class="collapse-toggle-label">Show provenance information</span>
         </a>
         <div class="collapse mt-2 mb-3" id="provenance-details" style="background: rgba(255,255,255,0.5); padding: 10px; border-radius: 4px;">
           {% render_provenance work.provenance %}
@@ -72,8 +76,12 @@
         {% endif %}
 
         {% if all_wikidata_exports %}
-        <a class="btn btn-sm btn-outline-info" data-toggle="collapse" href="#wikidata-export-details" role="button" aria-expanded="false" aria-controls="wikidata-export-details">
-          <i class="fas fa-database"></i> Show Wikidata export history ({{ all_wikidata_exports|length }})
+        <a class="btn btn-sm btn-outline-info collapse-toggle"
+           data-toggle="collapse" href="#wikidata-export-details" role="button"
+           aria-expanded="false" aria-controls="wikidata-export-details"
+           data-label-show="Show Wikidata export history ({{ all_wikidata_exports|length }})"
+           data-label-hide="Hide Wikidata export history ({{ all_wikidata_exports|length }})">
+          <i class="fas fa-database"></i> <span class="collapse-toggle-label">Show Wikidata export history ({{ all_wikidata_exports|length }})</span>
         </a>
         <div class="collapse mt-2" id="wikidata-export-details">
           <div style="background: rgba(255,255,255,0.5); padding: 15px; border-radius: 4px;">
@@ -650,6 +658,25 @@
           if (data && data.success) { location.reload(); }
           else { alert('Action failed: ' + (data && data.error ? data.error : 'unknown error')); btn.disabled = false; }
         }).catch(function (err) { alert('Action failed: ' + err); btn.disabled = false; });
+      });
+    });
+    // Swap "Show X" ↔ "Hide X" on collapsible toggle buttons so the action
+    // text matches the resulting state. Uses Bootstrap's collapse events on
+    // the target panel; the trigger anchor carries data-label-show /
+    // data-label-hide and a .collapse-toggle-label span to update.
+    document.querySelectorAll('.collapse-toggle').forEach(function (toggle) {
+      var targetSel = toggle.getAttribute('href') || toggle.getAttribute('data-target');
+      if (!targetSel) { return; }
+      var target = document.querySelector(targetSel);
+      if (!target) { return; }
+      var label = toggle.querySelector('.collapse-toggle-label');
+      var showText = toggle.getAttribute('data-label-show');
+      var hideText = toggle.getAttribute('data-label-hide');
+      $(target).on('show.bs.collapse', function () {
+        if (label && hideText) { label.textContent = hideText; }
+      });
+      $(target).on('hide.bs.collapse', function () {
+        if (label && showText) { label.textContent = showText; }
       });
     });
   </script>

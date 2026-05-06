@@ -180,6 +180,23 @@ class WorkLandingPageTest(TestCase):
         expected_title = f'<title>{self.pub_with_doi.title} ({self.pub_with_doi.doi}) - OPTIMAP</title>'
         self.assertIn(expected_title, content)
 
+    def test_provenance_toggle_carries_show_and_hide_labels(self):
+        # The provenance and Wikidata-history collapse toggles must carry
+        # both labels so the small JS snippet on the landing page can swap
+        # them on Bootstrap's show.bs.collapse / hide.bs.collapse events.
+        admin = User.objects.create_user(
+            username='adm@x.com', email='adm@x.com', password='p123', is_staff=True,
+        )
+        # Need provenance content to render the toggle.
+        self.pub_with_doi.provenance = {'harvest': {'harvester': 'test'}, 'events': []}
+        self.pub_with_doi.save()
+        self.client.login(username='adm@x.com', password='p123')
+        resp = self.client.get(f"/work/{self.pub_with_doi.doi}/")
+        body = resp.content.decode()
+        self.assertIn('data-label-show="Show provenance information"', body)
+        self.assertIn('data-label-hide="Hide provenance information"', body)
+        self.assertIn('class="collapse-toggle-label">Show provenance information</span>', body)
+
     def test_html_title_format(self):
         """Test that the HTML <title> tag has proper format and structure."""
         response = self.client.get(f"/work/{self.pub_with_doi.doi}/")

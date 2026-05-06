@@ -386,9 +386,12 @@ body.high-contrast #accessibility-toggle:hover {
    Improved Link Visibility
    ========================================================================== */
 
-/* External link indicators should be more visible */
-a[target="_blank"]::after,
-a[rel*="external"]::after {
+/* External link indicators should be more visible.
+   Skip links that already render their own external-link icon (templates and
+   JS-built popups frequently include an explicit <i class="fa-external-link-alt">),
+   otherwise we'd stack two icons on the same link. */
+a[target="_blank"]:not(:has(.fa-external-link-alt))::after,
+a[rel*="external"]:not(:has(.fa-external-link-alt))::after {
   content: " \f08e"; /* FontAwesome 6 arrow-up-right-from-square icon */
   font-family: "Font Awesome 6 Free";
   font-weight: 900;
@@ -398,8 +401,8 @@ a[rel*="external"]::after {
 }
 
 /* High contrast external link indicators */
-body.high-contrast a[target="_blank"]::after,
-body.high-contrast a[rel*="external"]::after {
+body.high-contrast a[target="_blank"]:not(:has(.fa-external-link-alt))::after,
+body.high-contrast a[rel*="external"]:not(:has(.fa-external-link-alt))::after {
   opacity: 1;
   color: inherit;
 }

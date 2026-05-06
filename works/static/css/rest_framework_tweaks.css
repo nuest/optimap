@@ -12,6 +12,20 @@ ul.breadcrumb {
     font-weight: bold;
 }
 
+/* DRF renders breadcrumbs as plain <li>, but Bootstrap 4's spacing/separator
+   rules only target .breadcrumb-item, so links collapse against each other
+   ("Api Root" → "Work list" with no gap). Replicate the BS4 behavior here. */
+ul.breadcrumb li + li {
+    padding-left: .5rem;
+}
+
+ul.breadcrumb li + li::before {
+    display: inline-block;
+    padding-right: .5rem;
+    color: #6c757d;
+    content: "/";
+}
+
 .breadcrumb li.active a {
     color: #777;
     padding: 0 10px;
@@ -51,6 +65,7 @@ html, body {
     top: 0;
     left: 0;
     padding-top: 60px;
+    padding-bottom: 80px;
     margin: -60px 0;
     min-height: 100%;
 }
