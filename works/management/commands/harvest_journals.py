@@ -121,16 +121,15 @@ SOURCE_CONFIG = {
     },
     'agile-giss-openalex': {
         'name': 'AGILE GIScience Series (OpenAlex)',
-        # The harvester resolves S<digits> from openalex_id / openalex_url /
-        # url_field; we keep the OpenAlex Source URL here for clarity in the
-        # admin and so --insert-sources stores something meaningful.
+        # The harvester resolves S<digits> from openalex_id (preferred) or
+        # url_field (fallback). The public Source API derives the display URL
+        # from openalex_id on the fly.
         'url': 'https://api.openalex.org/sources/S4210203054',
         'collection_name': 'AGILE-GISS',
         'homepage_url': 'https://www.agile-giscience-series.net/articles/index.html',
         'publisher_name': 'Copernicus Publications',
         'source_type': 'openalex',
         'openalex_id': 'S4210203054',
-        'openalex_url': 'https://openalex.org/sources/S4210203054',
         'is_oa': True,
         'default_work_type': 'proceedings-article',
     },
@@ -596,7 +595,6 @@ class Command(BaseCommand):
                 is_preprint=config.get('is_preprint', False),
                 default_work_type=config.get('default_work_type', 'article'),
                 openalex_id=config.get('openalex_id'),
-                openalex_url=config.get('openalex_url'),
                 harvest_interval_minutes=0,
             )
             self.stdout.write(self.style.SUCCESS(
@@ -651,7 +649,6 @@ class Command(BaseCommand):
             is_preprint=config.get('is_preprint', False),
             default_work_type=config.get('default_work_type', 'article'),
             openalex_id=config.get('openalex_id'),
-            openalex_url=config.get('openalex_url'),
             harvest_interval_minutes=0,
         )
 

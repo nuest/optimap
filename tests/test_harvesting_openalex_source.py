@@ -97,12 +97,11 @@ class ResolveOpenAlexSourceIdTests(TestCase):
 
     def test_prefers_openalex_id_field(self):
         s = self._src(openalex_id="S4210203054",
-                      openalex_url="https://openalex.org/sources/S9999",
                       url_field="https://example.test/no-s-here")
         self.assertEqual(_resolve_openalex_source_id(s), "S4210203054")
 
-    def test_falls_back_to_openalex_url(self):
-        s = self._src(openalex_url="https://openalex.org/sources/S4210203054",
+    def test_accepts_full_url_in_openalex_id(self):
+        s = self._src(openalex_id="https://openalex.org/S4210203054",
                       url_field="https://example.test/no-s-here")
         self.assertEqual(_resolve_openalex_source_id(s), "S4210203054")
 

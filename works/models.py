@@ -526,8 +526,9 @@ class Source(models.Model):
             'ListRecords URL incl. metadataPrefix. RSS: feed URL. '
             'Crossref-prefix: display-only (the prefix is hard-coded to '
             '10.5194 today, change requires code edit). Mountain-wetlands: '
-            'API base URL. OpenAlex: any URL containing the S<id> works, '
-            'or set openalex_id instead and put a placeholder here.'
+            'API base URL. OpenAlex: any placeholder URL works as long as '
+            'openalex_id is set to the S<id>; otherwise put a URL containing '
+            'the S<id> here.'
         ),
     )
     source_type              = models.CharField(
@@ -567,20 +568,11 @@ class Source(models.Model):
     openalex_id              = models.CharField(
         max_length=50, blank=True, null=True,
         help_text=(
-            'OpenAlex Source identifier (e.g. "S4210203054"). REQUIRED when '
-            'source_type=openalex (the harvester resolves it from openalex_id '
-            'first, then openalex_url, then url_field — whichever contains an '
-            'S<digits> token wins). Optional metadata for other source types.'
-        ),
-    )
-    openalex_url             = models.URLField(
-        max_length=512, blank=True, null=True,
-        help_text=(
-            'OpenAlex Source display URL (e.g. https://openalex.org/sources/S4210203054). '
-            'Redundant for the harvester when openalex_id is filled — kept '
-            'because the public Source API exposes it as the human-facing '
-            'OpenAlex page link. Leave blank for a clean row; the harvester '
-            'will not complain.'
+            'OpenAlex Source identifier, e.g. "S4210203054" (or the full URL '
+            '"https://openalex.org/S4210203054"). REQUIRED when '
+            'source_type=openalex — the harvester scans this field first, '
+            'then url_field, for an S<digits> token. The display URL '
+            '(`openalex_url` in the public Source API) is derived from this.'
         ),
     )
     publisher_name           = models.CharField(
@@ -629,6 +621,16 @@ class Source(models.Model):
             return None
         source_id = self.openalex_id.rstrip('/').split('/')[-1]
         return f"https://api.openalex.org/works?filter=primary_location.source.id:{source_id}"
+
+    @property
+    def openalex_url(self) -> str | None:
+        """Public OpenAlex page URL derived from ``openalex_id``."""
+        if not self.openalex_id:
+            return None
+        s_id = self.openalex_id.rstrip('/').split('/')[-1]
+        if not s_id:
+            return None
+        return f"https://openalex.org/{s_id}"
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)

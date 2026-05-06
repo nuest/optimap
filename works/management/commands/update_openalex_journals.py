@@ -76,7 +76,6 @@ class Command(BaseCommand):
 
                 metadata = {
                     "openalex_id": new_id,
-                    "openalex_url": full_id,
                     "works_count": works_count,
                     "works_api_url": works_api_url,
                     "publisher_name": publisher,

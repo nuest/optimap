@@ -70,7 +70,6 @@ class Command(BaseCommand):
 
             defaults = {
                 "openalex_id":    data.get("id"),
-                "openalex_url":   data.get("id"),
                 "publisher_name": (data.get("host_organization") or {}).get("display_name")
                                    or data.get("display_name"),
             }

@@ -27,8 +27,7 @@ The change form is grouped into five fieldsets, mirrored below. **Only the three
 | **Harvesting configuration** | `harvest_interval_minutes` | Defaulted to `0` | `0` = manual-only. `>0` = auto-schedule via Django-Q (`Harvest Source <id>`). |
 | | `collection` | Optional | Default `Collection` for harvested works. Blank is fine — works are simply not auto-added; OAI-PMH/OJS/Janeway also auto-create one if blank. |
 | | `default_work_type` | Defaulted to `article` | Default `Work.type` for harvested works (overridden by OpenAlex metadata when present). |
-| **OpenAlex / external IDs** | `openalex_id` | **Yes for `source_type=openalex`**, optional otherwise | OpenAlex Source identifier (`S<digits>`). |
-| | `openalex_url` | Optional | OpenAlex Source URL. Optional fallback for `openalex_id` when `source_type=openalex`. |
+| **OpenAlex / external IDs** | `openalex_id` | **Yes for `source_type=openalex`**, optional otherwise | OpenAlex Source identifier (`S<digits>`, or the full `https://openalex.org/S<id>` URL). The display URL exposed by the public Source API as `openalex_url` is derived from this field on the fly. |
 | | `issn_l`, `abbreviated_title` | Optional | Display only. |
 | **Display metadata** | `publisher_name`, `homepage_url`, `is_oa`, `is_preprint`, `tags` | Optional | Display only — none of these affect harvesting. |
 | **Statistics (auto-populated)** | `works_count`, `cited_by_count`, `last_harvest` | Read-only | Auto-populated. |
@@ -62,27 +61,26 @@ For each type, only mandatory and type-specific fields are listed; defaults / di
 
 ##### OpenAlex source (`openalex`)
 
-The harvester (`works.tasks.harvest_openalex_source`) needs the OpenAlex Source identifier `S<digits>`. It looks for an `S<digits>` substring in three fields, in this order — **first match wins**, so set whichever is most readable:
+The harvester (`works.tasks.harvest_openalex_source`) needs the OpenAlex Source identifier `S<digits>`. It looks for an `S<digits>` substring in two fields, in this order — **first match wins**:
 
-1. `openalex_id` — recommended. Set to the bare ID, e.g. `S4210203054`.
-2. `openalex_url` — fallback. Set to the canonical URL, e.g. `https://openalex.org/sources/S4210203054`.
-3. `url_field` — last fallback. Any URL containing the ID works (e.g. `https://api.openalex.org/sources/S4210203054`).
+1. `openalex_id` — recommended. Set to the bare ID, e.g. `S4210203054`, or the full URL `https://openalex.org/S4210203054`.
+2. `url_field` — fallback. Any URL containing the ID works (e.g. `https://api.openalex.org/sources/S4210203054`).
 
-Concrete example for **AGILE GIScience Series** (the one that just bit you):
+The public Source API exposes a derived `openalex_url` (`https://openalex.org/<S-id>`) computed from `openalex_id`; it is no longer a stored field, so there is no second OpenAlex field to keep in sync.
+
+Minimum-viable example for **AGILE GIScience Series**:
 
 | Field | Value |
 |-------|-------|
 | `name` | `AGILE GIScience Series (OpenAlex)` |
 | `source_type` | `openalex` |
-| `url_field` | `https://api.openalex.org/sources/S4210203054` |
+| `url_field` | `https://api.openalex.org/sources/S4210203054` *(any placeholder works as long as `openalex_id` is set)* |
 | `openalex_id` | `S4210203054` |
-| `openalex_url` | `https://openalex.org/sources/S4210203054` |
-| `publisher_name` | `Copernicus Publications` *(display)* |
-| `homepage_url` | `https://www.agile-giscience-series.net/articles/index.html` *(display)* |
 | `default_work_type` | `proceedings-article` |
-| `is_oa` | ✓ |
+| `is_oa` | ✓ *(display flag)* |
 | `harvest_interval_minutes` | `0` *(start manual, raise once a smoke run succeeds)* |
 | `collection` | optional — pick or create `agile-giss` |
+| `publisher_name`, `homepage_url` | optional display fields |
 
 > **Common error:** if you create the source with `source_type=oai-pmh` and the AGILE-GISS OAI URL (`https://oai-pmh.copernicus.org/oai.php?…&set=agile-giss`), the harvester will fail with HTTP 404 — Copernicus's OAI-PMH endpoint has been dark since 2025-12. Switch `source_type` to `openalex` and fill the OpenAlex fields above.
 > **Faster than typing it in:** `python manage.py harvest_journals --insert-sources` creates this exact AGILE-GISS-OpenAlex row (and every other built-in entry from `SOURCE_CONFIG`) idempotently — see "Bootstrap the admin from the journal config" below. Only do the manual admin route when you need a source that's not in `SOURCE_CONFIG`.
@@ -263,7 +261,7 @@ The `Source.source_type` choice field selects the harvester pipeline:
 
 OpenAlex is most useful in OPTIMAP as an *enrichment* layer (DOI-based matching during harvest), but for journals where the upstream OAI-PMH endpoint is unreliable and the Crossref payload is bibliographic-only (e.g. Copernicus journals, where the OAI-PMH endpoint at `oai-pmh.copernicus.org/oai.php` has been HTTP 404 since 2025-12), OpenAlex is also the most complete data source available. The `openalex` source type makes that an explicit, schedulable harvest path.
 
-- **Identifier:** the harvester pulls `https://api.openalex.org/works?filter=primary_location.source.id:<S-id>` where `<S-id>` is taken (in order) from `Source.openalex_id`, `Source.openalex_url`, or `Source.url_field` — anything containing the `S<digits>` token works. Set the OpenAlex Source URL on the Source change page (e.g. `https://openalex.org/sources/S4210203054` for AGILE GIScience Series).
+- **Identifier:** the harvester pulls `https://api.openalex.org/works?filter=primary_location.source.id:<S-id>` where `<S-id>` is taken (in order) from `Source.openalex_id` or `Source.url_field` — anything containing the `S<digits>` token works. Set the bare ID (e.g. `S4210203054` for AGILE GIScience Series) on the Source change page; the public Source API derives the `openalex_url` (`https://openalex.org/<S-id>`) from it on the fly.
 - **Pagination:** cursor-based (`cursor=*`), 200 records per page, polite-pool User-Agent. Honors `--max-records` and accepts a `sort` kwarg (`publication_date:desc` is the default for the comparison command, unset for production runs).
 - **What you get from OpenAlex:** title, abstract (reconstructed from `abstract_inverted_index`), publication date, authors, keywords, AI-derived topics, biblio (volume / issue / pages), `openalex_id`, `openalex_ids` (DOI / PMID / etc.), `openalex_open_access_status`, `openalex_fulltext_origin`, `openalex_is_retracted`, work type.
 - **What you don't get:** OpenAlex carries no spatial or temporal coverage. The harvester deliberately does **not** fetch publisher landing pages — for AGILE-GISS we verified that the Copernicus landing pages also carry no `DC.SpatialCoverage` / `DC.box` / schema.org `spatialCoverage` / `geo+json` link, so the round-trip would be wasted work. If you point the harvester at a journal whose landing pages *do* carry spatial metadata, leave a follow-up issue: a per-source toggle for landing-page extraction is the obvious extension.

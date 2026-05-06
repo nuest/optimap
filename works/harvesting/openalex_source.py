@@ -54,14 +54,13 @@ _OPENALEX_SOURCE_ID_RE = re.compile(r"S\d+", re.IGNORECASE)
 def _resolve_openalex_source_id(source: Source) -> str | None:
     """Return the OpenAlex source identifier (e.g. ``S4210203054``) for a Source.
 
-    Tries ``Source.openalex_id`` first (canonical), then ``Source.openalex_url``,
-    then ``Source.url_field``. None of these are required at the model level,
-    so the harvester surfaces a clear error if the operator hasn't set one.
+    Tries ``Source.openalex_id`` first (canonical), then ``Source.url_field``
+    as a fallback. Neither is required at the model level, so the harvester
+    surfaces a clear error if the operator hasn't set one.
     """
-    for candidate in (source.openalex_id, source.openalex_url, source.url_field):
+    for candidate in (source.openalex_id, source.url_field):
         if not candidate:
             continue
-        # Accept either a bare "S4210203054" or a URL containing it.
         match = _OPENALEX_SOURCE_ID_RE.search(candidate)
         if match:
             return match.group(0).upper().replace("S", "S", 1)
@@ -319,8 +318,8 @@ def harvest_openalex_source(
     """Harvest publications from a configured OpenAlex source.
 
     The Source row must have its OpenAlex source identifier set on
-    ``openalex_id`` (preferred), ``openalex_url``, or ``url_field`` —
-    anything containing the ``S<digits>`` token is accepted.
+    ``openalex_id`` (preferred) or ``url_field`` (fallback) — anything
+    containing the ``S<digits>`` token is accepted.
     """
     user = resolve_user(user)
     source = Source.objects.get(id=source_id)
@@ -335,7 +334,7 @@ def harvest_openalex_source(
         if not openalex_source_id:
             raise RuntimeError(
                 f"Source id={source.id} has no OpenAlex source identifier "
-                f"on openalex_id / openalex_url / url_field."
+                f"on openalex_id (preferred) or url_field (fallback)."
             )
 
         # Touch admin user up-front so the row exists when the harvester needs it.

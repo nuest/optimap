@@ -207,7 +207,6 @@ def create_source(pk, name, issn_l=None, is_oa=True):
             "name": name,
             "issn_l": issn_l,
             "openalex_id": f"https://openalex.org/S{pk}000000" if random.random() > 0.3 else None,
-            "openalex_url": f"https://api.openalex.org/sources/S{pk}000000" if random.random() > 0.3 else None,
             "publisher_name": f"{name.split()[0]} Publishers",
             "works_count": random.randint(100, 5000),
             "homepage_url": f"http://{name.lower().replace(' ', '')}.example.org",

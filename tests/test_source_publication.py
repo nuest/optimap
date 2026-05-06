@@ -17,12 +17,12 @@ class SourceAPITest(TestCase):
     def setUp(self):
         self.client = APIClient()
 
-        # 1. Fully populated source (works_api_url is now a property, not a field)
+        # 1. Fully populated source (openalex_url and works_api_url are
+        # properties derived from openalex_id, not stored fields)
         self.srcA = Source.objects.create(
             name="Test source A",
             issn_l="1234-5678",
             openalex_id="https://openalex.org/S012345678",
-            openalex_url="https://openalex.org/S012345678",
             publisher_name="Test Publisher A",
             works_count=42,
         )
@@ -32,7 +32,6 @@ class SourceAPITest(TestCase):
             name="No ISSN source",
             issn_l=None,
             openalex_id=None,
-            openalex_url=None,
             publisher_name=None,
             works_count=None,
         )
@@ -118,7 +117,6 @@ class PublicationAPITest(TestCase):
             name="API source",
             issn_l="1111-2222",
             openalex_id="https://openalex.org/S011112222",
-            openalex_url="https://openalex.org/S011112222",
             publisher_name="API Publisher",
             works_count=7,
         )

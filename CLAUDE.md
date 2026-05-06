@@ -318,7 +318,7 @@ All deployment-specific config uses `OPTIMAP_*` environment variables loaded fro
 
 ### Harvesting Flow
 
-1. Create/configure `Source` in admin with OAI-PMH URL, RSS/Atom feed URL, Crossref prefix, MaRESS API URL, or OpenAlex source identifier (`S<digits>` on `openalex_id`/`openalex_url`).
+1. Create/configure `Source` in admin with OAI-PMH URL, RSS/Atom feed URL, Crossref prefix, MaRESS API URL, or OpenAlex source identifier (`S<digits>` on `openalex_id`; the public `openalex_url` is now a derived property).
 2. Django-Q task creates `HarvestingEvent` (or use `harvest_journals` command for direct harvesting)
 3. Fetch XML/RSS/JSON → parse → extract DOI, spatial, temporal metadata → save `Work` records with status `h` (Harvested)
 4. Track status in `HarvestingEvent.status` (pending/in_progress/completed/failed)

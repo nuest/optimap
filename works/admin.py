@@ -347,12 +347,13 @@ class SourceAdmin(admin.ModelAdmin):
             ),
         }),
         ("OpenAlex / external identifiers", {
-            "fields": ("openalex_id", "openalex_url", "issn_l", "abbreviated_title"),
+            "fields": ("openalex_id", "issn_l", "abbreviated_title"),
             "description": (
-                "For <code>source_type=openalex</code> the harvester resolves "
-                "the <code>S&lt;id&gt;</code> from <code>openalex_id</code> "
-                "first, then <code>openalex_url</code>, then <code>url_field</code>. "
-                "All three optional for other source types."
+                "For <code>source_type=openalex</code>, set <code>openalex_id</code> "
+                "to the bare <code>S&lt;id&gt;</code> (e.g. <code>S4210203054</code>) — "
+                "the harvester also accepts the <code>S&lt;id&gt;</code> embedded in "
+                "<code>url_field</code> as a fallback. The public Source API derives "
+                "<code>openalex_url</code> on the fly. Optional for other source types."
             ),
         }),
         ("Display metadata", {

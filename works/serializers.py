@@ -13,6 +13,8 @@ from django.conf import settings
 User = get_user_model()
 
 class SourceSerializer(serializers.ModelSerializer):
+    openalex_url = serializers.ReadOnlyField()
+
     class Meta:
         model = Source
         fields = (
