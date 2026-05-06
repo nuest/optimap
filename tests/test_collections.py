@@ -85,11 +85,131 @@ class CollectionDetailPageTests(TestCase):
         self.assertEqual(body.count('class="Z3988"'), 1)
         self.assertIn(f"rft_id=info%3Adoi%2F{self.work.doi.replace('/', '%2F')}", body)
 
+    def test_card_links_to_optimap_landing_even_without_doi(self):
+        # Issue: MaRESS works have no DOI and Work.url points at the JSON API,
+        # so the card must always link to /work/<id>/ rather than the API URL.
+        no_doi = Work.objects.create(
+            title='A study without DOI', status='p',
+            url='https://example.com/api/v1/items/42',
+            geometry=GeometryCollection(Point(-1.0, 1.0)),
+            source=self.source,
+        )
+        no_doi.collections.add(self.col)
+        resp = self.client.get(reverse('optimap:collection-page', args=['mw']))
+        self.assertEqual(resp.status_code, 200)
+        body = resp.content.decode()
+        # Card title and "View work's page" button both link to /work/<id>/.
+        self.assertEqual(body.count(f'href="/work/{no_doi.id}/"'), 2)
+        # No card-level link to the external Work.url (it leaks into the map
+        # GeoJSON properties — that's fine; we only care about visible card hrefs).
+        self.assertNotIn('href="https://example.com/api/v1/items/42"', body)
+
     def test_unpublished_collection_404_for_anonymous(self):
         self.col.is_published = False
         self.col.save(update_fields=['is_published'])
         resp = self.client.get(reverse('optimap:collection-page', args=['mw']))
         self.assertEqual(resp.status_code, 404)
+
+
+class CollectionDescriptionTests(TestCase):
+    """Curator/admin can edit a collection's description inline; plain text only."""
+
+    def setUp(self):
+        self.client = Client()
+        self.col = Collection.objects.create(
+            identifier='c', name='C', is_published=True, description='Initial.',
+        )
+        self.curator = User.objects.create_user(
+            username='c@x.com', email='c@x.com', password='p123',
+        )
+        self.col.curators.add(self.curator)
+        self.outsider = User.objects.create_user(
+            username='o@x.com', email='o@x.com', password='p123',
+        )
+        self.admin = User.objects.create_user(
+            username='admin@x.com', email='admin@x.com', password='p123', is_staff=True,
+        )
+
+    def _post(self, description):
+        return self.client.post(
+            f'/collections/{self.col.id}/description/',
+            data={'description': description},
+        )
+
+    def test_anonymous_cannot_edit(self):
+        resp = self._post('hijacked')
+        # @login_required redirects to login.
+        self.assertEqual(resp.status_code, 302)
+        self.col.refresh_from_db()
+        self.assertEqual(self.col.description, 'Initial.')
+
+    def test_outsider_cannot_edit(self):
+        self.client.login(username='o@x.com', password='p123')
+        resp = self._post('hijacked')
+        self.assertEqual(resp.status_code, 403)
+        self.col.refresh_from_db()
+        self.assertEqual(self.col.description, 'Initial.')
+
+    def test_curator_can_save(self):
+        self.client.login(username='c@x.com', password='p123')
+        resp = self._post('A new description.')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()['success'], True)
+        self.col.refresh_from_db()
+        self.assertEqual(self.col.description, 'A new description.')
+
+    def test_admin_can_save(self):
+        self.client.login(username='admin@x.com', password='p123')
+        resp = self._post('Admin edit.')
+        self.assertEqual(resp.status_code, 200)
+        self.col.refresh_from_db()
+        self.assertEqual(self.col.description, 'Admin edit.')
+
+    def test_html_is_stripped_on_save(self):
+        # Plain text only — server-side strip_tags removes any HTML markup.
+        self.client.login(username='c@x.com', password='p123')
+        resp = self._post('Hello <script>alert(1)</script><b>world</b>')
+        self.assertEqual(resp.status_code, 200)
+        self.col.refresh_from_db()
+        self.assertNotIn('<script>', self.col.description)
+        self.assertNotIn('<b>', self.col.description)
+        self.assertIn('Hello', self.col.description)
+        self.assertIn('world', self.col.description)
+
+    def test_curator_sees_editor_on_detail_page(self):
+        self.client.login(username='c@x.com', password='p123')
+        resp = self.client.get(reverse('optimap:collection-page', args=[self.col.identifier]))
+        self.assertEqual(resp.status_code, 200)
+        body = resp.content.decode()
+        self.assertIn('id="collection-description-form"', body)
+        self.assertIn('id="collection-description-edit-btn"', body)
+
+    def test_outsider_does_not_see_editor(self):
+        self.client.login(username='o@x.com', password='p123')
+        resp = self.client.get(reverse('optimap:collection-page', args=[self.col.identifier]))
+        self.assertEqual(resp.status_code, 200)
+        body = resp.content.decode()
+        self.assertNotIn('id="collection-description-form"', body)
+        self.assertNotIn('id="collection-description-edit-btn"', body)
+
+    def test_admin_sees_manage_curators_link(self):
+        # Admin gets a one-click jump to the admin change page anchored on
+        # the curators field — but curators don't, since they cannot manage
+        # other curators.
+        self.client.login(username='admin@x.com', password='p123')
+        resp = self.client.get(reverse('optimap:collection-page', args=[self.col.identifier]))
+        self.assertEqual(resp.status_code, 200)
+        body = resp.content.decode()
+        self.assertIn(f'/admin/works/collection/{self.col.id}/change/#id_curators', body)
+        self.assertIn('Manage curators', body)
+
+    def test_curator_does_not_see_manage_curators_link(self):
+        self.client.login(username='c@x.com', password='p123')
+        resp = self.client.get(reverse('optimap:collection-page', args=[self.col.identifier]))
+        self.assertEqual(resp.status_code, 200)
+        body = resp.content.decode()
+        self.assertNotIn('Manage curators', body)
+        self.assertNotIn('/admin/works/collection/', body)
 
 
 class CollectionByIdRedirectTests(TestCase):

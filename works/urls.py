@@ -65,6 +65,7 @@ urlpatterns = [
     # would dispatch into the slug view and 404 on the lookup.
     path('collections/<int:collection_id>/publish/', views_collections.publish_collection, name='publish-collection'),
     path('collections/<int:collection_id>/unpublish/', views_collections.unpublish_collection, name='unpublish-collection'),
+    path('collections/<int:collection_id>/description/', views_collections.update_collection_description, name='update-collection-description'),
     path('collections/<int:collection_id>/', views_collections.collection_by_id_redirect, name='collection-by-id'),
     path('collections/<slug:collection_slug>/', views_collections.collection_page, name='collection-page'),
     path('work/<int:work_id>/collection/<int:collection_id>/add/', views_collections.add_work_to_collection, name='add-work-to-collection'),

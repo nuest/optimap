@@ -19,6 +19,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import Http404, JsonResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils.html import strip_tags
 from django.views.decorators.http import require_POST
 
 from .models import Collection, Work
@@ -87,6 +88,7 @@ def collection_page(request, collection_slug):
         'publications_geojson': _publications_to_geojson(works),
         'is_admin': is_admin,
         'is_curator': is_curator,
+        'can_edit_description': is_admin or is_curator,
         'canonical_url': request.build_absolute_uri(collection.get_absolute_url()),
     }
     return render(request, 'collection_page.html', context)
@@ -147,6 +149,26 @@ def _user_can_curate(user, collection):
     if user.is_staff:
         return True
     return collection.curators.filter(pk=user.pk).exists()
+
+
+@login_required
+@require_POST
+def update_collection_description(request, collection_id):
+    """Curators (and staff) update a collection's description.
+
+    Plain text only — incoming HTML is stripped server-side via
+    ``strip_tags``, then re-saved. The Django template ``{{ description }}``
+    auto-escapes on render, but stripping at write time also keeps the
+    persisted value clean (e.g. for API/feed consumers).
+    """
+    collection = get_object_or_404(Collection, pk=collection_id)
+    if not _user_can_curate(request.user, collection):
+        return JsonResponse({'error': 'Not a curator of this collection.'}, status=403)
+    raw = request.POST.get('description', '')
+    cleaned = strip_tags(raw).strip()
+    collection.description = cleaned
+    collection.save(update_fields=['description', 'updated_at'])
+    return JsonResponse({'success': True, 'description': cleaned})
 
 
 @login_required

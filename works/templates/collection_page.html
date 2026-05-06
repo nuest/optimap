@@ -47,6 +47,11 @@
                   <i class="fas fa-check-circle"></i> Publish
                 </button>
               {% endif %}
+              <a href="/admin/works/collection/{{ collection.id }}/change/#id_curators"
+                 class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener"
+                 title="Open the admin change page anchored on the curators field.">
+                <i class="fas fa-users-cog"></i> Manage curators
+              </a>
               <a href="/admin/works/collection/{{ collection.id }}/change/"
                  class="btn btn-primary btn-sm" target="_blank" rel="noopener">
                 <i class="fas fa-edit"></i> Edit in Admin
@@ -61,9 +66,60 @@
         </div>
       {% endif %}
 
-      {% if collection.description %}
-        <div class="lead">{{ collection.description|linebreaks }}</div>
-      {% endif %}
+      <div id="collection-description-block">
+        {% if can_edit_description %}
+          <div class="d-flex justify-content-end mb-1">
+            <button type="button"
+                    id="collection-description-edit-btn"
+                    class="btn btn-outline-secondary btn-sm"
+                    {% if not collection.description %}style="display: none;"{% endif %}>
+              <i class="fas fa-pencil-alt"></i> Edit description
+            </button>
+          </div>
+        {% endif %}
+
+        <div id="collection-description-view"
+             {% if not collection.description and not can_edit_description %}style="display: none;"{% endif %}>
+          {% if collection.description %}
+            <div class="lead">{{ collection.description|linebreaks }}</div>
+          {% elif can_edit_description %}
+            <p class="text-muted font-italic">
+              No description yet.
+              <button type="button"
+                      id="collection-description-add-btn"
+                      class="btn btn-link btn-sm p-0 align-baseline">
+                Add one.
+              </button>
+            </p>
+          {% endif %}
+        </div>
+
+        {% if can_edit_description %}
+          <form id="collection-description-form"
+                style="display: none;"
+                data-collection-id="{{ collection.id }}"
+                data-csrf="{{ csrf_token }}">
+            <div class="form-group">
+              <label for="collection-description-input" class="sr-only">Description (plain text)</label>
+              <textarea id="collection-description-input"
+                        class="form-control"
+                        rows="5"
+                        maxlength="5000"
+                        placeholder="Plain text description shown below the collection title…">{{ collection.description }}</textarea>
+              <small class="form-text text-muted">Plain text only. HTML tags will be removed on save.</small>
+            </div>
+            <div class="form-group mb-0">
+              <button type="submit" class="btn btn-primary btn-sm" id="collection-description-save-btn">
+                <i class="fas fa-save"></i> Save
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm" id="collection-description-cancel-btn">
+                Cancel
+              </button>
+              <span id="collection-description-status" class="ml-2 small text-muted"></span>
+            </div>
+          </form>
+        {% endif %}
+      </div>
 
       <p class="text-muted">
         <i class="fas fa-fingerprint"></i> <code>{{ collection.identifier }}</code>
@@ -85,17 +141,9 @@
               {% if work.coins_ctx %}<span class="Z3988" title="{{ work.coins_ctx }}"></span>{% endif %}
               <div class="card-body">
                 <h5 class="card-title">
-                  {% if work.doi %}
-                    <a href="{% url 'optimap:work-landing' work.doi %}" rel="noopener">
-                      {{ work.title|truncatechars:120 }}
-                    </a>
-                  {% elif work.url %}
-                    <a href="{{ work.url }}" target="_blank" rel="noopener noreferrer">
-                      {{ work.title|truncatechars:120 }}
-                    </a>
-                  {% else %}
-                    <span>{{ work.title|truncatechars:120 }}</span>
-                  {% endif %}
+                  <a href="{% url 'optimap:work-landing' work.get_identifier %}" rel="noopener">
+                    {{ work.title|truncatechars:120 }}
+                  </a>
                 </h5>
                 <div class="abstract-area">
                   {% if work.abstract %}
@@ -121,15 +169,9 @@
                     </div>
                   {% endif %}
                 </small>
-                {% if work.doi %}
-                  <a href="{% url 'optimap:work-landing' work.doi %}" class="btn btn-primary btn-sm">
-                    <i class="fas fa-map-marked-alt"></i> View work's page
-                  </a>
-                {% elif work.url %}
-                  <a href="{{ work.url }}" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer">
-                    View work (external)
-                  </a>
-                {% endif %}
+                <a href="{% url 'optimap:work-landing' work.get_identifier %}" class="btn btn-primary btn-sm">
+                  <i class="fas fa-map-marked-alt"></i> View work's page
+                </a>
               </div>
             </div>
           {% endfor %}
@@ -210,6 +252,77 @@
   });
   document.querySelectorAll('.collection-unpublish-btn').forEach(function (b) {
     b.addEventListener('click', function () { postToggle(b, 'unpublish'); });
+  });
+})();
+</script>
+{% endif %}
+{% if can_edit_description %}
+<script type="text/javascript">
+(function () {
+  var form = document.getElementById('collection-description-form');
+  var view = document.getElementById('collection-description-view');
+  var editBtn = document.getElementById('collection-description-edit-btn');
+  var addBtn = document.getElementById('collection-description-add-btn');
+  var cancelBtn = document.getElementById('collection-description-cancel-btn');
+  var saveBtn = document.getElementById('collection-description-save-btn');
+  var input = document.getElementById('collection-description-input');
+  var status = document.getElementById('collection-description-status');
+  if (!form || !view || !input) { return; }
+
+  function showEditor() {
+    view.style.display = 'none';
+    if (editBtn) { editBtn.style.display = 'none'; }
+    form.style.display = '';
+    input.focus();
+  }
+
+  function showView() {
+    form.style.display = 'none';
+    view.style.display = '';
+    if (editBtn) {
+      // Only re-show the "Edit" button if there is now description text to edit.
+      editBtn.style.display = input.value.trim() ? '' : 'none';
+    }
+  }
+
+  if (editBtn) { editBtn.addEventListener('click', showEditor); }
+  if (addBtn)  { addBtn.addEventListener('click', showEditor); }
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', function () {
+      // Restore the persisted value (drop unsaved edits).
+      input.value = input.defaultValue;
+      status.textContent = '';
+      showView();
+    });
+  }
+
+  form.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var id = form.getAttribute('data-collection-id');
+    var csrf = form.getAttribute('data-csrf');
+    var body = new FormData();
+    body.append('description', input.value);
+    saveBtn.disabled = true;
+    status.textContent = 'Saving…';
+    fetch('/collections/' + id + '/description/', {
+      method: 'POST',
+      headers: {'X-CSRFToken': csrf, 'Accept': 'application/json'},
+      credentials: 'same-origin',
+      body: body,
+    }).then(function (r) { return r.json(); }).then(function (data) {
+      saveBtn.disabled = false;
+      if (data && data.success) {
+        // Reload so the server-rendered linebreaks/escaping is consistent.
+        window.location.reload();
+      } else {
+        status.textContent = '';
+        alert('Save failed: ' + (data && data.error ? data.error : 'unknown error'));
+      }
+    }).catch(function (err) {
+      saveBtn.disabled = false;
+      status.textContent = '';
+      alert('Save failed: ' + err);
+    });
   });
 })();
 </script>
