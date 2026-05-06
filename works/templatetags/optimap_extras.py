@@ -86,6 +86,62 @@ def render_provenance(provenance):
             )
         sections.append(block)
 
+    geocoding = provenance.get('geocoding')
+    if isinstance(geocoding, dict) and geocoding:
+        rows = []
+        for label, key in (
+            ('Gazetteer', 'gazetteer'),
+            ('Gazetteer URL', 'gazetteer_url'),
+            ('Placename', 'placename'),
+            ('Country code', 'country_code'),
+            ('Points geocoded', 'n_geocoded'),
+            ('Geocoded at', 'geocoded_at'),
+        ):
+            v = geocoding.get(key)
+            if v is None or v == '':
+                continue
+            rows.append((label, str(v)))
+        block = format_html(
+            '<h6 class="mt-2 mb-1">Reverse geocoding</h6>'
+            '<p class="small text-muted mb-1">Placename and country code derived from the work\'s geometries via the Nominatim gazetteer.</p>'
+            '<dl class="row mb-2 small">{}</dl>',
+            format_html_join('', '<dt class="col-sm-3 text-muted">{}</dt><dd class="col-sm-9">{}</dd>', rows),
+        ) if rows else ''
+
+        matches = geocoding.get('matches')
+        if isinstance(matches, list) and matches:
+            match_items = []
+            for m in matches:
+                if not isinstance(m, dict):
+                    continue
+                display = m.get('display_name') or '(no display name)'
+                osm_url = m.get('osm_url')
+                osm_type = m.get('osm_type')
+                osm_id = m.get('osm_id')
+                lat = m.get('lat')
+                lon = m.get('lon')
+                # Format: "(lat, lon) → display name [OSM relation/51477]"
+                if osm_url and osm_type and osm_id:
+                    osm_link = format_html(
+                        ' <a href="{}" target="_blank" rel="noopener">OSM {}/{}</a>',
+                        osm_url, osm_type, osm_id,
+                    )
+                else:
+                    osm_link = ''
+                match_items.append(format_html(
+                    '<li><code>({}, {})</code> → {}{}</li>',
+                    lat, lon, display, osm_link,
+                ))
+            if match_items:
+                block = format_html(
+                    '{}<details class="small mb-2"><summary>Per-point Nominatim matches ({})</summary>'
+                    '<ul class="small">{}</ul></details>',
+                    block, len(match_items), mark_safe(''.join(match_items)),
+                )
+
+        if block:
+            sections.append(block)
+
     events = provenance.get('events')
     if isinstance(events, list) and events:
         rows = []
@@ -115,7 +171,7 @@ def render_provenance(provenance):
         ))
 
     # Anything else — show raw JSON so nothing is hidden.
-    known = {'harvest', 'metadata_sources', 'openalex_match', 'events', 'text_log'}
+    known = {'harvest', 'metadata_sources', 'openalex_match', 'geocoding', 'events', 'text_log'}
     leftover = {k: v for k, v in provenance.items() if k not in known}
     if leftover:
         sections.append(format_html(

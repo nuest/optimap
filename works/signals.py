@@ -10,7 +10,8 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 from django.conf import settings
 from django.db.models.signals import post_save
-User = get_user_model() 
+from django.utils import timezone
+User = get_user_model()
 from works.models import UserProfile
 
 @receiver(pre_save, sender=User)
@@ -78,13 +79,41 @@ def update_work_placename(sender, instance, **kwargs):
     if not geom or geom.empty:
         return
     try:
-        from works.services.geocoding import geocode_geometry
+        from works.services.geocoding import (
+            geocode_geometry, collect_geocoding_matches,
+        )
         placename, country_code, n_geocoded = geocode_geometry(geom)
     except Exception as err:  # pragma: no cover — geocode_geometry never raises
         logger.warning("reverse-geocode failed for work %s: %s", instance.pk, err)
         return
     if n_geocoded == 0:
-        # All Nominatim calls failed — preserve any populated fields.
+        # All Nominatim calls failed — preserve any populated fields, and
+        # leave any existing geocoding-provenance block untouched (it still
+        # describes the values currently in the DB).
         return
     instance.placename = placename
     instance.country_code = country_code
+
+    # Per-point matches (cache hit since geocode_geometry just populated it).
+    # For multi-point geometries the LCA placename is broader than any single
+    # match, so the honest representation is the list of underlying matches
+    # that produced it — each one with its OSM identifiers.
+    try:
+        matches = collect_geocoding_matches(geom)
+    except Exception as err:  # pragma: no cover — defensive
+        logger.warning("collect_geocoding_matches failed for work %s: %s", instance.pk, err)
+        matches = []
+
+    # Record reverse-geocoding provenance — single block, overwritten on each
+    # successful run, so it always describes the current placename / country.
+    provenance = instance.provenance if isinstance(instance.provenance, dict) else {}
+    provenance["geocoding"] = {
+        "gazetteer": "Nominatim",
+        "gazetteer_url": "https://nominatim.openstreetmap.org/",
+        "placename": placename,
+        "country_code": country_code,
+        "n_geocoded": n_geocoded,
+        "matches": matches,
+        "geocoded_at": timezone.now().isoformat(),
+    }
+    instance.provenance = provenance

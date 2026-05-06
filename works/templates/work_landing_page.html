@@ -181,6 +181,14 @@
   {% if timeperiod_label %}
     <strong>Time period:</strong> {{ timeperiod_label }} ·
   {% endif %}
+  {% if work.placename %}
+    <strong>Placename:</strong> {{ work.placename }}
+    <i class="fas fa-info-circle text-muted" title="This information was derived from the geometries of the work based on the Nominatim gazetteer." aria-label="This information was derived from the geometries of the work based on the Nominatim gazetteer."></i> ·
+  {% endif %}
+  {% if work.country_code %}
+    <strong>Region:</strong> {{ work.country_code }}
+    <i class="fas fa-info-circle text-muted" title="This information was derived from the geometries of the work based on the Nominatim gazetteer." aria-label="This information was derived from the geometries of the work based on the Nominatim gazetteer."></i> ·
+  {% endif %}
   {% if work.doi %}<strong>DOI:</strong> <a href="https://doi.org/{{ work.doi }}" target="_blank" rel="noopener">{{ work.doi }}</a> ·{% endif %}
   {% if work.publicationDate %}<strong>Published:</strong> {{ work.publicationDate }} ·{% endif %}
   {% if work.source %}

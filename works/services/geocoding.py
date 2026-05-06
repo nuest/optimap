@@ -75,7 +75,7 @@ def _build_geocoder():
     from geopy.geocoders import Nominatim
 
     user_agent = getattr(settings, "OPTIMAP_GEOCODER_USER_AGENT",
-                         "OPTIMAP/1.0 (https://optimap.science/)")
+                         settings.OPTIMAP_USER_AGENT)
     return Nominatim(user_agent=user_agent, timeout=10)
 
 
@@ -115,7 +115,23 @@ def _reverse_geocode_lookup(lat: float, lon: float) -> dict | None:
         raw = getattr(location, "raw", {}) or {}
         address = raw.get("address", {}) or {}
         display_name = getattr(location, "address", None) or raw.get("display_name")
-        result = {"address": address, "display_name": display_name}
+        # Capture the stable OSM identifiers — `osm_type` ("node"/"way"/
+        # "relation") + `osm_id` form a permalink at openstreetmap.org and are
+        # portable across Nominatim instances; `place_id` is convenient but
+        # specific to one Nominatim DB.
+        osm_type = raw.get("osm_type")
+        osm_id = raw.get("osm_id")
+        result = {
+            "address": address,
+            "display_name": display_name,
+            "osm_type": osm_type,
+            "osm_id": osm_id,
+            "place_id": raw.get("place_id"),
+            "osm_url": (
+                f"https://www.openstreetmap.org/{osm_type}/{osm_id}"
+                if osm_type and osm_id else None
+            ),
+        }
 
     cache.set(key, result, timeout=_CACHE_TTL)
     return result
@@ -216,6 +232,39 @@ def _common_address(addresses: list[dict]) -> Tuple[str | None, str | None]:
 
     placename = ", ".join(reversed(shared)) if shared else None
     return (placename, country_code)
+
+
+def collect_geocoding_matches(geom, max_points: int = 20) -> list[dict]:
+    """Per-point Nominatim matches for ``geom`` (cache-aware).
+
+    Returns one dict per representative point that returned an address, with
+    the stable OSM identifiers and the coordinates we asked Nominatim about:
+
+        {"lat": …, "lon": …, "osm_type": "relation", "osm_id": 51477,
+         "place_id": 12345, "osm_url": "https://www.openstreetmap.org/relation/51477",
+         "display_name": "Berlin, Germany"}
+
+    Shares the per-process cache with ``geocode_geometry`` so calling both
+    on the same geometry hits Nominatim only once per coordinate. Used by the
+    ``Work`` pre-save signal to record provenance for the LCA result; for
+    multi-point geometries the LCA itself doesn't have a single OSM ID, so
+    the caller stores this list instead.
+    """
+    matches: list[dict] = []
+    for lat, lon in _representative_points(geom, max_points=max_points):
+        info = _reverse_geocode_lookup(lat, lon)
+        if not info or not info.get("address"):
+            continue
+        matches.append({
+            "lat": lat,
+            "lon": lon,
+            "osm_type": info.get("osm_type"),
+            "osm_id": info.get("osm_id"),
+            "place_id": info.get("place_id"),
+            "osm_url": info.get("osm_url"),
+            "display_name": info.get("display_name"),
+        })
+    return matches
 
 
 def geocode_geometry(

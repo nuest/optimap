@@ -26,6 +26,7 @@ import time
 from django.core.cache import caches
 from django.core.management.base import BaseCommand
 from django.db.models import Q
+from django.utils import timezone
 
 from works.models import Work
 from works.services.geocoding import (
@@ -94,8 +95,12 @@ class Command(BaseCommand):
                 continue
 
             # Walk points by hand so we can sleep between Nominatim hits but
-            # skip the sleep on cache hits.
+            # skip the sleep on cache hits. Collect both the address dicts
+            # (for the LCA reduction) and the per-point match metadata (for
+            # the geocoding provenance block — same shape as
+            # ``works.services.geocoding.collect_geocoding_matches``).
             addresses = []
+            matches = []
             for lat, lon in points:
                 key = _cache_key(lat, lon)
                 hit = cache.get(key)
@@ -106,6 +111,15 @@ class Command(BaseCommand):
                     time.sleep(sleep)
                 if info and info.get("address"):
                     addresses.append(info["address"])
+                    matches.append({
+                        "lat": lat,
+                        "lon": lon,
+                        "osm_type": info.get("osm_type"),
+                        "osm_id": info.get("osm_id"),
+                        "place_id": info.get("place_id"),
+                        "osm_url": info.get("osm_url"),
+                        "display_name": info.get("display_name"),
+                    })
 
             placename, country_code = _common_address(addresses)
             self.stdout.write(
@@ -118,13 +132,30 @@ class Command(BaseCommand):
             if dry_run:
                 continue
 
+            geocoding_block = {
+                "gazetteer": "Nominatim",
+                "gazetteer_url": "https://nominatim.openstreetmap.org/",
+                "placename": placename,
+                "country_code": country_code,
+                "n_geocoded": len(addresses),
+                "matches": matches,
+                "geocoded_at": timezone.now().isoformat(),
+            }
+            existing_provenance = work.provenance if isinstance(work.provenance, dict) else {}
+            new_provenance = dict(existing_provenance)
+            new_provenance["geocoding"] = geocoding_block
+
             changed = (
-                work.placename != placename or work.country_code != country_code
+                work.placename != placename
+                or work.country_code != country_code
+                or existing_provenance.get("geocoding") != geocoding_block
             )
             if changed:
                 # Use update() to avoid bumping lastUpdate / re-running signals.
                 Work.objects.filter(pk=work.pk).update(
-                    placename=placename, country_code=country_code,
+                    placename=placename,
+                    country_code=country_code,
+                    provenance=new_provenance,
                 )
                 updated += 1
 
