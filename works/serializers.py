@@ -46,6 +46,8 @@ class WorkSerializer(GeoFeatureModelSerializer):
             "url",
             "timeperiod_startdate",
             "timeperiod_enddate",
+            "placename",
+            "country_code",
             "source_details",
             "authors",
             "keywords",

@@ -90,3 +90,32 @@ class PublicationsApiTest(TestCase):
     def test_api_publication_99_missing(self):
         response = self.client.get('/api/v1/works/99.json')
         self.assertEqual(response.status_code, 404)
+
+    def test_api_exposes_placename_and_country_code(self):
+        # Reverse-geocoded fields populated by the geocoding pipeline must
+        # surface in the public API so consumers can render them without a
+        # second roundtrip. Bypass the pre_save geocoding signal via
+        # queryset.update() so the test does not depend on Nominatim or its
+        # canonicalisation of "Berlin" → "Berlin, Germany".
+        pub = Work.objects.create(
+            title="Geocoded Work",
+            url="https://example.com/geo",
+            status="p",
+            publicationDate=date(2026, 1, 1),
+            geometry=GeometryCollection(Point(13.405, 52.52)),
+        )
+        Work.objects.filter(pk=pub.pk).update(placename="Berlin", country_code="DE")
+        response = self.client.get(f'/api/v1/works/{pub.id}.json')
+        self.assertEqual(response.status_code, 200)
+        properties = response.json()['properties']
+        self.assertEqual(properties['placename'], 'Berlin')
+        self.assertEqual(properties['country_code'], 'DE')
+
+    def test_api_emits_null_placename_when_unset(self):
+        # Works without geocoding still expose the keys (set to null) so the
+        # response shape is stable for clients.
+        properties = self.client.get('/api/v1/works/').json()['results']['features'][0]['properties']
+        self.assertIn('placename', properties)
+        self.assertIn('country_code', properties)
+        self.assertIsNone(properties['placename'])
+        self.assertIsNone(properties['country_code'])
