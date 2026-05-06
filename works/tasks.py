@@ -101,6 +101,14 @@ from works.harvesting.oai import (  # noqa: F401
     parse_oai_xml_and_save_works,
 )
 from works.harvesting.openalex import build_openalex_fields  # noqa: F401
+from works.harvesting.openalex_source import (  # noqa: F401
+    OPENALEX_API_URL,
+    OPENALEX_HTTP_TIMEOUT,
+    OPENALEX_PAGE_SIZE,
+    _openalex_session,
+    harvest_openalex_source,
+    parse_openalex_response_and_save_works,
+)
 from works.harvesting.rss import (  # noqa: F401
     harvest_rss_endpoint,
     parse_rss_feed_and_save_publications,

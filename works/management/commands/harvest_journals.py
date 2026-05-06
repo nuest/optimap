@@ -36,6 +36,7 @@ from works.tasks import (
     harvest_rss_endpoint,
     harvest_crossref_prefix,
     harvest_mountain_wetlands,
+    harvest_openalex_source,
 )
 
 logger = logging.getLogger(__name__)
@@ -96,8 +97,42 @@ SOURCE_CONFIG = {
         'enabled': False,
         'disabled_reason': (
             'Upstream OAI-PMH endpoint returns HTTP 404 since 2025-12. '
-            'Use --journal copernicus --journal-title "AGILE GIScience Series" instead.'
+            'Use agile-giss-crossref or agile-giss-openalex instead.'
         ),
+    },
+    'agile-giss-crossref': {
+        'name': 'AGILE: GIScience Series (Crossref)',
+        # Crossref-prefix harvester ignores `url` (builds its own params), but
+        # we keep a representative URL for the admin UI / --list display.
+        'url': 'https://api.crossref.org/works?filter=prefix:10.5194,container-title:AGILE%3A+GIScience+Series',
+        'collection_name': 'AGILE-GISS',
+        'homepage_url': 'https://www.agile-giscience-series.net/articles/index.html',
+        'publisher_name': 'Copernicus Publications',
+        'source_type': 'crossref-prefix',
+        'crossref_prefix': '10.5194',
+        # Baked-in container-title filter so an --all run reaches AGILE-GISS
+        # without the operator having to remember the title string. Note the
+        # colon: Crossref records the title as 'AGILE: GIScience Series'
+        # (verified 2026-05-06); without the colon the filter returns zero hits.
+        'journal_titles': ['AGILE: GIScience Series'],
+        'fetch_abstract_from_publisher': True,
+        'is_oa': True,
+        'default_work_type': 'proceedings-article',
+    },
+    'agile-giss-openalex': {
+        'name': 'AGILE GIScience Series (OpenAlex)',
+        # The harvester resolves S<digits> from openalex_id / openalex_url /
+        # url_field; we keep the OpenAlex Source URL here for clarity in the
+        # admin and so --insert-sources stores something meaningful.
+        'url': 'https://api.openalex.org/sources/S4210203054',
+        'collection_name': 'AGILE-GISS',
+        'homepage_url': 'https://www.agile-giscience-series.net/articles/index.html',
+        'publisher_name': 'Copernicus Publications',
+        'source_type': 'openalex',
+        'openalex_id': 'S4210203054',
+        'openalex_url': 'https://openalex.org/sources/S4210203054',
+        'is_oa': True,
+        'default_work_type': 'proceedings-article',
     },
     'geo-leo': {
         'name': 'GEO-LEO e-docs',
@@ -379,9 +414,12 @@ class Command(BaseCommand):
                     )
                 elif source_type == 'crossref-prefix':
                     self.stdout.write('Source type: Crossref by DOI prefix')
-                    if journal_titles:
+                    # CLI --journal-title takes precedence; otherwise fall back
+                    # to titles baked into the config (e.g. agile-giss-crossref).
+                    effective_titles = journal_titles or config.get('journal_titles')
+                    if effective_titles:
                         self.stdout.write(
-                            f'  Filtering to titles: {", ".join(journal_titles)}'
+                            f'  Filtering to titles: {", ".join(effective_titles)}'
                         )
                     fetch_abstract = (
                         config.get('fetch_abstract_from_publisher', True)
@@ -395,9 +433,20 @@ class Command(BaseCommand):
                         source.id,
                         user=user,
                         max_records=max_records,
-                        journal_titles=journal_titles,
+                        journal_titles=effective_titles,
                         prefix=config.get('crossref_prefix'),
                         fetch_abstract_from_publisher=fetch_abstract,
+                        update_existing=update_existing,
+                    )
+                elif source_type == 'openalex':
+                    self.stdout.write('Source type: OpenAlex source')
+                    self.stdout.write(
+                        f'  OpenAlex source ID: {config.get("openalex_id", "<from source row>")}'
+                    )
+                    harvest_openalex_source(
+                        source.id,
+                        user=user,
+                        max_records=max_records,
                         update_existing=update_existing,
                     )
                 else:
@@ -546,6 +595,8 @@ class Command(BaseCommand):
                 is_oa=config.get('is_oa', False),
                 is_preprint=config.get('is_preprint', False),
                 default_work_type=config.get('default_work_type', 'article'),
+                openalex_id=config.get('openalex_id'),
+                openalex_url=config.get('openalex_url'),
                 harvest_interval_minutes=0,
             )
             self.stdout.write(self.style.SUCCESS(
@@ -599,6 +650,8 @@ class Command(BaseCommand):
             is_oa=config.get('is_oa', False),
             is_preprint=config.get('is_preprint', False),
             default_work_type=config.get('default_work_type', 'article'),
+            openalex_id=config.get('openalex_id'),
+            openalex_url=config.get('openalex_url'),
             harvest_interval_minutes=0,
         )
 

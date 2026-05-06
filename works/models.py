@@ -504,6 +504,7 @@ class Source(models.Model):
         ('rss',               'RSS / Atom feed'),
         ('crossref-prefix',   'Crossref (DOI prefix)'),
         ('mountain-wetlands', 'Mountain Wetlands Repository'),
+        ('openalex',          'OpenAlex source'),
     ]
 
     # Map source_type → Django-Q task path. Types not listed here cannot be auto-scheduled.
@@ -514,6 +515,7 @@ class Source(models.Model):
         'rss':               'works.tasks.harvest_rss_endpoint',
         'crossref-prefix':   'works.tasks.harvest_crossref_prefix',
         'mountain-wetlands': 'works.tasks.harvest_mountain_wetlands',
+        'openalex':          'works.tasks.harvest_openalex_source',
     }
 
     url_field                = models.URLField(max_length=999)

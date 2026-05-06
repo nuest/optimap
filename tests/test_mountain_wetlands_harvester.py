@@ -98,8 +98,10 @@ class MountainWetlandsHarvesterTests(TestCase):
 
         baied = Work.objects.get(title__startswith='Evolution of High Andean')
         self.assertEqual(baied.publicationDate, _date(1993, 1, 1))
-        self.assertEqual(baied.timeperiod_startdate, ['1993'])
-        self.assertEqual(baied.timeperiod_enddate, ['1993'])
+        # MaRESS carries no study time period, so the temporal extent stays
+        # unset — the publication year is not a substitute for it.
+        self.assertIsNone(baied.timeperiod_startdate)
+        self.assertIsNone(baied.timeperiod_enddate)
 
     def test_provenance_records_original_record_and_match_status(self):
         with self._patched_session(self.payload), self._no_op_openalex():
