@@ -11,18 +11,24 @@
  */
 function publicationPopup(feature, layer) {
   const p = feature.properties;
+  // GeoJSON convention (and rest_framework_gis ``GeoFeatureModelSerializer``)
+  // puts the primary key at ``feature.id`` rather than in ``feature.properties``,
+  // so we have to merge both before deciding what landing-page URL to build —
+  // otherwise works without a DOI render no "View work details" button at all.
+  const featureId = feature.id || p.id;
   let html = '<div>';
 
-  // Title with link to work landing page
   if (p.title) {
     html += `<h3>${p.title}</h3>`;
+  }
 
-    // Add link to work landing page
-    if (p.doi) {
-      html += `<div style="margin-bottom: 10px;"><a href="/work/${encodeURIComponent(p.doi)}/" class="btn btn-sm btn-primary" style="color: white; text-decoration: none; padding: 5px 10px; border-radius: 3px; display: inline-block;">View work details</a></div>`;
-    } else if (p.id) {
-      html += `<div style="margin-bottom: 10px;"><a href="/work/${p.id}/" class="btn btn-sm btn-primary" style="color: white; text-decoration: none; padding: 5px 10px; border-radius: 3px; display: inline-block;">View work details</a></div>`;
-    }
+  // "View work details" button — render whenever we have an identifier, even
+  // when the title is absent, so the user can still navigate to the landing
+  // page from a single-feature popup.
+  if (p.doi) {
+    html += `<div style="margin-bottom: 10px;"><a href="/work/${encodeURIComponent(p.doi)}/" class="btn btn-sm btn-primary" style="color: white; text-decoration: none; padding: 5px 10px; border-radius: 3px; display: inline-block;">View work details</a></div>`;
+  } else if (featureId) {
+    html += `<div style="margin-bottom: 10px;"><a href="/work/${featureId}/" class="btn btn-sm btn-primary" style="color: white; text-decoration: none; padding: 5px 10px; border-radius: 3px; display: inline-block;">View work details</a></div>`;
   }
 
   // Source details from nested object

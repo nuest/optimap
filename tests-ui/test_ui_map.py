@@ -8,7 +8,7 @@ from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from helium import *
 
 from works.models import Work
-from django.contrib.gis.geos import Point, GeometryCollection
+from django.contrib.gis.geos import GEOSGeometry, GeometryCollection, Point, Polygon
 from django.contrib.auth import get_user_model
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'optimap.settings')
@@ -51,7 +51,7 @@ class SimpleTest(StaticLiveServerTestCase):
             self.assertEqual(path.web_element.get_attribute('stroke'), '#158F9B')
 
         click(leaflet_paths[0])
-        
+
         wait_until(lambda: Text('View work details').exists())
 
         # the last paper is the first in the paths
@@ -65,3 +65,58 @@ class SimpleTest(StaticLiveServerTestCase):
         # continue: click(link('Visit Article'))
 
         kill_browser()
+
+
+class NoDoiPopupTest(StaticLiveServerTestCase):
+    """Regression: works without a DOI must still expose a "View work details"
+    button in the single-feature popup. ``GeoFeatureModelSerializer`` puts the
+    primary key at ``feature.id`` (GeoJSON convention), not in
+    ``feature.properties``, so the popup builder has to check both. Without
+    that, no-DOI works (Mountain Wetlands, AGILE-GISS via OpenAlex source)
+    rendered a popup with title + abstract but no link to the landing page.
+    """
+
+    def setUp(self):
+        # Single published no-DOI work — keeps the map free of unrelated paths
+        # so we can target the click reliably. We use a Polygon (not a Point)
+        # because ``L.geoJSON`` renders points as default Markers (img tags)
+        # while polygons render as ``path.leaflet-interactive`` SVG elements,
+        # which the existing UI test already targets.
+        polygon = Polygon((
+            (13.70, 51.02),
+            (13.78, 51.02),
+            (13.78, 51.08),
+            (13.70, 51.08),
+            (13.70, 51.02),
+        ))
+        self.work = Work.objects.create(
+            title='No-DOI Map Popup Test',
+            status='p',
+            doi=None,
+            url='http://example.org/no-doi',
+            geometry=GeometryCollection(polygon),  # Dresden bbox
+        )
+
+    def test_view_details_button_links_to_id_url(self):
+        start_chrome(f'{self.live_server_url}/', headless=True)
+        try:
+            self.assertTrue(S('#map').exists())
+
+            # Wait for the async fetch from /api/v1/works/ to populate the
+            # map — without this, the test can race the network round-trip
+            # and find zero paths.
+            wait_until(lambda: len(find_all(S('path.leaflet-interactive'))) >= 1)
+            paths = find_all(S('path.leaflet-interactive'))
+            self.assertEqual(len(paths), 1)
+            click(paths[0])
+
+            wait_until(lambda: Text('View work details').exists())
+            popup = S('div.leaflet-popup-content').web_element
+            # Title from properties is rendered.
+            self.assertIn('No-DOI Map Popup Test', popup.text)
+            # The button's href falls back to /work/<id>/ (the GeoJSON
+            # ``feature.id``) because there is no DOI.
+            link_el = popup.find_element('css selector', 'a.btn-primary')
+            self.assertTrue(link_el.get_attribute('href').endswith(f'/work/{self.work.id}/'))
+        finally:
+            kill_browser()
