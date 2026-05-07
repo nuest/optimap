@@ -80,6 +80,13 @@ Please click on the link to log in.
 The link is valid for {valid} minutes.
 """
         logger.info('Login process started for user %s', email)
+        # Login (and the other auth-adjacent flows below) sends the email
+        # synchronously on purpose: SMTP failure must surface to the user
+        # immediately as the "Login failed!" error page so they can retry,
+        # and the magic-link cache TTL (10 min) is short enough that a
+        # Django-Q dispatch lag would eat into the window. Other email
+        # call sites in OPTIMAP (harvest, monthly digest, work-state
+        # notifications) are background concerns and do go through Django-Q.
         try:
             email_message = EmailMessage(
                 subject=subject,

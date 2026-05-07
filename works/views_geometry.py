@@ -115,9 +115,12 @@ def contribute_geometry_by_id(request, work_id):
             request.user.username, work.title[:50], work.id, ", ".join(changes_made)
         )
 
+        from works.notifications import notify_work_event
+        notify_work_event(work, "contribution", actor=request.user)
+
         messages.success(
             request,
-            "Thank you for your contribution! An administrator will review your changes.",
+            "Thank you for your contribution! It is now visible to curators and admins for review.",
         )
 
         return JsonResponse({
@@ -189,6 +192,11 @@ def publish_work_by_id(request, work_id):
         # Server-side flash so the post-reload page surfaces a self-closing
         # alert at the top, matching the rest of the app's communication flow.
         messages.success(request, "Work is now public.")
+
+        # Notify the original contributors (if any) that their work is live.
+        # Suppressed on republish cycles via provenance.publication_notified_at.
+        from works.notifications import notify_work_event
+        notify_work_event(work, "publish", actor=request.user)
 
         return JsonResponse({
             'success': True,

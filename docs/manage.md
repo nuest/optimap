@@ -162,6 +162,21 @@ Use `--update` when you want OpenAlex enrichment to re-run on previously-harvest
 EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
 ```
 
+### Work-state-change notifications
+
+Separate from harvest emails, OPTIMAP sends notification emails when a user-visible *Work* state change happens. The dispatcher lives in [`works/notifications.py`](../works/notifications.py); the event registry is `WORK_EVENT_HANDLERS`.
+
+| Event | Recipients | Body highlights |
+| --- | --- | --- |
+| `contribution` | all `is_staff` users + every curator of every `Collection` the work is in (minus the contributor) | work title + DOI + link to `/work/<identifier>/`; *transparency block* with **roles + counts** of the other notified parties (`Notified: 1 admin and 2 curators of 'Mountain Wetlands', 'AGILE-GISS'`); heads-up that any of them can publish the work concurrently. |
+| `publish` | every distinct `Contribution.user` for the work (minus the actor doing the publish) | "thank you, your work is now public" + title + DOI + their contribution kinds + the public landing-page URL. |
+
+Both events route through Django-Q (`async_task`) so the request that triggered the state change stays fast. Recipient resolution happens synchronously in the caller's transaction — the queue payload is just a list of user IDs.
+
+Republish suppression: `notify_work_event(work, "publish", …)` stamps `provenance.publication_notified_at` after the first fan-out and returns early on subsequent calls, so a publish→unpublish→republish cycle does not re-notify contributors.
+
+**To add a new state-change notification** — e.g. notify the original contributors when an admin *unpublishes* their work — write a private `_enqueue_<event>(work, actor)` function (resolves recipients + calls `async_task` on a sibling `send_*` task), add it to `WORK_EVENT_HANDLERS`, and call `notify_work_event(work, "<event>", actor=request.user)` after the relevant `work.save()`. The dispatcher is best-effort: any handler exception is logged but never crashes the state change.
+
 ### Where things live in code
 
 For maintainers cross-referencing the admin features above:
