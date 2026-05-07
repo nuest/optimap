@@ -57,9 +57,9 @@ def invalidate_work_preview_cache(sender, instance, **kwargs):
 def update_work_placename(sender, instance, **kwargs):
     """Populate ``placename`` + ``country_code`` via per-point reverse geocoding.
 
-    Only fires when ``OPTIMAP_GEOCODE_WORKS_ON_SAVE=True`` (off by default
-    so dev and the test suite never hit Nominatim). Skipped when the work
-    has no geometry.
+    Gated by ``OPTIMAP_GEOCODE_WORKS_ON_SAVE`` — defaults to ``True`` in
+    production and is forced off under the test runner (see ``settings.py``).
+    Skipped when the work has no geometry.
 
     Multi-point geometries are geocoded per-site and reduced to the lowest
     common ancestor in the address hierarchy — a work covering Berlin and

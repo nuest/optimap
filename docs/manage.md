@@ -314,7 +314,7 @@ The corresponding [schema.org `Place.geo`](https://schema.org/geo) payload follo
 
 `Work.placename` and `Work.country_code` are populated by reverse-geocoding the work's geometry via [Nominatim](https://nominatim.openstreetmap.org/). For multi-point geometries — e.g. the Mountain Wetlands harvester emits one `Point` per study site — every representative point is geocoded separately and the result is reduced to the **lowest common ancestor** in the Nominatim address hierarchy. So a work with sites in Berlin and Munich resolves to *"Germany"* / `DE` (state diverges, country shared); a work spanning Germany and France resolves to `(None, None)` rather than the misleading geometric centroid in northern France. Single-Polygon works contribute one interior representative point. The walk is capped at 20 points so a 500-vertex polygon doesn't trigger 500 Nominatim requests.
 
-Reverse geocoding is **off by default** to keep harvest-heavy deployments off the OpenStreetMap rate-limit radar; turn it on by setting `OPTIMAP_GEOCODE_WORKS_ON_SAVE=True` in the deployment environment. With the flag on, every `Work.save()` (creation or geometry edit) calls `works.services.geocoding.geocode_geometry(geom)` from a `pre_save` signal — each per-point lookup is cached in the per-process `LocMemCache` (key `reverse_geocode:<lat>:<lon>` with 3-decimal-place quantisation, ~100 m, 30-day TTL) so popular regions hit memory after the first lookup. On a complete geocoding outage (no point returned an address) the existing fields are preserved; on a real "geometry spans incompatible regions" outcome the fields are honestly cleared.
+Reverse geocoding is **on by default in production** so the `geo.placename` / `geo.region` HTML meta tags are emitted and `Work.provenance.geocoding` is populated by every harvester — set `OPTIMAP_GEOCODE_WORKS_ON_SAVE=False` in the deployment environment to opt out (e.g. for a bulk import where you would rather backfill placenames separately afterwards). The setting is forced off under the test runner regardless, so the suite stays offline. With the flag on, every `Work.save()` (creation or geometry edit) calls `works.services.geocoding.geocode_geometry(geom)` from a `pre_save` signal — each per-point lookup is cached in the per-process `LocMemCache` (key `reverse_geocode:<lat>:<lon>` with 3-decimal-place quantisation, ~100 m, 30-day TTL) so popular regions hit memory after the first lookup, keeping sustained Nominatim traffic well below the 1 req/s courtesy limit. On a complete geocoding outage (no point returned an address) the existing fields are preserved; on a real "geometry spans incompatible regions" outcome the fields are honestly cleared.
 
 For an existing deployment that wants to populate the new fields retroactively, run the backfill:
 
@@ -352,7 +352,7 @@ The blocklist is consulted at signup and at magic-link login time; blocked entri
 
 ## Operate the Django-Q cluster
 
-OPTIMAP uses [Django-Q2](https://django-q2.readthedocs.io/) to schedule and run background work — harvesting, monthly subscription emails, GeoJSON / GeoPackage cache regeneration, and the one-off retry / trigger actions in the harvesting admin. **The cluster must be running for any of those to actually execute.** The admin will accept actions while the cluster is down, but the queued tasks will sit in `django_q_task` until a worker picks them up.
+OPTIMAP uses [Django-Q2](https://django-q2.readthedocs.io/) to schedule and run background work — harvesting, monthly subscription emails, data-dump regeneration (GeoJSON + GeoPackage + CSV), and the one-off retry / trigger actions in the harvesting admin. **The cluster must be running for any of those to actually execute.** The admin will accept actions while the cluster is down, but the queued tasks will sit in `django_q_task` until a worker picks them up.
 
 **Run the cluster:**
 
@@ -434,11 +434,11 @@ The following sections are **suggested, not yet written**. They cover the rest o
 
 #### Data dump cache
 
-Cached files in `/tmp/optimap_cache/`; retention controlled by `OPTIMAP_DATA_DUMP_RETENTION` (default: 3).
+Cached files in `/tmp/optimap_cache/`; retention controlled by `OPTIMAP_DATA_DUMP_RETENTION` (default: 3 *cycles* — each cycle writes `.geojson`, `.geojson.gz`, `.gpkg`, and `.csv` for the same timestamp).
 
-- The `regenerate_geojson_cache` task and the `schedule_geojson` management command (recurring every 6 hours).
-- How to force a regenerate from the Django shell (`async_task('works.tasks.regenerate_geojson_cache')`).
-- Public download endpoints `/download/geojson/` and `/download/geopackage/`.
+- The umbrella `regenerate_all_data_dumps` task runs every `DATA_DUMP_INTERVAL_HOURS` hours (default 6, see `optimap/settings.py`). It serialises published works to GeoJSON once and converts the same intermediate to GeoPackage and CSV via `ogr2ogr`. The schedule is created on `post_migrate` (`works.apps.schedule_data_dump`); legacy single-format schedules are removed automatically.
+- Force a regenerate from the Django shell: `async_task('works.tasks.regenerate_all_data_dumps')`. Or, in admin, **Works → action "Regenerate all data exports now"**.
+- Public download endpoints: `/download/geojson/` (gzipped variant served when the client sends `Accept-Encoding: gzip`), `/download/geopackage/`, `/download/csv/` (CSV with a `WKT` column carrying each work's geometry in OGC Simple Features WKT — useful for `pandas.read_csv` + `shapely.wkt.loads` pipelines).
 
 #### Django caches (`memory`, `default`)
 

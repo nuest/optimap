@@ -17,6 +17,7 @@ https://djangocentral.com/environment-variables-in-django/
 """
 
 import os
+import sys
 import environ
 import dj_database_url
 import re
@@ -49,12 +50,21 @@ OPTIMAP_SUPERUSER_EMAILS = [i.strip('[]') for i in env('OPTIMAP_SUPERUSER_EMAILS
 TEST_HARVESTING_ONLINE = env('OPTIMAP_TEST_HARVESTING_ONLINE', default=False)
 
 # Reverse-geocoding via Nominatim (issue #222) — populates Work.placename and
-# Work.country_code on save when geometry changes. Disabled by default in dev
-# / test runs to keep the test suite offline; enable in deployments where the
-# `geo.placename` / `geo.region` HTML meta tags should be emitted. The 1 req/s
-# Nominatim courtesy rate limit is honoured by the per-process cache in
-# `works.services.geocoding`.
-GEOCODE_WORKS_ON_SAVE = env('OPTIMAP_GEOCODE_WORKS_ON_SAVE', default=False)
+# Work.country_code on save when geometry changes. Default is on in production
+# (so the `geo.placename` / `geo.region` HTML meta tags are emitted and the
+# Work.provenance.geocoding block is populated by every harvester); the
+# 30-day per-coordinate LocMemCache absorbs repeat lookups so the 1 req/s
+# Nominatim courtesy budget is rarely tested. Forced off under the test
+# runner so the suite stays offline; opt out in a deployment by setting
+# OPTIMAP_GEOCODE_WORKS_ON_SAVE=False (e.g. during a bulk import where you
+# want to backfill placenames separately via `manage.py backfill_placenames`).
+_RUNNING_TESTS = (
+    'test' in sys.argv or 'pytest' in sys.modules or env('PYTEST_CURRENT_TEST', default='') != ''
+)
+GEOCODE_WORKS_ON_SAVE = env(
+    'OPTIMAP_GEOCODE_WORKS_ON_SAVE',
+    default=False if _RUNNING_TESTS else True,
+)
 
 ROOT_URLCONF = 'optimap.urls'
 
