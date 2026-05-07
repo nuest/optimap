@@ -273,6 +273,31 @@
   document.querySelectorAll('.collection-unpublish-btn').forEach(function (b) {
     b.addEventListener('click', function () { postToggle(b, 'unpublish'); });
   });
+  document.querySelectorAll('.collection-publish-works-btn').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var n = b.getAttribute('data-publishable-count');
+      if (!window.confirm('Publish ' + n + ' Harvested/Contributed work(s) in this collection? This makes them visible to anonymous users.')) { return; }
+      var id = b.getAttribute('data-collection-id');
+      var csrf = b.getAttribute('data-csrf');
+      b.disabled = true;
+      fetch('/collections/' + id + '/publish-works/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': csrf, 'Accept': 'application/json'},
+        credentials: 'same-origin',
+      }).then(function (r) { return r.json(); }).then(function (data) {
+        if (data && data.success) {
+          OPTIMAP_FLASH('success', 'Published ' + data.published_count + ' work(s).');
+          window.location.reload();
+        } else {
+          OPTIMAP_FLASH('error', 'Publish-all failed: ' + (data && data.error ? data.error : 'unknown error'));
+          b.disabled = false;
+        }
+      }).catch(function (err) {
+        OPTIMAP_FLASH('error', 'Publish-all failed: ' + err);
+        b.disabled = false;
+      });
+    });
+  });
 })();
 </script>
 {% endif %}

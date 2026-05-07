@@ -290,6 +290,12 @@
       <div class="mb-4">
         <h6 class="font-weight-bold"><i class="fas fa-map-marked-alt"></i> Spatial extent (geographic location)</h6>
         <p class="text-muted small">Use the drawing tools on the map above to mark the geographic area covered by this research.</p>
+        <div id="paste-geoextents-row" class="mb-2" style="display:none;">
+          <button type="button" class="btn btn-sm btn-outline-info" id="paste-geoextents-btn">
+            <i class="fas fa-paste"></i> Paste geoextents
+          </button>
+          <small class="form-text text-muted" id="paste-geoextents-help"></small>
+        </div>
         <div id="geometry-status" class="alert alert-warning">
           <i class="fas fa-info-circle"></i> <span id="geometry-status-text">No geometry drawn yet. Use the map tools above to add spatial extent.</span>
         </div>
@@ -446,6 +452,93 @@
             geometryStatusText.textContent = `${count} ${noun} drawn. Ready to submit.`;
           }
         }
+      });
+
+      // "Paste geoextents" — pulls geometries previously copied from the
+      // /geoextent/ tool out of localStorage and adds them as editable layers
+      // on top of the contribution map. Storage shape produced by
+      // geoextent.html → "Copy extents".
+      const pasteRow = document.getElementById('paste-geoextents-row');
+      const pasteBtn = document.getElementById('paste-geoextents-btn');
+      const pasteHelp = document.getElementById('paste-geoextents-help');
+      const COPIED_GEOEXTENTS_KEY = 'optimap_copied_geoextents';
+
+      function readCopiedGeoextents() {
+        let raw = null;
+        try { raw = localStorage.getItem(COPIED_GEOEXTENTS_KEY); } catch (e) { return null; }
+        if (!raw) return null;
+        try {
+          const parsed = JSON.parse(raw);
+          if (!parsed || !Array.isArray(parsed.features) || parsed.features.length === 0) return null;
+          return parsed;
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function refreshPasteUi() {
+        if (!pasteRow || !pasteBtn || !pasteHelp) return;
+        const copied = readCopiedGeoextents();
+        if (!copied) {
+          pasteRow.style.display = 'none';
+          return;
+        }
+        const count = copied.features.length;
+        const noun = count === 1 ? 'geometry' : 'geometries';
+        let when = '';
+        if (copied.timestamp) {
+          const d = new Date(copied.timestamp);
+          if (!isNaN(d.getTime())) when = ' (copied ' + d.toLocaleString() + ')';
+        }
+        pasteHelp.textContent = count + ' ' + noun + ' available from the geoextent tool' + when + '.';
+        pasteRow.style.display = '';
+      }
+
+      if (pasteBtn) {
+        pasteBtn.addEventListener('click', function() {
+          const copied = readCopiedGeoextents();
+          if (!copied) {
+            refreshPasteUi();
+            return;
+          }
+          let added = 0;
+          copied.features.forEach(function(feature) {
+            if (!feature || !feature.geometry) return;
+            try {
+              L.geoJSON(feature, {
+                pointToLayer: function(_feat, latlng) { return L.marker(latlng); }
+              }).eachLayer(function(layer) {
+                drawnItems.addLayer(layer);
+                added++;
+              });
+            } catch (e) {
+              console.warn('Could not paste geometry', e);
+            }
+          });
+          if (added === 0) return;
+
+          try {
+            const bounds = drawnItems.getBounds();
+            if (bounds && bounds.isValid && bounds.isValid()) {
+              map.fitBounds(bounds.pad(0.2));
+            }
+          } catch (e) { /* point-only collections may have no bounds */ }
+
+          const geometryStatusText = document.getElementById('geometry-status-text');
+          const geometryStatus = document.getElementById('geometry-status');
+          if (geometryStatusText && geometryStatus) {
+            const count = drawnItems.getLayers().length;
+            const noun = count === 1 ? 'geometric feature' : 'geometric features';
+            geometryStatusText.textContent = `${count} ${noun} drawn. Ready to submit.`;
+            geometryStatus.classList.remove('alert-warning');
+            geometryStatus.classList.add('alert-success');
+          }
+        });
+      }
+
+      refreshPasteUi();
+      window.addEventListener('storage', function(e) {
+        if (e.key === COPIED_GEOEXTENTS_KEY) refreshPasteUi();
       });
     }
     } // end if (map)

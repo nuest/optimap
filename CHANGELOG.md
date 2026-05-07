@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Copy/paste geometries between the geoextent tool and the contribution form.** A new "Copy extents" button on `/geoextent/` saves all extracted geometries to the browser; a "Paste geoextents" button on the work landing page (when contributing spatial extent) pastes them into the map as editable layers ready to submit.
+
+
 - **Separate "Unpublished works" map layer** for admins (main map) and collection curators (collection pages). Features split into two togglable layers, *Published works (N)* and *Unpublished works (N)* (dashed, muted). Popups for unpublished features show a status badge.
 
 - **Work-state-change email notifications** — admins and collection curators receive an email when a user contributes spatial or temporal metadata; contributors receive an email when their work is later published. Per-user opt-out toggle on `/usersettings/`.

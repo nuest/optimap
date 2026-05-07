@@ -355,6 +355,9 @@
                     <button class="btn btn-sm btn-outline-primary" id="zoom-all-btn" title="Zoom map to show all extents">
                         <i class="fas fa-expand"></i> Zoom to all
                     </button>
+                    <button class="btn btn-sm btn-outline-primary ml-2" id="copy-extents-btn" title="Copy all extracted geometries to your browser so they can be pasted into a work's contribution form">
+                        <i class="fas fa-copy"></i> Copy extents
+                    </button>
                     <button class="btn btn-sm btn-danger ml-2" id="clear-map-btn" title="Remove all extents from the map">
                         <i class="fas fa-trash"></i> Clear map
                     </button>
@@ -754,6 +757,53 @@ $(document).ready(function() {
             const group = L.featureGroup(allLayers);
             map.fitBounds(group.getBounds().pad(0.1));
         }
+    });
+
+    // Copy all extracted geometries to localStorage so they can be pasted into
+    // a work's contribution form on /work/<id>/. Storage shape is intentionally
+    // small and stable — see the matching reader in work_landing_page.html.
+    const COPIED_GEOEXTENTS_KEY = 'optimap_copied_geoextents';
+    $('#copy-extents-btn').on('click', function() {
+        const features = [];
+        extractions.forEach(extraction => {
+            const sourceName = extraction.source ? extraction.source.name : '';
+            const fc = extraction.data;
+            if (!fc || !Array.isArray(fc.features)) return;
+            fc.features.forEach(f => {
+                if (!f || !f.geometry) return;
+                const props = Object.assign({}, f.properties || {});
+                if (sourceName) props._optimap_source_name = sourceName;
+                features.push({ type: 'Feature', geometry: f.geometry, properties: props });
+            });
+        });
+
+        if (features.length === 0) {
+            showError('No geometries available to copy.');
+            return;
+        }
+
+        const payload = {
+            version: 1,
+            timestamp: new Date().toISOString(),
+            features: features
+        };
+
+        const btn = $('#copy-extents-btn');
+        try {
+            localStorage.setItem(COPIED_GEOEXTENTS_KEY, JSON.stringify(payload));
+        } catch (e) {
+            showError('Could not save to browser storage: ' + e.message);
+            return;
+        }
+
+        const noun = features.length === 1 ? 'geometry' : 'geometries';
+        const original = btn.html();
+        btn.html('<i class="fas fa-check"></i> Copied ' + features.length + ' ' + noun);
+        btn.prop('disabled', true);
+        setTimeout(function() {
+            btn.html(original);
+            btn.prop('disabled', false);
+        }, 2000);
     });
 
     // Clear all extractions
