@@ -53,6 +53,17 @@ class CollectionsIndexTests(TestCase):
         self.assertContains(resp, 'collection-publish-btn')   # button on Hidden
         self.assertContains(resp, 'collection-unpublish-btn') # button on Public
 
+    def test_admin_response_is_not_cached_by_middleware(self):
+        # Site-wide UpdateCacheMiddleware would otherwise cache this response,
+        # so an admin's view would not reflect publish/unpublish actions until
+        # the entry expired. Regression for the production bug where the
+        # button state did not flip after a successful POST.
+        self.client.login(username='admin@example.com', password='admin123')
+        resp = self.client.get(reverse('optimap:collections'))
+        cache_control = resp.headers.get('Cache-Control', '')
+        self.assertIn('no-cache', cache_control)
+        self.assertIn('no-store', cache_control)
+
 
 class CollectionDetailPageTests(TestCase):
     def setUp(self):
@@ -150,6 +161,19 @@ class CollectionDetailPageTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         # Published work in setUp gets the green badge for admin.
         self.assertIn('badge-success', resp.content.decode())
+
+    def test_curator_response_is_not_cached_by_middleware(self):
+        # Same regression as the index page: curator/admin responses must
+        # bypass the site-wide cache so inline-mutation state stays live.
+        admin = User.objects.create_user(
+            username='admin-cache@example.com', email='admin-cache@example.com',
+            password='x', is_staff=True,
+        )
+        self.client.force_login(admin)
+        resp = self.client.get(reverse('optimap:collection-page', args=['mw']))
+        cache_control = resp.headers.get('Cache-Control', '')
+        self.assertIn('no-cache', cache_control)
+        self.assertIn('no-store', cache_control)
 
     def test_unpublished_collection_404_for_anonymous(self):
         self.col.is_published = False

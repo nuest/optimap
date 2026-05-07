@@ -278,10 +278,18 @@ def recognition_board(request):
         "all_tiers": RECOGNITION_TIERS,
     })
 
+@never_cache
 @login_required
 
 def user_subscriptions(request):
-    """Display and manage user's regional subscriptions."""
+    """Display and manage user's regional subscriptions.
+
+    ``@never_cache`` keeps the site-wide UpdateCacheMiddleware from caching
+    the rendered checkbox state per session cookie — without it, after the
+    user POSTs to ``/addsubscriptions/`` and gets redirected back here, the
+    middleware short-circuits with the pre-update HTML and the checkboxes
+    appear unchanged until ``CACHE_MIDDLEWARE_SECONDS`` expires.
+    """
     user = request.user
 
     # Get or create the user's subscription

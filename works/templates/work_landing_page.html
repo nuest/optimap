@@ -551,15 +551,15 @@
       });
     }
 
-    // Add publish button handler for admins
+    // Add publish button handler for admins.
+    // No confirm dialog and no success alert — unpublish is cheap, so a
+    // mis-click is easy to undo, and the success message is shown via the
+    // Django messages framework on the reloaded page (a self-closing flash
+    // at the top, consistent with the rest of the app).
     if (canPublish) {
       const publishBtn = document.getElementById('publish-btn');
       if (publishBtn) {
         publishBtn.addEventListener('click', function() {
-          if (!confirm('Are you sure you want to publish this work? It will become publicly visible.')) {
-            return;
-          }
-
           const csrfElement = document.querySelector('[name=csrfmiddlewaretoken]');
           if (!csrfElement) {
             alert('CSRF token not found. Please refresh the page.');
@@ -567,40 +567,41 @@
           }
           const csrftoken = csrfElement.value;
 
+          publishBtn.disabled = true;
           const publishUrl = useIdUrls ? `/work/${pubId}/publish/` : `/work/${doi}/publish/`;
-        fetch(publishUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': csrftoken
-          }
-        })
-        .then(response => response.json())
-        .then(data => {
-          if (data.success) {
-            alert(data.message);
-            location.reload();
-          } else {
-            alert('Error: ' + (data.error || 'Unknown error'));
-          }
-        })
-        .catch(error => {
-          console.error('Error:', error);
-          alert('An error occurred while publishing the work.');
-        });
+          fetch(publishUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': csrftoken
+            }
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              location.reload();
+            } else {
+              alert('Error: ' + (data.error || 'Unknown error'));
+              publishBtn.disabled = false;
+            }
+          })
+          .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while publishing the work.');
+            publishBtn.disabled = false;
+          });
         });
       }
     }
 
-    // Add unpublish button handler for admins
+    // Unpublish button handler — mirrors publish: no confirm, no success
+    // alert. If the admin mis-clicked they can just hit Publish again, and
+    // the success message arrives as a self-closing flash on the reloaded
+    // page (see views_geometry.unpublish_work_by_id).
     if (canUnpublish) {
       const unpublishBtn = document.getElementById('unpublish-btn');
       if (unpublishBtn) {
         unpublishBtn.addEventListener('click', function() {
-          if (!confirm('Are you sure you want to unpublish this work? It will be set to Draft status and will no longer be publicly visible.')) {
-            return;
-          }
-
           const csrfElement = document.querySelector('[name=csrfmiddlewaretoken]');
           if (!csrfElement) {
             alert('CSRF token not found. Please refresh the page.');
@@ -608,27 +609,29 @@
           }
           const csrftoken = csrfElement.value;
 
+          unpublishBtn.disabled = true;
           const unpublishUrl = useIdUrls ? `/work/${pubId}/unpublish/` : `/work/${doi}/unpublish/`;
-        fetch(unpublishUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': csrftoken
-          }
-        })
-        .then(response => response.json())
-        .then(data => {
-          if (data.success) {
-            alert(data.message);
-            location.reload();
-          } else {
-            alert('Error: ' + (data.error || 'Unknown error'));
-          }
-        })
-        .catch(error => {
-          console.error('Error:', error);
-          alert('An error occurred while unpublishing the work.');
-        });
+          fetch(unpublishUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': csrftoken
+            }
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              location.reload();
+            } else {
+              alert('Error: ' + (data.error || 'Unknown error'));
+              unpublishBtn.disabled = false;
+            }
+          })
+          .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while unpublishing the work.');
+            unpublishBtn.disabled = false;
+          });
         });
       }
     }

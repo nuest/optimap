@@ -19,6 +19,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import Http404, JsonResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils.cache import add_never_cache_headers
 from django.utils.html import strip_tags
 from django.views.decorators.http import require_POST
 
@@ -60,7 +61,14 @@ def collections_index(request):
         'collections': collections,
         'is_admin': is_admin,
     }
-    return render(request, 'collections.html', context)
+    response = render(request, 'collections.html', context)
+    if is_admin:
+        # Site-wide UpdateCacheMiddleware would otherwise cache this response
+        # (keyed by session cookie) for CACHE_MIDDLEWARE_SECONDS, so the
+        # admin's view of the page would not reflect publish/unpublish actions
+        # until the entry expired.
+        add_never_cache_headers(response)
+    return response
 
 
 def collection_page(request, collection_slug):
@@ -94,7 +102,12 @@ def collection_page(request, collection_slug):
         'can_edit_description': is_admin or is_curator,
         'canonical_url': request.build_absolute_uri(collection.get_absolute_url()),
     }
-    return render(request, 'collection_page.html', context)
+    response = render(request, 'collection_page.html', context)
+    if can_curate:
+        # Curators/admins see unpublished works and inline mutation controls
+        # whose state must stay live; bypass the site-wide cache middleware.
+        add_never_cache_headers(response)
+    return response
 
 
 def collection_short_redirect(request, short_slug):

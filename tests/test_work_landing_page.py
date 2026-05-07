@@ -394,6 +394,30 @@ class PublicationStatusVisibilityTest(TestCase):
         self.assertContains(response, 'Testing')
         self.assertContains(response, 'not visible to the public')
 
+    def test_authenticated_response_is_not_cached_by_middleware(self):
+        # The publish/unpublish, contribute, and add/remove-from-collection
+        # buttons all reload the page after a successful POST. Without
+        # ``add_never_cache_headers`` the site-wide UpdateCacheMiddleware
+        # would cache the response keyed by session cookie, so the reload
+        # would short-circuit on the pre-mutation HTML and the buttons
+        # would not flip until ``CACHE_MIDDLEWARE_SECONDS`` expired. Same
+        # production bug as the /collections/ page.
+        self.client.force_login(self.admin_user)
+        response = self.client.get(f'/work/{self.pub_published.doi}/')
+        cache_control = response.headers.get('Cache-Control', '')
+        self.assertIn('no-cache', cache_control)
+        self.assertIn('no-store', cache_control)
+
+    def test_anonymous_response_keeps_max_age_for_downstream_caching(self):
+        # Sanity check the other branch: anonymous responses keep the
+        # ``Cache-Control: max-age=…`` header set by ``patch_response_headers``
+        # so browsers and intermediaries can still co-cache.
+        response = self.client.get(f'/work/{self.pub_published.doi}/')
+        cache_control = response.headers.get('Cache-Control', '')
+        self.assertIn('max-age=', cache_control)
+        self.assertNotIn('no-cache', cache_control)
+        self.assertNotIn('no-store', cache_control)
+
     def test_api_viewset_queryset_filtering(self):
         """Test that WorkViewSet filters correctly based on user permissions."""
         from works.viewsets import WorkViewSet

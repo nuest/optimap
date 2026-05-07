@@ -971,10 +971,10 @@ sudo journalctl -u optimap -f
 sudo journalctl -u optimap-worker -f
 
 # Gunicorn logs
-tail -f /opt/optimap/logs/gunicorn-*.log
+sudo tail -f /opt/optimap/logs/gunicorn-*.log
 
 # nginx logs
-tail -f /var/log/nginx/optimap-*.log
+sudo tail -f /var/log/nginx/optimap-*.log
 ```
 
 ### Common issues

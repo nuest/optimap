@@ -22,7 +22,7 @@ from django.contrib.gis.geos import GeometryCollection
 from django.core.cache import caches
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db.models import Q
-from django.utils.cache import patch_response_headers
+from django.utils.cache import add_never_cache_headers, patch_response_headers
 from django.views.decorators.cache import never_cache
 from django.conf import settings
 from django.urls import reverse
@@ -359,6 +359,14 @@ def work_landing(request, identifier):
         # so they'll keep serving the stale entry until ``max-age`` expires.
         # 24h matches the server cache TTL.
         patch_response_headers(response, cache_timeout=_WORK_LANDING_CACHE_TIMEOUT)
+    else:
+        # Authenticated users see inline mutation controls (publish /
+        # unpublish, contribute, add/remove from collection) whose state
+        # must reflect the database after a POST. Without this, the
+        # site-wide UpdateCacheMiddleware would cache the response keyed
+        # by session cookie and the reloaded GET would short-circuit on
+        # the stale entry until CACHE_MIDDLEWARE_SECONDS expired.
+        add_never_cache_headers(response)
     return response
 
 

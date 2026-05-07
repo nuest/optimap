@@ -231,6 +231,8 @@ def unpublish_work_by_id(request, work_id):
             request.user.username, work.title[:50], work.id
         )
 
+        messages.success(request, "Work has been unpublished and set to draft.")
+
         return JsonResponse({
             'success': True,
             'message': 'Work has been unpublished and set to draft status.'
