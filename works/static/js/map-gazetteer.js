@@ -16,6 +16,12 @@ class MapGazetteerManager {
     this.map = map;
     this.provider = options.provider || 'nominatim';
     this.placeholder = options.placeholder || 'Search for a location...';
+    // Defaulting to ``topright`` keeps the search-results dropdown clear of
+    // the timeline / cards that sit below the map on the homepage — when the
+    // control was at ``topleft`` the alternatives popup expanded down into
+    // an area where Leaflet's ``overflow: hidden`` clipped it from view.
+    // Callers can still override via ``options.position``.
+    this.position = options.position || 'topright';
     this.geocoder = null;
 
     console.group('📍 Map Gazetteer Initialization');
@@ -53,7 +59,7 @@ class MapGazetteerManager {
       geocoder: geocoderInstance,
       placeholder: this.placeholder,
       defaultMarkGeocode: false, // Custom handling
-      position: 'topleft',
+      position: this.position,
       collapsed: true,
       errorMessage: 'No location found',
     });
