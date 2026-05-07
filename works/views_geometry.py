@@ -115,6 +115,11 @@ def contribute_geometry_by_id(request, work_id):
             request.user.username, work.title[:50], work.id, ", ".join(changes_made)
         )
 
+        messages.success(
+            request,
+            "Thank you for your contribution! An administrator will review your changes.",
+        )
+
         return JsonResponse({
             'success': True,
             'message': 'Thank you for your contribution! '

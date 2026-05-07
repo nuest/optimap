@@ -468,44 +468,33 @@
 
         // Validate that at least something is being contributed
         if (!geometryCollection && !startDate && !endDate) {
-          if (needsGeometry) {
-            alert('Please provide at least spatial extent (draw on map) or temporal extent (enter dates).');
-          } else {
-            alert('Please provide at least a start date or end date for temporal extent.');
-          }
+          OPTIMAP_FLASH('error', needsGeometry
+            ? 'Please provide at least spatial extent (draw on map) or temporal extent (enter dates).'
+            : 'Please provide at least a start date or end date for temporal extent.');
           return;
         }
 
         // Validate date formats if provided
         const datePattern = /^\d{4}(-\d{2})?(-\d{2})?$/;
         if (startDate && !datePattern.test(startDate)) {
-          alert('Invalid start date format. Please use YYYY, YYYY-MM, or YYYY-MM-DD.');
+          OPTIMAP_FLASH('error', 'Invalid start date format. Please use YYYY, YYYY-MM, or YYYY-MM-DD.');
           return;
         }
         if (endDate && !datePattern.test(endDate)) {
-          alert('Invalid end date format. Please use YYYY, YYYY-MM, or YYYY-MM-DD.');
+          OPTIMAP_FLASH('error', 'Invalid end date format. Please use YYYY, YYYY-MM, or YYYY-MM-DD.');
           return;
         }
 
-        // Build confirmation message
-        let confirmParts = [];
-        if (geometryCollection) confirmParts.push('spatial extent');
-        if (startDate || endDate) confirmParts.push('temporal extent');
-        const confirmMsg = `Are you sure you want to submit ${confirmParts.join(' and ')}? It will be reviewed by administrators.`;
-
-        if (!confirm(confirmMsg)) {
-          return;
-        }
-
-        // Get CSRF token
+        // No confirm dialog — contributions go to status 'c' (Contributed)
+        // and are easy to retract or resubmit. Success message arrives via
+        // the Django messages framework on the reloaded page.
         const csrfElement = document.querySelector('[name=csrfmiddlewaretoken]');
         if (!csrfElement) {
-          alert('CSRF token not found. Please refresh the page.');
+          OPTIMAP_FLASH('error', 'CSRF token not found. Please refresh the page.');
           return;
         }
         const csrftoken = csrfElement.value;
 
-        // Prepare submission data
         const submissionData = {};
         if (geometryCollection) {
           submissionData.geometry = geometryCollection;
@@ -519,7 +508,6 @@
         const url = useIdUrls ? `/work/${pubId}/contribute-geometry/` : `/work/${doi}/contribute-geometry/`;
         console.log('Submitting contribution:', submissionData);
 
-        // Submit contribution
         fetch(url, {
           method: 'POST',
           headers: {
@@ -538,15 +526,14 @@
         })
         .then(data => {
           if (data.success) {
-            alert(data.message);
             location.reload();
           } else {
-            alert('Error: ' + (data.error || 'Unknown error'));
+            OPTIMAP_FLASH('error', 'Error: ' + (data.error || 'Unknown error'));
           }
         })
         .catch(error => {
           console.error('Error:', error);
-          alert('Error: ' + error.message);
+          OPTIMAP_FLASH('error', 'Error: ' + error.message);
         });
       });
     }
@@ -562,7 +549,7 @@
         publishBtn.addEventListener('click', function() {
           const csrfElement = document.querySelector('[name=csrfmiddlewaretoken]');
           if (!csrfElement) {
-            alert('CSRF token not found. Please refresh the page.');
+            OPTIMAP_FLASH('error', 'CSRF token not found. Please refresh the page.');
             return;
           }
           const csrftoken = csrfElement.value;
@@ -581,13 +568,13 @@
             if (data.success) {
               location.reload();
             } else {
-              alert('Error: ' + (data.error || 'Unknown error'));
+              OPTIMAP_FLASH('error', 'Error: ' + (data.error || 'Unknown error'));
               publishBtn.disabled = false;
             }
           })
           .catch(error => {
             console.error('Error:', error);
-            alert('An error occurred while publishing the work.');
+            OPTIMAP_FLASH('error', 'An error occurred while publishing the work.');
             publishBtn.disabled = false;
           });
         });
@@ -604,7 +591,7 @@
         unpublishBtn.addEventListener('click', function() {
           const csrfElement = document.querySelector('[name=csrfmiddlewaretoken]');
           if (!csrfElement) {
-            alert('CSRF token not found. Please refresh the page.');
+            OPTIMAP_FLASH('error', 'CSRF token not found. Please refresh the page.');
             return;
           }
           const csrftoken = csrfElement.value;
@@ -623,13 +610,13 @@
             if (data.success) {
               location.reload();
             } else {
-              alert('Error: ' + (data.error || 'Unknown error'));
+              OPTIMAP_FLASH('error', 'Error: ' + (data.error || 'Unknown error'));
               unpublishBtn.disabled = false;
             }
           })
           .catch(error => {
             console.error('Error:', error);
-            alert('An error occurred while unpublishing the work.');
+            OPTIMAP_FLASH('error', 'An error occurred while unpublishing the work.');
             unpublishBtn.disabled = false;
           });
         });
@@ -667,8 +654,8 @@
           credentials: 'same-origin',
         }).then(function (r) { return r.json(); }).then(function (data) {
           if (data && data.success) { location.reload(); }
-          else { alert('Action failed: ' + (data && data.error ? data.error : 'unknown error')); btn.disabled = false; }
-        }).catch(function (err) { alert('Action failed: ' + err); btn.disabled = false; });
+          else { OPTIMAP_FLASH('error', 'Action failed: ' + (data && data.error ? data.error : 'unknown error')); btn.disabled = false; }
+        }).catch(function (err) { OPTIMAP_FLASH('error', 'Action failed: ' + err); btn.disabled = false; });
       });
     });
     // Swap "Show X" ↔ "Hide X" on collapsible toggle buttons so the action

@@ -154,11 +154,50 @@
     {% include 'footer.html' %} {% block scripts %}{% endblock %}
 
     <script>
-      // Auto-close any flash message tagged with .alert-autoclose after 5s.
-      // Lives in base.html so the behaviour is consistent across every page.
+      // Self-closing flash messages — global behaviour for every page.
+      //
+      // (a) Server-rendered alerts tagged with .alert-autoclose (see the
+      //     messages block above) close after 5s.
+      // (b) Runtime alerts created by JS via OPTIMAP_FLASH(level, msg) drop
+      //     into the same flash-messages host, with the same look and the
+      //     same auto-close behaviour. Use this in place of native browser
+      //     `alert(...)` so errors / info pop up consistently with framework
+      //     messages.
       $(function () {
         setTimeout(function () { $(".alert-autoclose").alert('close'); }, 5000);
       });
+
+      window.OPTIMAP_FLASH = function (level, message) {
+        const cls = ({error: 'alert-danger', warning: 'alert-warning',
+                      success: 'alert-success', info: 'alert-info'})[level] || 'alert-info';
+        const div = document.createElement('div');
+        div.className = 'alert ' + cls + ' alert-dismissible alert-autoclose fade show m-3';
+        div.setAttribute('role', 'alert');
+        const text = document.createElement('span');
+        text.textContent = message;
+        div.appendChild(text);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'close';
+        btn.setAttribute('data-dismiss', 'alert');
+        btn.setAttribute('aria-label', 'Close');
+        btn.innerHTML = '<span aria-hidden="true">&times;</span>';
+        div.appendChild(btn);
+        let host = document.getElementById('flash-messages');
+        if (!host) {
+          host = document.createElement('div');
+          host.id = 'flash-messages';
+          host.className = 'container pt-3';
+          const main = document.getElementById('main-content');
+          (main || document.body).prepend(host);
+        }
+        host.appendChild(div);
+        // Errors get a longer dwell than the 5s server flashes.
+        const ttl = (level === 'error') ? 8000 : 5000;
+        setTimeout(function () {
+          try { $(div).alert('close'); } catch (_) { div.remove(); }
+        }, ttl);
+      };
     </script>
   </body>
 </html>

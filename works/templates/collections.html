@@ -109,11 +109,11 @@
         // Reload to re-render badge and button state.
         window.location.reload();
       } else {
-        alert('Action failed: ' + (data && data.error ? data.error : 'unknown error'));
+        OPTIMAP_FLASH('error', 'Action failed: ' + (data && data.error ? data.error : 'unknown error'));
         button.disabled = false;
       }
     }).catch(function (err) {
-      alert('Action failed: ' + err);
+      OPTIMAP_FLASH('error', 'Action failed: ' + err);
       button.disabled = false;
     });
   }
