@@ -104,6 +104,53 @@ class CollectionDetailPageTests(TestCase):
         # GeoJSON properties — that's fine; we only care about visible card hrefs).
         self.assertNotIn('href="https://example.com/api/v1/items/42"', body)
 
+    def test_curator_sees_unpublished_works_and_status_badge(self):
+        # Add a non-published work so we can verify (a) it is rendered for
+        # curators / admins (visibility expansion) and (b) its publication
+        # status badge is shown in the work card.
+        draft = Work.objects.create(
+            title='A draft study', status='d',
+            doi='10.1234/mw-draft',
+            geometry=GeometryCollection(Point(-70.0, -19.0)),
+            source=self.source,
+        )
+        draft.collections.add(self.col)
+
+        # Anonymous: draft not visible, no status badge for the published work.
+        anon = self.client.get(reverse('optimap:collection-page', args=['mw']))
+        self.assertEqual(anon.status_code, 200)
+        anon_body = anon.content.decode()
+        self.assertNotIn('A draft study', anon_body)
+        self.assertNotIn('badge-secondary', anon_body)  # no Draft badge for anon
+
+        # Curator: draft visible + Draft badge rendered.
+        curator = User.objects.create_user(
+            username='curator@example.com', email='curator@example.com', password='x',
+        )
+        self.col.curators.add(curator)
+        self.client.force_login(curator)
+        resp = self.client.get(reverse('optimap:collection-page', args=['mw']))
+        self.assertEqual(resp.status_code, 200)
+        body = resp.content.decode()
+        self.assertIn('A draft study', body)
+        self.assertIn('badge-secondary', body)
+        self.assertIn('Draft', body)
+        # The published work should NOT carry a "not visible to anonymous users"
+        # caveat next to its badge.
+        self.assertIn('badge-success', body)
+        # Curators do see the caveat next to non-published works.
+        self.assertIn('not visible to anonymous users', body)
+
+    def test_admin_sees_status_badges(self):
+        admin = User.objects.create_user(
+            username='a@b.c', email='a@b.c', password='x', is_staff=True,
+        )
+        self.client.force_login(admin)
+        resp = self.client.get(reverse('optimap:collection-page', args=['mw']))
+        self.assertEqual(resp.status_code, 200)
+        # Published work in setUp gets the green badge for admin.
+        self.assertIn('badge-success', resp.content.decode())
+
     def test_unpublished_collection_404_for_anonymous(self):
         self.col.is_published = False
         self.col.save(update_fields=['is_published'])

@@ -145,6 +145,24 @@
                     {{ work.title|truncatechars:120 }}
                   </a>
                 </h5>
+                {% if can_curate %}
+                  <div class="mb-2">
+                    <span class="badge
+                      {% if work.status == 'p' %}badge-success
+                      {% elif work.status == 'd' %}badge-secondary
+                      {% elif work.status == 't' %}badge-warning
+                      {% elif work.status == 'w' %}badge-danger
+                      {% elif work.status == 'h' %}badge-info
+                      {% elif work.status == 'c' %}badge-primary
+                      {% endif %}"
+                      title="Publication status (visible to curators and admins).">
+                      {{ work.get_status_display }}
+                    </span>
+                    {% if work.status != 'p' %}
+                      <small class="text-muted">— not visible to anonymous users</small>
+                    {% endif %}
+                  </div>
+                {% endif %}
                 <div class="abstract-area">
                   {% if work.abstract %}
                     <p class="card-text text-muted small">{{ work.abstract|truncatechars:180 }}</p>

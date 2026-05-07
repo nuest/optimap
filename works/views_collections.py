@@ -72,10 +72,12 @@ def collection_page(request, collection_slug):
         and collection.curators.filter(pk=request.user.pk).exists()
     )
 
-    # Same visibility rule as the feed pages: only published works for the public,
-    # everything for staff so they can review unpublished works in context.
+    # Visibility rule: anonymous / non-curators see only published works;
+    # admins and curators of the collection see every work in the collection
+    # so they can identify which ones still need review or publishing.
+    can_curate = is_admin or is_curator
     works_qs = Work.objects.filter(collections=collection).select_related('source')
-    if not is_admin:
+    if not can_curate:
         works_qs = works_qs.filter(status='p')
     works = list(works_qs.order_by('-creationDate', '-id')[: settings.FEED_MAX_ITEMS])
     for w in works:
@@ -88,6 +90,7 @@ def collection_page(request, collection_slug):
         'publications_geojson': _publications_to_geojson(works),
         'is_admin': is_admin,
         'is_curator': is_curator,
+        'can_curate': can_curate,
         'can_edit_description': is_admin or is_curator,
         'canonical_url': request.build_absolute_uri(collection.get_absolute_url()),
     }
