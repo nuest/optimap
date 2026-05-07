@@ -11,8 +11,13 @@ Tests verify:
 """
 
 import os
+import shutil
+import tempfile
+from pathlib import Path
+
 from django.core.management import call_command
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
+from django.test import override_settings
 from helium import (
     start_chrome,
     kill_browser,
@@ -27,6 +32,19 @@ from helium import (
 from works.models import Work
 
 
+# Tiny fixture geojson files copied from tests/fixtures/global_regions/ keep
+# load_global_regions offline during the UI run.
+FIXTURE_DIR = Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "global_regions"
+
+
+def _install_global_region_fixtures(target_dir):
+    target = Path(target_dir)
+    target.mkdir(parents=True, exist_ok=True)
+    shutil.copy(FIXTURE_DIR / "world_continents.geojson", target / "world_continents.geojson")
+    shutil.copy(FIXTURE_DIR / "goas_v01_simplified.geojson", target / "goas_v01_simplified.geojson")
+    (target / "goas_v01.gpkg").touch()
+
+
 class FeedsAndWorkLandingTests(StaticLiveServerTestCase):
     """UI tests for feeds and work landing pages.
 
@@ -39,9 +57,19 @@ class FeedsAndWorkLandingTests(StaticLiveServerTestCase):
     @classmethod
     def setUpClass(cls):
         """Set up class-level resources including live server."""
+        cls._regions_tmp = tempfile.mkdtemp(prefix="optimap_global_regions_ui_")
+        _install_global_region_fixtures(cls._regions_tmp)
+        cls._settings_override = override_settings(GLOBAL_REGIONS_DATA_DIR=cls._regions_tmp)
+        cls._settings_override.enable()
         super().setUpClass()
 
         call_command("load_global_regions")
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        cls._settings_override.disable()
+        shutil.rmtree(cls._regions_tmp, ignore_errors=True)
 
     def test_europe_feed_page_loads(self):
         """Test that the Europe feed page loads and displays works."""

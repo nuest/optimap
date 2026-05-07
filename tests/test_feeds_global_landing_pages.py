@@ -9,14 +9,17 @@ works filtered by region.
 """
 
 import os
+import shutil
+import tempfile
 import xml.etree.ElementTree as ET
+from pathlib import Path
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "optimap.settings")
 import django
 django.setup()
 
 from django.core.management import call_command
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from works.models import Work, GlobalRegion
@@ -25,35 +28,70 @@ from works.models import Work, GlobalRegion
 NSPS = {"atom": "http://www.w3.org/2005/Atom"}
 
 
-# Expected work counts per region based on test_data_global_feeds fixture
-# These values are hardcoded from the actual fixture data to ensure tests
-# verify the exact expected behavior
+# Tiny fixture geojson files (committed under tests/fixtures/global_regions/)
+# are copied into a tmpdir before load_global_regions runs, so the command
+# skips network downloads and loads our deterministic, low-fidelity geometries.
+FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures" / "global_regions"
+
+
+# Expected work counts per region against the *tiny* simplified geometries in
+# tests/fixtures/global_regions/. Regenerate with scripts/recompute_expected_counts.py
+# (or by hand) whenever the fixture geometries or test_data_global_feeds change.
 EXPECTED_COUNTS = {
     # Continents
-    'africa': 15,
-    'antarctica': 2,
-    'asia': 24,
+    'africa': 12,
+    'antarctica': 1,
+    'asia': 22,
     'australia': 7,
-    'europe': 19,
-    'north-america': 14,
-    'oceania': 6,
+    'europe': 18,
+    'north-america': 12,
+    'oceania': 2,
     'south-america': 8,
     # Oceans
     'arctic-ocean': 9,
-    'baltic-sea': 6,
-    'indian-ocean': 17,
+    'baltic-sea': 5,
+    'indian-ocean': 18,
     'mediterranean-region': 13,
-    'north-atlantic-ocean': 21,
+    'north-atlantic-ocean': 20,
     'north-pacific-ocean': 18,
-    'south-atlantic-ocean': 12,
-    'south-china-and-easter-archipelagic-seas': 9,
-    'south-pacific-ocean': 8,
+    'south-atlantic-ocean': 13,
+    'south-china-and-easter-archipelagic-seas': 10,
+    'south-pacific-ocean': 9,
     'southern-ocean': 6,
 }
 
 
+def _install_global_region_fixtures(target_dir):
+    """Copy the tiny fixture files into target_dir and create a placeholder GPKG.
+
+    load_global_regions skips the Marine Regions ZIP download when goas_v01.gpkg
+    already exists, and skips re-simplification when goas_v01_simplified.geojson
+    already exists. The placeholder gpkg is never read because the simplified
+    file is present.
+    """
+    target = Path(target_dir)
+    target.mkdir(parents=True, exist_ok=True)
+    shutil.copy(FIXTURE_DIR / "world_continents.geojson", target / "world_continents.geojson")
+    shutil.copy(FIXTURE_DIR / "goas_v01_simplified.geojson", target / "goas_v01_simplified.geojson")
+    (target / "goas_v01.gpkg").touch()
+
+
 class GlobalFeedsAndLandingPageTests(TestCase):
     fixtures = ["test_data_global_feeds"]
+
+    @classmethod
+    def setUpClass(cls):
+        cls._regions_tmp = tempfile.mkdtemp(prefix="optimap_global_regions_")
+        _install_global_region_fixtures(cls._regions_tmp)
+        cls._settings_override = override_settings(GLOBAL_REGIONS_DATA_DIR=cls._regions_tmp)
+        cls._settings_override.enable()
+        super().setUpClass()
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        cls._settings_override.disable()
+        shutil.rmtree(cls._regions_tmp, ignore_errors=True)
 
     @classmethod
     def setUpTestData(cls):
@@ -125,9 +163,9 @@ class GlobalFeedsAndLandingPageTests(TestCase):
         titles = [item.find("title").text
                     for item in root.findall(".//item", namespaces=NSPS)]
 
-        self.assertEqual(len(titles), 12, "GeoRSS feed for South Atlantic Ocean should return 12 entries")
+        self.assertEqual(len(titles), 13, "GeoRSS feed for South Atlantic Ocean should return 13 entries")
         self.assertEqual(titles[0], "Pan-Pacific Study", "GeoRSS feed for South Atlantic Ocean returned unexpected first title")
-        self.assertEqual(titles[11], "Seismic Survey: Mid-Atlantic Ridge", "GeoRSS feed for South Atlantic Ocean returned unexpected last title")
+        self.assertEqual(titles[-1], "Seismic Survey: Mid-Atlantic Ridge", "GeoRSS feed for South Atlantic Ocean returned unexpected last title")
 
 
     def test_all_continent_pages_display_correct_work_counts(self):
@@ -156,9 +194,10 @@ class GlobalFeedsAndLandingPageTests(TestCase):
                 self.assertEqual(len(actual_works), expected_count,
                                f"Continent {region.name} ({slug}): expected {expected_count} works, got {len(actual_works)}")
 
-                # Verify the count is shown in the HTML
+                # Verify the count is shown in the HTML (template uses |pluralize)
                 if expected_count > 0:
-                    self.assertContains(response, f'{expected_count} research works',
+                    expected_phrase = f'{expected_count} research work{"" if expected_count == 1 else "s"}'
+                    self.assertContains(response, expected_phrase,
                                        msg_prefix=f"Work count not displayed for {region.name}")
 
                     # Verify at least the first work title appears
@@ -199,9 +238,10 @@ class GlobalFeedsAndLandingPageTests(TestCase):
                 self.assertEqual(len(actual_works), expected_count,
                                f"Ocean {region.name} ({slug}): expected {expected_count} works, got {len(actual_works)}")
 
-                # Verify the count is shown in the HTML
+                # Verify the count is shown in the HTML (template uses |pluralize)
                 if expected_count > 0:
-                    self.assertContains(response, f'{expected_count} research works',
+                    expected_phrase = f'{expected_count} research work{"" if expected_count == 1 else "s"}'
+                    self.assertContains(response, expected_phrase,
                                        msg_prefix=f"Work count not displayed for {region.name}")
 
                     # Verify at least the first work title appears

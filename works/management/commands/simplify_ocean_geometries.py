@@ -12,7 +12,12 @@ from shapely.ops import unary_union
 
 # Use configurable data directory if set, otherwise fall back to command directory
 COMMAND_DIR = os.path.dirname(__file__)
-DATA_DIR = settings.GLOBAL_REGIONS_DATA_DIR or COMMAND_DIR
+
+
+def _data_dir():
+    # Read at call time so override_settings(GLOBAL_REGIONS_DATA_DIR=...) is honored.
+    return settings.GLOBAL_REGIONS_DATA_DIR or COMMAND_DIR
+
 
 INPUT_GPKG = "goas_v01.gpkg"
 OUTPUT_GEOJSON = "goas_v01_simplified.geojson"
@@ -42,8 +47,9 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        input_path = os.path.join(DATA_DIR, INPUT_GPKG)
-        output_path = os.path.join(DATA_DIR, OUTPUT_GEOJSON)
+        data_dir = _data_dir()
+        input_path = os.path.join(data_dir, INPUT_GPKG)
+        output_path = os.path.join(data_dir, OUTPUT_GEOJSON)
         percentile = options['percentile']
         tolerance = options['tolerance']
         preserve_topology = options['preserve_topology']

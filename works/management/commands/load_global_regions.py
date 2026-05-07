@@ -16,7 +16,11 @@ from django.core.management.base import BaseCommand
 
 # Use configurable data directory if set, otherwise fall back to command directory
 COMMAND_DIR = os.path.dirname(__file__)
-DATA_DIR = settings.GLOBAL_REGIONS_DATA_DIR or COMMAND_DIR
+
+
+def _data_dir():
+    # Read at call time so override_settings(GLOBAL_REGIONS_DATA_DIR=...) is honored.
+    return settings.GLOBAL_REGIONS_DATA_DIR or COMMAND_DIR
 
 CONTINENTS_URL = (
     "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/"
@@ -42,12 +46,14 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         self.stdout.write(f"Looading global regions…")
 
-        # Ensure data directory exists if it's a custom path
-        if settings.GLOBAL_REGIONS_DATA_DIR and not os.path.exists(DATA_DIR):
-            self.stdout.write(f"Creating data directory: {DATA_DIR}")
-            os.makedirs(DATA_DIR, exist_ok=True)
+        data_dir = _data_dir()
 
-        continents_path = os.path.join(DATA_DIR, CONTINENTS_FILE)
+        # Ensure data directory exists if it's a custom path
+        if settings.GLOBAL_REGIONS_DATA_DIR and not os.path.exists(data_dir):
+            self.stdout.write(f"Creating data directory: {data_dir}")
+            os.makedirs(data_dir, exist_ok=True)
+
+        continents_path = os.path.join(data_dir, CONTINENTS_FILE)
 
         if os.path.exists(continents_path):
             self.stdout.write(f"File {continents_path} already exists, not downloading data again - delete it to renew the global regions")
@@ -77,8 +83,8 @@ class Command(BaseCommand):
             self.stdout.write(f"{verb} continent '{obj.name}'")
         del ds  # We cannot close the source but can only rely on the GC
 
-        oceans_gpkg_path = os.path.join(DATA_DIR, OCEANS_GPKG_FILE)
-        oceans_simplified_path = os.path.join(DATA_DIR, OCEANS_SIMPLIFIED_FILE)
+        oceans_gpkg_path = os.path.join(data_dir, OCEANS_GPKG_FILE)
+        oceans_simplified_path = os.path.join(data_dir, OCEANS_SIMPLIFIED_FILE)
 
         # Download and extract if GeoPackage doesn't exist
         gpkg_downloaded = False
@@ -108,9 +114,9 @@ class Command(BaseCommand):
                 # Extract the .gpkg file
                 for name in zf.namelist():
                     if name.endswith('.gpkg'):
-                        zf.extract(name, DATA_DIR)
+                        zf.extract(name, data_dir)
                         # Rename if necessary
-                        extracted_path = os.path.join(DATA_DIR, name)
+                        extracted_path = os.path.join(data_dir, name)
                         if extracted_path != oceans_gpkg_path:
                             shutil.move(extracted_path, oceans_gpkg_path)
                         break
