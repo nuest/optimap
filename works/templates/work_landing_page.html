@@ -418,19 +418,15 @@
       });
       map.addControl(drawControl);
 
-      // Handle drawing events
+      // Handle drawing events and update the status indicator
       map.on(L.Draw.Event.CREATED, function (event) {
-        const layer = event.layer;
-        drawnItems.addLayer(layer);
-      });
-
-      // Update geometry status indicator when drawings change
-      map.on('draw:created', function(e) {
+        drawnItems.addLayer(event.layer);
         const geometryStatusText = document.getElementById('geometry-status-text');
         const geometryStatus = document.getElementById('geometry-status');
         if (geometryStatusText && geometryStatus) {
-          const count = drawnItems.getLayers().length + 1;
-          geometryStatusText.textContent = `${count} geometric feature(s) drawn. Ready to submit.`;
+          const count = drawnItems.getLayers().length;
+          const noun = count === 1 ? 'geometric feature' : 'geometric features';
+          geometryStatusText.textContent = `${count} ${noun} drawn. Ready to submit.`;
           geometryStatus.classList.remove('alert-warning');
           geometryStatus.classList.add('alert-success');
         }
@@ -446,7 +442,8 @@
             geometryStatus.classList.remove('alert-success');
             geometryStatus.classList.add('alert-warning');
           } else {
-            geometryStatusText.textContent = `${count} geometric feature(s) drawn. Ready to submit.`;
+            const noun = count === 1 ? 'geometric feature' : 'geometric features';
+            geometryStatusText.textContent = `${count} ${noun} drawn. Ready to submit.`;
           }
         }
       });
