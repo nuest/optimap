@@ -64,6 +64,8 @@ def _publications_to_geojson(publications):
                 "abstract": work.abstract,
                 "source": work.source.name if work.source else None,
                 "source_details": source_details,
+                "status": work.status,
+                "status_display": work.get_status_display(),
                 "publicationDate": work.publicationDate.isoformat() if work.publicationDate else None,
                 "timeperiod_startdate": work.timeperiod_startdate,
                 "timeperiod_enddate": work.timeperiod_enddate,

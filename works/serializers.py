@@ -34,6 +34,7 @@ class SourceSerializer(serializers.ModelSerializer):
 
 class WorkSerializer(GeoFeatureModelSerializer):
     source_details = serializers.SerializerMethodField(help_text="Embedded source row (same shape as `/api/v1/sources/<id>/`).")
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
 
     class Meta:
         model = Work
@@ -52,6 +53,8 @@ class WorkSerializer(GeoFeatureModelSerializer):
             "placename",
             "country_code",
             "source_details",
+            "status",
+            "status_display",
             "authors",
             "keywords",
             "topics",

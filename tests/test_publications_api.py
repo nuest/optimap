@@ -119,3 +119,37 @@ class PublicationsApiTest(TestCase):
         self.assertIn('country_code', properties)
         self.assertIsNone(properties['placename'])
         self.assertIsNone(properties['country_code'])
+
+    def test_api_exposes_status_for_frontend_layer_split(self):
+        # The frontend splits the map into a "Published" and an "Unpublished"
+        # overlay (visible to admins) using `properties.status`. Pin the
+        # contract so it doesn't silently regress.
+        properties = self.client.get('/api/v1/works/').json()['results']['features'][0]['properties']
+        self.assertIn('status', properties)
+        self.assertIn('status_display', properties)
+        self.assertEqual(properties['status'], 'p')
+        self.assertEqual(properties['status_display'], 'Published')
+
+    def test_api_returns_unpublished_only_to_staff(self):
+        # Anonymous / non-staff users see only Published works. Staff users
+        # additionally get unpublished ones, which the frontend routes into
+        # the "Unpublished works" overlay.
+        Work.objects.create(
+            title="Harvested Draft",
+            url="https://example.com/h",
+            status="h",
+            publicationDate=date(2026, 1, 1),
+            geometry=GeometryCollection(Point(2, 2)),
+        )
+
+        # Non-staff (logged-in user from setUp) — only published works.
+        body = self.client.get('/api/v1/works/').json()
+        statuses = sorted(f['properties']['status'] for f in body['results']['features'])
+        self.assertEqual(statuses, ['p', 'p'])
+
+        # Staff — published and unpublished.
+        admin = User.objects.create_user('admintest', 'admin@test.com', 'test', is_staff=True)
+        self.client.force_login(admin)
+        body = self.client.get('/api/v1/works/').json()
+        statuses = sorted(f['properties']['status'] for f in body['results']['features'])
+        self.assertEqual(statuses, ['h', 'p', 'p'])

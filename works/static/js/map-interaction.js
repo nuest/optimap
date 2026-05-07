@@ -146,6 +146,13 @@ class MapInteractionManager {
     const tolerance = 10; // pixels
 
     this.publicationsLayer.eachLayer((layer) => {
+      // Respect the layer-control toggles. The combined `publicationsLayer`
+      // holds every feature regardless of which sub-group (Published /
+      // Unpublished) it lives in, so without this guard the paginated popup
+      // would surface works the user just toggled off.
+      if (!this.map.hasLayer(layer)) {
+        return;
+      }
       // Check if this layer contains the point
       if (this.layerContainsPoint(layer, latlng, point, tolerance)) {
         // GeoJSON can have ID at feature level or properties level

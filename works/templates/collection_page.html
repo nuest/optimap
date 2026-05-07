@@ -226,26 +226,28 @@
 <script src="{% static 'js/map-interaction.js' %}"></script>
 <script src="{% static 'js/map-gazetteer.js' %}"></script>
 <script src="{% static 'js/map-zoom-to-all.js' %}"></script>
+<script src="{% static 'js/map-status-layers.js' %}"></script>
 <script type="text/javascript">
   $(document).ready(function () {
     if (!document.getElementById('collection-map')) { return; }
     const map = L.map('collection-map');
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: 'Map data: © <a href="https://openstreetmap.org">OpenStreetMap</a> contributors',
       maxZoom: 18,
     }).addTo(map);
     const publicationsData = {{ publications_geojson|safe }};
-    const publicationsLayer = L.geoJSON(publicationsData, {
-      style: typeof publicationStyle !== 'undefined' ? publicationStyle : undefined,
-      onEachFeature: typeof publicationPopup !== 'undefined' ? publicationPopup : undefined,
-    }).addTo(map);
-    if (publicationsLayer.getBounds().isValid()) {
-      map.fitBounds(publicationsLayer.getBounds(), { padding: [20, 20] });
+    const layerControl = L.control.layers({ 'OpenStreetMap': osmLayer }, {}).addTo(map);
+    window.mapLayerControl = layerControl;
+    const statusLayers = new MapStatusLayersManager(map, layerControl, publicationsData);
+    const publicationsLayer = statusLayers.getCombinedLayer();
+    const publicationsGroup = statusLayers.getPublicationsGroup();
+    if (publicationsGroup.getBounds().isValid()) {
+      map.fitBounds(publicationsGroup.getBounds(), { padding: [20, 20] });
     } else {
       map.setView([0, 0], 2);
     }
     if (typeof MapInteractionManager !== 'undefined') { new MapInteractionManager(map, publicationsLayer); }
-    if (typeof MapZoomToAllControl !== 'undefined') { new MapZoomToAllControl(map, publicationsLayer); }
+    if (typeof MapZoomToAllControl !== 'undefined') { new MapZoomToAllControl(map, publicationsGroup); }
     if (typeof MapGazetteerManager !== 'undefined') { new MapGazetteerManager(map, {provider: 'nominatim'}); }
   });
 </script>

@@ -44,32 +44,29 @@ async function initMap() {
     }
   ).addTo(map);
 
-  // Group to hold all publication markers
-  const publicationsGroup = new L.FeatureGroup().addTo(map);
-
-  // Controls: scale and layer switcher
+  // Controls: scale and layer switcher. The work overlays are added by
+  // MapStatusLayersManager once the data has loaded so that the layer-control
+  // labels reflect the actual published / unpublished split.
   L.control.scale({ position: 'bottomright' }).addTo(map);
   const layerControl = L.control
-    .layers(
-      { 'OpenStreetMap': osmLayer },
-      { 'All works': publicationsGroup }
-    )
+    .layers({ 'OpenStreetMap': osmLayer }, {})
     .addTo(map);
 
   // Make layer control globally available for search manager
   window.mapLayerControl = layerControl;
 
-  // Fetch data and add to map
-  const pubs = await load_publications();
-  const pubsLayer = L.geoJSON(pubs, {
-    style: publicationStyle,
-    onEachFeature: publicationPopup
-  });
-  pubsLayer.eachLayer((layer) => publicationsGroup.addLayer(layer));
-
   // Make style and popup functions globally available for search manager
   window.publicationStyle = publicationStyle;
   window.publicationPopup = publicationPopup;
+
+  // Fetch data and split into Published / Unpublished overlays. For
+  // anonymous users the API only returns status='p' features, so the
+  // "Unpublished" overlay is silently omitted.
+  const pubs = await load_publications();
+  const statusLayers = new MapStatusLayersManager(map, layerControl, pubs);
+  const pubsLayer = statusLayers.getCombinedLayer();
+  const publicationsGroup = statusLayers.getPublicationsGroup();
+  window.mapStatusLayersManager = statusLayers;
 
   // Initialize enhanced interaction manager for handling overlapping polygons
   let interactionManager = null;
