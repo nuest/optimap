@@ -24,7 +24,14 @@ const dataCopyright =
   " | Publication metadata license: <a href='https://creativecommons.org/publicdomain/zero/1.0/'>CC-0</a>";
 
 async function initMap() {
-  const map = L.map('map');
+  // main.html is also extended by non-map pages (about, privacy, data, …) that
+  // do not override {% block scripts %}, so this script runs there too. Bail
+  // out gracefully when there is no #map element to initialise.
+  const mapEl = document.getElementById('map');
+  if (!mapEl) {
+    return;
+  }
+  const map = L.map(mapEl);
 
   // Base layer: OpenStreetMap
   const osmLayer = L.tileLayer(
