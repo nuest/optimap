@@ -50,7 +50,13 @@ class StatusWorkflowComplianceTests(TestCase):
         self.assertEqual(len(STATUS_CHOICES), 6)
 
     def test_harvested_status_visibility(self):
-        """Harvested publications should not be visible to non-admin users."""
+        """Harvested landing pages are visible to non-admins.
+
+        The /contribute/ listing hands users to the work landing page where
+        the contribution form lives, so a 404 there would break the flow.
+        See works/views/work_views.py:work_landing — Drafts ('d'), Testing
+        ('t'), and Withdrawn ('w') remain admin-only.
+        """
         pub = Work.objects.create(
             title='Harvested Publication',
             status='h',
@@ -58,17 +64,22 @@ class StatusWorkflowComplianceTests(TestCase):
             source=self.source
         )
 
-        # Non-admin cannot access
+        # Non-admin can access — needed for the contribute flow.
         response = self.client.get(f'/work/{pub.doi}/')
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, 200)
 
-        # Admin can access
+        # Admin can access too.
         self.client.login(username='admin@example.com', password='adminpass123')
         response = self.client.get(f'/work/{pub.doi}/')
         self.assertEqual(response.status_code, 200)
 
     def test_contributed_status_visibility(self):
-        """Contributed publications should not be visible to non-admin users."""
+        """Contributed landing pages are visible to non-admins.
+
+        After a successful contribution flips a work from 'h' to 'c', the
+        post-submit reload would 404 if 'c' were admin-only. See
+        works/views/work_views.py:work_landing for the rationale.
+        """
         pub = Work.objects.create(
             title='Contributed Publication',
             status='c',
@@ -77,11 +88,11 @@ class StatusWorkflowComplianceTests(TestCase):
             geometry=GeometryCollection(Point(13.405, 52.52))
         )
 
-        # Non-admin cannot access
+        # Non-admin can access — keeps the post-contribute reload working.
         response = self.client.get(f'/work/{pub.doi}/')
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, 200)
 
-        # Admin can access
+        # Admin can access too.
         self.client.login(username='admin@example.com', password='adminpass123')
         response = self.client.get(f'/work/{pub.doi}/')
         self.assertEqual(response.status_code, 200)

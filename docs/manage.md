@@ -256,6 +256,15 @@ Staff users see admin chrome integrated into the public pages:
 
 These mirror the per-work admin controls on the work landing page (Publish / Unpublish / Edit in Admin), keeping the workflow consistent for both admins and curators.
 
+### Unpublished works on the maps
+
+The main map (`/`) and the per-collection map (`/collections/<identifier>/`) split publication features into two Leaflet overlays in the layer-control panel (top-right):
+
+- **Published works (`N`)** — solid teal outline, full opacity. Visible to everyone; `N` is the count of published features in the current view.
+- **Unpublished works (`N`)** — same hue, dashed outline, ~50 % opacity. Only registered for users who can see non-`Published` works: site admins on the main map, plus curators of the collection on collection pages. Both overlays are on by default; toggle the Unpublished overlay off to declutter when triaging.
+
+Popups for unpublished features carry an inline status badge (Draft / Harvested / Contributed / Testing / Withdrawn) and a *"not visible to anonymous users"* caveat, mirroring the per-row badges in the collection card list. Anonymous users still see only `status='p'` features from the API/view, so the Unpublished overlay never appears for them.
+
 ### Source types
 
 The `Source.source_type` choice field selects the harvester pipeline:
