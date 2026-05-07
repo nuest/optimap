@@ -34,11 +34,15 @@ class HarvestStats:
     `records_updated`, and uses the totals in the completion email.
     """
 
-    __slots__ = ("created", "updated", "skipped_same_source", "skipped_cross_source")
+    __slots__ = (
+        "created", "updated", "doi_backfilled",
+        "skipped_same_source", "skipped_cross_source",
+    )
 
     def __init__(self):
         self.created = 0
         self.updated = 0
+        self.doi_backfilled = 0
         self.skipped_same_source = 0
         self.skipped_cross_source = 0
 
@@ -47,6 +51,8 @@ class HarvestStats:
             self.created += 1
         elif action == "updated":
             self.updated += 1
+        elif action == "doi_backfilled":
+            self.doi_backfilled += 1
         elif action == "skipped_same_source":
             self.skipped_same_source += 1
         elif action == "skipped_cross_source":
@@ -284,12 +290,44 @@ def _carefully_update_work(work, new_fields, event):
     return work
 
 
+def _backfill_empty_doi(work, new_doi, event):
+    """Populate an existing work's empty ``doi`` from a re-harvest.
+
+    Some legacy works (notably AGILE-GISS records harvested via the old
+    Copernicus OAI-PMH endpoint, which sometimes did not carry the DOI in
+    ``dc:identifier`` / ``dc:relation``) ended up with ``doi=None``. When a
+    later re-harvest from a richer source (Crossref, OpenAlex) finds the
+    same work by URL it would otherwise skip — see the source-match /
+    ``update_existing`` branches below — and the DOI gap would persist.
+
+    This helper is the targeted exception: when the existing record has no
+    DOI and the new harvest has one, write just the DOI (and bump
+    ``lastUpdate`` and ``provenance.events``) regardless of source identity
+    or ``update_existing``.
+    """
+    work.doi = new_doi
+    existing_provenance = work.provenance if isinstance(work.provenance, dict) else {}
+    existing_provenance.setdefault('events', []).append({
+        'type': 'doi_backfill',
+        'at': timezone.now().isoformat(),
+        'doi': new_doi,
+        'harvesting_event_id': event.id if event else None,
+    })
+    work.provenance = existing_provenance
+    # Include lastUpdate explicitly: with update_fields, auto_now fields are
+    # not bumped automatically, and we want the work-landing cache key to
+    # invalidate so the freshly populated DOI shows up immediately.
+    work.save(update_fields=['doi', 'provenance', 'lastUpdate'])
+    logger.info("Backfilled empty DOI on work id=%s with %s", work.id, new_doi)
+
+
 def _save_or_update_work(work_kwargs, source, event, update_existing=False):
     """Create or update a Work, applying per-source dedup.
 
     Returns ``(work_or_none, action)`` where ``action`` is one of:
       * ``'created'`` — new Work was inserted,
       * ``'updated'`` — existing same-source Work was updated in place,
+      * ``'doi_backfilled'`` — existing work had no DOI; only ``doi`` was filled in,
       * ``'skipped_same_source'`` — same-source duplicate, ``update_existing`` was False,
       * ``'skipped_cross_source'`` — different-source duplicate (never auto-merged).
     """
@@ -298,18 +336,25 @@ def _save_or_update_work(work_kwargs, source, event, update_existing=False):
 
     existing = _find_existing_work(doi=doi_value, url=url_value)
     if existing is not None:
+        # Targeted DOI backfill runs *before* the source-match / skip logic
+        # so a legacy no-DOI work gets its DOI populated even from a
+        # different-source re-harvest.
+        backfilled = bool(doi_value) and not existing.doi
+        if backfilled:
+            _backfill_empty_doi(existing, doi_value, event)
+
         if existing.source_id != getattr(source, 'id', None):
             logger.info(
                 "Skipping cross-source duplicate %s — already harvested under source id=%s",
                 doi_value or url_value, existing.source_id,
             )
-            return existing, 'skipped_cross_source'
+            return existing, 'doi_backfilled' if backfilled else 'skipped_cross_source'
         if not update_existing:
             logger.debug(
                 "Skipping same-source duplicate %s (use --update / update_existing=True to refresh)",
                 doi_value or url_value,
             )
-            return existing, 'skipped_same_source'
+            return existing, 'doi_backfilled' if backfilled else 'skipped_same_source'
         _carefully_update_work(existing, work_kwargs, event)
         return existing, 'updated'
 

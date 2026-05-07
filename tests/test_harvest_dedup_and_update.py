@@ -296,3 +296,94 @@ class SaveOrUpdateHelperTests(TestCase):
         self.assertEqual(action, 'skipped_cross_source')
         self.assertEqual(Work.objects.count(), 1)
         self.assertEqual(Work.objects.get().source_id, self.source.id)
+
+
+class EmptyDoiBackfillTests(TestCase):
+    """Targeted DOI backfill: when a re-harvest delivers a DOI for an
+    existing record that has none, write just the DOI even if the source
+    differs or ``update_existing`` is False. This is what closes the gap
+    on AGILE-GISS works that were ingested earlier via Copernicus OAI-PMH
+    without DOIs in ``dc:identifier`` and stayed empty across re-harvests.
+    """
+
+    def setUp(self):
+        self.source_a = Source.objects.create(
+            name='A', source_type='oai-pmh', url_field='https://a.example.com/oai',
+        )
+        self.source_b = Source.objects.create(
+            name='B', source_type='openalex', url_field='https://b.example.com/oa',
+            openalex_id='S4210203054',
+        )
+
+    def _kwargs(self, source, **overrides):
+        from works.tasks import get_or_create_admin_command_user
+        kwargs = dict(
+            title='X', abstract='a',
+            url='https://landing.example.com/x',
+            source=source, status='h',
+            geometry=GeometryCollection(),
+            timeperiod_startdate=[], timeperiod_enddate=[],
+            provenance={'harvest': {'harvester': 'test'}},
+            created_by=get_or_create_admin_command_user(),
+        )
+        kwargs.update(overrides)
+        return kwargs
+
+    def test_cross_source_reharvest_backfills_empty_doi(self):
+        from works.tasks import _save_or_update_work
+        # Step 1: legacy harvest stores work with no DOI but a landing URL.
+        first, _ = _save_or_update_work(
+            self._kwargs(self.source_a, doi=None), self.source_a, None,
+        )
+        self.assertIsNone(first.doi)
+
+        # Step 2: re-harvest from a different source with the same URL but a
+        # DOI now available. Without the backfill helper this would return
+        # ``skipped_cross_source`` and leave the DOI empty.
+        event = HarvestingEvent.objects.create(source=self.source_b, status='in_progress')
+        same, action = _save_or_update_work(
+            self._kwargs(self.source_b, doi='10.5194/agile-giss-1-1-2020'),
+            self.source_b, event,
+        )
+        self.assertEqual(action, 'doi_backfilled')
+        self.assertEqual(same.pk, first.pk)
+        same.refresh_from_db()
+        self.assertEqual(same.doi, '10.5194/agile-giss-1-1-2020')
+        # Source row stays attached to the legacy harvester — backfill is
+        # DOI-only and never reassigns ownership.
+        self.assertEqual(same.source_id, self.source_a.id)
+        # Provenance grew an audit entry that names the backfill action.
+        events = (same.provenance or {}).get('events') or []
+        self.assertTrue(any(e.get('type') == 'doi_backfill' for e in events))
+
+    def test_same_source_reharvest_backfills_empty_doi_without_update_flag(self):
+        from works.tasks import _save_or_update_work
+        first, _ = _save_or_update_work(
+            self._kwargs(self.source_a, doi=None), self.source_a, None,
+        )
+        self.assertIsNone(first.doi)
+
+        event = HarvestingEvent.objects.create(source=self.source_a, status='in_progress')
+        # No update_existing=True — same-source path would normally skip.
+        same, action = _save_or_update_work(
+            self._kwargs(self.source_a, doi='10.5194/agile-giss-1-1-2020'),
+            self.source_a, event,
+        )
+        self.assertEqual(action, 'doi_backfilled')
+        same.refresh_from_db()
+        self.assertEqual(same.doi, '10.5194/agile-giss-1-1-2020')
+
+    def test_existing_doi_is_preserved_when_new_kwargs_have_no_doi(self):
+        from works.tasks import _save_or_update_work
+        first, _ = _save_or_update_work(
+            self._kwargs(self.source_a, doi='10.5194/keep-me'), self.source_a, None,
+        )
+
+        # New harvest comes in with no DOI — must NOT clear the existing one.
+        # This dedup path matches by URL because the new kwargs has no DOI.
+        same, action = _save_or_update_work(
+            self._kwargs(self.source_a, doi=None), self.source_a, None,
+        )
+        self.assertNotEqual(action, 'doi_backfilled')
+        same.refresh_from_db()
+        self.assertEqual(same.doi, '10.5194/keep-me')

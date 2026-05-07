@@ -187,6 +187,20 @@ class OpenAlexMatcher:
             if source and isinstance(source, dict):
                 fulltext_origin = source.get('type')
 
+        # Bare DOI (no ``https://doi.org/`` prefix) so callers can write
+        # straight into ``Work.doi``. We *only* emit this when OpenAlex
+        # carries one — see ``backfill_openalex.py`` for the apply step
+        # which uses ``setattr`` and would otherwise blank a populated
+        # field with ``None``.
+        raw_doi = work_data.get('doi')
+        bare_doi = None
+        if raw_doi:
+            bare_doi = raw_doi.strip()
+            for prefix in ('https://doi.org/', 'http://doi.org/', 'doi.org/'):
+                if bare_doi.lower().startswith(prefix):
+                    bare_doi = bare_doi[len(prefix):]
+                    break
+
         extracted = {
             'openalex_id': work_data.get('id'),
             'openalex_fulltext_origin': fulltext_origin,
@@ -202,6 +216,8 @@ class OpenAlexMatcher:
             'first_page': None,
             'last_page': None,
         }
+        if bare_doi:
+            extracted['doi'] = bare_doi
 
         biblio = work_data.get('biblio') or {}
         if isinstance(biblio, dict):
