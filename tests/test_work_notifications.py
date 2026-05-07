@@ -193,3 +193,115 @@ class UnknownEventTests(TestCase):
     def test_unknown_event_is_a_noop(self):
         # Should not raise; should just log and move on.
         notify_work_event(work=None, event_type="not-registered", actor=None)
+
+
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    EMAIL_HOST_USER="optimap@example.org",
+    BASE_URL="http://testserver",
+)
+class WorkEventOptOutTests(TestCase):
+    """Per-user ``UserProfile.notify_work_events`` toggle.
+
+    Default is ``True`` (collaborators stay in the loop), but a user who
+    flips it to ``False`` must not receive contribution-review or
+    publication-thank-you emails. The actor is unaffected: they're already
+    excluded from recipient sets independently of the opt-out flag.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.actor = User.objects.create_user(
+            username="actor", email="actor@example.org", password="x",
+        )
+        cls.opted_in_admin = User.objects.create_user(
+            username="optin_admin", email="optin-admin@optimap.example",
+            password="x", is_staff=True,
+        )
+        cls.opted_out_admin = User.objects.create_user(
+            username="optout_admin", email="optout-admin@optimap.example",
+            password="x", is_staff=True,
+        )
+        cls.opted_out_admin.userprofile.notify_work_events = False
+        cls.opted_out_admin.userprofile.save()
+
+        cls.opted_in_curator = User.objects.create_user(
+            username="optin_cur", email="optin-curator@example.org", password="x",
+        )
+        cls.opted_out_curator = User.objects.create_user(
+            username="optout_cur", email="optout-curator@example.org", password="x",
+        )
+        cls.opted_out_curator.userprofile.notify_work_events = False
+        cls.opted_out_curator.userprofile.save()
+
+        cls.col = Collection.objects.create(identifier="opt", name="OptOut Collection")
+        cls.col.curators.add(cls.opted_in_curator, cls.opted_out_curator)
+
+        cls.source = Source.objects.create(
+            name="X", url_field="https://example.org/api", source_type="oai-pmh",
+        )
+        cls.work = Work.objects.create(
+            title="Opt-Out Coverage Work", status="c",
+            doi="10.1234/optout-1",
+            geometry=GeometryCollection(Point(11.0, 12.0)),
+            source=cls.source,
+        )
+        cls.work.collections.add(cls.col)
+
+    def setUp(self):
+        mail.outbox = []
+
+    def test_contribution_email_skips_opted_out_admins(self):
+        with patch("django_q.tasks.async_task", side_effect=_run_async_synchronously):
+            notify_work_event(self.work, "contribution", actor=self.actor)
+
+        recipients = sorted(addr for m in mail.outbox for addr in m.to)
+        self.assertIn("optin-admin@optimap.example", recipients)
+        self.assertNotIn("optout-admin@optimap.example", recipients)
+
+    def test_contribution_email_skips_opted_out_curators(self):
+        with patch("django_q.tasks.async_task", side_effect=_run_async_synchronously):
+            notify_work_event(self.work, "contribution", actor=self.actor)
+
+        recipients = sorted(addr for m in mail.outbox for addr in m.to)
+        self.assertIn("optin-curator@example.org", recipients)
+        self.assertNotIn("optout-curator@example.org", recipients)
+
+    def test_role_summary_does_not_count_opted_out_curators(self):
+        # The transparency block should describe who actually got notified —
+        # it would be misleading to claim 2 curators were emailed when one
+        # opted out.
+        with patch("django_q.tasks.async_task", side_effect=_run_async_synchronously):
+            notify_work_event(self.work, "contribution", actor=self.actor)
+
+        body = mail.outbox[0].body
+        self.assertIn("1 curator of 'OptOut Collection'", body)
+        self.assertNotIn("2 curators", body)
+
+    def test_publish_email_skips_opted_out_contributor(self):
+        # A contributor with notify_work_events=False does NOT get the
+        # "your work was published" email.
+        published = Work.objects.create(
+            title="Published Work", status="p", doi="10.1234/pub-1",
+            geometry=GeometryCollection(Point(0.0, 0.0)),
+            source=self.source,
+        )
+        Contribution.objects.create(
+            user=self.opted_in_curator, work=published, kind=Contribution.SPATIAL,
+        )
+        Contribution.objects.create(
+            user=self.opted_out_curator, work=published, kind=Contribution.TEMPORAL,
+        )
+
+        with patch("django_q.tasks.async_task", side_effect=_run_async_synchronously):
+            notify_work_event(published, "publish", actor=self.actor)
+
+        recipients = sorted(addr for m in mail.outbox for addr in m.to)
+        self.assertIn("optin-curator@example.org", recipients)
+        self.assertNotIn("optout-curator@example.org", recipients)
+
+    def test_default_value_is_opted_in(self):
+        # Sanity check: a freshly created user gets a UserProfile via signal
+        # with notify_work_events=True, so they receive the emails by default.
+        self.assertTrue(self.opted_in_admin.userprofile.notify_work_events)
+        self.assertTrue(self.opted_in_curator.userprofile.notify_work_events)

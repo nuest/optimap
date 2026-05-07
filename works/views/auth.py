@@ -238,7 +238,9 @@ def user_settings(request):
             messages.success(request, "Recognition Board settings saved.")
         else:
             profile.notify_new_manuscripts = request.POST.get("notify_new_manuscripts") == "on"
+            profile.notify_work_events = request.POST.get("notify_work_events") == "on"
             profile.save()
+            messages.success(request, "Notification settings saved.")
         return redirect(reverse("optimap:usersettings"))
     return render(request, "user_settings.html", {
         "profile": profile,

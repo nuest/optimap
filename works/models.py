@@ -397,6 +397,15 @@ class HarvestingEvent(models.Model):
 class UserProfile(models.Model):
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
     notify_new_manuscripts = models.BooleanField(default=False)
+    notify_work_events = models.BooleanField(
+        default=True,
+        help_text=(
+            "Receive emails for work-state changes (contributions to review as "
+            "an admin/curator, and 'your contribution was published' messages "
+            "as a contributor). Opt-out — defaults to on so collaborators stay "
+            "in the loop."
+        ),
+    )
     recognition_opt_in = models.BooleanField(default=False)
     recognition_username = models.CharField(
         max_length=64, unique=True, null=True, blank=True,

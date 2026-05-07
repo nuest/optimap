@@ -71,17 +71,28 @@ def _absolute_work_url(work) -> str:
     return f"{settings.BASE_URL}{reverse('optimap:work-landing', args=[work.get_identifier()])}"
 
 
+def _opted_in(qs):
+    """Filter a User queryset to those who haven't opted out of work-event emails.
+
+    Uses ``exclude(...=False)`` rather than ``filter(...=True)`` so that any
+    user without a ``UserProfile`` row (legacy / fixture-loaded accounts that
+    bypass the ``post_save`` signal) is treated as opted-in by default — the
+    field is opt-out per the docstring on ``UserProfile.notify_work_events``.
+    """
+    return qs.exclude(userprofile__notify_work_events=False)
+
+
 def _curators_for_work(work):
     """Return a queryset of curator users for any collection that contains ``work``."""
-    return User.objects.filter(
+    return _opted_in(User.objects.filter(
         curated_collections__in=work.collections.all(),
         email__gt="",
-    ).distinct()
+    ).distinct())
 
 
 def _admins():
     """Return a queryset of staff users with an email address."""
-    return User.objects.filter(is_staff=True).exclude(email__exact="").distinct()
+    return _opted_in(User.objects.filter(is_staff=True).exclude(email__exact="").distinct())
 
 
 def _format_role_summary(admins_count: int, curator_collections: list[str]) -> str:
@@ -117,7 +128,7 @@ def _enqueue_contribution_review(work, actor) -> None:
     curator_ids_by_collection = {}
     for collection in work.collections.all():
         ids = list(
-            collection.curators.filter(email__gt="")
+            _opted_in(collection.curators.filter(email__gt=""))
             .exclude(pk=getattr(actor, "pk", None))
             .values_list("id", flat=True)
         )
@@ -209,6 +220,10 @@ def _enqueue_publication_to_contributors(work, actor) -> None:
     contributor_ids = list(
         Contribution.objects.filter(work=work)
         .exclude(user__pk=getattr(actor, "pk", None))
+        # Honour the per-user opt-out — same exclude-False pattern as
+        # ``_opted_in`` so users without a UserProfile row stay opted-in by
+        # default (the field defaults to True at create time).
+        .exclude(user__userprofile__notify_work_events=False)
         .values_list("user_id", flat=True)
         .distinct()
     )
