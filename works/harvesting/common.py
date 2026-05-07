@@ -134,13 +134,15 @@ def ensure_collection_for_source(source):
     """Make sure ``source.collection`` is set, creating a Collection on first
     harvest if needed.
 
-    Called by the OAI-PMH / OJS / Janeway harvest entry point — issue #192
-    explicitly asks the generic OAI-PMH harvester to "create a collection for
-    each endpoint based on the provided metadata". The Collection is keyed by
-    a slug derived from the source's name (with a numeric suffix if the slug
-    already exists under a different source) and starts ``is_published=False``
-    so admins can review name/description before exposing it on
-    ``/collections/``.
+    Called from every harvest entry point (OAI-PMH / OJS / Janeway, the
+    Mountain Wetlands API, OpenAlex-as-source). Issue #192 originally asked
+    the generic OAI-PMH harvester to "create a collection for each endpoint
+    based on the provided metadata"; the same auto-creation now applies to
+    the other harvesters so admins don't have to pre-seed collections via
+    fixtures or the admin UI. The Collection is keyed by a slug derived from
+    the source's name (with a numeric suffix if the slug already exists under
+    a different source) and starts ``is_published=False`` so admins can
+    review name/description before exposing it on ``/collections/``.
 
     Returns the (possibly newly-created) ``Collection``, or ``None`` when the
     source has no usable name to derive a slug from. No-op when

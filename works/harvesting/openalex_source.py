@@ -34,6 +34,7 @@ from .common import (
     HarvestWarningCollector,
     _save_or_update_work,
     complete_harvest,
+    ensure_collection_for_source,
     fail_harvest,
     get_or_create_admin_command_user,
     resolve_user,
@@ -323,6 +324,10 @@ def harvest_openalex_source(
     """
     user = resolve_user(user)
     source = Source.objects.get(id=source_id)
+    # Issue #192 generalised: every harvester auto-creates a Collection on first
+    # run if the source has none, mirroring the OAI-PMH path. Idempotent — re-runs
+    # are no-ops once the source has a collection assigned.
+    ensure_collection_for_source(source)
     event = HarvestingEvent.objects.create(source=source, status="in_progress")
 
     warning_collector = HarvestWarningCollector()
