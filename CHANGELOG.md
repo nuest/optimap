@@ -9,230 +9,210 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Separate "Unpublished works" map layer for admins and curators** — the main map (`/`) and collection detail pages (`/collections/<identifier>/`) now split publication features into two independently togglable Leaflet overlays: *Published works (N)* (solid teal) and *Unpublished works (N)* (same hue, dashed outline at 50 % opacity), with the feature count in each layer-control label. Both default to on, so admins and curators still see everything as before — just visually distinguished and dismissable from the layer-control panel when the unpublished features are creating noise. Anonymous users still only get published features from the API/view, so the unpublished overlay never appears for them. Popups for unpublished features carry an inline status badge (Draft / Harvested / Contributed / Testing / Withdrawn, mirroring the badge style in collection card lists) plus a "not visible to anonymous users" caveat. New shared module `static/js/map-status-layers.js` (`MapStatusLayersManager`) drives both surfaces. The Work API and the embedded collection-page GeoJSON now also carry `status` and `status_display` properties so the split is data-driven.
+- **Separate "Unpublished works" map layer** for admins (main map) and collection curators (collection pages). Features split into two togglable layers, *Published works (N)* and *Unpublished works (N)* (dashed, muted). Popups for unpublished features show a status badge.
 
-- **Work-state-change email notifications** — new `works/notifications.py` module with a tiny dispatch registry (`WORK_EVENT_HANDLERS`) so adding a new state-change notification is one handler + one entry. Two events wired today, both routed through Django-Q (`async_task`): (1) when a user contributes spatial / temporal metadata, every site admin and every curator of any collection the work belongs to receives an email with the work title, DOI, an absolute link to `/work/<identifier>/`, and a *transparency block* that shows roles + counts of the other notified parties (e.g. *"Notified: 1 admin and 2 curators of 'Mountain Wetlands', 'AGILE-GISS'"*) plus a heads-up that any of them can publish the work concurrently. Emails are sent to each recipient individually so addresses do not leak between recipients. (2) When the same work is later published, every distinct contributor (minus the actor performing the publish) receives a "thank you, your work is now public" email with title, DOI, the kinds of metadata they contributed, and the public landing-page URL. A `provenance.publication_notified_at` timestamp suppresses re-sends on republish cycles. The user-facing success message on contribution submission was also tightened from *"An administrator will review your changes"* (which over-promised — there was no review-notification flow) to *"It is now visible to curators and admins for review."* New per-user opt-out: `UserProfile.notify_work_events` (default `True`, opt-out) is exposed as a toggle on `/usersettings/` ("Get emails for contributions and publications"). Both event handlers now `exclude(userprofile__notify_work_events=False)` from their recipient sets — including the per-collection curator list and the contributor list for the publish event — so a user who flips it off receives no contribution-review or publish-thank-you mail. The `_format_role_summary` transparency block reflects the actual notified count (a 2-curator collection where one curator opted out shows "1 curator of 'X'", not "2 curators"). Migration `0007_userprofile_notify_work_events_and_more.py` adds the field with default `True`, so existing users stay opted-in without action.
+- **Work-state-change email notifications** — admins and collection curators receive an email when a user contributes spatial or temporal metadata; contributors receive an email when their work is later published. Per-user opt-out toggle on `/usersettings/`.
 
-- **CSV download with WKT geometry column** (closes #206) — published works are now also exported as CSV alongside GeoJSON and GeoPackage. New endpoint `/download/csv/` (`works.views.data.download_csv`) and a third "Download CSV" button on `/data/` (visible once the first dump has been generated). The CSV is produced via `ogr2ogr -f CSV -lco GEOMETRY=AS_WKT` from the same intermediate GeoJSON used for the other formats — one row per work, all GeoJSON properties as columns, plus a `WKT` column carrying the work's `GEOMETRYCOLLECTION(...)` in OGC Simple Features WKT (one CSV row per work; multi-point geometries stay packed in the WKT column rather than fanning out). Same retention as the other dumps (`OPTIMAP_DATA_DUMP_RETENTION`, default 3 cycles). New `python manage.py regenerate_data_dumps [--format geojson|gpkg|csv] [--dry-run]` command for synchronous on-demand regeneration (in addition to the existing Django-Q schedule and the admin "Regenerate all data exports now" action). The Zenodo deposit hook-up referenced in #206 still belongs to its own ticket (#65), which the CSV path is now ready to plug into.
+- **CSV download with WKT geometry column** (closes #206) — published works are exported as CSV at `/download/csv/` alongside GeoJSON and GeoPackage. New `python manage.py regenerate_data_dumps [--format geojson|gpkg|csv] [--dry-run]` command for synchronous on-demand regeneration.
 
-- **Work landing pages now show the reverse-geocoded placename and country code**, with a small info icon (`fa-info-circle`) and tooltip explaining "This information was derived from the geometries of the work based on the Nominatim gazetteer." A new `geocoding` block on `Work.provenance` records the gazetteer name + URL, the resulting placename / country code, the count of points that returned an address, the timestamp, and **the per-point Nominatim matches** — for each representative point that resolved, the response's `osm_type` / `osm_id` / `place_id` plus a permalink to the OSM object (`https://www.openstreetmap.org/<type>/<id>`) and the input coordinates. Single-point geometries get one match; multi-point geometries get the list of underlying matches that produced the LCA placename (the LCA itself doesn't have a single OSM ID — *"Germany"* is the shared ancestor of e.g. Berlin/relation/62422 and Munich/relation/62428). `render_provenance` displays the block as a "Reverse geocoding" section in the admin provenance panel, with a collapsible "Per-point Nominatim matches" list of clickable OSM links. The block is overwritten on each successful run so it always describes the current values; on a complete Nominatim outage the signal still preserves both the fields and the prior provenance entry.
+- **Reverse-geocoded placename and country code on work landing pages**, with a tooltip noting Nominatim as the source. Per-point matches with permalinks to OSM are recorded under `Work.provenance.geocoding` for admins.
 
-- **OpenAlex-as-source harvester (`source_type='openalex'`)** — new harvester pipeline that uses OpenAlex itself as the harvest origin (rather than only as an enrichment layer over an OAI-PMH / Crossref payload). Configured with the OpenAlex Source identifier (e.g. `S4210203054` for AGILE GIScience Series); paginates `https://api.openalex.org/works?filter=primary_location.source.id:<S-id>` via cursor pagination at 200 records per page with a polite-pool User-Agent. Persists everything OpenAlex carries directly: title, abstract (reconstructed from `abstract_inverted_index`), publication date, authors, keywords, AI-derived topics, biblio (volume / issue / pages), `openalex_id`, `openalex_ids`, `openalex_open_access_status`, `openalex_fulltext_origin`, `openalex_is_retracted`, work type. Does **not** fetch publisher landing pages — OpenAlex carries no spatial or temporal coverage, and a smoke run against AGILE-GISS confirmed the Copernicus landing pages don't carry `DC.SpatialCoverage` / `DC.box` / `geo+json` link / `DC.temporal` either. Two new entries in `harvest_journals`'s `SOURCE_CONFIG`: `agile-giss-crossref` (Crossref-prefix harvest scoped to "AGILE: GIScience Series" — note the colon, Crossref records the title verbatim) and `agile-giss-openalex` (OpenAlex source `S4210203054`). New `python manage.py compare_agile_giss_routes [--max-records N]` command runs both routes end-to-end inside a transaction-rolled-back atomic block (savepoint-isolated so cross-source dedup doesn't poison the second route), then prints a side-by-side field-coverage diff — useful any time the harvester or a journal upstream changes. Migration `0004_alter_source_source_type.py` adds `openalex` to `SOURCE_TYPE_CHOICES` (DB-level no-op: choices are validated at the form/model layer, not the column constraint).
+- **OpenAlex-as-source harvester** (`source_type='openalex'`) — uses OpenAlex itself as the harvest origin, configured with an OpenAlex Source identifier. New `python manage.py compare_agile_giss_routes` command diffs the OpenAlex and Crossref routes side-by-side.
 
-- **Crossref harvester now extracts authors and biblio fields** — `_crossref_item_to_work_kwargs` was bibliographic-poor (it dropped Crossref's `author`, `volume`, `issue`, `page` even though Crossref returns them). It now persists authors as `"Given Family"` strings, `volume`, `issue`, and `first_page` / `last_page` parsed from Crossref's `page` (`"12-25"` → `("12", "25")`). The `select` clause was widened to request the new fields. Side benefit: the Crossref-prefix route is now informationally on par with the OpenAlex source route on bibliographic core fields (title / abstract / authors / publication_date / volume / pages all match byte-for-byte on overlapping DOIs).
+- **Crossref harvester now extracts authors and biblio fields** (`volume`, `issue`, `first_page`, `last_page`).
 
-- **Reverse-geocoded `placename` and `country_code` on the Work API** — the public `/api/v1/works/<id>/` (and list) responses now include the two reverse-geocoded fields populated by the geocoding pipeline, so consumers can render placename/country without re-doing the lookup. Both keys are always emitted (null when absent) so the response shape is stable.
+- **Reverse-geocoded `placename` and `country_code` on the Work API** — both keys always emitted (null when absent).
 
-- **Collection backlinks on work landing pages** — `/work/<id>/` now lists the collections the work belongs to, each linking to `/collections/<identifier>/`. Visibility mirrors the rest of the collections surface: anonymous users only see published collections; admins additionally see unpublished ones, tagged with an `unpublished` badge. The list is computed per-request (not cached with the rest of the work-landing context) because a collection's `is_published` flag can flip without bumping `Work.lastUpdate`.
+- **Collection backlinks on work landing pages** — each work landing page lists the collections it belongs to; unpublished collections shown only to admins.
 
-- **Inline curator-editable collection description** — curators (and admins) of a `Collection` can now edit its description directly on the collection page (`/collections/<identifier>/`) via an inline edit/save form, without going through the Django admin. Plain text only: HTML tags are stripped server-side via `django.utils.html.strip_tags` before persistence, and Django's template auto-escaping continues to handle render-time output. New endpoint `POST /collections/<id>/description/` (curator-or-staff, `@login_required` + `_user_can_curate`) with a small fetch-based vanilla-JS UI mirroring the existing publish/unpublish controls. Site admins (`is_staff`) are treated as curators throughout — `_user_can_curate` already short-circuits to `True` for staff — so admins inherit edit access for every collection's description without being explicitly listed.
+- **Inline curator-editable collection description** — curators (and admins) edit a collection's description directly on `/collections/<identifier>/`. Plain text only.
 
-- **Admin-only "Manage curators" deep-link on the collection page** — alongside the existing "Edit in Admin" button, admins now get a one-click jump to `/admin/works/collection/<id>/change/#id_curators`, the change form anchored on the curators field. Curators do not see this button (they cannot manage other curators).
-
-### Fixed
-
-- **Inline mutation buttons now reflect the new state immediately on production.** The `/collections/` index, `/collections/<identifier>/` detail page, work landing page (`/work/<identifier>/`), and `/subscriptions/` page were all captured by the site-wide `UpdateCacheMiddleware` for `CACHE_MIDDLEWARE_SECONDS` (1 h default), so after an authenticated user POSTed a state change (publish/unpublish a collection or work, contribute geometry/temporal extent, add/remove a work from a collection, update region subscriptions) the reloaded GET was served from cache and the badge/button/checkbox state never flipped — the database was updated correctly, only the rendered page was stale until the cache entry expired or the server was restarted. Local dev (`OPTIMAP_CACHE=dummy`) didn't reproduce. The fix marks staff/curator/authenticated responses with `add_never_cache_headers` (or `@never_cache` for the subscriptions view) so they bypass the middleware cache; anonymous responses are still cached as before, including the work-landing page's existing `Cache-Control: max-age=…` for downstream caches.
-
-- **"View work details" button now appears in single-feature popups for works without a DOI.** `works/static/js/map-popup.js` only checked `feature.properties.id` for the no-DOI fallback URL, but `rest_framework_gis.GeoFeatureModelSerializer` puts the primary key at `feature.id` (GeoJSON convention) rather than in `feature.properties`, so the fallback never fired and the popup rendered without a link to `/work/<id>/`. The paginated overlap popup in `map-interaction.js:397` already handled both — now `map-popup.js` mirrors that pattern with `feature.id || properties.id`. Also stops gating the button on `properties.title` so it remains visible even when the title is empty.
-
-- **Empty-DOI backfill on re-harvest** — when `_save_or_update_work` finds an existing record with no DOI (typically AGILE-GISS works ingested earlier via the now-disabled Copernicus OAI-PMH endpoint, whose `dc:identifier` / `dc:relation` did not always carry the DOI URL), and the new harvest delivers a non-empty DOI, the helper now writes just the DOI (and appends a `doi_backfill` event to `Work.provenance`) regardless of `update_existing` and regardless of source identity. Previously the dedup branches returned `'skipped_cross_source'` / `'skipped_same_source'` without touching the record, so the DOI gap survived re-harvests forever and the work-landing link in popups always fell back to `/work/<id>/`. New `'doi_backfilled'` action is also exposed via `HarvestStats`. Companion change in `works.openalex_matcher.extract_openalex_fields`: the bare DOI is now included in the field dict so `python manage.py backfill_openalex` recovers DOIs whenever an OpenAlex match exists, not just auxiliary fields. The key is omitted (rather than emitted as `None`) when OpenAlex carries no DOI, so a populated `Work.doi` is never accidentally blanked by the `setattr` loop.
-
-- **Collections entry restored to the burger menu**, and **collection-page work cards now always link to the OPTIMAP landing page** rather than falling back to `Work.url`. The unified menu (`unified_menu_snippet.html`, the active one — the older `burger_menu_snippet.html` remains unused) was missing the *Collections* link that it used to carry. On the collection detail page, works without a DOI (notably every Mountain Wetlands record, since the MaRESS API exposes no DOIs and OpenAlex enrichment only matches some by title+author) were rendering "View work (external)" pointing at the MaRESS JSON API URL — useless to users. The card now uses `work.get_identifier` (DOI when present, internal numeric ID otherwise), so every card consistently links into `/work/<identifier>/` where users get the proper landing page.
-
-### Changed
-
-- **Data-dump regeneration unified into one umbrella task.** `works.tasks.regenerate_all_data_dumps` runs the GeoJSON serialisation once and converts the same intermediate to GeoPackage and CSV via `ogr2ogr`, instead of three independent passes. The Django-Q schedule (`works.apps.schedule_data_dump`, post-migrate) and the admin "regenerate" action both call the umbrella; legacy `regenerate_geojson_cache` / `regenerate_geopackage_cache` schedule rows are deleted on next migrate so existing deployments converge to the new entry point. `convert_geojson_to_geopackage` is now a thin wrapper over a generic `convert_geojson_via_ogr(geojson_path, *, fmt, ext, layer_creation_options)` helper, and `cleanup_old_data_dumps` keeps the newest N *cycles* (timestamp groups) rather than the newest N raw files — needed because each cycle now writes four files (`.geojson`, `.geojson.gz`, `.gpkg`, `.csv`) and the old per-file count would have pruned fresh formats from the current cycle.
-
-- **HTML geotagging meta tags + spec-compliant schema.org `Place.geo` on work landing pages** (closes #222) — landing pages now emit the conventional HTML *Geotagging* meta tags `geo.position` (`"lat;lon"`) and `ICBM` (`"lat, lon"`) whenever a work has geometry, computed once from the geometry's bounding-box centroid via the existing `Work.get_center_coordinate()`. When the new denormalized fields are populated (see *Added*), `geo.placename` and `geo.region` (ISO 3166-1 alpha-2) are emitted alongside, and the JSON-LD `Place` carries `name` + `addressCountry`. Multi-point GeometryCollections (e.g. the Mountain Wetlands harvester emits one `Point` per study site) are reverse-geocoded **per point** and reduced to the lowest common ancestor in the Nominatim address hierarchy — so a work with sites in Berlin and Munich resolves to *"Germany"* / `DE` rather than the geometric-centroid result somewhere in Thuringia, and a work spanning Germany and France yields no shared placename / country at all (honest empty rather than misleading). The `ScholarlyArticle.spatialCoverage.geo` payload is also corrected: previously a raw GeoJSON `GeometryCollection` dump (not a valid schema.org value), it now follows [schema.org/geo](https://schema.org/geo) — single-point geometries become `GeoCoordinates` (`latitude`/`longitude`), all other shapes become `GeoShape` with a `box` ("south west north east", same vocabulary already used by the `CollectionPage` feeds metadata). Helpers live in `works/seo.py` (`_format_geo_for_schema_org`, `geo_meta_tags`); template parallel-renders the new tag list in `{% block extra_meta %}` next to `citation_tags`. References: [Wikipedia *Geotagging — HTML pages*](https://en.wikipedia.org/wiki/Geotagging#HTML_pages), [Wikipedia *ICBM address — Modern use*](https://en.wikipedia.org/wiki/ICBM_address#Modern_use).
-
-- **In-memory cache for hot anonymous reads** (closes #180, partially #7) — adds a `LocMemCache` alias (`CACHES['memory']`) alongside the existing `DatabaseCache`, so per-process hot reads stop paying the DB-cache roundtrip every hit. The static / low-change anonymous pages are decorated with `@cache_page(..., cache='memory')`: `privacy`, `about`, `accessibility` (24 h), `feeds_list`, `sitemap_page`, `robots.txt` (1 h). The work landing page caches its work-derived context dict for anonymous requests under `work_landing:ctx:<host>:<work.id>:<work.lastUpdate-timestamp>` (24 h TTL). Including `work.lastUpdate` in the cache key makes the cache self-invalidating: every `Work.save()` auto-bumps `lastUpdate` (`auto_now=True`), so the next request misses on the new key and old entries age out via TTL — no signal hook needed. Authenticated and staff requests always render live so status badges, publish buttons, and provenance stay current. The expensive schema.org JSON-LD construction in `works/seo.py` was split out into `build_schema_org_for_work(work, request)` so the cached payload contains the heavy dict (the only PostGIS roundtrip on the page) and `build_work_meta` accepts it via a new `kwargs_schema=` parameter to skip the rebuild on cache hits. Each cached response also advertises its TTL to the client via `Cache-Control: max-age=…` and `Expires` headers (24 h on the static pages and on anonymous landing pages, 1 h on `feeds_list` / `sitemap_page` / `robots.txt`) so browsers and intermediaries can co-cache instead of hitting the server every time. Also fixes a long-standing typo in `MIDDLEWARE`: the cache + common + auth middleware classes were each listed twice in `optimap/settings.py`, so every request paid the cost of the cache machinery twice on the way in and out. The duplicates are removed and the cache pair is reordered to bracket `SessionMiddleware` (`UpdateCacheMiddleware` outermost, `FetchFromCacheMiddleware` *after* `SessionMiddleware`) per the Django cache-framework docs so site-wide cache keys can vary on session.
-
-- **Zotero / reference-manager metadata on work landing pages** (issue #243) — landing pages already emitted the foundational Highwire Press `citation_*` tags and a schema.org `ScholarlyArticle` JSON-LD payload from the SEO work in #22, so the Zotero connector recognises OPTIMAP pages today. This release closes the remaining gaps that were causing Zotero to lose detail on import: `citation_abstract` (full text — previously the abstract was truncated to 200 chars via the OG/JSON-LD `description` fallback), `citation_publisher`, `citation_language`, repeated `citation_keywords` (one per item, like `citation_author`), `citation_volume` / `citation_issue` / `citation_firstpage` / `citation_lastpage` (from new nullable `Work.volume` / `issue` / `first_page` / `last_page` fields populated by the OpenAlex matcher; other harvesters can be extended to populate them later), and `citation_pdf_url` when the harvested URL ends in `.pdf`. The JSON-LD upgrades to a nested `PublicationIssue` → `PublicationVolume` → `Periodical` shape when volume/issue are present (flat `Periodical` otherwise), and `sameAs` is now a list with both the DOI and the OpenAlex Work URL when available. Landing pages and `/collections/<id>/` work-cards now also carry a COinS `<span class="Z3988">` fallback so reference managers can multi-item-save from a curated collection.
-
-- **Squashed Django migrations into a single `0001_initial`** in preparation for a clean redeployment. The six in-progress migration files (`0001_initial` … `0006_add_query_indexes`) carried four data-migration steps (legacy text → JSON provenance, `source_type` URL-pattern classification, `collection_name` → `Collection` FK + Work M2M backfill, orphan `Schedule` wipe) that are no-ops on fresh DBs. Local DB drop+recreate, `makemigrations` regenerates the consolidated baseline, fixtures (`test_data_partners`, `test_data_global_feeds`) and `load_global_regions` reseed; full unit-test suite still passes.
-
-### Added
-
-- **`Work.placename` + `Work.country_code`, populated by per-point reverse geocoding** (issue #222) — two new nullable fields on `Work` cache the human-readable placename and ISO 3166-1 alpha-2 country code for the work's geometry (migration `0003_work_country_code_work_placename.py`). The values feed both the new HTML `geo.placename` / `geo.region` meta tags and the JSON-LD `Place.name` / `Place.addressCountry` (see *Changed*). A new `works.services.geocoding` module wraps `geopy.geocoders.Nominatim` with two layers: `_reverse_geocode_lookup(lat, lon)` does the per-coordinate lookup, caching the structured Nominatim address dict under `reverse_geocode:<lat>:<lon>` (3-decimal quantisation, ~100 m, 30-day TTL) in the per-process `LocMemCache`; `geocode_geometry(geom)` walks every representative point of the work's geometry (each `Point` individually for multi-point GeometryCollections, one interior point per Polygon / LineString, capped at 20 by default) and returns the lowest common ancestor in the address hierarchy as `(placename, country_code, n_geocoded)`. The `pre_save` Work signal calls `geocode_geometry` and persists the result; on a complete geocoding outage (`n_geocoded == 0`) it preserves any previously-populated fields, but a real "geometry spans incompatible regions" outcome (`n_geocoded > 0`, no shared LCA) honestly clears them. Gated by a new `OPTIMAP_GEOCODE_WORKS_ON_SAVE` env var (off by default, so dev / test / harvest-heavy deployments stay offline). A new `python manage.py backfill_placenames [--limit N] [--force] [--sleep 1.1] [--dry-run]` management command iterates over works with geometry but no placename, sleeps between Nominatim hits (cache misses only) to honour the courtesy rate limit, and re-uses the same cache. See `docs/manage.md` → "Reverse geocoding".
-
-- **OAI-PMH harvester auto-creates a Collection per endpoint** (issue #192, closes) — when an OAI-PMH / OJS / Janeway source is harvested for the first time and `Source.collection` is unset, the harvester now creates a `Collection` from the source name (slug derived via `slugify`, with a `-2`/`-3` suffix on collisions) and links it on the source. The new Collection starts `is_published=False` so admins can review the auto-derived name and description before exposing it on `/collections/`. Existing same-source duplicates continue to flow into the right Collection on subsequent harvests via the M2M propagation introduced earlier in this release. Lives as `works.harvesting.common.ensure_collection_for_source`.
-
-- **`HarvestingEvent.records_updated` counter** — each harvester now tracks updated works separately from created ones. A new `HarvestStats` accumulator threads through every parser (`parse_oai_xml_and_save_works`, `parse_rss_feed_and_save_publications`, `parse_crossref_response_and_save_works`, `parse_mountain_wetlands_response_and_save_works`) via a `stats=` kwarg, recording every `_save_or_update_work` outcome (`created` / `updated` / `skipped_same_source` / `skipped_cross_source`). Each harvester reads `stats.created` → `records_added` and `stats.updated` → `records_updated`, persists both on the event, and adds an "Updated articles: N" line to the completion email. Surfaced in the `HarvestingEventAdmin` changelist + change page (and the recent-events inline on the source page) alongside `records_added`. Migration `0005_harvestingevent_records_updated.py` adds the column.
-
-- **Per-source dedup and careful-update flag in every harvester** — all four harvesters (OAI-PMH, RSS, Crossref, MaRESS) now route through one shared `_save_or_update_work` helper that scopes duplicate detection to the harvest's `Source` and distinguishes same-source from cross-source matches. A new `--update` flag on `python manage.py harvest_journals` (and `update_existing=True` on every harvester task) refreshes existing same-source works in place instead of skipping them; the update is *careful*: `geometry`, `timeperiod_startdate`, and `timeperiod_enddate` are preserved when the new harvest brings nothing for those (so user-contributed spatial/temporal metadata survives a re-harvest), `status` and `created_by` are never overwritten, and a `harvest_update` event is appended to `Work.provenance.events` instead of replacing the existing audit trail. Cross-source duplicates (the same DOI/URL surfaced under a different Source) are now logged and skipped explicitly rather than crashing on the global `Work.url` / `Work.doi` uniqueness constraint — OPTIMAP does not currently merge across sources, see docs/manage.md "Deduplication and updates".
-
-- **Mountain Wetlands Repository harvester** (issue #192) — bespoke `harvest_mountain_wetlands` task pulls articles from the [MaRESS API](https://andes.mountain-wetlands-repository.info/api/v1/items/) (`?limit=500&scope=all`, paged via `skip`). Builds geometry from the embedded `study_sites[].location.{latitude,longitude}` (one Point per site, wrapped in a `GeometryCollection`); parses year-only `date` strings to Jan 1 of the year; recovers DOI and full metadata via OpenAlex `build_openalex_fields(title, author=<surname>)` since every record currently has `DOI=null` and an empty URL. Each work's `provenance.harvest.original_record` stashes the verbatim API record so curators can re-run enrichment without re-fetching. `provenance.openalex_match.status` is one of `verified` (DOI persisted), `candidate` (top hits stored in `openalex_match_info` for follow-up), or `none`. Manual-only (`harvest_interval_minutes = 0`); run via `python manage.py harvest_journals --journal mountain-wetlands` or the admin "Trigger harvesting" action. Idempotent on re-run via `Work.url` uniqueness (the harvester uses each item's stable API URL).
-
-- **Collections** (issue #192, foundation) — new `Collection` model groups works under a curated identifier (e.g. `mountain-wetlands`, `agile-gi`). A work can belong to multiple collections (`Work.collections`, M2M). Each collection has a name, description, optional homepage URL, an `is_published` flag, an optional vanity `short_slug` (`/<short_slug>/` 301-redirects to canonical `/collections/<identifier>/`), and a curators many-to-many link. New routes: `/collections/` index, `/collections/<identifier>/` detail (map + works list), and admin/curator inline controls — staff can publish/unpublish from either page and deep-link into the change form; curators of a collection get **Add to {X}** / **Remove from {X}** buttons on every work landing page (idempotent — adding to one collection never displaces another). Sitemaps (machine and human-readable) list `/collections/` and each published collection. Burger menu gains a Collections entry.
-- **`Source.source_type` choice field** (`oai-pmh` / `ojs` / `janeway` / `rss` / `crossref-prefix` / `mountain-wetlands`) replaces the implicit "everything is OAI-PMH" assumption in `Source.save()`. The save-time scheduler now dispatches to the correct task per source type, and only schedules when `harvest_interval_minutes > 0` — the default flips from `60*24*3` to `0`, so newly inserted sources are manual-only by default. The data migration classifies existing sources by URL pattern and wipes orphan `Harvest Source <id>` schedules.
-- **`Source.collection` foreign key** replaces the legacy `collection_name` string field. `harvest_journals` creates a `Collection` per configured journal on first use; subsequent harvests reuse it.
-- **Structured `Work.provenance` (JSONField)** with a defined schema (`harvest`, `metadata_sources`, `openalex_match`, `events`, `text_log`). The three existing harvesters (OAI-PMH, RSS, Crossref-prefix) now write structured dicts; user contributions, admin publish, and admin unpublish append to the `events` array via a new `works.utils.provenance.append_event` helper. A new `render_provenance` template tag renders the JSON readably for admins and curators on work landing pages. Pre-migration text values are preserved under `text_log`.
+- **Admin-only "Manage curators" deep-link on the collection page** — one-click jump to the admin change form anchored on the curators field.
 
 ### Fixed
 
-- **Crossref-prefix harvester no longer auto-publishes harvested works.** `_crossref_item_to_work_kwargs` was creating new `Work` rows with `status="p"` (Published), so any work fetched via `harvest_journals --journal copernicus` (the Copernicus Crossref fallback) became publicly visible immediately — even when it had no spatial metadata. The status now defaults to `"h"` (Harvested), matching the OAI-PMH and Mountain Wetlands harvesters; admins still publish via the landing-page button or the "Publish" admin action.
-- **Work landing page hides the empty map when no geometry is available.** Published works that lack spatial metadata (e.g. those affected by the bug above before the fix landed) used to render an unusable empty Leaflet container. The template now shows a `This work does not include geospatial metadata` notice with a link to the contribution page, and only initialises the Leaflet map when geometry exists or the viewer can contribute one.
+- **Inline mutation buttons reflect the new state immediately on production.** Authenticated responses on `/collections/`, the work landing page, and `/subscriptions/` are no longer captured by the site-wide cache, so publish/unpublish/contribute/subscribe state flips on reload. Anonymous responses still cached.
 
-- **`Source.save()` no longer queues every source to fire immediately, and no longer resets the schedule on unrelated edits.** `Schedule.next_run` defaults to `timezone.now`, so the previous "delete-and-recreate on every save" path produced two surprising symptoms: (1) bulk-creating sources via `harvest_journals --insert-sources` (or any seed script) caused every source's recurring schedule to fire on the next Q-cluster tick — so triggering one source from the admin would visibly run a *different* source first; (2) editing any unrelated field on a `Source` reset its `next_run` to "now", causing unintended immediate harvests. `save()` now sets the freshly-created schedule's `next_run` to `now() + harvest_interval_minutes`, and preserves the existing schedule row (no delete/recreate, no `next_run` reset) when the interval is unchanged. Existing deployments may want to either inspect `/admin/django_q/schedule/` for stale `next_run=now` rows or just let the next harvest cycle re-stabilise them.
+- **"View work details" button now appears in single-feature popups for works without a DOI.**
+
+- **Empty-DOI backfill on re-harvest** — works ingested without a DOI have it filled when a later harvest delivers one. `python manage.py backfill_openalex` also recovers DOIs via OpenAlex matches.
+
+- **Collections entry restored to the burger menu**, and **collection-page work cards always link to the OPTIMAP landing page** rather than to an external URL.
 
 ### Changed
 
-- **Harvesting code split into `works.harvesting` package** — `works/tasks.py` had grown to ~2.5k lines with four full harvesters and their parsers, helpers, sessions, metadata extractors, and OpenAlex glue all interleaved. The harvesting surface now lives in one module per concern: `common.py` (HarvestStats / HarvestWarningCollector / dedup helpers / completion+failure+notify helpers), `sessions.py` (HTTP session factories), `metadata_html.py` (geometry + temporal extraction from publisher landing pages), `openalex.py`, `oai.py`, `rss.py`, `crossref.py`, `mountain_wetlands.py`. `works/tasks.py` becomes a thin re-export shim — every Django-Q dotted-path schedule (`works.tasks.harvest_oai_endpoint`, etc.) and existing test import keeps resolving without migration. The previously duplicated success/failure/email tail blocks at the bottom of each harvester are replaced with three shared helpers (`complete_harvest`, `fail_harvest`, `send_harvest_email`) — about 250 lines of duplication collapse to one. The non-harvest tasks (monthly email digest, subscription emails, GeoJSON / GeoPackage cache regeneration, schedule helpers) still live in `tasks.py`.
+- **Data-dump regeneration unified into one umbrella task.** GeoJSON, GeoPackage, and CSV are produced from one intermediate. Retention now keeps the newest N timestamp groups rather than raw files.
 
-- **Database indices on hot `Work` query paths** (issue #141) — `works/migrations/0006_add_query_indexes.py` adds four B-tree indices to the `Work` table to speed up the canonical list/feed queries: `status` (gates virtually every public list), `(-creationDate, -id)` (matches the canonical `order_by`), `publicationDate`, and a partial `(-creationDate, -id) WHERE status='p'` that turns the published-newest path into an index-only scan. The DOI/URL fields named in the issue already had B-tree indices via `unique=True`, and `Work.geometry` already had a GIST index from GeoDjango's default `spatial_index=True`, so neither needed a new entry.
+- **HTML geotagging meta tags + spec-compliant schema.org `Place.geo` on work landing pages** (closes #222) — landing pages emit `geo.position`, `ICBM`, and (when available) `geo.placename` / `geo.region`. `ScholarlyArticle.spatialCoverage.geo` now follows [schema.org/geo](https://schema.org/geo): point geometries become `GeoCoordinates`, others become `GeoShape` with a `box`. Multi-point geometries reduced to the lowest common ancestor in the address hierarchy.
 
-- **HTTP `Referrer-Policy` is now `strict-origin-when-cross-origin`** so the OpenStreetMap tile server stops blocking our map requests. Django's `SecurityMiddleware` was relying on its built-in `"same-origin"` default, which strips the `Referer` on cross-origin requests — and OSM's [tile-usage policy](https://wiki.openstreetmap.org/wiki/Referer) explicitly rejects clients that send no `Referer`. The new value sends only the origin (no URL path) on third-party requests, satisfies OSM's identification requirement, and matches modern browser defaults.
+- **In-memory cache for hot anonymous reads** (closes #180, partially #7) — adds a `LocMemCache` alias for static / low-change anonymous pages (privacy, about, accessibility, feeds list, sitemap, robots.txt) and the work landing page. Responses advertise their TTL via `Cache-Control` and `Expires` headers. Authenticated/staff requests always render live.
 
-- **OAI-PMH harvester is now hardened against transient and content-type errors.** `harvest_oai_endpoint` uses a `requests.Session` with retries (3 attempts, exponential back-off, on 429/500/502/503/504 and connection/timeout errors), a 30-second timeout, and an `OPTIMAP-harvester/1.0` User-Agent. The response is now sniffed before being passed to the XML parser — non-XML 200 responses (e.g. an HTML maintenance page) are rejected with a body preview in the error log, so operators can diagnose upstream changes without spelunking. The two live-endpoint tests against Copernicus (`test_real_journal_harvesting_essd` / `_geo_leo`) now skip cleanly when the upstream is unreachable.
+- **Zotero / reference-manager metadata on work landing pages** (issue #243) — emits `citation_abstract` (full text), `citation_publisher`, `citation_language`, repeated `citation_keywords`, `citation_volume`/`issue`/`firstpage`/`lastpage`, and `citation_pdf_url`. Collection card pages also carry a COinS fallback for multi-item save.
+
+- **Squashed Django migrations into a single `0001_initial`** in preparation for a clean redeployment.
 
 ### Added
 
-- **`reset_harvest_schedules` management command** — rebuilds every `Harvest Source <id>` recurring Django-Q schedule with a properly deferred `next_run`, staggered across the smallest harvest interval so the cluster does not get a thundering herd. Companion to the `Source.save()` fix above for recovering existing deployments whose Schedule rows already have `next_run=now`. Flags: `--dry-run`, `--no-stagger`, `--clear-manual` (also wipes leftover `Manual Harvest Source <id>` one-offs from the admin "Schedule harvesting" action).
+- **`Work.placename` + `Work.country_code` populated by reverse geocoding** (issue #222). Gated by `OPTIMAP_GEOCODE_WORKS_ON_SAVE` (off by default). New `python manage.py backfill_placenames [--limit N] [--force] [--sleep 1.1] [--dry-run]` command.
 
-- **`harvest_journals --insert-sources`** — bulk-creates `Source` rows for every (enabled) entry in the command's `SOURCE_CONFIG` without harvesting, so the configured journal sources show up in the Django admin and can be triggered from there. Existing rows (matched by name or URL) are left untouched. Disabled journals are skipped unless `--include-disabled` is also given. Warns when an inserted source is not OAI-PMH (RSS / Crossref-prefix), since the auto-schedule and admin trigger both call `works.tasks.harvest_oai_endpoint` and won't dispatch correctly for those — they still need the CLI route until the dispatch logic is generalised.
+- **OAI-PMH harvester auto-creates a Collection per endpoint** (closes #192) — the first harvest of an OAI/OJS/Janeway source creates a `Collection` and links it. New collections start `is_published=False`.
 
-- **Admin UI for harvesting management and log exploration** (issue #228) — `Source` is now registered in the Django admin (`/admin/works/source/`) with list, filter, search, and three bound actions ("Trigger harvesting for selected sources", "Trigger harvesting for all sources", "Schedule harvesting"). The trigger actions now enqueue via Django-Q `async_task` instead of running synchronously in the request thread (which hit gunicorn worker timeouts on non-trivial sources). `HarvestingEvent` now persists the harvested-record counts (`records_added`, `records_with_spatial`, `records_with_temporal`), the `error_message` on failure, and the full per-event `log_text` summary captured by `HarvestWarningCollector`. The `HarvestingEventAdmin` change form renders these as readonly fields with a `<pre>`-formatted log block (mirroring `WikidataExportLogAdmin`), exposes `date_hierarchy` + full-text search across `log_text`/`error_message`, links each event back to its `Source`, blocks manual `add` (events are machine-created), and offers a "Retry selected harvesting events" action. Each `Source` change page also shows the five most recent events inline. Fixes a latent bug where the scheduled harvest used the stale dotted path `'publications.tasks.harvest_oai_endpoint'` instead of `'works.tasks.harvest_oai_endpoint'`.
+- **`HarvestingEvent.records_updated` counter** — every harvester tracks updated works separately from created ones, surfaced in the admin and the completion email.
 
-- **Profanity filter on Recognition Board usernames** — submitted display names are checked against [`better-profanity`](https://pypi.org/project/better-profanity/)'s default English word list (split on `-`/`_` so slug-style names are checked word-by-word). Offensive names are rejected with a generic "please choose a different username" message; the auto-generated `coolname` defaults are also re-checked, so users never receive a flagged suggestion. Best-effort: profanity filters always have false positives, so admins can adjust manually if needed.
+- **Per-source dedup and careful-update flag in every harvester** — duplicate detection scoped to `Source`. New `--update` flag on `harvest_journals` (and `update_existing=True`) refreshes existing same-source works in place; user-contributed spatial/temporal metadata, `status`, and `created_by` are preserved.
 
-- **Flash messages are now visible on every page.** Django's `messages` framework was wired up in views (e.g. on Recognition Board form errors) but no template rendered them, so users only saw a redirect with no on-screen explanation. `base.html` now renders queued messages as dismissible Bootstrap alerts above the page content, with `error`-level messages mapped to `alert-danger` and the rest to their matching alert class.
+- **Mountain Wetlands Repository harvester** (issue #192) — manual-only; run via `python manage.py harvest_journals --journal mountain-wetlands`.
 
-- **Contributor Recognition Board** (issue #240) — new public `/recognition-board/` page recognising users who add spatial or temporal metadata to OPTIMAP works. Contributions are now tracked per event in a structured `Contribution` model in addition to the existing free-text `Work.provenance` log; counts are always recorded regardless of opt-in. Users opt in and choose a display name (auto-filled with a `coolname`-generated slug) under Settings → Recognition Board. Contributors are grouped into five explorer-named tiers — Marco Polo, Vasco da Gama, Ferdinand Magellan, James Cook, Roald Amundsen — using a logarithmic scale (1, 10, 100, 1000, 10000 total contributions). Each tier title links to the explorer's Wikipedia page via a small info icon. Spatial and temporal contributions are shown separately in each tier with `fa-map-marked-alt` and `fa-clock` icons.
+- **Collections** (issue #192, foundation) — new `Collection` model groups works under a curated identifier. Routes: `/collections/`, `/collections/<identifier>/`. Curators add/remove works on the work landing page; admins publish/unpublish from either page. Includes a collection sitemap and burger-menu entry.
 
-- **Minimal SEO surface on landing pages** (issue #22) — work landing pages now emit Open Graph, Twitter Card, schema.org `ScholarlyArticle` JSON-LD, and Google Scholar `citation_*` tags. The `ScholarlyArticle` JSON-LD includes `spatialCoverage` and `temporalCoverage` mirroring exactly what we *consume* from harvested Janeway pages, closing the loop. The homepage emits `WebSite` + `SearchAction`, and the regional feed pages emit `CollectionPage` JSON-LD with the region as the `about` `Place`. `<link rel="canonical">` is set on every page that ships SEO context. Built on `django-meta`.
-- **Open Graph preview images for work landing pages** (issue #22) — a new `/work/<id>/preview.png` endpoint renders a 1200×630 PNG showing the work's spatial extent on an OSM basemap with a small "OPTIMAP" wordmark in the bottom-right. Served as `og:image` / `twitter:image`. Cached lazily on disk and invalidated by a `post_save` signal on `Work`. Works without geometry skip the `og:image` tag entirely.
+- **`Source.source_type` choice field** (`oai-pmh` / `ojs` / `janeway` / `rss` / `crossref-prefix` / `mountain-wetlands`) — replaces the implicit OAI-PMH assumption. Default `harvest_interval_minutes` flips to `0` (manual-only).
 
-- **`.zenodo.json` deposit metadata** (issue #16) — adds a Zenodo deposit metadata file at the repository root so that GitHub releases archived to Zenodo are populated with a curated title, description, creators, license, keywords, and links to related resources (KOMET/OPTIMETA project pages, the live instance, the GeoJSON/GeoPackage data downloads, the OpenAPI schema, and the OPTIMETA Geo OJS plugin).
+- **`Source.collection` foreign key** replaces the legacy `collection_name` string field.
+
+- **Structured `Work.provenance` (JSONField)** with a defined schema (`harvest`, `metadata_sources`, `openalex_match`, `events`, `text_log`). User contributions and admin publish/unpublish actions append to `events`. Pre-migration text values preserved under `text_log`.
+
+### Fixed
+
+- **Crossref-prefix harvester no longer auto-publishes harvested works** — new works default to Harvested, not Published.
+
+- **Work landing page hides the empty map when no geometry is available.** Shows a "no geospatial metadata" notice with a link to the contribution page instead.
+
+- **`Source.save()` no longer queues every source to fire immediately, and no longer resets the schedule on unrelated edits.** New schedules use `now() + harvest_interval_minutes`; the schedule row is preserved when the interval is unchanged.
+
+### Changed
+
+- **Harvesting code split into the `works.harvesting` package** — one module per concern (OAI-PMH, RSS, Crossref, Mountain Wetlands, OpenAlex, sessions, helpers). Existing dotted-path imports (`works.tasks.harvest_*`) continue to resolve.
+
+- **Database indices on hot `Work` query paths** (issue #141) — adds `status`, `(-creationDate, -id)`, `publicationDate`, and a partial `(-creationDate, -id) WHERE status='p'`.
+
+- **HTTP `Referrer-Policy` is now `strict-origin-when-cross-origin`** so the OpenStreetMap tile server stops blocking map requests.
+
+- **OAI-PMH harvester hardened against transient and content-type errors** — sessions get retries (3 attempts, exponential back-off), 30 s timeout, and a User-Agent. Non-XML 200 responses are rejected with a body preview.
+
+### Added
+
+- **`reset_harvest_schedules` management command** — rebuilds every `Harvest Source <id>` schedule with a deferred `next_run`, staggered. Flags: `--dry-run`, `--no-stagger`, `--clear-manual`.
+
+- **`harvest_journals --insert-sources`** — bulk-creates `Source` rows for every entry in `SOURCE_CONFIG` without harvesting. `--include-disabled` opts in disabled journals.
+
+- **Admin UI for harvesting management and log exploration** (issue #228) — `Source` is registered at `/admin/works/source/` with three actions ("Trigger harvesting", "Trigger harvesting for all", "Schedule harvesting"). `HarvestingEvent` admin shows record counts, error message, log block, and a "Retry" action; recent events appear inline on each `Source`.
+
+- **Profanity filter on Recognition Board usernames** — submitted display names are checked against [`better-profanity`](https://pypi.org/project/better-profanity/)'s default list.
+
+- **Flash messages are now visible on every page** — queued Django messages render as dismissible Bootstrap alerts in `base.html`.
+
+- **Contributor Recognition Board** (issue #240) — public `/recognition-board/` page ranking users who contributed spatial or temporal metadata. Five explorer-named tiers (Marco Polo → Roald Amundsen) on a logarithmic scale (1 / 10 / 100 / 1000 / 10000). Opt-in display name set under Settings → Recognition Board.
+
+- **Minimal SEO surface on landing pages** (issue #22) — work landing pages emit Open Graph, Twitter Card, schema.org `ScholarlyArticle` JSON-LD, and Google Scholar `citation_*` tags. Homepage emits `WebSite` + `SearchAction`; regional feeds emit `CollectionPage`. `<link rel="canonical">` on every SEO-relevant page.
+
+- **Open Graph preview images for work landing pages** (issue #22) — `/work/<id>/preview.png` renders a 1200×630 PNG of the work's spatial extent on an OSM basemap. Disk-cached, invalidated on save.
+
+- **`.zenodo.json` deposit metadata** (issue #16) — repository-root metadata file so GitHub releases archived to Zenodo are populated with title, description, creators, license, and links.
 
 <!-- REUSE-IgnoreStart -->
-- **REUSE / SPDX license headers on all source files** (issue #30) — every first-party `.py`/`.js`/`.css`/`.html`/`.sh` file now carries a two-line SPDX header (`SPDX-FileCopyrightText` + `SPDX-License-Identifier: GPL-3.0-or-later`). A `REUSE.toml` covers migrations, fixtures, vendored static assets, and binaries. Run `reuse lint` to verify; the package is in `requirements-dev.txt`.
+- **REUSE / SPDX license headers on all source files** (issue #30) — every first-party file carries SPDX headers; `REUSE.toml` covers fixtures and vendored assets. Run `reuse lint` to verify.
 <!-- REUSE-IgnoreEnd -->
-- **Janeway harvesting and `janeway_geometadata` plugin support** (issues #15, #18) — OAI-PMH harvesting now picks up geospatial and temporal metadata published by Janeway journals running the [`janeway_geometadata`](https://github.com/GeoinformationSystems/janeway_geometadata) plugin (e.g., DQJ, EarthArxiv, EcoEvoArxiv). The HTML extractor tries, in priority order:
-  1. schema.org JSON-LD `spatialCoverage` / `temporalCoverage` (supports GeoJSON `geo`, schema.org `GeoShape` `box`, and `GeoCoordinates`),
-  2. `<link rel="alternate" type="application/geo+json">` — fetched and merged when present,
-  3. `DC.SpatialCoverage` GeoJSON `Feature`/`FeatureCollection`,
-  4. `DC.box` (`name=…; northlimit=N; southlimit=S; westlimit=W; eastlimit=E; projection=EPSG4326`).
-  The provenance log records which signal was used per work.
-- **ISO 8601 open intervals** in `DC.temporal` / `DC.PeriodOfTime` and JSON-LD `temporalCoverage` are now parsed correctly: `../2024-12-31` produces `(None, "2024-12-31")` instead of storing `'..'` as a date string. Single instants (no `/`) are stored as `(value, value)`.
-- **Geoextent API** - REST API exposing the [geoextent library](https://github.com/nuest/geoextent) for extracting geospatial and temporal extents from various file formats and remote repositories. Features include:
-  - `/api/v1/geoextent/extract/` - Extract from uploaded files (GeoJSON, GeoTIFF, Shapefile, GeoPackage, KML, CSV, etc.)
-  - `/api/v1/geoextent/extract-remote/` - Extract from remote repositories (Zenodo, PANGAEA, OSF, Figshare, Dryad, GFZ Data Services, Dataverse)
-  - `/api/v1/geoextent/extract-batch/` - Batch processing of multiple files with combined extent
-  - Multiple response formats: GeoJSON (default), WKT, WKB
-  - Support for bbox, convex hull, temporal extent, and placename geocoding
-  - Interactive web UI at `/geoextent/` with file upload, remote extraction, and map preview
-  - Comprehensive documentation and integration tests
-- **Geoextent web interface** - Interactive tool at `/geoextent/` for extracting spatial/temporal extents from data files:
-  - File upload with drag-and-drop support and size validation
-  - Remote resource extraction via DOI/URL (comma-separated identifiers)
-  - Interactive Leaflet map preview with clickable features showing properties
-  - Parameter customization (bbox, tbox, convex hull, placename, gazetteer selection)
-  - Response format selection (GeoJSON, WKT, WKB)
-  - Download results in selected format
-  - Documentation section with supported formats and providers
-  - Added to main menu and sitemaps
-- **Feeds sitemap** - Dynamic `/sitemap-feeds.xml` listing all regional feeds (continents and oceans) for search engine discovery
-- **Wikidata export** - Export publication metadata to Wikibase/Wikidata instances:
-  - Export works with spatial metadata to Wikidata
-  - Support for complex geometries (points, lines, polygons, multigeometry)
-  - Export extreme points (northernmost, southernmost, easternmost, westernmost) and geometric center
-  - Configurable via `WIKIBASE_*` environment variables
-- **Global regions layer** - Interactive map overlay showing continent and ocean boundaries:
-  - Toggle-able layer control to show/hide global regions on the main map
-  - Simplified ocean geometries for efficient rendering
-  - Color-coded regions (brown for continents, blue for oceans)
-  - Dashed line styling for clear visual distinction
-  - Click to view region details and navigate to regional feeds
-  - Integrated with feed landing pages showing region outlines
-- **Zoom-to-all features control** - Quick navigation button on all maps:
-  - Expands view to fit all publications in the current context
-  - Available on main map, feed landing pages, and work landing pages
-  - Accessible button with screen reader support
-  - Uses FontAwesome expand icon for visual clarity
-- **Geocoding/gazetteer search** - Map search functionality allowing users to search for locations by name:
-  - Nominatim geocoder integration (default)
-  - Optional GeoNames support (requires username configuration)
-  - Search results displayed on map with zoom to location
-  - Accessible via search box in map interface
-  - Available on feed landing pages and work landing pages for consistent navigation
-- **Works list with pagination** - Browse all works page at `/works/list/` with:
-  - Configurable pagination (default 50 items per page)
-  - User-selectable page size with min/max limits
-  - Cached publication statistics (total works, published works, metadata completeness)
-  - Direct links to work landing pages
-- **Regional subscription system** - Users can subscribe to receive notifications for new publications from specific continents and oceans. Features include:
-  - Checkbox-based UI with 8 continents and 7 oceans
-  - "All Regions" checkbox to select/deselect all at once
-  - "Disable all" link for quick clearing
-  - Real-time subscription summary showing currently monitored regions
-  - Persistent subscriptions across login sessions
-  - Comprehensive test coverage (16 tests)
-- **Temporal extent contribution** - Users can now contribute temporal extent (start/end dates) in addition to spatial extent. Works can be published with either spatial, temporal, or both extents. Supports flexible date formats: YYYY, YYYY-MM, YYYY-MM-DD.
-- **Complete status workflow documentation** - Documented all 6 publication statuses (Draft, Harvested, Contributed, Published, Testing, Withdrawn) with workflow transitions and visibility rules in README.md.
-- **Burger menu navigation** - Added top bar hamburger menu (☰) next to user icon with dropdown links to all main pages including Home, Browse Works, Contribute, Data & API, Feeds, About, Contact, Accessibility, and GitHub code repository.
-- **Human-readable sitemap** - New `/pages` endpoint showing organized list of all pages with descriptions, categorized into Main Pages, Data & Technical, Information & Help, User Pages, and Development sections.
-- **Custom error pages** - Added styled 404 and 500 error pages matching application design with navigation links and help information directing users to About and Accessibility pages.
-- **Map popup enhancement** - Added "View Publication Details" button to map popups linking to work landing pages.
-- **Paginated popup for overlapping features** - When multiple publications overlap on the map, a paginated popup allows users to cycle through them with Previous/Next navigation showing "Publication X of Y".
-- **Point geometry highlighting** - Map markers (CircleMarkers) now show visual feedback when selected with increased size (10px) and high-contrast gold/orange colors, matching polygon highlighting behavior.
-- **Admin unpublish functionality** - Admins can unpublish works, changing status from Published to Draft.
-- **RSS/Atom feed harvesting support** - Added support for harvesting publications from RSS/Atom feeds in addition to OAI-PMH.
-- **Django management command `harvest_journals`** - Command-line tool for harvesting from real journal sources with progress reporting and statistics.
-- **Comprehensive test coverage** - Added 40+ new tests covering temporal contribution, status workflow, RSS harvesting, error handling, and real journal harvesting.
+
+- **Janeway harvesting and `janeway_geometadata` plugin support** (issues #15, #18) — OAI-PMH harvesting picks up geometries published by Janeway journals running [`janeway_geometadata`](https://github.com/GeoinformationSystems/janeway_geometadata). Extraction priority: schema.org JSON-LD → `<link rel="alternate" type="application/geo+json">` → `DC.SpatialCoverage` → `DC.box`.
+
+- **ISO 8601 open intervals** in `DC.temporal` and JSON-LD `temporalCoverage` are parsed correctly: `../2024-12-31` produces `(None, "2024-12-31")`. Single instants stored as `(value, value)`.
+
+- **Geoextent API** — REST endpoints exposing the [geoextent library](https://github.com/nuest/geoextent):
+  - `/api/v1/geoextent/extract/` — extract from uploaded files (GeoJSON, GeoTIFF, Shapefile, GeoPackage, KML, CSV, etc.)
+  - `/api/v1/geoextent/extract-remote/` — extract from remote repositories (Zenodo, PANGAEA, OSF, Figshare, Dryad, GFZ, Dataverse)
+  - `/api/v1/geoextent/extract-batch/` — batch processing
+  - Response formats: GeoJSON (default), WKT, WKB. Optional placename via Nominatim / GeoNames / Photon.
+
+- **Geoextent web interface** — interactive tool at `/geoextent/` for file upload, remote extraction by DOI/URL, Leaflet preview, parameter customisation, and result download.
+
+- **Feeds sitemap** — `/sitemap-feeds.xml` listing all regional feeds.
+
+- **Wikidata export** — export work metadata to a Wikibase/Wikidata instance, including extreme points and geometric centre. Configured via `WIKIBASE_*` environment variables.
+
+- **Global regions layer** — toggleable map overlay showing continent and ocean boundaries; click for region details and regional feed.
+
+- **Zoom-to-all features control** — quick-fit button on every map.
+
+- **Geocoding/gazetteer search** — search-by-location on map (Nominatim default; GeoNames optional).
+
+- **Works list with pagination** — `/works/list/` browse page with configurable page size.
+
+- **Regional subscription system** — subscribe to email notifications for new works in selected continents/oceans.
+
+- **Temporal extent contribution** — users contribute temporal extent (start/end dates) alongside or instead of spatial extent. Accepts `YYYY`, `YYYY-MM`, `YYYY-MM-DD`.
+
+- **Status workflow documentation** — all 6 publication statuses (Draft, Harvested, Contributed, Published, Testing, Withdrawn) documented in README with transitions and visibility rules.
+
+- **Burger menu navigation** — top-bar hamburger menu with links to all main pages.
+
+- **Human-readable sitemap** — `/pages` lists all pages with descriptions, organised by category.
+
+- **Custom error pages** — styled 404 and 500 pages matching the application design.
+
+- **"View work details" button on map popups** linking to the work landing page.
+
+- **Paginated popup for overlapping features** — Previous/Next navigation when multiple works overlap.
+
+- **Point geometry highlighting** — circle markers show visual feedback when selected (gold/orange).
+
+- **Admin unpublish action** — admins can unpublish a work, changing status from Published to Draft.
+
+- **RSS/Atom feed harvesting support** alongside OAI-PMH.
+
+- **`harvest_journals` management command** — CLI tool for harvesting from real journal sources with progress reporting.
+
+- **Test coverage** — 40+ tests covering temporal contribution, status workflow, RSS harvesting, and live journal harvesting.
 
 ### Changed
 
-- **Contribution page pagination** - Added full pagination support to the contribution page (`/contribute/`) with:
-  - Configurable page size (default 50, min 10, max 200 works per page)
-  - User-selectable page size dropdown with automatic form submission
-  - Full pagination controls at top and bottom (First, Previous, page numbers, Next, Last)
-  - Shows current range (e.g., "Showing 1 to 50 of 150 works")
-  - Fixed variable name bugs (`publication` → `work` throughout template)
-  - Reuses the same pagination layout as works listing page for consistency
-- **Model terminology alignment** - Renamed base entity from "publications" to "works" throughout the codebase to align with [OpenAlex terminology](https://docs.openalex.org/api-entities/works):
-  - Django app renamed from `publications/` to `works/`
-  - `Publication` model renamed to `Work`
-  - API endpoint changed from `/api/v1/publications/` to `/api/v1/works/`
-  - Sitemap updated from `/sitemap-publications.xml` to `/sitemap-works.xml`
-  - URL patterns updated from `/publication/<id>/` to `/work/<id>/`
-  - All import statements, templates, and configuration files updated
-  - Fresh migrations created from scratch
-  - All test fixtures updated
-- **Work type taxonomy** - Added comprehensive `type` field to works using Crossref/OpenAlex controlled vocabulary:
-  - 39 work types supported (article, book, book-chapter, dataset, preprint, dissertation, etc.)
-  - Type set from source's `default_work_type` during harvesting
-  - Overridden by OpenAlex API type when available
-  - Indexed and filterable in admin interface
-- **Removed external CDN dependencies** - All JavaScript and CSS libraries now served locally for improved privacy, security, and offline functionality
-- **Improved map accessibility** - Enhanced keyboard navigation and screen reader support for map interactions
-- **Regional subscription email notifications** - Notification emails now group publications by region with dedicated sections for each subscribed continent or ocean. Each region section includes:
-  - Region name and type (Continent/Ocean)
-  - Count of new publications in that region
-  - Direct link to the region's landing page to view all publications
-  - Up to 10 publications per region in email (with link to view more)
-  - Subject line shows total publication count across all regions
-- **Unified contribution workflow** - Single "Submit contribution" button for both spatial and temporal extent. Users can submit either or both in one action.
-- **Unified admin control panel** - Consolidated admin status display, publish/unpublish buttons, provenance information, and "Edit in Admin" link into single highlighted box at top of work landing page. Provenance is collapsible.
-- **Improved text wrapping** - Page titles and abstract text now properly wrap on narrow windows instead of overflowing.
-- **Unified URL structure** - Changed ID-based URLs from `/publication/<id>/` to `/work/<id>/` for consistency with DOI-based URLs.
-- **Consolidated work identifier logic** - Centralized logic for determining work identifiers (DOI or internal ID) in a `get_identifier()` method on the `Work` model:
-  - Ensures consistent identifier usage across permalinks, sitemaps, and API responses
-  - Prioritizes DOI when available, falls back to internal ID
-  - Reduces code duplication across views and serializers
-- **Refactored views_geometry.py** - Eliminated code duplication by making DOI-based functions wrap ID-based functions. Reduced from 375 to 240 lines (~36% reduction).
-- **Renamed "Locate" to "Contribute"** - URL, page title, and navigation updated for clarity about crowdsourcing purpose.
-- **Contribute page layout refactored** - Fixed text overflow issues with proper CSS containment strategy.
-- **Flexible publishing requirements** - Harvested publications with geometry can be published directly without requiring user contribution.
-- **Contribute page login button improved** - Changed to informational disabled button with clear text: "Please log in to contribute (user menu at top right)".
-- **Simplified footer navigation** - Footer now contains only Sitemap, About/Contact/Imprint, Privacy, and data license. Other page links moved to burger menu and sitemap.
+- **Contribution page pagination** — `/contribute/` paginates with configurable page size (default 50, max 200).
+
+- **Model terminology alignment** — `Publication` renamed to `Work` throughout. API endpoint changes from `/api/v1/publications/` to `/api/v1/works/`, sitemap to `/sitemap-works.xml`, URL pattern to `/work/<id>/`. Django app renamed from `publications/` to `works/`.
+
+- **Work type taxonomy** — `type` field added with 39 work types (Crossref/OpenAlex vocabulary). Set from source's `default_work_type`; overridden by OpenAlex when available.
+
+- **Removed external CDN dependencies** — all JS and CSS libraries served locally.
+
+- **Improved map accessibility** — keyboard navigation and screen reader support.
+
+- **Regional subscription email notifications** — emails group works by region; each section shows region name, type, count, and a link.
+
+- **Unified contribution workflow** — single "Submit contribution" button covers spatial and/or temporal extent in one action.
+
+- **Unified admin control panel** — admin status, publish/unpublish, provenance, and "Edit in Admin" consolidated into one box at the top of the work landing page.
+
+- **Improved text wrapping** — page titles and abstracts wrap on narrow windows.
+
+- **Unified URL structure** — ID-based URLs changed from `/publication/<id>/` to `/work/<id>/`.
+
+- **Consolidated work identifier logic** — new `Work.get_identifier()` returns the DOI when available, falling back to the internal ID.
+
+- **Refactored `views_geometry.py`** — DOI-based functions wrap ID-based functions; ~36 % reduction.
+
+- **Renamed "Locate" to "Contribute"** — URL, page title, and navigation updated.
+
+- **Contribute page layout refactored** — text overflow fixed.
+
+- **Flexible publishing requirements** — harvested works with geometry can be published directly without requiring user contribution.
+
+- **Contribute page login button improved** — informational disabled button: "Please log in to contribute (user menu at top right)".
+
+- **Simplified footer navigation** — Sitemap, About/Contact/Imprint, Privacy, and data license only. Other links moved to burger menu and sitemap.
 
 ### Fixed
 
-- **JavaScript scope error** - Fixed "drawnItems is not defined" error in contribution form by declaring variable in outer scope.
-- **GeoJSON geometry detection** - Fixed map click detection for GeoJSON layers by working directly with `layer.feature.geometry` instead of unreliable `instanceof` checks. Implemented proper point-in-polygon (ray casting), point-on-line (distance threshold), and point detection algorithms.
-- **Map popup null location error** - Fixed crash when opening paginated popup by reordering operations to close existing popup before setting new location.
-- **Highlight persistence after popup close** - Geometries now properly return to default blue style when popups close, removing gold dashed borders and explicit fill colors.
-- **Individual popups during pagination** - Individual feature popups no longer open simultaneously with paginated popup, preventing UI conflicts.
-- **Close button highlight clearing** - Popup close button (X) and ESC key now properly clear geometry highlights, not just map clicks.
-- **First page highlight race condition** - Fixed race condition where first page of paginated popup wasn't highlighted due to premature clearing by `popupclose` event handler.
-- **CircleMarker style properties** - Point geometries now use appropriate style properties (`radius` instead of `dashArray`) for proper visual feedback.
+- **JavaScript scope error** — `drawnItems is not defined` on the contribution form.
+
+- **GeoJSON geometry detection** — map click detection now reads `layer.feature.geometry` directly, with point-in-polygon (ray casting), point-on-line, and point detection.
+
+- **Map popup null location error** — paginated popup no longer crashes; existing popup is closed before setting a new location.
+
+- **Highlight persistence after popup close** — geometries return to default style when popups close.
+
+- **Individual popups during pagination** — individual feature popups no longer open simultaneously with the paginated popup.
+
+- **Close button highlight clearing** — popup close (X) and ESC clear geometry highlights.
+
+- **First-page highlight race condition** in the paginated popup.
+
+- **CircleMarker style properties** — point geometries use `radius` instead of `dashArray` for proper visual feedback.
