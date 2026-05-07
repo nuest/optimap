@@ -290,8 +290,13 @@ def work_landing(request, identifier):
     # Resolve identifier to work object.
     work, identifier_type = resolve_work_identifier(identifier)
 
-    # Check access permissions.
-    if not is_admin and work.status != 'p':
+    # Visibility: 'p' (Published) is fully public. 'h' (Harvested) and 'c'
+    # (Contributed) are also visible to non-admins so the /contribute/ flow
+    # can hand the user from the listing to the work landing page (where the
+    # contribution form lives) — and so a successful contribution that flips
+    # a work from 'h' to 'c' does not 404 the user on the post-reload. Drafts
+    # ('d'), Testing ('t'), and Withdrawn ('w') remain admin-only.
+    if not is_admin and work.status not in ('p', 'h', 'c'):
         raise Http404("Work not found.")
 
     is_anonymous = not request.user.is_authenticated
@@ -313,6 +318,14 @@ def work_landing(request, identifier):
     # User-dependent overlay — never cached.
     can_contribute = (
         request.user.is_authenticated
+        and work.status == 'h'
+        and (not cacheable["has_geometry"] or not cacheable["has_temporal"])
+    )
+    # Anonymous visitors who land on a contributable work via the /contribute/
+    # listing get a "log in to contribute" call-to-action instead of a silent
+    # "no form here" page.
+    prompt_login_to_contribute = (
+        not request.user.is_authenticated
         and work.status == 'h'
         and (not cacheable["has_geometry"] or not cacheable["has_temporal"])
     )
@@ -343,6 +356,7 @@ def work_landing(request, identifier):
         "is_admin": is_admin,
         "status_display": work.get_status_display() if is_admin else None,
         "can_contribute": can_contribute,
+        "prompt_login_to_contribute": prompt_login_to_contribute,
         "can_publish": can_publish,
         "can_unpublish": can_unpublish,
         "show_provenance": is_admin,
@@ -381,7 +395,9 @@ def work_preview_png(request, identifier):
     """
 
     work, _ = resolve_work_identifier(identifier)
-    if not (request.user.is_authenticated and request.user.is_staff) and work.status != 'p':
+    # Same visibility rule as work_landing — preview is the og:image for the
+    # landing page, so it has to be reachable wherever the landing page is.
+    if not (request.user.is_authenticated and request.user.is_staff) and work.status not in ('p', 'h', 'c'):
         raise Http404("Work not found.")
     if not work.geometry or work.geometry.empty:
         raise Http404("Work has no geometry — no preview available.")

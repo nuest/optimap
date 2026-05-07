@@ -243,6 +243,19 @@
     {% endif %}.
     You can help by adding this information below!
   </div>
+{% elif prompt_login_to_contribute %}
+  <div class="alert alert-info" role="alert">
+    <strong><i class="fas fa-sign-in-alt"></i> Log in to contribute.</strong>
+    This publication is missing
+    {% if not has_geometry and not has_temporal %}
+      geographic location and temporal extent
+    {% elif not has_geometry %}
+      geographic location
+    {% elif not has_temporal %}
+      temporal extent (time period)
+    {% endif %}.
+    Use the user menu in the top bar (the <i class="fas fa-user" aria-label="user menu"></i> icon) to log in with a magic link, then return to this page to add the missing information.
+  </div>
 {% endif %}
 
 {% if has_geometry or can_contribute %}

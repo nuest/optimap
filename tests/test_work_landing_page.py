@@ -62,6 +62,65 @@ class WorkLandingPageTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.pub_with_doi.title)
 
+    def test_anonymous_sees_login_cta_on_contributable_harvested_work(self):
+        """Anonymous visitor on a harvested work that's missing extent should
+        see a 'Log in to contribute' CTA pointing at the user menu, not just
+        a silent page with no contribute affordance."""
+        work = Work.objects.create(
+            title="Needs contributions", status="h",
+            doi="10.1234/anon-cta",
+            geometry=GeometryCollection(),  # missing geometry → contributable
+            source=self.source,
+        )
+        resp = self.client.get(f"/work/{work.doi}/")
+        self.assertEqual(resp.status_code, 200)
+        body = resp.content.decode()
+        self.assertIn("Log in to contribute", body)
+        self.assertIn("user menu", body)
+        # Authenticated user with the same work should NOT see the CTA —
+        # they get the actual contribute form instead.
+        from django.contrib.auth import get_user_model
+        contributor = get_user_model().objects.create_user(
+            username="cta-user", email="cta-user@example.org", password="x",
+        )
+        self.client.force_login(contributor)
+        resp = self.client.get(f"/work/{work.doi}/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotIn("Log in to contribute", resp.content.decode())
+
+    def test_anonymous_can_view_harvested_and_contributed_works(self):
+        """The /contribute/ list and the post-contribute redirect both go to
+        the work landing page, so anonymous users must be allowed to open
+        works in 'h' (Harvested) or 'c' (Contributed) status. Drafts /
+        Testing / Withdrawn stay admin-only."""
+        for visible_status in ("h", "c"):
+            work = Work.objects.create(
+                title=f"Visible to anon in status {visible_status}",
+                status=visible_status,
+                doi=f"10.1234/visible-{visible_status}",
+                geometry=GeometryCollection(Point(0.0, 0.0)),
+                source=self.source,
+            )
+            resp = self.client.get(f"/work/{work.doi}/")
+            self.assertEqual(
+                resp.status_code, 200,
+                f"Expected 200 for anonymous visit to status={visible_status!r}",
+            )
+
+        for hidden_status in ("d", "t", "w"):
+            work = Work.objects.create(
+                title=f"Hidden from anon in status {hidden_status}",
+                status=hidden_status,
+                doi=f"10.1234/hidden-{hidden_status}",
+                geometry=GeometryCollection(Point(0.0, 0.0)),
+                source=self.source,
+            )
+            resp = self.client.get(f"/work/{work.doi}/")
+            self.assertEqual(
+                resp.status_code, 404,
+                f"Expected 404 for anonymous visit to status={hidden_status!r}",
+            )
+
     def test_work_landing_page_with_geometry(self):
         """Test that work landing page properly handles geometry (regression test for json import)."""
         # This test catches: NameError: name 'json' is not defined
