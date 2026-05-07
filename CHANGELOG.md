@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Copy/paste geometries between the geoextent tool and the contribution form.** A new "Copy extents" button on `/geoextent/` saves all extracted geometries to the browser; a "Paste geoextents" button on the work landing page (when contributing spatial extent) pastes them into the map as editable layers ready to submit.
 
+- **Admin-only "Publish all unpublished works" button on collection pages** — bulk-flips every Harvested or Contributed work in the collection to Published in one click. Curators see no button (admins-only). Draft / Testing / Withdrawn works are deliberately left untouched.
+
+- **Mountain Wetlands and OpenAlex-as-source harvesters now auto-create a Collection** for the source on first run (mirroring the OAI-PMH path from issue #192). New collections start unpublished so admins can review name/description before exposing them on `/collections/`.
 
 - **Separate "Unpublished works" map layer** for admins (main map) and collection curators (collection pages). Features split into two togglable layers, *Published works (N)* and *Unpublished works (N)* (dashed, muted). Popups for unpublished features show a status badge.
 

@@ -242,27 +242,72 @@ class GeocodeGeometryLcaTests(TestCase):
         self.assertIn("Berlin", placename)
         self.assertEqual(n, 1)
 
-    def test_polygon_uses_one_representative_interior_point(self):
-        # A 4-vertex polygon has 5 ring points (closed) — we must NOT
-        # geocode each vertex; one representative point is enough.
+    def test_polygon_samples_envelope_corners_plus_interior(self):
+        # A polygon must sample the four corners of its bounding box plus an
+        # interior point, so cross-border polygons aren't reduced to a single
+        # interior placename. The 4-vertex closing ring is still NOT
+        # geocoded vertex-by-vertex (would explode for high-resolution rings).
         from django.contrib.gis.geos import Polygon
         poly = Polygon(
             ((10.0, 50.0), (11.0, 50.0), (11.0, 51.0), (10.0, 51.0), (10.0, 50.0)),
             srid=4326,
         )
         gc = GeometryCollection(poly, srid=4326)
-        call_count = {"n": 0}
+        seen_coords: list[tuple[float, float]] = []
 
         def lookup(lat, lon):
-            call_count["n"] += 1
+            seen_coords.append((round(lat, 3), round(lon, 3)))
             return {"address": _BERLIN, "display_name": "Berlin"}
 
         with mock.patch.object(
             geocoding, "_reverse_geocode_lookup", side_effect=lookup,
         ):
             placename, country, n = geocoding.geocode_geometry(gc)
-        self.assertEqual(call_count["n"], 1, "polygon should geocode once")
+        # Four corners + one interior point — five lookups, not the five
+        # ring vertices (which would include the duplicated closing point).
+        self.assertEqual(len(seen_coords), 5, f"polygon: corners + interior, got {seen_coords}")
+        self.assertEqual(set([c for c in seen_coords if c in {
+            (50.0, 10.0), (50.0, 11.0), (51.0, 10.0), (51.0, 11.0),
+        }]), {(50.0, 10.0), (50.0, 11.0), (51.0, 10.0), (51.0, 11.0)},
+            "all four envelope corners must be sampled")
         self.assertEqual(country, "DE")
+
+    def test_polygon_spanning_two_countries_lca_falls_back(self):
+        # Bug demoed by work id=10 on the deployed instance: a polygon
+        # straddling Germany and Poland was getting "Mniszki, …, Poland" as
+        # placename because only the centroid was geocoded. With corners
+        # sampled, two corners hit Germany, two hit Poland → LCA collapses
+        # past country (no shared continent in our test fixture either) and
+        # the work no longer claims a misleading specific placename.
+        from django.contrib.gis.geos import Polygon
+        # Envelope corners → (lat, lon):
+        #   (50, 10) DE, (50, 20) PL, (52, 10) DE, (52, 20) PL
+        # Interior (point_on_surface for an axis-aligned rectangle) → (51, 15) — DE.
+        _POLAND = {
+            "country_code": "pl", "country": "Poland",
+            "state": "Łódź Voivodeship", "city": "Mniszki",
+        }
+        lookup = _LookupTable({
+            (50.0, 10.0): {"address": _BERLIN,  "display_name": "Berlin"},
+            (50.0, 20.0): {"address": _POLAND,  "display_name": "Mniszki"},
+            (52.0, 10.0): {"address": _BERLIN,  "display_name": "Berlin"},
+            (52.0, 20.0): {"address": _POLAND,  "display_name": "Mniszki"},
+            (51.0, 15.0): {"address": _BERLIN,  "display_name": "Berlin"},
+        })
+        poly = Polygon(
+            ((10.0, 50.0), (20.0, 50.0), (20.0, 52.0), (10.0, 52.0), (10.0, 50.0)),
+            srid=4326,
+        )
+        gc = GeometryCollection(poly, srid=4326)
+        with mock.patch.object(
+            geocoding, "_reverse_geocode_lookup", side_effect=lookup,
+        ):
+            placename, country, n = geocoding.geocode_geometry(gc)
+        # Two countries appear among the corners → no shared country → both
+        # placename and country must be None, not the centroid's interior.
+        self.assertIsNone(placename, f"expected None, got {placename!r}")
+        self.assertIsNone(country)
+        self.assertEqual(n, 5)
 
     def test_max_points_caps_geocoder_calls(self):
         # 30 points but max_points=5 → only 5 lookups.

@@ -161,17 +161,34 @@ def _representative_points(geom, max_points: int = 20) -> list[tuple[float, floa
 
     Each ``Point`` in the geometry is sampled individually (so multi-point
     GeometryCollections are geocoded per-site). Polygons / lines contribute
-    one interior representative point. Bounded so a 500-vertex polygon
+    the four corners of their bounding box plus an interior point — sampling
+    only an interior point would mask cross-border coverage: a Polygon
+    spanning Germany and Poland geocodes through its centroid (which lands
+    in one country) and the LCA blindly reports that country, even though
+    the polygon's corners clearly cross the border. Sampling the corners
+    forces ``_common_address`` to detect the divergence and fall back to
+    the shared ancestor (or to ``None``). Bounded so a 500-vertex polygon
     doesn't trigger 500 Nominatim requests.
     """
     points: list[tuple[float, float]] = []
+    seen: set[tuple[float, float]] = set()
+
+    def _add(lat: float, lon: float):
+        # Quantise to the cache resolution (~100 m) so envelope corners that
+        # round to the same grid cell as an interior point don't waste a
+        # Nominatim hit on the same neighbourhood.
+        key = (round(lat, 3), round(lon, 3))
+        if key in seen:
+            return
+        seen.add(key)
+        points.append((lat, lon))
 
     def _walk(g):
         if len(points) >= max_points:
             return
         gt = g.geom_type
         if gt == "Point":
-            points.append((g.y, g.x))
+            _add(g.y, g.x)
         elif gt in ("MultiPoint", "GeometryCollection",
                     "MultiPolygon", "MultiLineString"):
             for child in g:
@@ -179,12 +196,26 @@ def _representative_points(geom, max_points: int = 20) -> list[tuple[float, floa
                 if len(points) >= max_points:
                     return
         else:
-            # Polygon, LineString, LinearRing — pick one interior point.
+            # Polygon, LineString, LinearRing — sample the envelope corners
+            # plus an interior point. See module docstring above.
+            try:
+                minx, miny, maxx, maxy = g.extent
+            except Exception:  # pragma: no cover — defensive
+                minx = miny = maxx = maxy = None
+            if minx is not None:
+                for lat, lon in (
+                    (miny, minx), (miny, maxx),
+                    (maxy, minx), (maxy, maxx),
+                ):
+                    if len(points) >= max_points:
+                        return
+                    _add(lat, lon)
             try:
                 pt = g.point_on_surface
             except Exception:  # pragma: no cover — defensive
                 pt = g.centroid
-            points.append((pt.y, pt.x))
+            if len(points) < max_points:
+                _add(pt.y, pt.x)
 
     _walk(geom)
     return points[:max_points]

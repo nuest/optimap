@@ -91,6 +91,14 @@ def collection_page(request, collection_slug):
     for w in works:
         w.coins_ctx = coins_title(w)
 
+    # Count of works that the bulk "Publish all" admin button would publish:
+    # only Harvested ('h') and Contributed ('c') — Draft / Testing / Withdrawn
+    # are deliberate admin states and never auto-published.
+    publishable_count = (
+        Work.objects.filter(collections=collection, status__in=['h', 'c']).count()
+        if is_admin else 0
+    )
+
     context = {
         'collection': collection,
         'works': works,
@@ -100,6 +108,7 @@ def collection_page(request, collection_slug):
         'is_curator': is_curator,
         'can_curate': can_curate,
         'can_edit_description': is_admin or is_curator,
+        'publishable_count': publishable_count,
         'canonical_url': request.build_absolute_uri(collection.get_absolute_url()),
     }
     response = render(request, 'collection_page.html', context)
@@ -156,6 +165,21 @@ def unpublish_collection(request, collection_id):
     collection.is_published = False
     collection.save(update_fields=['is_published', 'updated_at'])
     return JsonResponse({'success': True, 'is_published': False})
+
+
+@staff_member_required
+@require_POST
+def publish_collection_works(request, collection_id):
+    """Admins only: bulk-set every Harvested/Contributed work in the collection
+    to Published. Curators (non-staff) get 403 from ``staff_member_required``.
+
+    Targets ``status__in=['h', 'c']`` only — Draft / Testing / Withdrawn are
+    admin-managed states and are deliberately left untouched.
+    """
+    collection = get_object_or_404(Collection, pk=collection_id)
+    qs = Work.objects.filter(collections=collection, status__in=['h', 'c'])
+    count = qs.update(status='p')
+    return JsonResponse({'success': True, 'published_count': count})
 
 
 def _user_can_curate(user, collection):

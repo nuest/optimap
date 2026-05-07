@@ -364,6 +364,121 @@ class PublishUnpublishEndpointTests(TestCase):
         self.assertFalse(self.col.is_published)
 
 
+class PublishCollectionWorksTests(TestCase):
+    """Admin-only bulk action to flip Harvested/Contributed works to Published.
+
+    Curators (non-staff) must be rejected — explicitly tested because curators
+    can otherwise edit collection descriptions and add/remove individual works.
+    """
+
+    def setUp(self):
+        self.client = Client()
+        self.col = Collection.objects.create(identifier='c', name='C', is_published=True)
+        self.admin = User.objects.create_user(
+            username='admin@x.com', email='admin@x.com', password='p123', is_staff=True,
+        )
+        self.curator = User.objects.create_user(
+            username='c@x.com', email='c@x.com', password='p123',
+        )
+        self.col.curators.add(self.curator)
+
+        self.harvested = Work.objects.create(
+            title='H', status='h', doi='10.1234/h',
+            geometry=GeometryCollection(Point(0, 0)),
+        )
+        self.contributed = Work.objects.create(
+            title='C', status='c', doi='10.1234/c',
+            geometry=GeometryCollection(Point(1, 1)),
+        )
+        self.draft = Work.objects.create(
+            title='D', status='d', doi='10.1234/d',
+            geometry=GeometryCollection(Point(2, 2)),
+        )
+        self.withdrawn = Work.objects.create(
+            title='W', status='w', doi='10.1234/w',
+            geometry=GeometryCollection(Point(3, 3)),
+        )
+        self.already_published = Work.objects.create(
+            title='P', status='p', doi='10.1234/p',
+            geometry=GeometryCollection(Point(4, 4)),
+        )
+        for w in (self.harvested, self.contributed, self.draft, self.withdrawn, self.already_published):
+            w.collections.add(self.col)
+
+        # Work in another collection — must not be touched.
+        self.other_col = Collection.objects.create(identifier='other', name='Other', is_published=True)
+        self.outsider_work = Work.objects.create(
+            title='O', status='h', doi='10.1234/o',
+            geometry=GeometryCollection(Point(5, 5)),
+        )
+        self.outsider_work.collections.add(self.other_col)
+
+    def _url(self):
+        return f'/collections/{self.col.id}/publish-works/'
+
+    def test_admin_publishes_harvested_and_contributed_only(self):
+        self.client.force_login(self.admin)
+        resp = self.client.post(self._url())
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json(), {'success': True, 'published_count': 2})
+
+        for w in (self.harvested, self.contributed):
+            w.refresh_from_db()
+            self.assertEqual(w.status, 'p')
+        # Draft / Withdrawn deliberately untouched.
+        self.draft.refresh_from_db()
+        self.assertEqual(self.draft.status, 'd')
+        self.withdrawn.refresh_from_db()
+        self.assertEqual(self.withdrawn.status, 'w')
+        # Other collection's work untouched.
+        self.outsider_work.refresh_from_db()
+        self.assertEqual(self.outsider_work.status, 'h')
+
+    def test_curator_is_rejected(self):
+        self.client.force_login(self.curator)
+        resp = self.client.post(self._url())
+        # staff_member_required redirects to admin login for non-staff.
+        self.assertEqual(resp.status_code, 302)
+        self.harvested.refresh_from_db()
+        self.assertEqual(self.harvested.status, 'h')
+
+    def test_anonymous_is_rejected(self):
+        resp = self.client.post(self._url())
+        self.assertEqual(resp.status_code, 302)
+        self.harvested.refresh_from_db()
+        self.assertEqual(self.harvested.status, 'h')
+
+    def test_get_is_not_allowed(self):
+        self.client.force_login(self.admin)
+        resp = self.client.get(self._url())
+        self.assertEqual(resp.status_code, 405)
+
+    def test_button_visible_to_admin_with_count(self):
+        self.client.force_login(self.admin)
+        resp = self.client.get(reverse('optimap:collection-page', args=[self.col.identifier]))
+        self.assertEqual(resp.status_code, 200)
+        body = resp.content.decode()
+        self.assertIn('collection-publish-works-btn', body)
+        # 2 works are h/c, count rendered in the button label.
+        self.assertIn('Publish all 2 unpublished works', body)
+
+    def test_button_hidden_when_no_publishable_works(self):
+        # Flip the two candidates to Published — button disappears. The class
+        # name and ``data-publishable-count`` both appear in the admin's JS
+        # handler block, so assert on the human-visible label that only the
+        # rendered button carries.
+        self.harvested.status = 'p'; self.harvested.save()
+        self.contributed.status = 'p'; self.contributed.save()
+        self.client.force_login(self.admin)
+        resp = self.client.get(reverse('optimap:collection-page', args=[self.col.identifier]))
+        self.assertNotIn('Publish all', resp.content.decode())
+
+    def test_button_hidden_for_curator(self):
+        self.client.force_login(self.curator)
+        resp = self.client.get(reverse('optimap:collection-page', args=[self.col.identifier]))
+        self.assertNotIn('Publish all', resp.content.decode())
+
+
 class CuratorAddRemoveTests(TestCase):
     def setUp(self):
         self.client = Client()
