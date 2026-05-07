@@ -1,11 +1,7 @@
 {# SPDX-FileCopyrightText: 2022 OPTIMETA and KOMET projects <https://projects.tib.eu/komet> #}
 {# SPDX-License-Identifier: GPL-3.0-or-later #}
 
+{# Logout confirmation is rendered via the Django messages framework in
+   base.html — extending main.html alone is enough to surface that alert
+   at the top of the page, consistent with every other flash message. #}
 {% extends "main.html" %}
-
-{% block alert %}
-<div class="alert alert-primary m-3" role="alert">
-  <button type="button" class="close alert-autoclose" data-dismiss="alert" aria-label="Close">×</button>
-  <p><strong>Logged out!</strong> You have been succesfully logged out. This message closes in <span id="autoclose_secs"></span> seconds, or use the 'x' to the right...</p>
-</div>
-{% endblock %}

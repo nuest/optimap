@@ -6,6 +6,7 @@ Views for geometry contribution and work management.
 """
 import logging
 import json
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.admin.views.decorators import staff_member_required
 from django.http import Http404, JsonResponse
@@ -179,6 +180,10 @@ def publish_work_by_id(request, work_id):
             "Admin %s published %s work %s (ID: %s)",
             request.user.username, old_status.lower(), work.title[:50], work.id
         )
+
+        # Server-side flash so the post-reload page surfaces a self-closing
+        # alert at the top, matching the rest of the app's communication flow.
+        messages.success(request, "Work is now public.")
 
         return JsonResponse({
             'success': True,
