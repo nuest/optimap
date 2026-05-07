@@ -6,6 +6,7 @@
 from rest_framework import serializers
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 from rest_framework import serializers as drf_serializers
+from drf_spectacular.utils import extend_schema_field
 from .models import Work, Subscription, Source, GlobalRegion
 from django.contrib.auth import get_user_model
 from django.conf import settings
@@ -32,7 +33,7 @@ class SourceSerializer(serializers.ModelSerializer):
 
 
 class WorkSerializer(GeoFeatureModelSerializer):
-    source_details = serializers.SerializerMethodField()
+    source_details = serializers.SerializerMethodField(help_text="Embedded source row (same shape as `/api/v1/sources/<id>/`).")
 
     class Meta:
         model = Work
@@ -62,6 +63,7 @@ class WorkSerializer(GeoFeatureModelSerializer):
             "openalex_open_access_status",
         ]
 
+    @extend_schema_field(SourceSerializer)
     def get_source_details(self, obj):
         source = obj.source
         if not source:

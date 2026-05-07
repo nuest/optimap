@@ -158,9 +158,69 @@ DATABASES = {
 # https://github.com/tfranzel/drf-spectacular
 SPECTACULAR_SETTINGS = {
     'TITLE': 'OPTIMAP API',
-    'DESCRIPTION': 'OPTIMAP provides geospatial metadata for scientific publications.',
+    'DESCRIPTION': """
+OPTIMAP is a geospatial discovery portal for scientific publications. The API exposes the same
+data that powers the OPTIMAP web UI: harvested **works** with spatial / temporal metadata,
+**sources** that fed them, **collections** they belong to, **subscriptions** that drive email
+alerts, and helper services for **geoextent extraction** and **gazetteer** lookups.
+
+The OpenAPI schema this page is built from is at [`/api/schema/`](/api/schema/) (YAML, served
+without auth). The UI is rendered by [Redoc](https://github.com/Redocly/redoc) from drf-spectacular.
+
+## Conventions
+
+- **Base URL:** every endpoint is rooted at `/api/v1/`.
+- **Anonymous reads:** `Works`, `Sources`, `Global regions`, `Geoextent`, `Gazetteer`, and the
+  feed / download endpoints accept anonymous GETs. `Subscriptions` requires session auth.
+- **Pagination:** list endpoints return a `{count, next, previous, results}` envelope with
+  the default page size from `REST_FRAMEWORK['PAGE_SIZE']`. Use `?limit=` for explicit page
+  size, `?offset=` to skip records.
+- **Spatial filtering:** list endpoints with a geometry field accept `?in_bbox=west,south,east,north`
+  (longitude/latitude in EPSG:4326).
+- **GeoJSON envelope:** `Works` responses are valid GeoJSON `FeatureCollection`s; the OPTIMAP
+  fields live under `properties` of each `Feature`.
+- **CSRF:** browser POST/PUT/DELETE requests need the `X-CSRFToken` header. Server-side scripts
+  with session cookies should also fetch a CSRF token first.
+
+## Bulk downloads
+
+The full corpus is also available as flat-file dumps (regenerated every 6 h):
+
+| Endpoint | Format | Notes |
+| -- | -- | -- |
+| [`/download/geojson/`](/download/geojson/) | GeoJSON `FeatureCollection` | Gzipped when the client sends `Accept-Encoding: gzip` |
+| [`/download/geopackage/`](/download/geopackage/) | OGC GeoPackage (`.gpkg`) | Single layer `works`, EPSG:4326 |
+| [`/download/csv/`](/download/csv/) | CSV with WKT geometry column | UTF-8, RFC 4180 |
+
+These are documented in the *Downloads* section below.
+
+## Feeds (machine-readable)
+
+Region-filtered GeoRSS / GeoAtom feeds are not full REST endpoints; they are produced by the
+Django syndication framework and consumed by feed readers. The catalog:
+
+| URL | Format | Scope |
+| -- | -- | -- |
+| `/api/v1/feeds/optimap-global.rss` | GeoRSS 2.0 | All published works |
+| `/api/v1/feeds/optimap-global.atom` | GeoAtom | All published works |
+| `/api/v1/feeds/optimap-<continent-slug>.rss` / `.atom` | GeoRSS / GeoAtom | Continent-filtered (e.g. `optimap-africa.rss`) |
+| `/api/v1/feeds/optimap-<ocean-slug>.rss` / `.atom` | GeoRSS / GeoAtom | Ocean-filtered (e.g. `optimap-pacific-ocean.rss`) |
+
+Continent and ocean slugs match `GlobalRegion.identifier`; list them via
+[`/api/v1/global-regions/`](/api/v1/global-regions/).
+""".strip(),
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
+    'SCHEMA_PATH_PREFIX': r'/api/v1',  # strips the redundant "v1_" prefix from operationIds
+    'TAGS': [
+        {'name': 'Works', 'description': 'Harvested scientific works with spatial / temporal metadata, returned as GeoJSON.'},
+        {'name': 'Sources', 'description': 'Configured harvest origins (OAI-PMH endpoints, RSS feeds, OpenAlex sources, etc.).'},
+        {'name': 'Subscriptions', 'description': 'Per-user regional subscriptions that drive email alerts. Session auth required.'},
+        {'name': 'Global regions', 'description': 'Continent and ocean polygons used by feeds and subscriptions.'},
+        {'name': 'Geoextent', 'description': 'Extract a spatial / temporal extent from an uploaded file or a remote DOI/URL. Powered by the [geoextent](https://nuest.github.io/geoextent/) Python library.'},
+        {'name': 'Gazetteer', 'description': 'Server-side proxy for forward / reverse geocoding via Nominatim or Photon.'},
+        {'name': 'Downloads', 'description': 'Flat-file dumps of the full work corpus (GeoJSON, GeoPackage, CSV).'},
+    ],
     'SWAGGER_UI_DIST': 'SIDECAR',  # shorthand to use the sidecar instead
     'SWAGGER_UI_FAVICON_HREF': 'SIDECAR',
     'REDOC_DIST': 'SIDECAR',

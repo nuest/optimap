@@ -17,6 +17,11 @@ from rest_framework_gis import filters
 from rest_framework.permissions import IsAuthenticatedOrReadOnly, AllowAny
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from drf_spectacular.utils import (
+    extend_schema, extend_schema_view, inline_serializer, OpenApiResponse,
+)
+from drf_spectacular.types import OpenApiTypes
+from rest_framework import serializers as drf_serializers
 from django.conf import settings
 from django.contrib.gis.geos import Polygon, Point, MultiPoint
 
@@ -37,11 +42,57 @@ from .serializers import (
 
 logger = logging.getLogger(__name__)
 
+
+# Reusable error-response schema. Most error paths in this module return
+# `{"error": "<message>"}` (and sometimes also `{"details": "<…>"}`); a
+# couple of validation paths fall back to DRF's serializer-error envelope.
+# Schema-wise both fit `additionalProperties: true`, so a single shape covers them.
+_ERROR_RESPONSE = inline_serializer(
+    name="ErrorResponse",
+    fields={
+        "error": drf_serializers.CharField(),
+        "details": drf_serializers.CharField(required=False),
+    },
+)
+
+
+@extend_schema_view(
+    list=extend_schema(summary="List harvested data sources", tags=["Sources"]),
+    retrieve=extend_schema(
+        summary="Retrieve a source by ID",
+        tags=["Sources"],
+        responses={
+            200: SourceSerializer,
+            404: OpenApiResponse(_ERROR_RESPONSE, description="No source with this ID."),
+        },
+    ),
+)
 class SourceViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Source.objects.all()
     serializer_class = SourceSerializer
     permission_classes = [IsAuthenticatedOrReadOnly]
 
+
+@extend_schema_view(
+    list=extend_schema(
+        summary="List published works (paginated GeoJSON)",
+        description=(
+            "Returns published works as a GeoJSON `FeatureCollection`. Admins additionally "
+            "see drafts and harvested-but-unpublished works. Filter the spatial slice with "
+            "`?in_bbox=west,south,east,north`."
+        ),
+        tags=["Works"],
+    ),
+    retrieve=extend_schema(
+        summary="Retrieve a work by numeric ID",
+        description="See the work landing page (`/work/<id>/`) for the human-readable view.",
+        tags=["Works"],
+        responses={
+            200: WorkSerializer,
+            404: OpenApiResponse(_ERROR_RESPONSE, description="No work with this ID, or the work is not yet published and the request is anonymous."),
+        },
+    ),
+)
 class WorkViewSet(viewsets.ReadOnlyModelViewSet):
     bbox_filter_field = "geometry"
     filter_backends = (filters.InBBoxFilter,)
@@ -57,6 +108,67 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
             return Work.objects.all().order_by("-creationDate", "-id").distinct()
         return Work.objects.filter(status="p").order_by("-creationDate", "-id").distinct()
 
+
+_SUBSCRIPTION_AUTH_RESPONSES = {
+    401: OpenApiResponse(_ERROR_RESPONSE, description="Authentication credentials were not provided."),
+    403: OpenApiResponse(_ERROR_RESPONSE, description="Authenticated user is not allowed to access this subscription."),
+}
+
+
+@extend_schema_view(
+    list=extend_schema(
+        summary="List the current user's subscriptions",
+        tags=["Subscriptions"],
+        responses={200: SubscriptionSerializer(many=True), **_SUBSCRIPTION_AUTH_RESPONSES},
+    ),
+    create=extend_schema(
+        summary="Create a new subscription",
+        tags=["Subscriptions"],
+        responses={
+            201: SubscriptionSerializer,
+            400: OpenApiResponse(_ERROR_RESPONSE, description="Invalid payload (validation error)."),
+            **_SUBSCRIPTION_AUTH_RESPONSES,
+        },
+    ),
+    retrieve=extend_schema(
+        summary="Retrieve a subscription by ID",
+        tags=["Subscriptions"],
+        responses={
+            200: SubscriptionSerializer,
+            404: OpenApiResponse(_ERROR_RESPONSE, description="No subscription with this ID owned by the current user."),
+            **_SUBSCRIPTION_AUTH_RESPONSES,
+        },
+    ),
+    update=extend_schema(
+        summary="Replace a subscription",
+        tags=["Subscriptions"],
+        responses={
+            200: SubscriptionSerializer,
+            400: OpenApiResponse(_ERROR_RESPONSE, description="Invalid payload (validation error)."),
+            404: OpenApiResponse(_ERROR_RESPONSE, description="No subscription with this ID owned by the current user."),
+            **_SUBSCRIPTION_AUTH_RESPONSES,
+        },
+    ),
+    partial_update=extend_schema(
+        summary="Patch a subscription",
+        tags=["Subscriptions"],
+        responses={
+            200: SubscriptionSerializer,
+            400: OpenApiResponse(_ERROR_RESPONSE, description="Invalid payload (validation error)."),
+            404: OpenApiResponse(_ERROR_RESPONSE, description="No subscription with this ID owned by the current user."),
+            **_SUBSCRIPTION_AUTH_RESPONSES,
+        },
+    ),
+    destroy=extend_schema(
+        summary="Delete a subscription",
+        tags=["Subscriptions"],
+        responses={
+            204: OpenApiResponse(description="Subscription deleted."),
+            404: OpenApiResponse(_ERROR_RESPONSE, description="No subscription with this ID owned by the current user."),
+            **_SUBSCRIPTION_AUTH_RESPONSES,
+        },
+    ),
+)
 class SubscriptionViewSet(viewsets.ModelViewSet):
     """
     Subscription view set.
@@ -75,6 +187,24 @@ class SubscriptionViewSet(viewsets.ModelViewSet):
         serializer.save(user=self.request.user)
 
 
+@extend_schema_view(
+    list=extend_schema(
+        summary="List global regions (continents + oceans)",
+        description=(
+            "Continent and ocean polygons used by region-filtered feeds and subscriptions. "
+            "Region slugs in this response are the ones to use in `/api/v1/feeds/optimap-<slug>.rss`."
+        ),
+        tags=["Global regions"],
+    ),
+    retrieve=extend_schema(
+        summary="Retrieve a global region by ID",
+        tags=["Global regions"],
+        responses={
+            200: GlobalRegionSerializer,
+            404: OpenApiResponse(_ERROR_RESPONSE, description="No global region with this ID."),
+        },
+    ),
+)
 class GlobalRegionViewSet(viewsets.ReadOnlyModelViewSet):
     """
     GlobalRegion view set for continent and ocean geometries.
@@ -86,6 +216,7 @@ class GlobalRegionViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [AllowAny]
 
 
+@extend_schema(tags=["Geoextent"])
 class GeoextentViewSet(viewsets.ViewSet):
     """
     ViewSet for extracting geospatial and temporal extents from files.
@@ -98,6 +229,10 @@ class GeoextentViewSet(viewsets.ViewSet):
     Public API - no authentication required.
     """
     permission_classes = [AllowAny]
+    # Each @action declares its own request= via @extend_schema; this default
+    # silences drf-spectacular's "unable to guess serializer" warning on the
+    # parent ViewSet class.
+    serializer_class = GeoextentExtractSerializer
 
     def _cleanup_temp_file(self, filepath):
         """Delete temporary file safely."""
@@ -314,6 +449,22 @@ class GeoextentViewSet(viewsets.ViewSet):
         # Default fallback
         return structured_result
 
+    @extend_schema(
+        summary="Extract spatial / temporal extent from an uploaded file",
+        description=(
+            "Wraps the [geoextent](https://nuest.github.io/geoextent/) Python library, "
+            "which inspects supported geospatial / data file formats and returns a "
+            "bounding box and (when present) a temporal extent."
+        ),
+        tags=["Geoextent"],
+        request=GeoextentExtractSerializer,
+        responses={
+            200: OpenApiResponse(OpenApiTypes.OBJECT, description="GeoJSON / WKT / WKB extent + metadata (see `response_format`)."),
+            400: OpenApiResponse(_ERROR_RESPONSE, description="Invalid request body, unreadable file, or no spatial data extracted."),
+            413: OpenApiResponse(_ERROR_RESPONSE, description=f"File exceeds OPTIMAP_GEOEXTENT_MAX_FILE_SIZE_MB."),
+            500: OpenApiResponse(_ERROR_RESPONSE, description="Processing error inside the geoextent library."),
+        },
+    )
     @action(detail=False, methods=['post'])
     def extract(self, request):
         """
@@ -428,6 +579,23 @@ class GeoextentViewSet(viewsets.ViewSet):
                 except Exception as e:
                     logger.warning(f"Failed to cleanup temp directory {temp_dir}: {e}")
 
+    @extend_schema(
+        summary="Extract spatial / temporal extent from a remote DOI or URL",
+        description=(
+            "Resolves the identifier(s) against supported repositories "
+            "(Zenodo, PANGAEA, OSF, Figshare, Dryad, GFZ, Dataverse) and runs the "
+            "[geoextent](https://nuest.github.io/geoextent/) Python library on the "
+            "downloaded files. Supports a list of identifiers via JSON POST or a "
+            "comma-separated `?identifiers=…` query parameter."
+        ),
+        tags=["Geoextent"],
+        request=GeoextentRemoteSerializer,
+        responses={
+            200: OpenApiResponse(OpenApiTypes.OBJECT, description="Combined extent across all resolved identifiers."),
+            400: OpenApiResponse(_ERROR_RESPONSE, description="Invalid identifier(s) or request body."),
+            500: OpenApiResponse(_ERROR_RESPONSE, description="Resolver or extraction error."),
+        },
+    )
     @action(detail=False, methods=['get', 'post'], url_path='extract-remote')
     def extract_remote(self, request):
         """
@@ -568,6 +736,21 @@ class GeoextentViewSet(viewsets.ViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+    @extend_schema(
+        summary="Extract a combined spatial / temporal extent from multiple uploaded files",
+        description=(
+            "Wraps the [geoextent](https://nuest.github.io/geoextent/) Python library, "
+            "running it across every uploaded file and merging the extents."
+        ),
+        tags=["Geoextent"],
+        request=GeoextentBatchSerializer,
+        responses={
+            200: OpenApiResponse(OpenApiTypes.OBJECT, description="Combined extent across all uploaded files plus per-file features."),
+            400: OpenApiResponse(_ERROR_RESPONSE, description="Invalid request body or no spatial data extracted from any file."),
+            413: OpenApiResponse(_ERROR_RESPONSE, description=f"Total upload size exceeds OPTIMAP_GEOEXTENT_MAX_BATCH_SIZE_MB."),
+            500: OpenApiResponse(_ERROR_RESPONSE, description="Processing error inside the geoextent library."),
+        },
+    )
     @action(detail=False, methods=['post'], url_path='extract-batch')
     def extract_batch(self, request):
         """

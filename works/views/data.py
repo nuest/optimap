@@ -19,6 +19,19 @@ from django.http import FileResponse, Http404
 from django.views.decorators.http import require_GET
 import tempfile
 from pathlib import Path
+from drf_spectacular.utils import extend_schema, OpenApiResponse, inline_serializer
+from drf_spectacular.types import OpenApiTypes
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+from rest_framework import serializers as drf_serializers
+
+_DOWNLOAD_404 = OpenApiResponse(
+    inline_serializer(
+        name="DownloadNotFoundResponse",
+        fields={"detail": drf_serializers.CharField()},
+    ),
+    description="Cached dump is missing and could not be regenerated.",
+)
 from works.tasks import (
     regenerate_geojson_cache,
     regenerate_geopackage_cache,
@@ -30,6 +43,20 @@ from works.models import Work
 ogr.UseExceptions()
 
 
+@extend_schema(
+    summary="Download all published works as GeoJSON",
+    description=(
+        "Streams the cached GeoJSON `FeatureCollection` of every published work. "
+        "When the client sends `Accept-Encoding: gzip` the response is gzipped on the "
+        "wire (`Content-Encoding: gzip`); the payload itself remains GeoJSON. "
+        "The cache is regenerated every 6 hours by a Django-Q schedule; this endpoint "
+        "regenerates on demand if the cache is missing."
+    ),
+    tags=["Downloads"],
+    responses={(200, 'application/json'): OpenApiTypes.BINARY},
+)
+@api_view(["GET"])
+@permission_classes([AllowAny])
 def download_geojson(request):
     """
     Returns the latest GeoJSON dump file, gzipped if the client accepts it,
@@ -97,8 +124,20 @@ def generate_geopackage():
     ds = None
     return gpkg_path
 
-@require_GET
-
+@extend_schema(
+    summary="Download all published works as a GeoPackage (.gpkg)",
+    description=(
+        "Returns the cached OGC GeoPackage of every published work — single layer "
+        "`works`, EPSG:4326. Regenerated every 6 hours by a Django-Q schedule."
+    ),
+    tags=["Downloads"],
+    responses={
+        (200, 'application/geopackage+sqlite3'): OpenApiTypes.BINARY,
+        404: _DOWNLOAD_404,
+    },
+)
+@api_view(["GET"])
+@permission_classes([AllowAny])
 def download_geopackage(request):
     """
     Returns the latest GeoPackage dump file.
@@ -109,7 +148,20 @@ def download_geopackage(request):
     return FileResponse(open(gpkg_path, 'rb'), as_attachment=True, filename=os.path.basename(gpkg_path))
 
 
-@require_GET
+@extend_schema(
+    summary="Download all published works as CSV (WKT geometry column)",
+    description=(
+        "Returns the cached CSV dump of every published work, with geometries serialized "
+        "as a WKT column (issue #206). UTF-8, RFC 4180."
+    ),
+    tags=["Downloads"],
+    responses={
+        (200, 'text/csv'): OpenApiTypes.BINARY,
+        404: _DOWNLOAD_404,
+    },
+)
+@api_view(["GET"])
+@permission_classes([AllowAny])
 def download_csv(request):
     """
     Returns the latest CSV dump file (WKT geometry column, issue #206).

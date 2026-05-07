@@ -411,6 +411,17 @@ optimap/
 
 ## API & Endpoints
 
+> **Keep the API docs in sync with the code.** Whenever you add, remove, or change a REST
+> endpoint — including new `@action` methods, new ViewSets, new function-based `@api_view`
+> handlers, new query parameters, new response shapes, or new error paths — also update
+> the schema annotations so `/api/schema/ui/` keeps reflecting reality. Concretely:
+> - Decorate every public endpoint with `@extend_schema(summary=…, tags=[…], request=…, responses={200: …, 4xx/5xx: OpenApiResponse(…)})`. Use `@extend_schema_view` on ViewSets to set per-method summaries.
+> - Tag each endpoint with one of the `TAGS` declared in `optimap/settings.py:SPECTACULAR_SETTINGS` (Works / Sources / Subscriptions / Global regions / Geoextent / Gazetteer / Downloads). If a new endpoint doesn't fit any tag, add a tag entry alongside the others so Redoc gives it a sidebar section.
+> - Document every error status the view can actually return — `404`, `400`, `401`/`403`, `413`, `500`, etc. (cross-check against `tests/test_*.py` assertions on `response.status_code` and explicit `Response(..., status=...)` returns in the view).
+> - For function-based Django views that should appear in the docs (downloads, gazetteer proxies, …), wrap them in `@api_view([…])` + `@permission_classes([...])` so drf-spectacular can pick them up.
+> - Run `python manage.py spectacular --file /tmp/optimap_schema.yaml` after the change; it must report `Errors: 0` (warnings are tolerable but should not regress).
+> - Update the Markdown intro in `SPECTACULAR_SETTINGS['DESCRIPTION']` (and the relevant `TAGS` description) when conventions change (auth, pagination, filtering, new endpoint families).
+
 - `/api/v1/` - REST API root (see `/api/schema/ui/` for OpenAPI docs)
 - `/admin/` - Django admin interface
 - `/download/geojson/` - Download full publication dataset as GeoJSON

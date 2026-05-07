@@ -10,9 +10,26 @@ import requests
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.conf import settings
+from drf_spectacular.utils import (
+    extend_schema, OpenApiParameter, OpenApiResponse, inline_serializer,
+)
+from drf_spectacular.types import OpenApiTypes
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+from rest_framework import serializers as drf_serializers
 import logging
 
 logger = logging.getLogger(__name__)
+
+_ERROR_RESPONSE = inline_serializer(
+    name="GazetteerErrorResponse",
+    fields={"error": drf_serializers.CharField()},
+)
+_GAZETTEER_ERROR_RESPONSES = {
+    400: OpenApiResponse(_ERROR_RESPONSE, description="Unknown provider, missing or invalid query / coordinates."),
+    502: OpenApiResponse(_ERROR_RESPONSE, description="Upstream geocoder returned an error or unparseable response."),
+    504: OpenApiResponse(_ERROR_RESPONSE, description="Upstream geocoder timed out."),
+}
 
 # Geocoding service configurations
 GEOCODING_SERVICES = {
@@ -30,7 +47,29 @@ GEOCODING_SERVICES = {
 }
 
 
-@require_http_methods(["GET"])
+@extend_schema(
+    summary="Forward geocode a free-text query (CORS proxy)",
+    description=(
+        "Proxies a forward-geocoding request to the chosen provider so the OPTIMAP "
+        "frontend can call it without running into CORS. The response is the provider's "
+        "raw JSON, untouched."
+    ),
+    tags=["Gazetteer"],
+    parameters=[
+        OpenApiParameter('provider', str, OpenApiParameter.PATH,
+                         description='Provider id: `nominatim` or `photon`.'),
+        OpenApiParameter('q', str, OpenApiParameter.QUERY, required=True,
+                         description='Search query string.'),
+        OpenApiParameter('limit', int, OpenApiParameter.QUERY, required=False,
+                         description='Maximum number of results (default 5).'),
+    ],
+    responses={
+        (200, 'application/json'): OpenApiTypes.OBJECT,
+        **_GAZETTEER_ERROR_RESPONSES,
+    },
+)
+@api_view(["GET"])
+@permission_classes([AllowAny])
 def gazetteer_search(request, provider):
     """
     Proxy geocoding search requests to avoid CORS issues.
@@ -131,7 +170,26 @@ def gazetteer_search(request, provider):
         }, status=502)
 
 
-@require_http_methods(["GET"])
+@extend_schema(
+    summary="Reverse geocode lat/lon to a placename (CORS proxy)",
+    description=(
+        "Proxies a reverse-geocoding request to the chosen provider so the OPTIMAP "
+        "frontend can call it without running into CORS. Returns the provider's raw JSON."
+    ),
+    tags=["Gazetteer"],
+    parameters=[
+        OpenApiParameter('provider', str, OpenApiParameter.PATH,
+                         description='Provider id: `nominatim` or `photon`.'),
+        OpenApiParameter('lat', float, OpenApiParameter.QUERY, required=True),
+        OpenApiParameter('lon', float, OpenApiParameter.QUERY, required=True),
+    ],
+    responses={
+        (200, 'application/json'): OpenApiTypes.OBJECT,
+        **_GAZETTEER_ERROR_RESPONSES,
+    },
+)
+@api_view(["GET"])
+@permission_classes([AllowAny])
 def gazetteer_reverse(request, provider):
     """
     Proxy reverse geocoding requests (coordinates to address).
