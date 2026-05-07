@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: 2025 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import csv
 import os
 import json
 import tempfile
@@ -15,6 +16,8 @@ from works.views import generate_geopackage
 from works.tasks import (
     regenerate_geojson_cache,
     regenerate_geopackage_cache,
+    regenerate_csv_cache,
+    regenerate_all_data_dumps,
     generate_data_dump_filename,
     cleanup_old_data_dumps,
 )
@@ -174,15 +177,72 @@ class GeoDataAlternativeTestCase(TestCase):
         content = response.content.decode()
         self.assertNotIn('Download GeoJSON', content)
         self.assertNotIn('Download GeoPackage', content)
+        self.assertNotIn('Download CSV', content)
 
         regenerate_geojson_cache()
         response = self.client.get(reverse('optimap:data'))
         content = response.content.decode()
         self.assertIn('Download GeoJSON', content)
         self.assertNotIn('Download GeoPackage', content)
+        self.assertNotIn('Download CSV', content)
 
         regenerate_geopackage_cache()
         response = self.client.get(reverse('optimap:data'))
         content = response.content.decode()
         self.assertIn('Download GeoJSON', content)
         self.assertIn('Download GeoPackage', content)
+        self.assertNotIn('Download CSV', content)
+
+        regenerate_csv_cache()
+        response = self.client.get(reverse('optimap:data'))
+        content = response.content.decode()
+        self.assertIn('Download GeoJSON', content)
+        self.assertIn('Download GeoPackage', content)
+        self.assertIn('Download CSV', content)
+
+    def test_regenerate_csv_cache_creates_file(self):
+        cache_dir = Path(tempfile.gettempdir()) / 'optimap_cache'
+        for f in cache_dir.glob('optimap_data_dump_*'):
+            f.unlink()
+
+        returned_path = regenerate_csv_cache()
+        self.assertIsNotNone(returned_path, "ogr2ogr CSV conversion should succeed")
+        self.assertTrue(Path(returned_path).exists(), "CSV cache file should be created")
+        self.assertTrue(returned_path.endswith('.csv'))
+
+    def test_csv_content_valid(self):
+        # Publish one work so the CSV has at least one data row to inspect.
+        pub = Work.objects.first()
+        pub.status = "p"
+        pub.save()
+
+        csv_path = regenerate_csv_cache()
+        self.assertIsNotNone(csv_path)
+        with open(csv_path, newline='') as f:
+            rows = list(csv.DictReader(f))
+        self.assertEqual(len(rows), Work.objects.filter(status='p').count())
+        self.assertIn('WKT', rows[0],
+                      "CSV must carry a WKT geometry column (issue #206)")
+        self.assertTrue(rows[0]['WKT'].startswith('GEOMETRYCOLLECTION'),
+                        f"WKT column should hold a GeometryCollection, got: {rows[0]['WKT']!r}")
+        self.assertIn('title', rows[0],
+                      "CSV should expose the work title alongside the geometry")
+
+    def test_download_csv_endpoint(self):
+        regenerate_csv_cache()
+        url = reverse('optimap:download_csv')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'text/csv; charset=utf-8')
+        self.assertRegex(response['Content-Disposition'], r'optimap_data_dump_.*\.csv')
+
+    def test_regenerate_all_data_dumps_creates_all_three(self):
+        cache_dir = Path(tempfile.gettempdir()) / 'optimap_cache'
+        for f in cache_dir.glob('optimap_data_dump_*'):
+            f.unlink()
+
+        result = regenerate_all_data_dumps()
+        self.assertSetEqual(set(result.keys()), {'geojson', 'gpkg', 'csv'})
+        for fmt, path in result.items():
+            self.assertIsNotNone(path, f"{fmt} dump should be produced")
+            self.assertTrue(Path(path).exists(), f"{fmt} dump file should exist on disk")

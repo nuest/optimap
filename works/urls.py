@@ -74,6 +74,7 @@ urlpatterns = [
     # Data downloads
     path('download/geojson/', work_views.download_geojson, name='download_geojson'),
     path('download/geopackage/', work_views.download_geopackage, name='download_geopackage'),
+    path('download/csv/', work_views.download_csv, name='download_csv'),
 
     # Works
     path("works/", work_views.works_list, name="works"),

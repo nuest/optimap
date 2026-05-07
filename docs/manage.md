@@ -437,7 +437,13 @@ The following sections are **suggested, not yet written**. They cover the rest o
 Cached files in `/tmp/optimap_cache/`; retention controlled by `OPTIMAP_DATA_DUMP_RETENTION` (default: 3 *cycles* — each cycle writes `.geojson`, `.geojson.gz`, `.gpkg`, and `.csv` for the same timestamp).
 
 - The umbrella `regenerate_all_data_dumps` task runs every `DATA_DUMP_INTERVAL_HOURS` hours (default 6, see `optimap/settings.py`). It serialises published works to GeoJSON once and converts the same intermediate to GeoPackage and CSV via `ogr2ogr`. The schedule is created on `post_migrate` (`works.apps.schedule_data_dump`); legacy single-format schedules are removed automatically.
-- Force a regenerate from the Django shell: `async_task('works.tasks.regenerate_all_data_dumps')`. Or, in admin, **Works → action "Regenerate all data exports now"**.
+- Force a regenerate from a shell:
+  ```bash
+  python manage.py regenerate_data_dumps                  # all three formats (umbrella)
+  python manage.py regenerate_data_dumps --format csv     # only CSV (also: geojson | gpkg)
+  python manage.py regenerate_data_dumps --dry-run        # report without writing
+  ```
+  Runs synchronously in-process — does not need the Q cluster, useful in deploy scripts and for ad-hoc debugging. The same operation is also available via Django-Q (`async_task('works.tasks.regenerate_all_data_dumps')`) and via the admin **Works → action "Regenerate all data exports now"**.
 - Public download endpoints: `/download/geojson/` (gzipped variant served when the client sends `Accept-Encoding: gzip`), `/download/geopackage/`, `/download/csv/` (CSV with a `WKT` column carrying each work's geometry in OGC Simple Features WKT — useful for `pandas.read_csv` + `shapely.wkt.loads` pipelines).
 
 #### Django caches (`memory`, `default`)

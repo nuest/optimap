@@ -232,6 +232,14 @@ python manage.py schedule_geojson
 # Adds GeoJSON/GeoPackage regeneration task to Django-Q schedule
 # Creates recurring task to refresh data dumps every 6 hours
 
+# Regenerate data dumps on-demand (synchronous, no Q cluster needed)
+python manage.py regenerate_data_dumps
+# Runs the umbrella regen and writes GeoJSON + GeoPackage + CSV to /tmp/optimap_cache/
+python manage.py regenerate_data_dumps --format csv
+# Restrict to a single format (geojson | gpkg | csv)
+python manage.py regenerate_data_dumps --dry-run
+# Report what would be regenerated without writing
+
 # Harvest from real journals
 python manage.py harvest_journals --list
 # Lists all available journal sources (OAI-PMH and RSS/Atom)
@@ -407,6 +415,7 @@ optimap/
 - `/admin/` - Django admin interface
 - `/download/geojson/` - Download full publication dataset as GeoJSON
 - `/download/geopackage/` - Download as GeoPackage
+- `/download/csv/` - Download as CSV (one row per work, `WKT` geometry column in OGC Simple Features)
 - `/feed/georss/` - Global GeoRSS feed
 - `/feeds/georss/<slug>/` - Region-filtered GeoRSS feed (continents and oceans)
 - `/sitemap-works.xml` - Sitemap for all published works

@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: 2022 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-__version__ = "0.18.0"
+__version__ = "0.19.0"
 VERSION = __version__

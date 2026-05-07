@@ -42,6 +42,7 @@ from .work_views import (
 from .data import (
     download_geojson,
     download_geopackage,
+    download_csv,
     generate_geopackage,
 )
 
@@ -72,5 +73,6 @@ __all__ = [
     # Data exports
     'download_geojson',
     'download_geopackage',
+    'download_csv',
     'generate_geopackage',
 ]

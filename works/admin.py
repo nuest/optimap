@@ -18,8 +18,7 @@ from django_q.models import Schedule
 from django_q.tasks import async_task
 from django.utils.timezone import now
 from works.models import CustomUser
-from works.tasks import regenerate_geojson_cache
-from works.tasks import regenerate_geopackage_cache
+from works.tasks import regenerate_all_data_dumps
 from django.test import Client
 from django.http import HttpResponse
 from works.wikidata import export_works_to_wikidata, export_works_to_wikidata_dryrun
@@ -177,17 +176,15 @@ def block_email_and_domain(modeladmin, request, queryset):
         user.delete()
     modeladmin.message_user(request, "Selected users have been deleted and their emails/domains blocked.")
     
-@admin.action(description="Regenerate GeoJSON & GeoPackage now")
+@admin.action(description="Regenerate all data exports now")
 def regenerate_all_exports(modeladmin, request, queryset):
     """
-    Immediately rebuild both:
-      • the /tmp/optimap_cache/geojson_cache.json
-      • the /tmp/optimap_cache/publications.gpkg
+    Immediately rebuild every cached data dump (GeoJSON + GeoPackage + CSV)
+    in ``/tmp/optimap_cache/`` from a single PostGIS pass.
     """
     try:
-        regenerate_geojson_cache()
-        regenerate_geopackage_cache()
-        messages.success(request, "GeoJSON & GeoPackage caches were regenerated.")
+        regenerate_all_data_dumps()
+        messages.success(request, "GeoJSON, GeoPackage, and CSV caches were regenerated.")
     except Exception as e:
         messages.error(request, f"Error during export regeneration: {e}")
  

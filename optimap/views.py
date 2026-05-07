@@ -69,26 +69,27 @@ def data(request):
     # scan for existing dumps
     geojson_files = sorted(cache_dir.glob('optimap_data_dump_*.geojson'), reverse=True)
     gpkg_files    = sorted(cache_dir.glob('optimap_data_dump_*.gpkg'),   reverse=True)
+    csv_files     = sorted(cache_dir.glob('optimap_data_dump_*.csv'),    reverse=True)
 
     last_geo  = geojson_files[0] if geojson_files else None
     last_gzip = Path(str(last_geo) + ".gz") if last_geo else None
     last_gpkg = gpkg_files[0]    if gpkg_files    else None
+    last_csv  = csv_files[0]     if csv_files     else None
 
     # — Supervisor check: ensure all dump file times are within 1 hour
-    mtimes = []
-    for p in (last_geo, last_gzip, last_gpkg):
-        if p and p.exists():
-            mtimes.append(p.stat().st_mtime)
+    dump_files = (last_geo, last_gzip, last_gpkg, last_csv)
+    mtimes = [p.stat().st_mtime for p in dump_files if p and p.exists()]
     if mtimes and (max(mtimes) - min(mtimes) > 3600):
         ts_map = {
             p.name: datetime.fromtimestamp(p.stat().st_mtime, get_default_timezone())
-            for p in (last_geo, last_gzip, last_gpkg) if p and p.exists()
+            for p in dump_files if p and p.exists()
         }
         logger.warning("Data dump timestamps differ by >1h: %s", ts_map)
 
     # humanized sizes
     geojson_size    = humanize.naturalsize(last_geo.stat().st_size, binary=True) if last_geo else None
     geopackage_size = humanize.naturalsize(last_gpkg.stat().st_size, binary=True) if last_gpkg else None
+    csv_size        = humanize.naturalsize(last_csv.stat().st_size, binary=True) if last_csv else None
 
     # last updated timestamp (using JSON file)
     if last_geo:
@@ -100,10 +101,12 @@ def data(request):
     return render(request, 'data.html', {
         'geojson_size':    geojson_size,
         'geopackage_size': geopackage_size,
+        'csv_size':        csv_size,
         'interval':        settings.DATA_DUMP_INTERVAL_HOURS,
         'last_updated':    last_updated,
         'last_geojson':    last_geo.name  if last_geo else None,
         'last_gpkg':       last_gpkg.name if last_gpkg else None,
+        'last_csv':        last_csv.name  if last_csv  else None,
     })
 
 def feeds_list(request):

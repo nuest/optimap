@@ -13,7 +13,13 @@ def schedule_data_dump(sender, **kwargs):
     from django_q.models import Schedule
     from django_q.tasks  import schedule
 
-    func_name = "works.tasks.regenerate_geopackage_cache"
+    func_name = "works.tasks.regenerate_all_data_dumps"
+    # Drop legacy single-format schedules so existing deployments migrate to
+    # the umbrella that produces GeoJSON + GeoPackage + CSV in one pass.
+    legacy = ("works.tasks.regenerate_geopackage_cache",
+              "works.tasks.regenerate_geojson_cache")
+    Schedule.objects.filter(func__in=legacy).delete()
+
     if not Schedule.objects.filter(func=func_name).exists():
         schedule(
             func_name,

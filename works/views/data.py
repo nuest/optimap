@@ -7,6 +7,7 @@ Data export views.
 This module handles:
 - GeoJSON export
 - GeoPackage export
+- CSV export (with WKT geometry column, issue #206)
 - Data download endpoints
 """
 
@@ -18,7 +19,11 @@ from django.http import FileResponse, Http404
 from django.views.decorators.http import require_GET
 import tempfile
 from pathlib import Path
-from works.tasks import regenerate_geojson_cache, regenerate_geopackage_cache
+from works.tasks import (
+    regenerate_geojson_cache,
+    regenerate_geopackage_cache,
+    regenerate_csv_cache,
+)
 from osgeo import ogr, osr
 from works.models import Work
 
@@ -102,3 +107,19 @@ def download_geopackage(request):
     if not gpkg_path or not os.path.exists(gpkg_path):
         raise Http404("GeoPackage not available.")
     return FileResponse(open(gpkg_path, 'rb'), as_attachment=True, filename=os.path.basename(gpkg_path))
+
+
+@require_GET
+def download_csv(request):
+    """
+    Returns the latest CSV dump file (WKT geometry column, issue #206).
+    """
+    csv_path = regenerate_csv_cache()
+    if not csv_path or not os.path.exists(csv_path):
+        raise Http404("CSV not available.")
+    return FileResponse(
+        open(csv_path, 'rb'),
+        content_type="text/csv; charset=utf-8",
+        as_attachment=True,
+        filename=os.path.basename(csv_path),
+    )

@@ -19,7 +19,7 @@ The OPTIMAP has the following features:
 - **Admin controls**: Publish/unpublish functionality with audit trails
 - **Recognition Board** at `/recognition-board/`: opt-in public leaderboard for contributors of spatial/temporal metadata, organised into explorer-named tiers
 - **Subscriptions**: email notifications for new works matching a region (continent / ocean / custom bbox)
-- **Regional feeds and data downloads**: per-region GeoRSS / GeoAtom feeds and full-corpus GeoJSON / GeoPackage exports refreshed every six hours
+- **Regional feeds and data downloads**: per-region GeoRSS / GeoAtom feeds and full-corpus GeoJSON / GeoPackage / CSV (with WKT geometry column) exports refreshed every six hours
 - **Reference-manager / Zotero compatibility**: landing and collection pages emit Highwire Press `citation_*` tags, schema.org `ScholarlyArticle` JSON-LD, and a COinS fallback so the Zotero browser connector and similar tools save complete bibliographic records (with PDF when known)
 - **Sharing-friendly metadata**: Open Graph, Twitter Card, schema.org, and Google Scholar tags on landing pages, plus a per-work `og:image` map preview
 - **Geoextent service** at `/geoextent/`: interactive tool to extract spatial/temporal extents from uploaded files or remote repositories (Zenodo, PANGAEA, OSF, Figshare, Dryad, Dataverse, GFZ Data Services)
@@ -192,11 +192,13 @@ OPTIMAP_CACHE=dummy OPTIMAP_DEBUG=True python manage.py runserver
 # Start the app with specific configurations for development at a different port
 OPTIMAP_CACHE=dummy OPTIMAP_DEBUG=True python manage.py runserver 8002
 
-# Manually regenerating data export files (GeoJSON / GeoPackage cache)
-## Via Django-Q cluster: if you already have a Q cluster running (e.g. `python manage.py qcluster`), you can simply add the job to the schedule table (once) by running:
-python manage.py schedule_geojson
-## One‐off via the Django shell: if python manage.py harvest_journalsyou just want a “right‐now” rebuild (without waiting for the next 6-hour tick), drop into a one-liner:
-python manage.py shell -c "from publications.tasks import regenerate_geojson_cache; regenerate_geojson_cache()"
+# Manually regenerating data export files (GeoJSON / GeoPackage / CSV)
+## Synchronous in-process (no Q cluster needed): regenerates all three formats from a single PostGIS pass.
+python manage.py regenerate_data_dumps
+## Restrict to a single format if needed (geojson | gpkg | csv):
+python manage.py regenerate_data_dumps --format csv
+## Via Django-Q cluster: enqueue the umbrella task on a running cluster (e.g. `python manage.py qcluster`):
+python manage.py shell -c "from django_q.tasks import async_task; async_task('works.tasks.regenerate_all_data_dumps')"
 ```
 
 Now open a browser at <http://127.0.0.1:8000/>.

@@ -140,14 +140,33 @@ def generate_data_dump_filename(extension: str) -> str:
 
 
 def cleanup_old_data_dumps(directory: Path, keep: int):
-    """Delete all files matching optimap_data_dump_* beyond the newest ``keep``."""
+    """Keep the newest ``keep`` dump cycles, dropping older files.
+
+    Each regen cycle now produces multiple files for the same timestamp
+    (``optimap_data_dump_<ts>.geojson`` + ``.geojson.gz`` + ``.gpkg`` +
+    ``.csv``). Counting raw files would prune fresh formats from the current
+    cycle (e.g. drop ``.csv`` because it sorts after ``.gpkg``); instead, we
+    group by the ``optimap_data_dump_<ts>`` prefix and keep the newest
+    ``keep`` *cycles*.
+    """
     pattern = str(directory / "optimap_data_dump_*")
-    files = sorted(glob.glob(pattern), reverse=True)
-    for old in files[keep:]:
-        try:
-            os.remove(old)
-        except OSError:
-            logger.warning("Could not delete old dump %s", old)
+    files = glob.glob(pattern)
+    # Group by `optimap_data_dump_<TS>`. The timestamp is fixed-width
+    # (``%Y%m%dT%H%M%S``) so the second underscore-delimited field is the
+    # full prefix we want regardless of extension.
+    cycles = defaultdict(list)
+    for path in files:
+        name = os.path.basename(path)
+        # `optimap_data_dump_<TS>.<ext>` — split on the first '.' to get the
+        # cycle key (drops the extension, including compound `.geojson.gz`).
+        cycle_key = name.split(".", 1)[0]
+        cycles[cycle_key].append(path)
+    for cycle_key in sorted(cycles, reverse=True)[keep:]:
+        for old in cycles[cycle_key]:
+            try:
+                os.remove(old)
+            except OSError:
+                logger.warning("Could not delete old dump %s", old)
 
 
 # -----------------------------------------------------------------------------
@@ -399,20 +418,42 @@ def regenerate_geojson_cache():
     return json_path
 
 
-def convert_geojson_to_geopackage(geojson_path):
+def convert_geojson_via_ogr(geojson_path, *, fmt, ext, layer_creation_options=None):
+    """Convert an existing GeoJSON dump to ``fmt`` via ``ogr2ogr``.
+
+    ``fmt`` is the OGR driver name (e.g. ``"GPKG"``, ``"CSV"``); ``ext`` is the
+    file extension used for the output dump filename (e.g. ``"gpkg"``,
+    ``"csv"``); ``layer_creation_options`` is a list of ``KEY=VALUE`` strings
+    passed via ``-lco``. Returns the output path or ``None`` if ogr2ogr fails.
+    """
     cache_dir = os.path.dirname(geojson_path)
-    gpkg_filename = generate_data_dump_filename("gpkg")
-    gpkg_path = os.path.join(cache_dir, gpkg_filename)
+    out_filename = generate_data_dump_filename(ext)
+    out_path = os.path.join(cache_dir, out_filename)
+    cmd = ["ogr2ogr", "-f", fmt, out_path, geojson_path]
+    for opt in layer_creation_options or []:
+        cmd.extend(["-lco", opt])
     try:
-        output = subprocess.check_output(
-            ["ogr2ogr", "-f", "GPKG", gpkg_path, geojson_path],
-            stderr=subprocess.STDOUT,
-            text=True,
-        )
-        logger.info("ogr2ogr output:\n%s", output)
-        return gpkg_path
-    except subprocess.CalledProcessError:
+        output = subprocess.check_output(cmd, stderr=subprocess.STDOUT, text=True)
+        logger.info("ogr2ogr output (%s):\n%s", fmt, output)
+        return out_path
+    except subprocess.CalledProcessError as err:
+        logger.warning("ogr2ogr %s conversion failed: %s", fmt, err.output)
         return None
+
+
+def convert_geojson_to_geopackage(geojson_path):
+    return convert_geojson_via_ogr(geojson_path, fmt="GPKG", ext="gpkg")
+
+
+def convert_geojson_to_csv(geojson_path):
+    # `GEOMETRY=AS_WKT` makes ogr2ogr emit a `WKT` column instead of dropping
+    # the geometry — that's the whole point of a CSV export for #206.
+    return convert_geojson_via_ogr(
+        geojson_path,
+        fmt="CSV",
+        ext="csv",
+        layer_creation_options=["GEOMETRY=AS_WKT"],
+    )
 
 
 def regenerate_geopackage_cache():
@@ -421,3 +462,27 @@ def regenerate_geopackage_cache():
     gpkg_path = convert_geojson_to_geopackage(geojson_path)
     cleanup_old_data_dumps(cache_dir, settings.DATA_DUMP_RETENTION)
     return gpkg_path
+
+
+def regenerate_csv_cache():
+    geojson_path = regenerate_geojson_cache()
+    cache_dir = Path(geojson_path).parent
+    csv_path = convert_geojson_to_csv(geojson_path)
+    cleanup_old_data_dumps(cache_dir, settings.DATA_DUMP_RETENTION)
+    return csv_path
+
+
+def regenerate_all_data_dumps():
+    """Regenerate GeoJSON + GeoPackage + CSV from a single PostGIS pass.
+
+    Used as the scheduled task (every ``DATA_DUMP_INTERVAL_HOURS`` hours) and
+    by the admin "regenerate all data exports now" action. Returns a dict of
+    ``{format: path}``; values may be ``None`` if a conversion failed (the
+    GeoJSON path is always present — we'd have raised before this point).
+    """
+    geojson_path = regenerate_geojson_cache()
+    cache_dir = Path(geojson_path).parent
+    gpkg_path = convert_geojson_to_geopackage(geojson_path)
+    csv_path = convert_geojson_to_csv(geojson_path)
+    cleanup_old_data_dumps(cache_dir, settings.DATA_DUMP_RETENTION)
+    return {"geojson": geojson_path, "gpkg": gpkg_path, "csv": csv_path}

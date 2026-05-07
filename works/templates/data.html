@@ -57,7 +57,7 @@ curl -X GET {{ site|addstr:"/api" }}/api/optimap/ | jq
       {% endif %}
 
       {% if last_gpkg %}
-      <li>
+      <li class="mb-3">
         <div class="d-flex align-items-center">
           <a class="btn btn-primary btn-sm" href="{% url 'optimap:download_geopackage' %}">
             Download GeoPackage
@@ -66,6 +66,21 @@ curl -X GET {{ site|addstr:"/api" }}/api/optimap/ | jq
         </div>
         <div class="small text-muted mt-1">
           File: {{ last_gpkg }}{% if geopackage_size %} &middot; Size: {{ geopackage_size }}{% endif %}
+        </div>
+      </li>
+      {% endif %}
+
+      {% if last_csv %}
+      <li>
+        <div class="d-flex align-items-center">
+          <a class="btn btn-primary btn-sm" href="{% url 'optimap:download_csv' %}">
+            Download CSV
+          </a>
+          &nbsp;(<a href="https://datatracker.ietf.org/doc/html/rfc4180" target="_blank" class="ms-2 small">RFC 4180</a>,
+          geometry column <code>WKT</code> in <a href="https://www.ogc.org/standard/sfa/" target="_blank" class="small">OGC Simple Features</a>)
+        </div>
+        <div class="small text-muted mt-1">
+          File: {{ last_csv }}{% if csv_size %} &middot; Size: {{ csv_size }}{% endif %}
         </div>
       </li>
       {% endif %}
