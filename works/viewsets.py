@@ -507,15 +507,15 @@ class GeoextentViewSet(viewsets.ViewSet):
             temp_dir = None
 
             if is_zip:
-                # Extract ZIP to temporary directory and process with fromDirectory
+                # Extract ZIP to temporary directory and process with from_directory
                 temp_dir = tempfile.mkdtemp(prefix='geoextent_zip_')
                 logger.info(f"Extracting ZIP file to: {temp_dir}")
 
                 with zipfile.ZipFile(temp_path, 'r') as zip_ref:
                     zip_ref.extractall(temp_dir)
 
-                # Call geoextent.fromDirectory on extracted contents
-                geoextent_result = geoextent.fromDirectory(
+                # Call geoextent.from_directory on extracted contents
+                geoextent_result = geoextent.from_directory(
                     temp_dir,
                     bbox=bbox,
                     tbox=tbox,
@@ -527,7 +527,7 @@ class GeoextentViewSet(viewsets.ViewSet):
             else:
                 # Call geoextent once with all parameters
                 # placename parameter: None, 'nominatim', 'geonames', or 'photon'
-                geoextent_result = geoextent.fromFile(
+                geoextent_result = geoextent.from_file(
                     temp_path,
                     bbox=bbox,
                     tbox=tbox,
@@ -628,12 +628,12 @@ class GeoextentViewSet(viewsets.ViewSet):
         try:
             workers = settings.GEOEXTENT_DOWNLOAD_WORKERS
 
-            # Pass identifiers as list or string to geoextent.fromRemote
+            # Pass identifiers as list or string to geoextent.from_remote
             # It will handle combining extents natively
             geoextent_input = identifiers[0] if len(identifiers) == 1 else identifiers
 
             # Call geoextent once with all identifiers
-            geoextent_result = geoextent.fromRemote(
+            geoextent_result = geoextent.from_remote(
                 geoextent_input,
                 bbox=bbox,
                 tbox=tbox,
@@ -810,9 +810,9 @@ class GeoextentViewSet(viewsets.ViewSet):
                         destination.write(chunk)
                 logger.debug(f"Saved {uploaded_file.name} to {temp_path}")
 
-            # Use geoextent.fromDirectory to process all files at once
+            # Use geoextent.from_directory to process all files at once
             # details=True provides individual file results
-            geoextent_result = geoextent.fromDirectory(
+            geoextent_result = geoextent.from_directory(
                 temp_dir,
                 bbox=bbox,
                 tbox=tbox,

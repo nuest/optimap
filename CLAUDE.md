@@ -458,7 +458,7 @@ All geoextent endpoints return valid GeoJSON FeatureCollections by default, matc
 - `/api/v1/geoextent/extract-batch/` - Batch processing of multiple files
   - Method: POST with multipart/form-data (multiple files)
   - Parameters: files[], bbox, tbox, convex_hull, response_format, placename, gazetteer, size_limit_mb
-  - Uses geoextent's `fromDirectory` for native extent combination
+  - Uses geoextent's `from_directory` for native extent combination
   - Returns: GeoJSON FeatureCollection with combined extent and individual features
 
 **Response Formats** (`response_format` parameter):
@@ -502,7 +502,7 @@ GeoJSON, GeoTIFF, Shapefile, GeoPackage, KML, GML, GPX, FlatGeobuf, CSV (with la
 
 **Known Issues:**
 
-- **Coordinate order bug in geoextent.fromRemote()**: The geoextent library's `fromRemote()` function returns bounding boxes in `[minLat, minLon, maxLat, maxLon]` format instead of the GeoJSON standard `[minLon, minLat, maxLon, maxLat]`. This affects remote extractions only (not file uploads). This needs to be fixed upstream in the geoextent library. Until fixed, remote extraction coordinates will be in the wrong order.
+- **Coordinate order bug in geoextent.from_remote()**: The geoextent library's `from_remote()` function returns bounding boxes in `[minLat, minLon, maxLat, maxLon]` format instead of the GeoJSON standard `[minLon, minLat, maxLon, maxLat]`. This affects remote extractions only (not file uploads). This needs to be fixed upstream in the geoextent library. Until fixed, remote extraction coordinates will be in the wrong order.
 
 ### Geoextent Web UI
 

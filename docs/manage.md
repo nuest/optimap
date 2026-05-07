@@ -517,7 +517,7 @@ When to clear which:
 ### Operate the geoextent service
 
 - Configuration knobs from CLAUDE.md §[Geoextent API Endpoints](../CLAUDE.md): `GEOEXTENT_MAX_FILE_SIZE_MB`, `GEOEXTENT_MAX_BATCH_SIZE_MB`, `GEOEXTENT_MAX_DOWNLOAD_SIZE_MB`, `GEOEXTENT_DOWNLOAD_WORKERS`.
-- Known upstream bug (coordinate-order in `geoextent.fromRemote()`); how to detect it in the wild.
+- Known upstream bug (coordinate-order in `geoextent.from_remote()`); how to detect it in the wild.
 - Where logs surface for failed remote extractions.
 
 ### Backup and restore

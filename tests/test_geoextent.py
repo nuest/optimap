@@ -456,7 +456,7 @@ class GeoextentRemoteTest(TestCase):
     """
 
     # Reference value from Zenodo dataset 10.5281/zenodo.4593540
-    # NOTE: geoextent.fromRemote() has a bug where it returns coordinates in
+    # NOTE: geoextent.from_remote() has a bug where it returns coordinates in
     # [minLat, minLon, maxLat, maxLon] format instead of the GeoJSON standard
     # [minLon, minLat, maxLon, maxLat]. This needs to be fixed upstream in geoextent.
     # Pennsylvania coordinates: ~40°N latitude, ~75-80°W longitude
@@ -591,7 +591,7 @@ class GeoextentRemoteGetTest(TestCase):
     """
 
     # Reference value from Zenodo dataset 10.5281/zenodo.4593540
-    # NOTE: geoextent.fromRemote() has a bug where it returns coordinates in
+    # NOTE: geoextent.from_remote() has a bug where it returns coordinates in
     # [minLat, minLon, maxLat, maxLon] format instead of the GeoJSON standard
     # [minLon, minLat, maxLon, maxLat]. This needs to be fixed upstream in geoextent.
     # Pennsylvania coordinates: ~40°N latitude, ~75-80°W longitude
