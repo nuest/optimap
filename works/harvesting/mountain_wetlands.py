@@ -6,10 +6,11 @@
 The MaRESS API at /api/v1/items/ is a Zotero-shaped item dump: every record
 carries a title, a free-text date (often year-only), an abstract, a list of
 `creators` (lastName/firstName), and a list of `study_sites` with point
-coordinates. The DOI and url fields are present in the schema but in the
-234 records currently exposed they are uniformly null/empty — so OpenAlex
-enrichment is the *only* path to a DOI for this collection. Title +
-first-author surname is the matcher signal; year acts as a sanity check.
+coordinates. The ``DOI`` field is now populated by the API for the bulk of
+records; we treat that as authoritative when present and feed it into the
+OpenAlex matcher so enrichment locks onto the canonical work. Records
+without an API DOI still fall back to title + first-author-surname matching
+and may recover a DOI from OpenAlex.
 """
 
 import logging
@@ -100,6 +101,28 @@ def _mwr_authors_list(creators):
     return authors
 
 
+def _mwr_clean_doi(raw):
+    """Normalise the API's free-text ``DOI`` into a bare ``10.x/y`` string.
+
+    Returns ``None`` for missing / empty / clearly-bogus values so the
+    matcher and DOI-uniqueness logic don't have to second-guess us.
+    """
+    if not raw:
+        return None
+    s = str(raw).strip()
+    if not s:
+        return None
+    lower = s.lower()
+    for prefix in ('https://doi.org/', 'http://doi.org/', 'https://dx.doi.org/', 'http://dx.doi.org/', 'doi:'):
+        if lower.startswith(prefix):
+            s = s[len(prefix):]
+            break
+    s = s.lstrip('/').strip()
+    if not s.lower().startswith('10.'):
+        return None
+    return s
+
+
 def _mwr_publication_year(date_str):
     """Parse a year from the API's free-text ``date`` field. Many records have
     only ``"1993"`` etc., so we don't try to recover month/day. Returns a
@@ -157,16 +180,18 @@ def parse_mountain_wetlands_response_and_save_works(
         pub_date = _mwr_publication_year(item.get('date'))
         geom_obj = _mwr_geometry_from_study_sites(item.get('study_sites'))
         abstract = (item.get('abstractNote') or None) or None
+        api_doi = _mwr_clean_doi(item.get('DOI'))
 
         existing_metadata = {}
         if api_authors:
             existing_metadata['authors'] = api_authors
 
-        # OpenAlex enrichment — DOI is None for every MaRESS record, so
-        # title+author is the only available signal.
+        # OpenAlex enrichment — pass the API DOI when present so the matcher
+        # locks onto the canonical work directly; otherwise fall back to
+        # title + first-author surname.
         openalex_fields, metadata_provenance = build_openalex_fields(
             title=title,
-            doi=None,
+            doi=api_doi,
             author=first_author_surname,
             existing_metadata=existing_metadata,
         )
@@ -178,18 +203,24 @@ def parse_mountain_wetlands_response_and_save_works(
         else:
             match_status = 'none'
 
-        # Pull the DOI out of OpenAlex IDs when verified — issue #192 explicitly
-        # asks the harvester to recover DOIs from OpenAlex by title.
-        doi_value = None
-        ids_blob = openalex_fields.get('openalex_ids') or {}
-        if match_status == 'verified' and ids_blob.get('doi'):
-            raw = ids_blob['doi']
-            doi_value = raw.split('doi.org/', 1)[-1].lstrip('/') if 'doi.org/' in raw else raw.lstrip('/')
+        # API DOI is authoritative when present; otherwise recover the DOI
+        # from a verified OpenAlex match, mirroring the legacy behaviour for
+        # records the API still doesn't have a DOI for.
+        doi_value = api_doi
+        if not doi_value:
+            ids_blob = openalex_fields.get('openalex_ids') or {}
+            if match_status == 'verified' and ids_blob.get('doi'):
+                raw = ids_blob['doi']
+                doi_value = raw.split('doi.org/', 1)[-1].lstrip('/') if 'doi.org/' in raw else raw.lstrip('/')
 
         if not metadata_provenance.get('authors') and api_authors:
             metadata_provenance['authors'] = 'original_source'
         metadata_provenance['geometry'] = 'study_sites' if not geom_obj.empty else None
         metadata_provenance['date'] = 'original_source (year-only)' if pub_date else None
+        if api_doi:
+            metadata_provenance['doi'] = 'original_source'
+        elif doi_value:
+            metadata_provenance['doi'] = 'openalex'
 
         provenance = {
             'harvest': {

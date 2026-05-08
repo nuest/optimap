@@ -191,35 +191,71 @@ class MountainWetlandsOpenAlexMatchTests(TestCase):
         session.get.return_value = _mock_response(payload)
         return patch('works.harvesting.mountain_wetlands._mwr_session', return_value=session)
 
-    def test_verified_match_persists_doi_from_openalex(self):
+    def test_api_doi_persisted_on_work(self):
+        """When the MaRESS API carries a DOI, it is saved on the Work and
+        passed to the OpenAlex matcher (so enrichment can lock onto the
+        canonical record). Provenance attributes the DOI to the source."""
+        captured = {}
+
+        def fake_build(title, doi, author, existing_metadata=None):
+            captured.setdefault(title, []).append(doi)
+            return ({}, {})
+
+        with self._patched_session(self.payload), \
+             patch('works.harvesting.mountain_wetlands.build_openalex_fields',
+                   side_effect=fake_build):
+            from works.tasks import harvest_mountain_wetlands
+            harvest_mountain_wetlands(self.source.id)
+
+        baied = Work.objects.get(title__startswith='Evolution of High Andean')
+        self.assertEqual(baied.doi, '10.2307/3673632')
+        self.assertEqual(baied.provenance['metadata_sources'].get('doi'), 'original_source')
+        # OpenAlex matcher saw the API DOI for this record.
+        self.assertIn('10.2307/3673632', captured.get(baied.title, []))
+
+    def test_api_doi_normalised_from_https_form(self):
+        """API records that ship the DOI as a URL (``https://doi.org/…``) are
+        stored as the canonical bare ``10.x/y`` form."""
+        with self._patched_session(self.payload), \
+             patch('works.harvesting.mountain_wetlands.build_openalex_fields',
+                   return_value=({}, {})):
+            from works.tasks import harvest_mountain_wetlands
+            harvest_mountain_wetlands(self.source.id)
+
+        barros = Work.objects.get(title__startswith='Short-Term Effects')
+        self.assertEqual(barros.doi, '10.1657/1938-4246-46.2.333')
+
+    def test_openalex_doi_used_when_api_doi_missing(self):
+        """If the API record has no DOI, a verified OpenAlex match still
+        populates one — preserves the legacy recovery path for older
+        records that the upstream hasn't backfilled yet."""
         verified_fields = {
             'openalex_id': 'https://openalex.org/W123',
             'openalex_ids': {'doi': 'https://doi.org/10.1234/test'},
             'openalex_is_retracted': False,
             'openalex_open_access_status': 'gold',
-            'authors': ['Baied', 'Wheeler'],
+            'authors': [],
             'topics': ['Andean Ecology'],
         }
         with self._patched_session(self.payload), \
              patch('works.harvesting.mountain_wetlands.build_openalex_fields',
                    side_effect=lambda title, doi, author, existing_metadata=None: (
-                       (dict(verified_fields), {'authors': 'original_source', 'topics': 'openalex'})
-                       if title.startswith('Evolution of High Andean')
+                       (dict(verified_fields), {'topics': 'openalex'})
+                       if title.startswith('Record Without Study Sites')
                        else ({}, {})
                    )):
             from works.tasks import harvest_mountain_wetlands
             harvest_mountain_wetlands(self.source.id)
 
-        baied = Work.objects.get(title__startswith='Evolution of High Andean')
-        self.assertEqual(baied.doi, '10.1234/test')
-        self.assertEqual(baied.openalex_id, 'https://openalex.org/W123')
-        self.assertEqual(baied.provenance['openalex_match']['status'], 'verified')
-        self.assertEqual(
-            baied.provenance['openalex_match']['matched_id'],
-            'https://openalex.org/W123',
-        )
+        no_sites = Work.objects.get(title='Record Without Study Sites')
+        self.assertEqual(no_sites.doi, '10.1234/test')
+        self.assertEqual(no_sites.openalex_id, 'https://openalex.org/W123')
+        self.assertEqual(no_sites.provenance['openalex_match']['status'], 'verified')
+        self.assertEqual(no_sites.provenance['metadata_sources'].get('doi'), 'openalex')
 
-    def test_candidate_match_keeps_doi_none(self):
+    def test_candidate_match_with_api_doi_keeps_api_doi(self):
+        """A merely-candidate OpenAlex match cannot overwrite the
+        authoritative API DOI."""
         candidate_fields = {
             'openalex_id': None,
             'openalex_match_info': [
@@ -237,7 +273,6 @@ class MountainWetlandsOpenAlexMatchTests(TestCase):
             harvest_mountain_wetlands(self.source.id)
 
         baied = Work.objects.get(title__startswith='Evolution of High Andean')
-        self.assertIsNone(baied.doi)
+        self.assertEqual(baied.doi, '10.2307/3673632')
         self.assertEqual(baied.provenance['openalex_match']['status'], 'candidate')
-        # The match_info is still persisted in the dedicated field for curators.
         self.assertTrue(baied.openalex_match_info)

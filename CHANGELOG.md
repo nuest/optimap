@@ -49,6 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Mountain Wetlands harvester now reads DOIs directly from the API.** The MaRESS endpoint started populating the `DOI` field, so the harvester saves it on the work and feeds it into the OpenAlex matcher (which previously had to rely on title + first-author surname alone). Records still missing a DOI fall back to the legacy OpenAlex-by-title path. URLs returned from the API in `https://doi.org/…` form are normalised to bare `10.x/y` strings.
+
 - **`/collections/` work counts no longer hide unpublished works.** Regular users see only the count of *published* works in each collection (the works they can actually browse). Admins and curators of a given collection see a per-status breakdown (Published / Harvested / Contributed / …) so harvested-but-not-yet-published works are visible at a glance; status rows with zero count are hidden.
 
 - **Data-dump regeneration unified into one umbrella task.** GeoJSON, GeoPackage, and CSV are produced from one intermediate. Retention now keeps the newest N timestamp groups rather than raw files.
