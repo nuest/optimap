@@ -66,12 +66,6 @@ class CollectionsIndexTests(TestCase):
 
 
 class CollectionsIndexCountsTests(TestCase):
-    """Work-count display on /collections/: regular users see only the
-    published count; admins and per-collection curators get a per-status
-    breakdown so harvested-but-not-yet-published works are not hidden in
-    the total.
-    """
-
     def setUp(self):
         self.client = Client()
         self.col = Collection.objects.create(
@@ -80,7 +74,6 @@ class CollectionsIndexCountsTests(TestCase):
         self.other = Collection.objects.create(
             identifier='other', name='Other', is_published=True,
         )
-        # Mixed: 2 published, 3 harvested, 1 contributed; nothing else.
         for i in range(2):
             Work.objects.create(
                 title=f'pub-{i}', status='p', doi=f'10.1234/p{i}',
@@ -95,7 +88,6 @@ class CollectionsIndexCountsTests(TestCase):
             title='contrib', status='c', doi='10.1234/contrib',
             geometry=GeometryCollection(Point(0, 0)),
         ).collections.add(self.col)
-        # Other: 1 published only — used to verify per-collection scoping for curators.
         Work.objects.create(
             title='other-pub', status='p', doi='10.1234/other',
             geometry=GeometryCollection(Point(0, 0)),
@@ -105,16 +97,12 @@ class CollectionsIndexCountsTests(TestCase):
         resp = self.client.get(reverse('optimap:collections'))
         self.assertEqual(resp.status_code, 200)
         body = resp.content.decode()
-        # 2 published works in 'mixed' — total of 6 must NOT leak through.
         self.assertIn('2 works', body)
         self.assertNotIn('Harvested:', body)
         self.assertNotIn('Contributed:', body)
-        # Total of 6 is the legacy confusing value — must not appear.
         self.assertNotIn('6 works', body)
 
     def test_authenticated_non_curator_sees_only_published_count(self):
-        # A logged-in user who is not staff and not a curator of the collection
-        # is still a "regular user" for this display.
         outsider = User.objects.create_user(
             username='outsider@example.com', email='outsider@example.com', password='p',
         )
@@ -136,7 +124,6 @@ class CollectionsIndexCountsTests(TestCase):
         self.assertIn('Published: 2', body)
         self.assertIn('Harvested: 3', body)
         self.assertIn('Contributed: 1', body)
-        # Stages with zero count are hidden.
         self.assertNotIn('Draft:', body)
         self.assertNotIn('Testing:', body)
         self.assertNotIn('Withdrawn:', body)
@@ -145,15 +132,13 @@ class CollectionsIndexCountsTests(TestCase):
         curator = User.objects.create_user(
             username='cur@example.com', email='cur@example.com', password='p',
         )
-        self.col.curators.add(curator)  # curator of 'mixed', not 'other'
+        self.col.curators.add(curator)
         self.client.force_login(curator)
         resp = self.client.get(reverse('optimap:collections'))
         body = resp.content.decode()
-        # 'mixed' shows breakdown.
         self.assertIn('Published: 2', body)
         self.assertIn('Harvested: 3', body)
         self.assertIn('Contributed: 1', body)
-        # 'other' is not curated by this user — falls back to plain published count.
         self.assertIn('1 work', body)
 
 
@@ -684,11 +669,6 @@ class WorkLandingPageCollectionBacklinksTests(TestCase):
 
 
 class ContributeCollectionFilterTests(TestCase):
-    """``/contribute/?collection=<id|identifier|short_slug>`` narrows the
-    harvested-works listing to a single collection. Only published collections
-    are filterable by anonymous / non-staff users.
-    """
-
     def setUp(self):
         self.client = Client()
         self.col = Collection.objects.create(
@@ -701,8 +681,6 @@ class ContributeCollectionFilterTests(TestCase):
         self.hidden = Collection.objects.create(
             identifier='hidden', name='Hidden Stuff', is_published=False,
         )
-        # In 'mw': one harvested work missing geometry, one published work
-        # (must be excluded by the status='h' filter).
         self.mw_needs = Work.objects.create(
             title='MW needs geom', status='h', doi='10.1234/mw-need',
         )
@@ -712,12 +690,10 @@ class ContributeCollectionFilterTests(TestCase):
             geometry=GeometryCollection(Point(0, 0)),
         )
         self.mw_done.collections.add(self.col)
-        # In 'other': a harvested work that must NOT appear when filter=mw.
         self.other_needs = Work.objects.create(
             title='Other needs geom', status='h', doi='10.1234/other-need',
         )
         self.other_needs.collections.add(self.other)
-        # Loose harvested work, in no collection — appears unfiltered, hidden when filter is on.
         self.loose_needs = Work.objects.create(
             title='Loose needs geom', status='h', doi='10.1234/loose-need',
         )
@@ -729,7 +705,6 @@ class ContributeCollectionFilterTests(TestCase):
         self.assertIn('MW needs geom', body)
         self.assertIn('Other needs geom', body)
         self.assertIn('Loose needs geom', body)
-        # Filter banner not rendered when no filter active.
         self.assertNotIn('Filtered to collection', body)
 
     def test_filter_by_identifier(self):
@@ -739,7 +714,6 @@ class ContributeCollectionFilterTests(TestCase):
         self.assertIn('MW needs geom', body)
         self.assertNotIn('Other needs geom', body)
         self.assertNotIn('Loose needs geom', body)
-        # Prominent filter banner with collection name and "Show all" button.
         self.assertIn('Filtered to collection', body)
         self.assertIn('Mountain Wetlands', body)
         self.assertIn('Show all', body)
@@ -763,7 +737,6 @@ class ContributeCollectionFilterTests(TestCase):
         resp = self.client.get(reverse('optimap:contribute') + '?collection=nope')
         self.assertEqual(resp.status_code, 200)
         body = resp.content.decode()
-        # Warning visible, all works still shown.
         self.assertIn('Unknown collection', body)
         self.assertIn('MW needs geom', body)
         self.assertIn('Other needs geom', body)
@@ -771,8 +744,6 @@ class ContributeCollectionFilterTests(TestCase):
 
     def test_unpublished_collection_hidden_from_anonymous(self):
         resp = self.client.get(reverse('optimap:contribute') + '?collection=hidden')
-        # Anonymous users cannot filter by an unpublished collection — the
-        # name is not revealed, and the filter is rejected as "unknown".
         body = resp.content.decode()
         self.assertIn('Unknown collection', body)
         self.assertNotIn('Hidden Stuff', body)
@@ -781,7 +752,6 @@ class ContributeCollectionFilterTests(TestCase):
         admin = User.objects.create_user(
             username='ad@example.com', email='ad@example.com', password='p', is_staff=True,
         )
-        # Add a harvested work to the hidden collection so the filter has something to render.
         w = Work.objects.create(title='Hidden harvest', status='h', doi='10.1234/hh')
         w.collections.add(self.hidden)
         self.client.force_login(admin)
@@ -790,15 +760,10 @@ class ContributeCollectionFilterTests(TestCase):
         body = resp.content.decode()
         self.assertIn('Hidden Stuff', body)
         self.assertIn('Hidden harvest', body)
-        # Other collections' works are excluded under the filter.
         self.assertNotIn('Other needs geom', body)
 
 
 class CollectionPageContributeLinkTests(TestCase):
-    """The collection landing page exposes a 'Contribute metadata' button
-    that deep-links to ``/contribute/?collection=<identifier>``.
-    """
-
     def setUp(self):
         self.client = Client()
         self.col = Collection.objects.create(

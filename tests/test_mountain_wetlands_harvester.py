@@ -192,9 +192,6 @@ class MountainWetlandsOpenAlexMatchTests(TestCase):
         return patch('works.harvesting.mountain_wetlands._mwr_session', return_value=session)
 
     def test_api_doi_persisted_on_work(self):
-        """When the MaRESS API carries a DOI, it is saved on the Work and
-        passed to the OpenAlex matcher (so enrichment can lock onto the
-        canonical record). Provenance attributes the DOI to the source."""
         captured = {}
 
         def fake_build(title, doi, author, existing_metadata=None):
@@ -210,12 +207,9 @@ class MountainWetlandsOpenAlexMatchTests(TestCase):
         baied = Work.objects.get(title__startswith='Evolution of High Andean')
         self.assertEqual(baied.doi, '10.2307/3673632')
         self.assertEqual(baied.provenance['metadata_sources'].get('doi'), 'original_source')
-        # OpenAlex matcher saw the API DOI for this record.
         self.assertIn('10.2307/3673632', captured.get(baied.title, []))
 
     def test_api_doi_normalised_from_https_form(self):
-        """API records that ship the DOI as a URL (``https://doi.org/…``) are
-        stored as the canonical bare ``10.x/y`` form."""
         with self._patched_session(self.payload), \
              patch('works.harvesting.mountain_wetlands.build_openalex_fields',
                    return_value=({}, {})):
@@ -226,9 +220,6 @@ class MountainWetlandsOpenAlexMatchTests(TestCase):
         self.assertEqual(barros.doi, '10.1657/1938-4246-46.2.333')
 
     def test_openalex_doi_used_when_api_doi_missing(self):
-        """If the API record has no DOI, a verified OpenAlex match still
-        populates one — preserves the legacy recovery path for older
-        records that the upstream hasn't backfilled yet."""
         verified_fields = {
             'openalex_id': 'https://openalex.org/W123',
             'openalex_ids': {'doi': 'https://doi.org/10.1234/test'},
@@ -254,8 +245,6 @@ class MountainWetlandsOpenAlexMatchTests(TestCase):
         self.assertEqual(no_sites.provenance['metadata_sources'].get('doi'), 'openalex')
 
     def test_candidate_match_with_api_doi_keeps_api_doi(self):
-        """A merely-candidate OpenAlex match cannot overwrite the
-        authoritative API DOI."""
         candidate_fields = {
             'openalex_id': None,
             'openalex_match_info': [

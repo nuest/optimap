@@ -13,7 +13,7 @@ from leaflet.admin import LeafletGeoAdmin
 from works.models import Work, Source, HarvestingEvent, BlockedEmail, BlockedDomain, GlobalRegion, Collection
 from import_export.admin import ImportExportModelAdmin
 from works.models import Contribution, EmailLog, Subscription, UserProfile, WikidataExportLog
-from works.tasks import harvest_oai_endpoint, schedule_subscription_email_task, send_monthly_email, schedule_monthly_email_task, send_subscription_based_email
+from works.tasks import schedule_subscription_email_task, send_monthly_email, schedule_monthly_email_task, send_subscription_based_email
 from django_q.models import Schedule
 from django_q.tasks import async_task
 from django.utils.timezone import now
@@ -71,15 +71,27 @@ def make_draft(modeladmin, request, queryset):
 
 def _enqueue_harvest(sources, request, modeladmin):
     user_id = request.user.id if request.user.is_authenticated else None
-    count = 0
+    queued = 0
+    skipped = []
     for source in sources:
-        async_task('works.tasks.harvest_oai_endpoint', source.id, user_id)
-        count += 1
-    if count:
+        task_func = Source.SOURCE_TYPE_TASKS.get(source.source_type)
+        if not task_func:
+            skipped.append((source, source.source_type))
+            continue
+        async_task(task_func, source.id, user_id)
+        queued += 1
+    if queued:
         modeladmin.message_user(
             request,
-            f"Queued {count} harvest(s); watch the HarvestingEvent admin for progress.",
+            f"Queued {queued} harvest(s); watch the HarvestingEvent admin for progress.",
             level=messages.SUCCESS,
+        )
+    if skipped:
+        names = ', '.join(f"{s.name!r} (source_type={t!r})" for s, t in skipped)
+        modeladmin.message_user(
+            request,
+            f"Skipped {len(skipped)} source(s) — no harvester registered for their source_type: {names}",
+            level=messages.WARNING,
         )
 
 @admin.action(description="Trigger harvesting for selected sources")
@@ -92,16 +104,20 @@ def trigger_harvesting_for_all(modeladmin, request, queryset):
 
 @admin.action(description="Schedule harvesting for selected sources")
 def schedule_harvesting(modeladmin, request, queryset):
-    """Admin action to schedule a one-off harvest via Django-Q."""
     scheduled = 0
-    skipped = 0
+    already_scheduled = 0
+    no_task = []
     for source in queryset:
+        task_func = Source.SOURCE_TYPE_TASKS.get(source.source_type)
+        if not task_func:
+            no_task.append((source, source.source_type))
+            continue
         name = f"Manual Harvest Source {source.id}"
         if Schedule.objects.filter(name=name).exists():
-            skipped += 1
+            already_scheduled += 1
             continue
         Schedule.objects.create(
-            func='works.tasks.harvest_oai_endpoint',
+            func=task_func,
             args=str(source.id),
             schedule_type=Schedule.ONCE,
             next_run=now(),
@@ -110,8 +126,15 @@ def schedule_harvesting(modeladmin, request, queryset):
         scheduled += 1
     if scheduled:
         modeladmin.message_user(request, f"Scheduled {scheduled} one-off harvest(s).", level=messages.SUCCESS)
-    if skipped:
-        modeladmin.message_user(request, f"Skipped {skipped} source(s) — already scheduled.", level=messages.WARNING)
+    if already_scheduled:
+        modeladmin.message_user(request, f"Skipped {already_scheduled} source(s) — already scheduled.", level=messages.WARNING)
+    if no_task:
+        names = ', '.join(f"{s.name!r} (source_type={t!r})" for s, t in no_task)
+        modeladmin.message_user(
+            request,
+            f"Skipped {len(no_task)} source(s) — no harvester registered for their source_type: {names}",
+            level=messages.WARNING,
+        )
 
 @admin.action(description="Send Monthly Manuscript Email")
 def trigger_monthly_email(modeladmin, request, queryset):
@@ -269,15 +292,28 @@ class WorkAdmin(LeafletGeoAdmin, ImportExportModelAdmin):
 @admin.action(description="Retry selected harvesting events")
 def retry_event(modeladmin, request, queryset):
     user_id = request.user.id if request.user.is_authenticated else None
-    count = 0
+    queued = 0
+    skipped = []
     for event in queryset:
-        async_task('works.tasks.harvest_oai_endpoint', event.source_id, user_id)
-        count += 1
-    if count:
+        source = event.source
+        task_func = Source.SOURCE_TYPE_TASKS.get(source.source_type) if source else None
+        if not task_func:
+            skipped.append((event, getattr(source, 'source_type', None)))
+            continue
+        async_task(task_func, event.source_id, user_id)
+        queued += 1
+    if queued:
         modeladmin.message_user(
             request,
-            f"Re-queued {count} harvest(s); a new HarvestingEvent will appear per source.",
+            f"Re-queued {queued} harvest(s); a new HarvestingEvent will appear per source.",
             level=messages.SUCCESS,
+        )
+    if skipped:
+        names = ', '.join(f"event #{e.id} (source_type={t!r})" for e, t in skipped)
+        modeladmin.message_user(
+            request,
+            f"Skipped {len(skipped)} event(s) — no harvester registered for their source_type: {names}",
+            level=messages.WARNING,
         )
 
 

@@ -52,13 +52,7 @@ def _collection_for_request(request, collection_slug):
 
 
 def collections_index(request):
-    """List all collections. Staff see unpublished too, with inline controls.
-
-    Work counts: regular users only see the number of *published* works
-    (the works they can actually browse). Admins and curators of a given
-    collection get a per-status breakdown for that collection so the total
-    no longer hides harvested-but-not-yet-published works.
-    """
+    """List all collections. Staff see unpublished too, with inline controls."""
     is_admin = request.user.is_authenticated and request.user.is_staff
     collections = list(_visible_collections(request))
     if request.user.is_authenticated:
@@ -68,8 +62,6 @@ def collections_index(request):
     else:
         curated_ids = set()
     status_label = dict(STATUS_CHOICES)
-    # Order shown to curators/admins: surface Published first, then the
-    # pipeline states a curator most likely cares about, then admin states.
     breakdown_order = ['p', 'h', 'c', 'd', 't', 'w']
     for c in collections:
         c.show_breakdown = is_admin or c.id in curated_ids

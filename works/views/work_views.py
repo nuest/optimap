@@ -39,17 +39,11 @@ from works.utils.statistics import get_cached_statistics
 
 
 def contribute(request):
-    """
-    Page showing harvested works that need spatial or temporal extent contributions.
-    Supports pagination with user-selectable page size.
+    """Page showing harvested works that need spatial or temporal extent.
 
     Optional ``?collection=<id|identifier|short_slug>`` narrows the listing
-    to works belonging to a single Collection. Only one collection can be
-    selected at a time. Anonymous / non-staff users can only filter by
-    *published* collections — same visibility rule as /collections/. An
-    unknown or invisible value is treated as "no filter" and surfaced to
-    the user as a warning so a stale link doesn't silently behave like the
-    unfiltered page.
+    to a single Collection (anonymous / non-staff users only see published
+    collections; unknown values surface a warning).
     """
     page_size = request.GET.get('size', settings.WORKS_PAGE_SIZE_DEFAULT)
     try:

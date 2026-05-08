@@ -6,11 +6,9 @@
 The MaRESS API at /api/v1/items/ is a Zotero-shaped item dump: every record
 carries a title, a free-text date (often year-only), an abstract, a list of
 `creators` (lastName/firstName), and a list of `study_sites` with point
-coordinates. The ``DOI`` field is now populated by the API for the bulk of
-records; we treat that as authoritative when present and feed it into the
-OpenAlex matcher so enrichment locks onto the canonical work. Records
-without an API DOI still fall back to title + first-author-surname matching
-and may recover a DOI from OpenAlex.
+coordinates. The ``DOI`` field is populated for most records and is treated
+as authoritative; records without one fall back to title + first-author
+matching against OpenAlex.
 """
 
 import logging
@@ -102,11 +100,7 @@ def _mwr_authors_list(creators):
 
 
 def _mwr_clean_doi(raw):
-    """Normalise the API's free-text ``DOI`` into a bare ``10.x/y`` string.
-
-    Returns ``None`` for missing / empty / clearly-bogus values so the
-    matcher and DOI-uniqueness logic don't have to second-guess us.
-    """
+    """Normalise the API's free-text ``DOI`` into a bare ``10.x/y`` string."""
     if not raw:
         return None
     s = str(raw).strip()
@@ -186,9 +180,6 @@ def parse_mountain_wetlands_response_and_save_works(
         if api_authors:
             existing_metadata['authors'] = api_authors
 
-        # OpenAlex enrichment — pass the API DOI when present so the matcher
-        # locks onto the canonical work directly; otherwise fall back to
-        # title + first-author surname.
         openalex_fields, metadata_provenance = build_openalex_fields(
             title=title,
             doi=api_doi,
@@ -203,9 +194,6 @@ def parse_mountain_wetlands_response_and_save_works(
         else:
             match_status = 'none'
 
-        # API DOI is authoritative when present; otherwise recover the DOI
-        # from a verified OpenAlex match, mirroring the legacy behaviour for
-        # records the API still doesn't have a DOI for.
         doi_value = api_doi
         if not doi_value:
             ids_blob = openalex_fields.get('openalex_ids') or {}

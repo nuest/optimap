@@ -168,6 +168,68 @@ class HarvestAdminActionsTest(TestCase):
         self.assertEqual(sched.func, "works.tasks.harvest_oai_endpoint")
 
     @patch("works.admin.async_task")
+    def test_trigger_action_dispatches_by_source_type_for_mountain_wetlands(self, mock_async):
+        mwr = _make_source(
+            name="MWR", url_field="https://andes.example.org/api/v1/items/",
+            source_type="mountain-wetlands",
+        )
+        ma = admin_site.site._registry[Source]
+        request = self._request()
+        trigger_harvesting_for_specific(ma, request, Source.objects.filter(id=mwr.id))
+
+        self.assertEqual(mock_async.call_count, 1)
+        args, _ = mock_async.call_args
+        self.assertEqual(args[0], "works.tasks.harvest_mountain_wetlands")
+        self.assertEqual(args[1], mwr.id)
+
+    @patch("works.admin.async_task")
+    def test_trigger_action_dispatches_by_source_type_for_rss(self, mock_async):
+        rss = _make_source(
+            name="RSS", url_field="https://example.org/feed.rss", source_type="rss",
+        )
+        ma = admin_site.site._registry[Source]
+        request = self._request()
+        trigger_harvesting_for_specific(ma, request, Source.objects.filter(id=rss.id))
+
+        self.assertEqual(mock_async.call_count, 1)
+        args, _ = mock_async.call_args
+        self.assertEqual(args[0], "works.tasks.harvest_rss_endpoint")
+
+    def test_schedule_action_picks_task_by_source_type(self):
+        from django_q.models import Schedule
+        mwr = _make_source(
+            name="MWR-sch", url_field="https://andes.example.org/api/v1/items2/",
+            source_type="mountain-wetlands",
+        )
+        ma = admin_site.site._registry[Source]
+        request = self._request()
+        Schedule.objects.filter(name=f"Manual Harvest Source {mwr.id}").delete()
+        schedule_harvesting(ma, request, Source.objects.filter(id=mwr.id))
+
+        sched = Schedule.objects.get(name=f"Manual Harvest Source {mwr.id}")
+        self.assertEqual(sched.func, "works.tasks.harvest_mountain_wetlands")
+
+    @patch("works.admin.async_task")
+    def test_retry_event_dispatches_by_current_source_type(self, mock_async):
+        mwr = _make_source(
+            name="MWR-retry", url_field="https://andes.example.org/api/v1/items3/",
+            source_type="mountain-wetlands",
+        )
+        event = HarvestingEvent.objects.create(source=mwr, status="failed")
+        ma = admin_site.site._registry[HarvestingEvent]
+        request = self.rf.post("/admin/works/harvestingevent/")
+        request.user = self.user
+        from django.contrib.messages.storage.fallback import FallbackStorage
+        setattr(request, "session", {})
+        setattr(request, "_messages", FallbackStorage(request))
+
+        retry_event(ma, request, HarvestingEvent.objects.filter(id=event.id))
+
+        self.assertEqual(mock_async.call_count, 1)
+        args, _ = mock_async.call_args
+        self.assertEqual(args[0], "works.tasks.harvest_mountain_wetlands")
+
+    @patch("works.admin.async_task")
     def test_retry_event_action_enqueues_per_event(self, mock_async):
         ma = admin_site.site._registry[HarvestingEvent]
         event = HarvestingEvent.objects.create(source=self.source, status="failed")

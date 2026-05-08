@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Filter the contribute page by collection** with `/contribute/?collection=<identifier|id|short_slug>`. The active filter is shown prominently with a "Show all" button to clear it, and the collection landing page exposes a "Contribute metadata for this collection" button that deep-links into the filtered view. Anonymous and non-staff users can only filter by published collections.
+- **Filter the contribute page by collection** with `/contribute/?collection=<identifier|id|short_slug>`; collection landing pages link into it.
 
 - **Copy/paste geometries between the geoextent tool and the contribution form.** A new "Copy extents" button on `/geoextent/` saves all extracted geometries to the browser; a "Paste geoextents" button on the work landing page (when contributing spatial extent) pastes them into the map as editable layers ready to submit.
 
@@ -39,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Admin "Trigger / Schedule / Retry harvesting" actions and `harvest_journals` now dispatch by `source_type`** instead of hardcoding the OAI task, so non-OAI sources (MaRESS, RSS, Crossref, OpenAlex) run the right harvester. `harvest_journals` also reconciles stale Source rows against `SOURCE_CONFIG` (rewrites `source_type`, fills blank soft fields, preserves admin edits).
+
 - **Inline mutation buttons reflect the new state immediately on production.** Authenticated responses on `/collections/`, the work landing page, and `/subscriptions/` are no longer captured by the site-wide cache, so publish/unpublish/contribute/subscribe state flips on reload. Anonymous responses still cached.
 
 - **"View work details" button now appears in single-feature popups for works without a DOI.**
@@ -49,9 +51,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Mountain Wetlands harvester now reads DOIs directly from the API.** The MaRESS endpoint started populating the `DOI` field, so the harvester saves it on the work and feeds it into the OpenAlex matcher (which previously had to rely on title + first-author surname alone). Records still missing a DOI fall back to the legacy OpenAlex-by-title path. URLs returned from the API in `https://doi.org/…` form are normalised to bare `10.x/y` strings.
+- **Mountain Wetlands harvester reads DOIs from the API** (now populated upstream) and feeds them to the OpenAlex matcher; title-only fallback retained for records without one.
 
-- **`/collections/` work counts no longer hide unpublished works.** Regular users see only the count of *published* works in each collection (the works they can actually browse). Admins and curators of a given collection see a per-status breakdown (Published / Harvested / Contributed / …) so harvested-but-not-yet-published works are visible at a glance; status rows with zero count are hidden.
+- **`/collections/` work counts** show only published works to regular users; admins and curators of a collection get a per-status breakdown (zero-count rows hidden).
 
 - **Data-dump regeneration unified into one umbrella task.** GeoJSON, GeoPackage, and CSV are produced from one intermediate. Retention now keeps the newest N timestamp groups rather than raw files.
 

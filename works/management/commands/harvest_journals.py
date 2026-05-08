@@ -581,6 +581,7 @@ class Command(BaseCommand):
                 self.stdout.write(
                     f"= {key:15} already exists (id={existing.id}, name={existing.name!r})"
                 )
+                self._reconcile_source(existing, config)
                 existed += 1
                 continue
 
@@ -621,7 +622,6 @@ class Command(BaseCommand):
 
     def _get_or_create_source(self, config, create_if_missing):
         """Get or optionally create a Source for the journal."""
-        # Try to find existing source by name or URL
         source = Source.objects.filter(name=config['name']).first()
 
         if not source:
@@ -629,6 +629,7 @@ class Command(BaseCommand):
 
         if source:
             self.stdout.write(f'Using existing source: {source.name} (ID: {source.id})')
+            self._reconcile_source(source, config)
             return source
 
         if not create_if_missing:
@@ -656,4 +657,39 @@ class Command(BaseCommand):
             f'Created new source: {source.name} (ID: {source.id})'
         ))
 
+        return source
+
+    def _reconcile_source(self, source, config):
+        """Reconcile an existing Source row with its SOURCE_CONFIG entry.
+
+        ``source_type`` is rewritten from the config; the other config-derived
+        fields are filled only when blank so admin edits are preserved.
+        """
+        update_fields = []
+
+        config_type = config.get('source_type', 'oai-pmh')
+        if source.source_type != config_type:
+            self.stdout.write(self.style.WARNING(
+                f"  Reconciled source_type: {source.source_type!r} -> {config_type!r}"
+            ))
+            source.source_type = config_type
+            update_fields.append('source_type')
+
+        if not source.collection_id:
+            col = _get_or_create_collection(config)
+            if col is not None:
+                self.stdout.write(f"  Linked to collection: {col.name}")
+                source.collection = col
+                update_fields.append('collection')
+
+        for field in ('homepage_url', 'publisher_name', 'default_work_type', 'openalex_id'):
+            new_value = config.get(field)
+            if not new_value or getattr(source, field):
+                continue
+            self.stdout.write(f"  Filled blank {field}: {new_value!r}")
+            setattr(source, field, new_value)
+            update_fields.append(field)
+
+        if update_fields:
+            source.save(update_fields=update_fields)
         return source
