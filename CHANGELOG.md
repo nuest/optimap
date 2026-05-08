@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Filter the contribute page by collection** with `/contribute/?collection=<identifier|id|short_slug>`. The active filter is shown prominently with a "Show all" button to clear it, and the collection landing page exposes a "Contribute metadata for this collection" button that deep-links into the filtered view. Anonymous and non-staff users can only filter by published collections.
+
 - **Copy/paste geometries between the geoextent tool and the contribution form.** A new "Copy extents" button on `/geoextent/` saves all extracted geometries to the browser; a "Paste geoextents" button on the work landing page (when contributing spatial extent) pastes them into the map as editable layers ready to submit.
 
 - **Admin-only "Publish all unpublished works" button on collection pages** — bulk-flips every Harvested or Contributed work in the collection to Published in one click. Curators see no button (admins-only). Draft / Testing / Withdrawn works are deliberately left untouched.
@@ -46,6 +48,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Collections entry restored to the burger menu**, and **collection-page work cards always link to the OPTIMAP landing page** rather than to an external URL.
 
 ### Changed
+
+- **`/collections/` work counts no longer hide unpublished works.** Regular users see only the count of *published* works in each collection (the works they can actually browse). Admins and curators of a given collection see a per-status breakdown (Published / Harvested / Contributed / …) so harvested-but-not-yet-published works are visible at a glance; status rows with zero count are hidden.
 
 - **Data-dump regeneration unified into one umbrella task.** GeoJSON, GeoPackage, and CSV are produced from one intermediate. Retention now keeps the newest N timestamp groups rather than raw files.
 

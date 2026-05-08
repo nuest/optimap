@@ -46,7 +46,27 @@
                   {% endif %}
                   <small class="text-muted">
                     <i class="fas fa-fingerprint"></i> {{ collection.identifier }}
-                    &middot; <i class="fas fa-file-alt"></i> {{ collection.work_count }} work{{ collection.work_count|pluralize }}
+                    &middot;
+                    <i class="fas fa-file-alt"></i>
+                    {% if collection.show_breakdown %}
+                      {% for entry in collection.status_breakdown %}
+                        <span class="badge
+                          {% if entry.status == 'p' %}badge-success
+                          {% elif entry.status == 'd' %}badge-secondary
+                          {% elif entry.status == 't' %}badge-warning
+                          {% elif entry.status == 'w' %}badge-danger
+                          {% elif entry.status == 'h' %}badge-info
+                          {% elif entry.status == 'c' %}badge-primary
+                          {% endif %}"
+                          title="Works with status &quot;{{ entry.label }}&quot; in this collection.">
+                          {{ entry.label }}: {{ entry.count }}
+                        </span>{% if not forloop.last %} {% endif %}
+                      {% empty %}
+                        no works yet
+                      {% endfor %}
+                    {% else %}
+                      {{ collection.published_count }} work{{ collection.published_count|pluralize }}
+                    {% endif %}
                     {% if collection.homepage_url %}
                       &middot; <a href="{{ collection.homepage_url }}" target="_blank" rel="noopener">homepage <i class="fas fa-external-link-alt fa-xs"></i></a>
                     {% endif %}

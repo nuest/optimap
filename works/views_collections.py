@@ -16,6 +16,7 @@ import logging
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
+from django.db.models import Count
 from django.http import Http404, JsonResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -23,7 +24,7 @@ from django.utils.cache import add_never_cache_headers
 from django.utils.html import strip_tags
 from django.views.decorators.http import require_POST
 
-from .models import Collection, Work
+from .models import Collection, STATUS_CHOICES, Work
 from .seo import coins_title
 from .views_feeds import _publications_to_geojson
 
@@ -51,12 +52,40 @@ def _collection_for_request(request, collection_slug):
 
 
 def collections_index(request):
-    """List all collections. Staff see unpublished too, with inline controls."""
+    """List all collections. Staff see unpublished too, with inline controls.
+
+    Work counts: regular users only see the number of *published* works
+    (the works they can actually browse). Admins and curators of a given
+    collection get a per-status breakdown for that collection so the total
+    no longer hides harvested-but-not-yet-published works.
+    """
     is_admin = request.user.is_authenticated and request.user.is_staff
     collections = list(_visible_collections(request))
-    # Annotate with work count to avoid N+1 in templates.
+    if request.user.is_authenticated:
+        curated_ids = set(
+            request.user.curated_collections.values_list('id', flat=True)
+        )
+    else:
+        curated_ids = set()
+    status_label = dict(STATUS_CHOICES)
+    # Order shown to curators/admins: surface Published first, then the
+    # pipeline states a curator most likely cares about, then admin states.
+    breakdown_order = ['p', 'h', 'c', 'd', 't', 'w']
     for c in collections:
-        c.work_count = c.works.count()
+        c.show_breakdown = is_admin or c.id in curated_ids
+        counts = {
+            row['status']: row['n']
+            for row in c.works.values('status').annotate(n=Count('id'))
+        }
+        c.published_count = counts.get('p', 0)
+        if c.show_breakdown:
+            c.status_breakdown = [
+                {'status': s, 'label': status_label[s], 'count': counts[s]}
+                for s in breakdown_order
+                if counts.get(s, 0) > 0
+            ]
+        else:
+            c.status_breakdown = []
     context = {
         'collections': collections,
         'is_admin': is_admin,

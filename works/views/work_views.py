@@ -28,7 +28,7 @@ from django.conf import settings
 from django.urls import reverse
 from django.http import Http404, FileResponse
 from django.views.decorators.http import require_GET
-from works.models import Work
+from works.models import Collection, Work
 from works.seo import build_schema_org_for_work, build_work_meta, citation_meta_tags, coins_title, geo_meta_tags
 from works.services.preview_image import (
     cache_path_for as _preview_cache_path,
@@ -42,32 +42,51 @@ def contribute(request):
     """
     Page showing harvested works that need spatial or temporal extent contributions.
     Supports pagination with user-selectable page size.
+
+    Optional ``?collection=<id|identifier|short_slug>`` narrows the listing
+    to works belonging to a single Collection. Only one collection can be
+    selected at a time. Anonymous / non-staff users can only filter by
+    *published* collections — same visibility rule as /collections/. An
+    unknown or invisible value is treated as "no filter" and surfaced to
+    the user as a warning so a stale link doesn't silently behave like the
+    unfiltered page.
     """
-    # Get page size from request or use default
     page_size = request.GET.get('size', settings.WORKS_PAGE_SIZE_DEFAULT)
     try:
         page_size = int(page_size)
-        # Clamp page size within allowed limits
         page_size = max(settings.WORKS_PAGE_SIZE_MIN, min(page_size, settings.WORKS_PAGE_SIZE_MAX))
     except (ValueError, TypeError):
         page_size = settings.WORKS_PAGE_SIZE_DEFAULT
 
-    # Get page number from request
     page_number = request.GET.get('page', 1)
 
-    # Get publications that are harvested and missing spatial OR temporal extent
     publications_query = Work.objects.filter(
-        status='h',  # Harvested status
+        status='h',
     ).filter(
-        Q(geometry__isnull=True) |  # NULL geometry
-        Q(geometry__isempty=True) |  # Empty GeometryCollection
-        Q(timeperiod_startdate__isnull=True) |  # NULL start date
-        Q(timeperiod_enddate__isnull=True)      # NULL end date
+        Q(geometry__isnull=True)
+        | Q(geometry__isempty=True)
+        | Q(timeperiod_startdate__isnull=True)
+        | Q(timeperiod_enddate__isnull=True)
     ).order_by('-creationDate')
 
-    # Create paginator
-    paginator = Paginator(publications_query, page_size)
+    filter_collection = None
+    filter_raw = request.GET.get('collection', '').strip()
+    filter_invalid = False
+    if filter_raw:
+        is_admin = request.user.is_authenticated and request.user.is_staff
+        candidates = Collection.objects.all() if is_admin else Collection.objects.filter(is_published=True)
+        match = None
+        if filter_raw.isdigit():
+            match = candidates.filter(pk=int(filter_raw)).first()
+        if match is None:
+            match = candidates.filter(identifier=filter_raw).first() or candidates.filter(short_slug=filter_raw).first()
+        if match is not None:
+            filter_collection = match
+            publications_query = publications_query.filter(collections=match)
+        else:
+            filter_invalid = True
 
+    paginator = Paginator(publications_query, page_size)
     try:
         page_obj = paginator.page(page_number)
     except PageNotAnInteger:
@@ -81,6 +100,9 @@ def contribute(request):
         'page_size': page_size,
         'page_size_options': settings.WORKS_PAGE_SIZE_OPTIONS,
         'total_count': paginator.count,
+        'filter_collection': filter_collection,
+        'filter_raw': filter_raw,
+        'filter_invalid': filter_invalid,
     }
     return render(request, 'contribute.html', context)
 

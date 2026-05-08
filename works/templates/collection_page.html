@@ -139,6 +139,14 @@
         {% endif %}
       </p>
 
+      <p>
+        <a href="{% url 'optimap:contribute' %}?collection={{ collection.identifier }}"
+           class="btn btn-outline-primary btn-sm"
+           title="Show only the harvested works of this collection that need geolocation or temporal extent.">
+          <i class="fas fa-map-marked-alt"></i> Contribute metadata for this collection
+        </a>
+      </p>
+
       {% if works %}
         <div id="collection-map" style="height: 540px; width: 100%; margin-bottom: 2rem; border-radius: 8px;"></div>
 

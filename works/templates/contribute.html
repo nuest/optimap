@@ -24,12 +24,34 @@
 
     <p class="lead">Help us add geographic metadata to scientific works!</p>
 
-    <p class="text-wrap text-break">The works listed below have been harvested from various scientific sources but do not have geolocation data yet. If you know the geographic location or area mentioned in any of these publications, you can help us improve our database.</p>
+    <p class="text-wrap text-break">The works listed below have been harvested from various scientific sources but do not have geolocation data yet. If you know the geographic location or area mentioned in any of these works, you can help us improve our database.</p>
+
+    {% if filter_invalid %}
+      <div class="alert alert-warning text-break" role="alert">
+        <i class="fas fa-exclamation-triangle"></i>
+        Unknown collection <code>{{ filter_raw }}</code>. Showing all works that need contribution.
+        <a href="{% url 'optimap:contribute' %}" class="alert-link">Clear filter</a>.
+      </div>
+    {% endif %}
+
+    {% if filter_collection %}
+      <div class="alert alert-primary d-flex align-items-center justify-content-between flex-wrap" role="alert">
+        <div class="mr-3 mb-2 mb-md-0">
+          <i class="fas fa-filter"></i>
+          Filtered to collection
+          <a href="{{ filter_collection.get_absolute_url }}" class="alert-link"><strong>{{ filter_collection.name }}</strong></a>
+          <small class="text-muted">(<code>{{ filter_collection.identifier }}</code>)</small>
+        </div>
+        <a href="{% url 'optimap:contribute' %}" class="btn btn-outline-primary btn-sm">
+          <i class="fas fa-times"></i> Show all
+        </a>
+      </div>
+    {% endif %}
 
     {% if total_count > 0 %}
       <div class="alert alert-info text-break" role="alert">
         <i class="fas fa-info-circle"></i>
-        <strong>{{ total_count }}</strong> publication{{ total_count|pluralize }} need{{ total_count|pluralize:"s," }} geolocation data.
+        <strong>{{ total_count }}</strong> publication{{ total_count|pluralize }} need{{ total_count|pluralize:"s," }} geolocation data{% if filter_collection %} in this collection{% endif %}.
       </div>
 
       <!-- Pagination controls (top) -->
@@ -43,6 +65,9 @@
           </div>
           <div class="col-md-6 text-md-right">
             <form method="get" class="form-inline justify-content-md-end">
+              {% if filter_collection %}
+                <input type="hidden" name="collection" value="{{ filter_collection.identifier }}">
+              {% endif %}
               <label for="page-size" class="mr-2">Works per page:</label>
               <select name="size" id="page-size" class="form-control form-control-sm" onchange="this.form.submit()">
                 {% for option in page_size_options %}
@@ -58,12 +83,12 @@
           <ul class="pagination justify-content-center">
             {% if page_obj.has_previous %}
               <li class="page-item">
-                <a class="page-link" href="?page=1&size={{ page_size }}" aria-label="First">
+                <a class="page-link" href="?page=1&size={{ page_size }}{% if filter_collection %}&collection={{ filter_collection.identifier }}{% endif %}" aria-label="First">
                   <span aria-hidden="true">&laquo;&laquo;</span>
                 </a>
               </li>
               <li class="page-item">
-                <a class="page-link" href="?page={{ page_obj.previous_page_number }}&size={{ page_size }}" aria-label="Previous">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}&size={{ page_size }}{% if filter_collection %}&collection={{ filter_collection.identifier }}{% endif %}" aria-label="Previous">
                   <span aria-hidden="true">&laquo;</span>
                 </a>
               </li>
@@ -80,18 +105,18 @@
               {% if page_obj.number == num %}
                 <li class="page-item active"><span class="page-link">{{ num }} <span class="sr-only">(current)</span></span></li>
               {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-                <li class="page-item"><a class="page-link" href="?page={{ num }}&size={{ page_size }}">{{ num }}</a></li>
+                <li class="page-item"><a class="page-link" href="?page={{ num }}&size={{ page_size }}{% if filter_collection %}&collection={{ filter_collection.identifier }}{% endif %}">{{ num }}</a></li>
               {% endif %}
             {% endfor %}
 
             {% if page_obj.has_next %}
               <li class="page-item">
-                <a class="page-link" href="?page={{ page_obj.next_page_number }}&size={{ page_size }}" aria-label="Next">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}&size={{ page_size }}{% if filter_collection %}&collection={{ filter_collection.identifier }}{% endif %}" aria-label="Next">
                   <span aria-hidden="true">&raquo;</span>
                 </a>
               </li>
               <li class="page-item">
-                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}&size={{ page_size }}" aria-label="Last">
+                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}&size={{ page_size }}{% if filter_collection %}&collection={{ filter_collection.identifier }}{% endif %}" aria-label="Last">
                   <span aria-hidden="true">&raquo;&raquo;</span>
                 </a>
               </li>
@@ -171,12 +196,12 @@
           <ul class="pagination justify-content-center">
             {% if page_obj.has_previous %}
               <li class="page-item">
-                <a class="page-link" href="?page=1&size={{ page_size }}" aria-label="First">
+                <a class="page-link" href="?page=1&size={{ page_size }}{% if filter_collection %}&collection={{ filter_collection.identifier }}{% endif %}" aria-label="First">
                   <span aria-hidden="true">&laquo;&laquo;</span>
                 </a>
               </li>
               <li class="page-item">
-                <a class="page-link" href="?page={{ page_obj.previous_page_number }}&size={{ page_size }}" aria-label="Previous">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}&size={{ page_size }}{% if filter_collection %}&collection={{ filter_collection.identifier }}{% endif %}" aria-label="Previous">
                   <span aria-hidden="true">&laquo;</span>
                 </a>
               </li>
@@ -193,18 +218,18 @@
               {% if page_obj.number == num %}
                 <li class="page-item active"><span class="page-link">{{ num }} <span class="sr-only">(current)</span></span></li>
               {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-                <li class="page-item"><a class="page-link" href="?page={{ num }}&size={{ page_size }}">{{ num }}</a></li>
+                <li class="page-item"><a class="page-link" href="?page={{ num }}&size={{ page_size }}{% if filter_collection %}&collection={{ filter_collection.identifier }}{% endif %}">{{ num }}</a></li>
               {% endif %}
             {% endfor %}
 
             {% if page_obj.has_next %}
               <li class="page-item">
-                <a class="page-link" href="?page={{ page_obj.next_page_number }}&size={{ page_size }}" aria-label="Next">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}&size={{ page_size }}{% if filter_collection %}&collection={{ filter_collection.identifier }}{% endif %}" aria-label="Next">
                   <span aria-hidden="true">&raquo;</span>
                 </a>
               </li>
               <li class="page-item">
-                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}&size={{ page_size }}" aria-label="Last">
+                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}&size={{ page_size }}{% if filter_collection %}&collection={{ filter_collection.identifier }}{% endif %}" aria-label="Last">
                   <span aria-hidden="true">&raquo;&raquo;</span>
                 </a>
               </li>
@@ -224,14 +249,19 @@
     {% else %}
       <div class="alert alert-success" role="alert">
         <i class="fas fa-check-circle"></i>
-        Great! All harvested publications currently have geolocation data.
+        {% if filter_collection %}
+          Great! All harvested works in this collection currently have geolocation data.
+          <a href="{% url 'optimap:contribute' %}" class="alert-link">Show all works</a>.
+        {% else %}
+          Great! All harvested works currently have geolocation data.
+        {% endif %}
       </div>
     {% endif %}
 
     <div class="mt-5">
       <h3>How to help</h3>
-      <p>If you recognize any publications that reference specific geographic locations, please login, confirm your account, and contribute metadata.</p>
-      <p>In case you find any errors in other metadata fields, if you see a work with incorrect location or time information, or if you find publications that should be included in our database, please contact us:</p>
+      <p>If you recognize any works that reference specific geographic locations, please login, confirm your account, and contribute metadata.</p>
+      <p>In case you find any errors in other metadata fields, if you see a work with incorrect location or time information, or if you find works that should be included in our database, please contact us:</p>
       <p>
         <a href="/about" class="btn btn-primary">
           <i class="fas fa-envelope"></i> Contact Us
