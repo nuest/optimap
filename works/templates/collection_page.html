@@ -47,6 +47,14 @@
                   <i class="fas fa-check-circle"></i> Publish
                 </button>
               {% endif %}
+              {% if publishable_count %}
+                <button class="btn btn-success btn-sm collection-publish-works-btn"
+                        data-collection-id="{{ collection.id }}"
+                        data-publishable-count="{{ publishable_count }}"
+                        data-csrf="{{ csrf_token }}">
+                  <i class="fas fa-globe"></i> Publish all {{ publishable_count }} unpublished works
+                </button>
+              {% endif %}
               <a href="/admin/works/collection/{{ collection.id }}/change/#id_curators"
                  class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener"
                  title="Open the admin change page anchored on the curators field.">
