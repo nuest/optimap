@@ -6,8 +6,75 @@ from copy import deepcopy
 from unittest.mock import patch
 
 from django.core.management import call_command
-from django.test import TestCase, override_settings
+from django.test import TestCase, SimpleTestCase, override_settings
 from works.models import Work, Source
+from works.zenodo import _build_upload_list, _latest_dump_files
+
+
+class BuildUploadListTest(SimpleTestCase):
+    """Direct unit tests for the upload-list helpers (issue #63, item 4)."""
+
+    def setUp(self):
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmpdir.name)
+        self.data_dir = self.root / "data"
+        self.dump_dir = self.root / "optimap_cache"
+        self.data_dir.mkdir()
+        self.dump_dir.mkdir()
+
+    def tearDown(self):
+        self._tmpdir.cleanup()
+
+    def test_latest_dump_files_picks_newest_timestamp_only(self):
+        # Two cycles in the same dir, three formats each
+        for ts in ("20240101", "20250101"):
+            (self.dump_dir / f"optimap_data_dump_{ts}.geojson").write_text("{}")
+            (self.dump_dir / f"optimap_data_dump_{ts}.geojson.gz").write_bytes(b"\x1f\x8b")
+            (self.dump_dir / f"optimap_data_dump_{ts}.gpkg").write_bytes(b"GPKG")
+        # And a CSV pair for the newer cycle only
+        (self.dump_dir / "optimap_data_dump_20250101.csv").write_text("a,b\n")
+        (self.dump_dir / "optimap_data_dump_20250101.csv.gz").write_bytes(b"\x1f\x8b")
+
+        files = _latest_dump_files(self.dump_dir)
+        names = {p.name for p in files}
+        self.assertEqual(names, {
+            "optimap_data_dump_20250101.geojson",
+            "optimap_data_dump_20250101.geojson.gz",
+            "optimap_data_dump_20250101.gpkg",
+            "optimap_data_dump_20250101.csv",
+            "optimap_data_dump_20250101.csv.gz",
+        })
+
+    def test_build_upload_list_includes_csv_variants(self):
+        (self.data_dir / "README.md").write_text("# x")
+        (self.data_dir / "optimap-main.zip").write_bytes(b"ZIP")
+        for ext in ("geojson", "geojson.gz", "gpkg", "csv", "csv.gz"):
+            (self.data_dir / f"optimap_data_dump_20250101.{ext}").write_bytes(b"x")
+
+        paths = _build_upload_list(self.data_dir, dump_dir=self.dump_dir)
+        names = {p.name for p in paths}
+
+        # README + git archive snapshot
+        self.assertIn("README.md", names)
+        self.assertIn("optimap-main.zip", names)
+        # All five dump formats land in the upload
+        for ext in ("geojson", "geojson.gz", "gpkg", "csv", "csv.gz"):
+            self.assertIn(f"optimap_data_dump_20250101.{ext}", names)
+
+    def test_build_upload_list_falls_back_to_dump_dir_when_data_dir_has_no_dumps(self):
+        """Production layout: render writes to data/, regenerate writes to cache."""
+        (self.data_dir / "README.md").write_text("# x")
+        (self.data_dir / "optimap-main.zip").write_bytes(b"ZIP")
+        # Dumps only in dump_dir
+        for ext in ("geojson", "gpkg", "csv"):
+            (self.dump_dir / f"optimap_data_dump_20250101.{ext}").write_bytes(b"x")
+
+        paths = _build_upload_list(self.data_dir, dump_dir=self.dump_dir)
+        names = {p.name for p in paths}
+        self.assertIn("README.md", names)
+        self.assertIn("optimap_data_dump_20250101.geojson", names)
+        self.assertIn("optimap_data_dump_20250101.gpkg", names)
+        self.assertIn("optimap_data_dump_20250101.csv", names)
 
 
 class DepositZenodoTest(TestCase):

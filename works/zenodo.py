@@ -5,6 +5,7 @@ This module handles rendering metadata and depositing data to Zenodo.
 """
 import json
 import os
+import tempfile
 import time
 import traceback
 from datetime import date
@@ -340,16 +341,70 @@ def _get_deposition(api_base: str, token: str, deposition_id: str) -> dict:
     return r.json()
 
 
-def _build_upload_list(data_dir: Path) -> list[Path]:
-    """Build list of files to upload."""
-    paths = []
+_DUMP_PATTERNS = (
+    "optimap_data_dump_*.geojson",
+    "optimap_data_dump_*.geojson.gz",
+    "optimap_data_dump_*.gpkg",
+    "optimap_data_dump_*.csv",
+    "optimap_data_dump_*.csv.gz",
+)
+
+
+def _dump_timestamp(p: Path) -> str:
+    """
+    Extract the timestamp portion of an `optimap_data_dump_<TS>.<ext>` filename.
+    Returns "" for non-matching paths.
+    """
+    name = p.name
+    if not name.startswith("optimap_data_dump_"):
+        return ""
+    # Strip leading prefix and trailing suffix (everything from the first '.')
+    stem = name[len("optimap_data_dump_"):]
+    return stem.split(".", 1)[0]
+
+
+def _latest_dump_files(directory: Path) -> list[Path]:
+    """
+    Return all dump files belonging to the newest timestamp present in
+    `directory`, across geojson / geojson.gz / gpkg / csv / csv.gz. Old
+    cycles are ignored so a deposit never ships stale formats next to
+    fresh ones.
+    """
+    if not directory.exists():
+        return []
+    candidates: list[Path] = []
+    for pat in _DUMP_PATTERNS:
+        candidates.extend(directory.glob(pat))
+    if not candidates:
+        return []
+    latest = max(_dump_timestamp(p) for p in candidates)
+    return sorted(p for p in candidates if _dump_timestamp(p) == latest)
+
+
+def _build_upload_list(data_dir: Path, dump_dir: Path | None = None) -> list[Path]:
+    """
+    Build the file list for a Zenodo deposit.
+
+    - `README.md` and `optimap-main.zip` come from `data_dir` (where the
+      render step writes them).
+    - Data dumps come from `data_dir` first (covers tests and ad-hoc
+      single-directory layouts); falling back to `dump_dir`, which
+      defaults to the `optimap_cache` directory `regenerate_data_dumps`
+      writes to in production.
+    """
+    if dump_dir is None:
+        dump_dir = Path(tempfile.gettempdir()) / "optimap_cache"
+
+    paths: list[Path] = []
     for name in ("README.md", "optimap-main.zip"):
         p = data_dir / name
         if p.exists():
             paths.append(p)
-    # Include data dumps if present
-    for pat in ("optimap_data_dump_*.geojson", "optimap_data_dump_*.geojson.gz", "optimap_data_dump_*.gpkg"):
-        paths.extend(sorted(data_dir.glob(pat)))
+
+    dumps = _latest_dump_files(data_dir)
+    if not dumps and data_dir.resolve() != dump_dir.resolve():
+        dumps = _latest_dump_files(dump_dir)
+    paths.extend(dumps)
     return paths
 
 
