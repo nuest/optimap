@@ -121,6 +121,39 @@ def _source_identifier(source: dict) -> tuple[str, str] | None:
     return None
 
 
+# Static "Note" description that documents the license split. Wording follows
+# the 2025-07-21 issue comment on #63 — both licenses are listed on the
+# Zenodo record, the data files are CC0 and only the software snapshot is
+# GPLv3, so harvesters and reusers can apply the correct terms per file.
+_LICENSE_NOTE_HTML = (
+    "<p><strong>Mixed licenses:</strong> this record bundles data files and a "
+    "snapshot of the OPTIMAP source code, which carry different licenses.</p>"
+    "<ul>"
+    "<li>The <strong>data files</strong> "
+    "(<code>README.md</code>, <code>optimap_data_dump_*.geojson</code>, "
+    "<code>optimap_data_dump_*.geojson.gz</code>, "
+    "<code>optimap_data_dump_*.gpkg</code>, "
+    "<code>optimap_data_dump_*.csv</code>, "
+    "<code>optimap_data_dump_*.csv.gz</code>) "
+    "are published under the "
+    "<a href=\"https://creativecommons.org/publicdomain/zero/1.0/\">"
+    "Creative Commons Zero (CC0-1.0)</a> license.</li>"
+    "<li>The <strong>software snapshot</strong> "
+    "(<code>optimap-main.zip</code>) is published under the "
+    "<a href=\"https://opensource.org/licenses/GPL-3.0\">"
+    "GNU General Public License v3.0 (GPL-3.0)</a>.</li>"
+    "</ul>"
+)
+
+
+def _license_additional_descriptions() -> list[dict]:
+    """
+    Build the Zenodo `additional_descriptions` entry that documents the
+    CC0 (data) / GPL-3.0 (code snapshot) license split.
+    """
+    return [{"type": "notes", "description": _LICENSE_NOTE_HTML}]
+
+
 def _describes_related_identifiers(sources: Iterable[dict]) -> list[dict]:
     """
     One Zenodo `related_identifiers` entry per harvested Source with
@@ -262,7 +295,19 @@ def render_zenodo_package(project_root: Path | None = None, stdout_callback=None
         except Exception:
             existing_dyn = {}
 
-    default_keywords = ["Open Access", "Open Science", "ORI", "Open Data", "FAIR"]
+    # Final keyword list per nuest's 2025-07-14 comment on #63. "Open Research
+    # Information" and its short form "ORI" both appear so the record is
+    # discoverable under either label.
+    default_keywords = [
+        "Open Access",
+        "Open Science",
+        "Open Research Information",
+        "ORI",
+        "Open Data",
+        "FAIR",
+    ]
+    # Contributor-level attribution is deferred to #207; for now the deposit's
+    # creator is the project as a whole, matching the 2025-07-14 decision.
     default_creators = existing_dyn.get("creators") or [
         {"name": "OPTIMAP Contributors", "affiliation": "OPTIMAP Project"}
     ]
@@ -285,6 +330,7 @@ def render_zenodo_package(project_root: Path | None = None, stdout_callback=None
         "version": version,
         "keywords": existing_dyn.get("keywords") or default_keywords,
         "related_identifiers": related_identifiers,
+        "additional_descriptions": _license_additional_descriptions(),
         "description_markdown": readme_path.read_text(encoding="utf-8"),
     }
     dyn_path.write_text(json.dumps(dyn, indent=2), encoding="utf-8")
@@ -637,7 +683,11 @@ def deposit_to_zenodo(
 
         # Determine fields to patch
         if patch_fields is None:
-            patch_fields = "description,version,keywords,related_identifiers,title,upload_type,publication_date,creators"
+            patch_fields = (
+                "description,version,keywords,related_identifiers,"
+                "additional_descriptions,title,upload_type,publication_date,"
+                "creators"
+            )
 
         fields_to_patch = {x.strip() for x in patch_fields.split(",") if x.strip()}
 

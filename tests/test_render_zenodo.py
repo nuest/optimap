@@ -21,15 +21,14 @@ class RenderZenodoTest(TestCase):
         self.cmds_dir.mkdir(parents=True, exist_ok=True)
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
-        # Minimal README template with Sources
+        # Copy the real README.md.j2 from the source tree so the codebook /
+        # cross-format prose are the same in tests as in production. This
+        # keeps assertions on README content honest.
+        real_template = (
+            Path(__file__).resolve().parents[1] / "works" / "templates" / "README.md.j2"
+        )
         (self.templates_dir / "README.md.j2").write_text(
-            "# OPTIMAP FAIR Data Package\n"
-            "**Version:** {{ version }}\n\n"
-            "## Sources\n\n"
-            "{% for src in sources %}- [{{ src.name }}]({{ src.url }})\n{% endfor %}\n"
-            "\n## Codebook\n\n"
-            "| Field | Description |\n|---|---|\n| id | pk |\n",
-            encoding="utf-8",
+            real_template.read_text(encoding="utf-8"), encoding="utf-8",
         )
 
         # DB fixtures
@@ -197,6 +196,64 @@ class RenderZenodoTest(TestCase):
              patch("subprocess.run", _failing):
             with self.assertRaisesRegex(Exception, r"git archive HEAD.*failed"):
                 call_command("render_zenodo")
+
+    def test_render_default_keywords_match_issue_decisions(self):
+        """Keywords default to the list agreed in nuest's 2025-07-14 comment.
+        Both `Open Research Information` and its short form `ORI` ship so
+        the record is findable under either label."""
+        with patch.object(self.zenodo_mod, "__file__", new=self.zenodo_file), \
+             patch.object(self.zenodo_mod, "Path", self.FakePath), \
+             patch("subprocess.run", self._fake_git_archive):
+            call_command("render_zenodo")
+
+        dyn = json.loads((self.data_dir / "zenodo_dynamic.json").read_text(encoding="utf-8"))
+        self.assertEqual(dyn["keywords"], [
+            "Open Access", "Open Science", "Open Research Information",
+            "ORI", "Open Data", "FAIR",
+        ])
+
+    def test_render_emits_license_split_additional_description(self):
+        """License split (CC0 for data, GPL-3.0 for code) is documented as a
+        Zenodo `additional_descriptions` entry of type=notes — per the
+        2025-07-21 issue comment."""
+        with patch.object(self.zenodo_mod, "__file__", new=self.zenodo_file), \
+             patch.object(self.zenodo_mod, "Path", self.FakePath), \
+             patch("subprocess.run", self._fake_git_archive):
+            call_command("render_zenodo")
+
+        dyn = json.loads((self.data_dir / "zenodo_dynamic.json").read_text(encoding="utf-8"))
+        notes = dyn.get("additional_descriptions") or []
+        self.assertEqual(len(notes), 1)
+        self.assertEqual(notes[0]["type"], "notes")
+        html = notes[0]["description"]
+        # Both licenses called out, with their actual file scopes
+        self.assertIn("CC0-1.0", html)
+        self.assertIn("GPL-3.0", html)
+        self.assertIn("optimap-main.zip", html)
+        self.assertIn("optimap_data_dump_*.csv", html)
+        self.assertIn("optimap_data_dump_*.gpkg", html)
+
+    def test_render_codebook_covers_post_rebase_fields(self):
+        """README codebook mentions the fields added since the initial
+        Zenodo branch (type, authors, keywords, topics, bok_concepts,
+        placename, country_code, openalex_id) and notes cross-format
+        equivalence (WKT in CSV)."""
+        with patch.object(self.zenodo_mod, "__file__", new=self.zenodo_file), \
+             patch.object(self.zenodo_mod, "Path", self.FakePath), \
+             patch("subprocess.run", self._fake_git_archive):
+            call_command("render_zenodo")
+
+        md = (self.data_dir / "README.md").read_text(encoding="utf-8")
+        # Cross-format note
+        self.assertIn("CSV column", md)
+        self.assertIn("WKT", md)
+        # New fields
+        for field in (
+            "`type`", "`authors`", "`keywords`", "`topics`",
+            "`bok_concepts`", "`placename`", "`country_code`",
+            "`openalex_id`",
+        ):
+            self.assertIn(field, md, f"codebook is missing {field}")
 
     def test_render_raises_when_git_archive_writes_empty_file(self):
         """If `git archive` exits 0 but writes a 0-byte file (corrupt repo,

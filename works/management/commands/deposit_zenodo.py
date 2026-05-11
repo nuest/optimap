@@ -15,7 +15,11 @@ class Command(BaseCommand):
         parser.add_argument(
             "--patch",
             dest="patch",
-            default="description,version,keywords,related_identifiers,title,upload_type,publication_date,creators",
+            default=(
+                "description,version,keywords,related_identifiers,"
+                "additional_descriptions,title,upload_type,publication_date,"
+                "creators"
+            ),
             help="Comma-separated list of metadata fields to patch (others are preserved).",
         )
         parser.add_argument("--merge-keywords", action="store_true", help="Merge incoming keywords with existing.")

@@ -22,18 +22,43 @@
 
 ## Codebook
 
-| Field                  | Description                                           |
-|------------------------|-------------------------------------------------------|
-| `id`                   | Primary key of the publication record                 |
-| `title`                | Title of the article                                  |
-| `abstract`             | Abstract or summary                                   |
-| `doi`                  | Digital Object Identifier (if available)              |
-| `url`                  | URL to the article or preprint                        |
-| `publicationDate`      | Date of publication (ISO format)                      |
-| `geometry`             | Spatial geometry in GeoJSON/WKT                       |
-| `timeperiod_startdate` | Coverage start dates (ISO format)                     |
-| `timeperiod_enddate`   | Coverage end dates (ISO format)                       |
-| `provenance`           | Source/method by which the record was imported/added  |
+The same field names appear verbatim across all three formats: as
+**GeoJSON `Feature.properties` keys**, as **CSV column headers**, and as
+**GeoPackage attribute columns**. CSV represents geometry as a `WKT`
+column ([OGC Simple Features](https://www.ogc.org/standard/sfa/));
+GeoJSON uses the standard `geometry` member; GeoPackage uses the
+default geometry column from the GeoPackage driver.
+
+| Field                       | Description                                                              |
+|-----------------------------|--------------------------------------------------------------------------|
+| `id`                        | Primary key of the work record                                           |
+| `title`                     | Title of the work                                                        |
+| `type`                      | Work type (Crossref / OpenAlex vocabulary, e.g. `article`, `preprint`)    |
+| `abstract`                  | Abstract or summary                                                      |
+| `doi`                       | Digital Object Identifier (if available)                                 |
+| `url`                       | URL to the article or preprint                                           |
+| `publicationDate`           | Publication date (ISO 8601)                                              |
+| `status`                    | Lifecycle code: `p` (Published) — only `p` works appear in the dumps     |
+| `source`                    | Foreign-key reference to the harvested source (see Sources section)      |
+| `volume`                    | Journal volume (where applicable)                                        |
+| `issue`                     | Journal issue (where applicable)                                         |
+| `first_page` / `last_page`  | Pagination (where applicable)                                            |
+| `authors`                   | Author names (list)                                                      |
+| `keywords`                  | Subject keywords (list, from source or OpenAlex)                         |
+| `topics`                    | Research topics (list, typically from OpenAlex)                          |
+| `bok_concepts`              | EO4GEO Body of Knowledge concept codes (list, user-contributed)          |
+| `geometry` (GeoJSON / GPKG) | Spatial extent — GeometryCollection in WGS 84 (EPSG:4326)                |
+| `WKT` (CSV only)            | Same spatial extent in OGC Well-Known Text                               |
+| `timeperiod_startdate`      | Temporal coverage start dates (list, ISO 8601)                           |
+| `timeperiod_enddate`        | Temporal coverage end dates (list, ISO 8601)                             |
+| `placename`                 | Reverse-geocoded placename for the geometry centroid (Nominatim)         |
+| `country_code`              | ISO 3166-1 alpha-2 country code (or 3166-2 subdivision) for the centroid |
+| `provenance`                | Structured JSON: harvest origin, per-field sources, contributions        |
+| `openalex_id`               | OpenAlex Work identifier (`W…`) when matched                             |
+| `openalex_ids`              | OpenAlex IDs object (DOI, PMID, etc.)                                    |
+| `openalex_open_access_status` | OpenAlex open-access status (`gold`, `green`, `bronze`, `closed`, …)   |
+| `creationDate`              | Timestamp the record entered OPTIMAP                                     |
+| `lastUpdate`                | Timestamp of the last modification                                       |
 
 
 ## License
