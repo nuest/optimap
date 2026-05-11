@@ -17,6 +17,7 @@ import requests
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
+from django.urls import reverse
 from jinja2 import Environment, FileSystemLoader
 from zenodo_client import Zenodo
 
@@ -72,6 +73,29 @@ def _clean_label(name: str | None, url: str | None) -> str:
     if n and not n.isdigit():
         return n
     return _label_from_domain(domain) if domain else "Source"
+
+
+def _live_download_related_identifiers() -> list[dict]:
+    """
+    Build Zenodo `related_identifiers` entries pointing at the always-current
+    download endpoints on optimap.science. The Zenodo deposit is a frozen
+    snapshot; the live URLs serve the rolling release of the same dataset.
+    """
+    base = settings.BASE_URL.rstrip("/")
+    routes = [
+        ("optimap:download_geojson", "dataset"),
+        ("optimap:download_geopackage", "dataset"),
+        ("optimap:download_csv", "dataset"),
+    ]
+    return [
+        {
+            "scheme": "url",
+            "identifier": f"{base}{reverse(name)}",
+            "relation": "isSupplementTo",
+            "resource_type": resource_type,
+        }
+        for name, resource_type in routes
+    ]
 
 
 # ================== Rendering ==================
@@ -176,6 +200,12 @@ def render_zenodo_package(project_root: Path | None = None, stdout_callback=None
         {"name": "OPTIMAP Contributors", "affiliation": "OPTIMAP Project"}
     ]
 
+    # `related_identifiers` is always derived from current state — the live
+    # download URLs come from settings.BASE_URL + URL config, so a stale
+    # zenodo_dynamic.json from another environment (e.g. localhost) cannot
+    # leak into the deposit.
+    related_identifiers = _live_download_related_identifiers()
+
     dyn = {
         **existing_dyn,
         "title": existing_dyn.get("title") or "OPTIMAP FAIR Data Package",
@@ -184,7 +214,7 @@ def render_zenodo_package(project_root: Path | None = None, stdout_callback=None
         "creators": default_creators,
         "version": version,
         "keywords": existing_dyn.get("keywords") or default_keywords,
-        "related_identifiers": existing_dyn.get("related_identifiers") or [],
+        "related_identifiers": related_identifiers,
         "description_markdown": readme_path.read_text(encoding="utf-8"),
     }
     dyn_path.write_text(json.dumps(dyn, indent=2), encoding="utf-8")

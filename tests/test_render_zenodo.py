@@ -1,10 +1,11 @@
 # tests/test_render_zenodo.py
+import json
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
 from django.core.management import call_command
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from works.models import Work, Source
 
 
@@ -84,3 +85,35 @@ class RenderZenodoTest(TestCase):
         self.assertIn("AGILE: GIScience Series", md, "Named source missing")
         # example.org should appear only once after dedupe
         self.assertEqual(md.count("example.org"), 1, "Duplicate source/domain not deduped")
+
+    @override_settings(BASE_URL="https://optimap.science")
+    def test_render_includes_live_download_urls_as_related_identifiers(self):
+        """Each render must overwrite related_identifiers with the live
+        download URLs derived from settings.BASE_URL — never trust a stale
+        zenodo_dynamic.json (issue #63, item 5)."""
+        # Seed a stale dyn file with a localhost identifier; render must drop it.
+        (self.data_dir / "zenodo_dynamic.json").write_text(json.dumps({
+            "related_identifiers": [
+                {"scheme": "url", "identifier": "http://127.0.0.1:8000/stale",
+                 "relation": "isSupplementTo", "resource_type": "dataset"}
+            ]
+        }), encoding="utf-8")
+
+        def _noop(*a, **k): return None
+        with patch.object(self.zenodo_mod, "__file__", new=self.zenodo_file), \
+             patch.object(self.zenodo_mod, "Path", self.FakePath), \
+             patch("subprocess.run", _noop):
+            call_command("render_zenodo")
+
+        dyn = json.loads((self.data_dir / "zenodo_dynamic.json").read_text(encoding="utf-8"))
+        identifiers = {r["identifier"] for r in dyn["related_identifiers"]}
+
+        self.assertEqual(identifiers, {
+            "https://optimap.science/download/geojson/",
+            "https://optimap.science/download/geopackage/",
+            "https://optimap.science/download/csv/",
+        })
+        for r in dyn["related_identifiers"]:
+            self.assertEqual(r["relation"], "isSupplementTo")
+            self.assertEqual(r["resource_type"], "dataset")
+            self.assertEqual(r["scheme"], "url")
