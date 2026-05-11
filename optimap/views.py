@@ -151,6 +151,8 @@ def geoextent(request):
         'max_file_size_mb': getattr(settings, 'GEOEXTENT_MAX_FILE_SIZE_MB', 100),
         'max_batch_size_mb': getattr(settings, 'GEOEXTENT_MAX_BATCH_SIZE_MB', 500),
         'max_download_size_mb': getattr(settings, 'GEOEXTENT_MAX_DOWNLOAD_SIZE_MB', 1000),
+        'copy_ttl_seconds': getattr(settings, 'GEOEXTENT_COPY_TTL_SECONDS', 300),
+        'copy_ttl_minutes': max(1, getattr(settings, 'GEOEXTENT_COPY_TTL_SECONDS', 300) // 60),
     }
 
     return render(request, 'geoextent.html', context)

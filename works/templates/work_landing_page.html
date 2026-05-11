@@ -356,6 +356,8 @@
   <script>
     const publicationFeature = {{ feature_json|default:"null"|safe }};
     const canContribute = {{ can_contribute|yesno:"true,false" }};
+    // TTL for geoextent "Copy extents" clipboard (settings.GEOEXTENT_COPY_TTL_SECONDS).
+    const COPIED_GEOEXTENTS_TTL_MS = {{ geoextent_copy_ttl_seconds|default:300 }} * 1000;
     const canPublish = {{ can_publish|yesno:"true,false" }};
     const canUnpublish = {{ can_unpublish|yesno:"true,false" }};
     const hasGeometry = {{ has_geometry|yesno:"true,false" }};
@@ -467,13 +469,22 @@
         let raw = null;
         try { raw = localStorage.getItem(COPIED_GEOEXTENTS_KEY); } catch (e) { return null; }
         if (!raw) return null;
+        let parsed;
         try {
-          const parsed = JSON.parse(raw);
-          if (!parsed || !Array.isArray(parsed.features) || parsed.features.length === 0) return null;
-          return parsed;
+          parsed = JSON.parse(raw);
         } catch (e) {
           return null;
         }
+        if (!parsed || !Array.isArray(parsed.features) || parsed.features.length === 0) return null;
+        // TTL: discard anything older than GEOEXTENT_COPY_TTL_SECONDS. A
+        // missing or unparsable timestamp is treated as expired so we
+        // never paste data with unknown freshness.
+        const ts = parsed.timestamp ? new Date(parsed.timestamp).getTime() : NaN;
+        if (!isFinite(ts) || (Date.now() - ts) > COPIED_GEOEXTENTS_TTL_MS) {
+          try { localStorage.removeItem(COPIED_GEOEXTENTS_KEY); } catch (e) { /* ignore */ }
+          return null;
+        }
+        return parsed;
       }
 
       function refreshPasteUi() {

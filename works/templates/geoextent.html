@@ -355,7 +355,9 @@
                     <button class="btn btn-sm btn-outline-primary" id="zoom-all-btn" title="Zoom map to show all extents">
                         <i class="fas fa-expand"></i> Zoom to all
                     </button>
-                    <button class="btn btn-sm btn-outline-primary ml-2" id="copy-extents-btn" title="Copy all extracted geometries to your browser so they can be pasted into a work's contribution form">
+                    <button class="btn btn-sm btn-outline-primary ml-2" id="copy-extents-btn"
+                            data-ttl-seconds="{{ copy_ttl_seconds }}"
+                            title="Copy all extracted geometries to your browser so they can be pasted into a work's contribution form. Kept for {{ copy_ttl_minutes }} minute{{ copy_ttl_minutes|pluralize }}, then discarded.">
                         <i class="fas fa-copy"></i> Copy extents
                     </button>
                     <button class="btn btn-sm btn-danger ml-2" id="clear-map-btn" title="Remove all extents from the map">
@@ -364,6 +366,13 @@
                 </div>
             </div>
             <div class="card-body">
+                <p class="small text-muted mb-2" id="copy-extents-help">
+                    <i class="fas fa-info-circle"></i>
+                    <em>Copy extents</em> stores the extracted geometries in
+                    your browser for {{ copy_ttl_minutes }} minute{{ copy_ttl_minutes|pluralize }},
+                    so you can paste them into a work's contribution form.
+                    After that window they are discarded automatically.
+                </p>
                 <!-- Map Preview -->
                 <div style="position: relative;">
                     <div id="geoextent-map"></div>
@@ -762,7 +771,12 @@ $(document).ready(function() {
     // Copy all extracted geometries to localStorage so they can be pasted into
     // a work's contribution form on /work/<id>/. Storage shape is intentionally
     // small and stable — see the matching reader in work_landing_page.html.
+    // TTL (settings.GEOEXTENT_COPY_TTL_SECONDS) is read from the data
+    // attribute the server emits; expiry is enforced on the reader side.
     const COPIED_GEOEXTENTS_KEY = 'optimap_copied_geoextents';
+    const COPY_TTL_SECONDS = parseInt(
+      document.getElementById('copy-extents-btn').dataset.ttlSeconds || '300', 10
+    );
     $('#copy-extents-btn').on('click', function() {
         const features = [];
         extractions.forEach(extraction => {

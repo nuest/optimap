@@ -397,6 +397,13 @@ GEOEXTENT_GAZETTEER_TIMEOUT_SECONDS = int(os.getenv("OPTIMAP_GEOEXTENT_GAZETTEER
 # GeoNames API configuration (if using geonames gazetteer)
 GEOEXTENT_GEONAMES_USERNAME = os.getenv("OPTIMAP_GEOEXTENT_GEONAMES_USERNAME", "")
 
+# How long copied geometries from the geoextent tool ("Copy extents")
+# remain available for paste into a work's contribution form. Stored
+# client-side in localStorage; the work landing page silently discards
+# anything older than this. Intentionally not env-var configurable —
+# change in code only (small UX number, no per-deploy reason to tune).
+GEOEXTENT_COPY_TTL_SECONDS = 5 * 60
+
 # Browser Referrer-Policy. Django's SecurityMiddleware defaults this to
 # "same-origin", which strips the Referer on cross-origin requests — and the
 # OpenStreetMap standard tile server (used by every map on this site) blocks

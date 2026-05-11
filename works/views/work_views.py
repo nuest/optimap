@@ -375,6 +375,7 @@ def work_landing(request, identifier):
         "prompt_login_to_contribute": prompt_login_to_contribute,
         "can_publish": can_publish,
         "can_unpublish": can_unpublish,
+        "geoextent_copy_ttl_seconds": getattr(settings, 'GEOEXTENT_COPY_TTL_SECONDS', 300),
         "show_provenance": is_admin,
         "latest_wikidata_export": latest_wikidata_export,
         "all_wikidata_exports": all_wikidata_exports,
