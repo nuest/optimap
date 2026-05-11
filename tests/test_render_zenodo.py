@@ -1,10 +1,10 @@
 # tests/test_render_zenodo.py
 import tempfile
 from pathlib import Path
-from unittest import TestCase
 from unittest.mock import patch
 
 from django.core.management import call_command
+from django.test import TestCase
 from works.models import Work, Source
 
 

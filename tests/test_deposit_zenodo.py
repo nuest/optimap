@@ -3,11 +3,10 @@ import json
 import tempfile
 from pathlib import Path
 from copy import deepcopy
-from unittest import TestCase
 from unittest.mock import patch
 
 from django.core.management import call_command
-from django.test import override_settings
+from django.test import TestCase, override_settings
 from works.models import Work, Source
 
 

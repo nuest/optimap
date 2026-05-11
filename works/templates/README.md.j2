@@ -16,9 +16,8 @@
 
 ## Sources
 
-{% for label, url in sources -%}
-- [{{ label }}]({{ url }})
-{%- endfor %}
+{% for s in sources %}- [{{ s.name }}]({{ s.url }})
+{% endfor %}
 
 
 ## Codebook
