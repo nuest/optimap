@@ -332,24 +332,47 @@ def work_landing(request, identifier):
     meta = build_work_meta(request, work, kwargs_schema=cacheable["schema_org"])
 
     # User-dependent overlay — never cached.
+    # Contribution editor is open on harvested AND contributed works so
+    # different users can fill different gaps (spatial, temporal, topics).
+    # Pre-existing extents do NOT close the form: replacing user A's
+    # geometry as user B is allowed; the provenance log records who did
+    # what, and the Recognition Board dedupes per (user, work, kind).
     can_contribute = (
         request.user.is_authenticated
-        and work.status == 'h'
-        and (not cacheable["has_geometry"] or not cacheable["has_temporal"])
+        and work.status in ('h', 'c')
     )
     # Anonymous visitors who land on a contributable work via the /contribute/
     # listing get a "log in to contribute" call-to-action instead of a silent
     # "no form here" page.
     prompt_login_to_contribute = (
         not request.user.is_authenticated
-        and work.status == 'h'
-        and (not cacheable["has_geometry"] or not cacheable["has_temporal"])
+        and work.status in ('h', 'c')
     )
     can_publish = is_admin and (
         work.status == 'c'
         or (work.status == 'h' and (cacheable["has_geometry"] or cacheable["has_temporal"]))
     )
     can_unpublish = is_admin and work.status == 'p'
+
+    # Single source of truth for the "missing information" alert on the
+    # landing page — items the *current* viewer could fix if they were to
+    # use the contribution form (or log in first). Anonymous viewers see
+    # the same item list with a "log in to contribute" CTA. Each item
+    # carries the in-page anchor for a "jump to that section" link.
+    _GEOM = {"label": "geographic location",           "anchor": "contribute-spatial"}
+    _TIME = {"label": "temporal extent (time period)", "anchor": "contribute-temporal"}
+
+    missing_for_logged_in = []
+    if can_contribute and not cacheable["has_geometry"]:
+        missing_for_logged_in.append(_GEOM)
+    if can_contribute and not cacheable["has_temporal"]:
+        missing_for_logged_in.append(_TIME)
+
+    missing_for_anonymous = []
+    if prompt_login_to_contribute and not cacheable["has_geometry"]:
+        missing_for_anonymous.append(_GEOM)
+    if prompt_login_to_contribute and not cacheable["has_temporal"]:
+        missing_for_anonymous.append(_TIME)
 
     latest_wikidata_export = work.wikidata_exports.filter(
         action__in=['created', 'updated']
@@ -375,6 +398,8 @@ def work_landing(request, identifier):
         "prompt_login_to_contribute": prompt_login_to_contribute,
         "can_publish": can_publish,
         "can_unpublish": can_unpublish,
+        "missing_for_logged_in": missing_for_logged_in,
+        "missing_for_anonymous": missing_for_anonymous,
         "geoextent_copy_ttl_seconds": getattr(settings, 'GEOEXTENT_COPY_TTL_SECONDS', 300),
         "show_provenance": is_admin,
         "latest_wikidata_export": latest_wikidata_export,

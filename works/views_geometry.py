@@ -28,9 +28,12 @@ def contribute_geometry_by_id(request, work_id):
     """
     API endpoint for users to contribute geometry and/or temporal extent to a work by ID.
     Used for publications without a DOI.
-    Changes status from 'Harvested' to 'Contributed'.
+
+    Open to logged-in users while a work is Harvested or Contributed —
+    different contributors can fill different gaps, and pre-existing
+    extents are not a barrier (user B may replace user A's geometry,
+    with the provenance log carrying attribution).
     """
-    # Check authentication for AJAX requests
     if not request.user.is_authenticated:
         return JsonResponse({'error': 'Authentication required'}, status=401)
 
@@ -39,14 +42,12 @@ def contribute_geometry_by_id(request, work_id):
     except Work.DoesNotExist:
         return JsonResponse({'error': 'Work not found'}, status=404)
 
-    # Only allow contributions to harvested publications
-    if work.status != 'h':
+    if work.status not in ('h', 'c'):
         return JsonResponse({
-            'error': 'Can only contribute to harvested publications'
+            'error': 'Can only contribute to harvested or contributed publications'
         }, status=400)
 
     try:
-        # Parse request data
         data = json.loads(request.body)
         geojson = data.get('geometry')
         temporal_extent = data.get('temporal_extent')
@@ -61,22 +62,17 @@ def contribute_geometry_by_id(request, work_id):
         spatial_contributed = False
         temporal_contributed = False
 
-        # Handle geometry contribution
         if geojson:
-            # Check if geometry already exists
-            if work.geometry and not work.geometry.empty:
-                return JsonResponse({
-                    'error': 'Work already has geometry'
-                }, status=400)
-
-            # Convert GeoJSON to GeometryCollection
+            had_geometry = bool(work.geometry and not work.geometry.empty)
             logger.info("Converting geometry: %s", geojson)
             geometry = GEOSGeometry(json.dumps(geojson))
             work.geometry = geometry
-            changes_made.append(f"Changed geometry from empty to {geometry.geom_type}")
+            changes_made.append(
+                f"{'Replaced geometry with' if had_geometry else 'Changed geometry from empty to'} "
+                f"{geometry.geom_type}"
+            )
             spatial_contributed = True
 
-        # Handle temporal extent contribution
         if temporal_extent:
             start_date = temporal_extent.get('start_date')
             end_date = temporal_extent.get('end_date')
@@ -90,7 +86,11 @@ def contribute_geometry_by_id(request, work_id):
                 changes_made.append(f"Set end date to {end_date}")
                 temporal_contributed = True
 
-        work.status = 'c'  # Contributed
+        status_from = work.status
+        # Harvested works flip to Contributed on the first contribution;
+        # already-Contributed works stay there.
+        status_to = 'c'
+
         append_event(
             work,
             "contribution",
@@ -98,13 +98,12 @@ def contribute_geometry_by_id(request, work_id):
             user_email=request.user.email,
             kinds=[k for k, flag in (("spatial", spatial_contributed), ("temporal", temporal_contributed)) if flag],
             changes=changes_made,
-            status_from="h",
-            status_to="c",
+            status_from=status_from,
+            status_to=status_to,
         )
+        work.status = status_to
         work.save()
 
-        # Record structured contribution rows for the Recognition Board / statistics.
-        # Always recorded regardless of Recognition Board opt-in.
         if spatial_contributed:
             Contribution.objects.create(user=request.user, work=work, kind=Contribution.SPATIAL)
         if temporal_contributed:

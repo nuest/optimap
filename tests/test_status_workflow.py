@@ -169,10 +169,10 @@ class StatusWorkflowComplianceTests(TestCase):
         """Users can only contribute to harvested publications."""
         self.client.login(username='user@example.com', password='testpass123')
 
-        # Test each non-harvested status
+        # Statuses that DO NOT accept contributions. (h and c both do — c
+        # so a second contributor can fill a different gap.)
         for status_code, status_name in [('d', 'Draft'), ('p', 'Published'),
-                                         ('t', 'Testing'), ('w', 'Withdrawn'),
-                                         ('c', 'Contributed')]:
+                                         ('t', 'Testing'), ('w', 'Withdrawn')]:
             pub = Work.objects.create(
                 title=f'{status_name} Publication',
                 status=status_code,
@@ -188,7 +188,7 @@ class StatusWorkflowComplianceTests(TestCase):
 
             self.assertEqual(response.status_code, 400)
             data = response.json()
-            self.assertIn('Can only contribute to harvested publications', data['error'])
+            self.assertIn('Can only contribute to harvested or contributed publications', data['error'])
 
     def test_api_only_returns_published_for_non_admin(self):
         """API should only return published publications to non-admin users."""

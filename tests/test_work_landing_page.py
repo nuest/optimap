@@ -64,8 +64,8 @@ class WorkLandingPageTest(TestCase):
 
     def test_anonymous_sees_login_cta_on_contributable_harvested_work(self):
         """Anonymous visitor on a harvested work that's missing extent should
-        see a 'Log in to contribute' CTA pointing at the user menu, not just
-        a silent page with no contribute affordance."""
+        see a CTA pointing at the user menu, not just a silent page with no
+        contribute affordance."""
         work = Work.objects.create(
             title="Needs contributions", status="h",
             doi="10.1234/anon-cta",
@@ -75,10 +75,14 @@ class WorkLandingPageTest(TestCase):
         resp = self.client.get(f"/work/{work.doi}/")
         self.assertEqual(resp.status_code, 200)
         body = resp.content.decode()
-        self.assertIn("Log in to contribute", body)
+        # Unified missing-information alert with login CTA.
+        self.assertIn("Missing information", body)
         self.assertIn("user menu", body)
-        # Authenticated user with the same work should NOT see the CTA —
-        # they get the actual contribute form instead.
+        self.assertIn("log in with a magic link", body)
+        # Authenticated user with the same work should NOT see the
+        # login CTA — they get the actual contribute form instead. The
+        # missing-information alert is still shown, but with the
+        # "You can help by adding this information below!" wording.
         from django.contrib.auth import get_user_model
         contributor = get_user_model().objects.create_user(
             username="cta-user", email="cta-user@example.org", password="x",
@@ -86,7 +90,9 @@ class WorkLandingPageTest(TestCase):
         self.client.force_login(contributor)
         resp = self.client.get(f"/work/{work.doi}/")
         self.assertEqual(resp.status_code, 200)
-        self.assertNotIn("Log in to contribute", resp.content.decode())
+        body_logged_in = resp.content.decode()
+        self.assertNotIn("log in with a magic link", body_logged_in)
+        self.assertIn("You can help by adding this information", body_logged_in)
 
     def test_anonymous_can_view_harvested_and_contributed_works(self):
         """The /contribute/ list and the post-contribute redirect both go to

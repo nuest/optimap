@@ -147,7 +147,7 @@ class GeometryContributionTests(TestCase):
         self.assertEqual(data['error'], 'Work not found')
 
     def test_contribute_geometry_wrong_status(self):
-        """Test that only harvested publications can receive contributions."""
+        """Published / draft / withdrawn works don't accept contributions."""
         self.client.login(username='contributor@example.com', password='testpass123')
 
         url = f'/work/{self.pub_published.doi}/contribute-geometry/'
@@ -159,10 +159,11 @@ class GeometryContributionTests(TestCase):
 
         self.assertEqual(response.status_code, 400)
         data = response.json()
-        self.assertEqual(data['error'], 'Can only contribute to harvested publications')
+        self.assertEqual(data['error'], 'Can only contribute to harvested or contributed publications')
 
     def test_contribute_geometry_already_has_geometry(self):
-        """Test that publications with geometry cannot receive new contributions."""
+        """Re-editing an existing geometry is allowed; the provenance log
+        carries attribution so user A may replace user B's geometry."""
         self.client.login(username='contributor@example.com', password='testpass123')
 
         url = f'/work/{self.pub_with_geometry.doi}/contribute-geometry/'
@@ -172,9 +173,16 @@ class GeometryContributionTests(TestCase):
             content_type='application/json'
         )
 
-        self.assertEqual(response.status_code, 400)
-        data = response.json()
-        self.assertEqual(data['error'], 'Work already has geometry')
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()['success'])
+        self.pub_with_geometry.refresh_from_db()
+        events = (self.pub_with_geometry.provenance or {}).get('events', [])
+        # Most recent event should describe a geometry replacement.
+        self.assertTrue(any(
+            "Replaced geometry" in change
+            for evt in events if evt.get("type") == "contribution"
+            for change in (evt.get("changes") or [])
+        ))
 
     def test_contribute_geometry_no_geometry_provided(self):
         """Test error when no geometry is provided."""
@@ -241,6 +249,47 @@ class GeometryContributionTests(TestCase):
         self.assertEqual(self.pub_harvested.status, 'c')
         self.assertFalse(self.pub_harvested.geometry.empty)
 
+    def test_contribute_geometry_works_on_contributed_status(self):
+        """Already-Contributed works still accept further contributions
+        (different users may add different things)."""
+        from works.models import Contribution
+
+        self.client.login(username='contributor@example.com', password='testpass123')
+
+        # Promote to 'c' first by contributing a temporal extent.
+        url = f'/work/{self.pub_harvested.doi}/contribute-geometry/'
+        self.client.post(
+            url,
+            data=json.dumps({'temporal_extent': {'start_date': '2020-01-01'}}),
+            content_type='application/json',
+        )
+        self.pub_harvested.refresh_from_db()
+        self.assertEqual(self.pub_harvested.status, 'c')
+
+        # Now a *different* user contributes geometry on the contributed work.
+        other = User.objects.create_user(
+            username='other@example.com',
+            email='other@example.com',
+            password='testpass123',
+        )
+        self.client.login(username='other@example.com', password='testpass123')
+        response = self.client.post(
+            url,
+            data=json.dumps({'geometry': self.test_geometry}),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        self.pub_harvested.refresh_from_db()
+        self.assertEqual(self.pub_harvested.status, 'c')
+        # Recognition: regular_user got 1 temporal row; other got 1 spatial row.
+        self.assertEqual(
+            Contribution.objects.filter(user=self.regular_user, work=self.pub_harvested, kind=Contribution.TEMPORAL).count(),
+            1,
+        )
+        self.assertEqual(
+            Contribution.objects.filter(user=other, work=self.pub_harvested, kind=Contribution.SPATIAL).count(),
+            1,
+        )
 
 class PublishWorkTests(TestCase):
     """Test publish work API endpoint."""

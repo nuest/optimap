@@ -231,29 +231,18 @@
 <!-- Leaflet Control Geocoder (Gazetteer) -->
 <link rel="stylesheet" href="{% static 'css/leaflet.control.geocoder.css' %}" />
 
-{% if can_contribute %}
-  <div class="alert alert-warning">
-    <strong>Missing information:</strong> This publication is missing
-    {% if not has_geometry and not has_temporal %}
-      geographic location and temporal extent
-    {% elif not has_geometry %}
-      geographic location
-    {% elif not has_temporal %}
-      temporal extent (time period)
-    {% endif %}.
+{% if missing_for_logged_in %}
+  {# Logged-in viewer can fix at least one missing piece. #}
+  <div class="alert alert-warning" role="alert">
+    <strong><i class="fas fa-info-circle"></i> Missing information:</strong>
+    This publication is missing {% for item in missing_for_logged_in %}<a href="#{{ item.anchor }}" class="alert-link">{{ item.label }}</a>{% if not forloop.last %}{% if forloop.revcounter == 2 %} and {% else %}, {% endif %}{% endif %}{% endfor %}.
     You can help by adding this information below!
   </div>
-{% elif prompt_login_to_contribute %}
+{% elif missing_for_anonymous %}
+  {# Anonymous viewer on a contributable work — invite login. #}
   <div class="alert alert-info" role="alert">
-    <strong><i class="fas fa-sign-in-alt"></i> Log in to contribute.</strong>
-    This publication is missing
-    {% if not has_geometry and not has_temporal %}
-      geographic location and temporal extent
-    {% elif not has_geometry %}
-      geographic location
-    {% elif not has_temporal %}
-      temporal extent (time period)
-    {% endif %}.
+    <strong><i class="fas fa-info-circle"></i> Missing information:</strong>
+    This publication is missing {% for item in missing_for_anonymous %}<a href="#{{ item.anchor }}" class="alert-link">{{ item.label }}</a>{% if not forloop.last %}{% if forloop.revcounter == 2 %} and {% else %}, {% endif %}{% endif %}{% endfor %}.
     Use the user menu in the top bar (the <i class="fas fa-user" aria-label="user menu"></i> icon) to log in with a magic link, then return to this page to add the missing information.
   </div>
 {% endif %}
@@ -262,8 +251,8 @@
 <div id="mini-map"></div>
 {% else %}
 <div class="alert alert-secondary" role="alert">
-  <strong><i class="fas fa-map-marked-alt"></i> This work does not include geospatial metadata.</strong>
-  No spatial extent is available for this publication, so no map can be shown.
+  <strong><i class="fas fa-info-circle"></i> Missing information:</strong>
+  This work does not include geospatial metadata, so no map can be shown.
   Logged-in users can help by contributing missing metadata on the
   <a href="{% url 'optimap:contribute' %}">contribution page</a>.
 </div>
@@ -273,22 +262,18 @@
 <div class="card mt-3">
   <div class="card-header">
     <h5 class="mb-0">
-      <i class="fas fa-hands-helping"></i> Contribute metadata
+      <i class="fas fa-hands-helping"></i> Contribute extent <small class="text-muted">(spatial &amp; temporal)</small>
     </h5>
   </div>
   <div class="card-body">
-    {% if not has_geometry and not has_temporal %}
-      <p class="text-muted mb-3">This publication is missing both spatial and temporal extent. Please help by adding this information.</p>
-    {% elif not has_geometry %}
-      <p class="text-muted mb-3">This publication is missing spatial extent. {% if has_temporal %}Temporal extent data already exists but can be updated if needed.{% endif %}</p>
-    {% elif not has_temporal %}
-      <p class="text-muted mb-3">This publication is missing temporal extent. Spatial extent already exists.</p>
-    {% endif %}
-
     <form id="contribution-form">
-      {% if not has_geometry %}
-      <div class="mb-4">
+      <div class="mb-4" id="contribute-spatial">
         <h6 class="font-weight-bold"><i class="fas fa-map-marked-alt"></i> Spatial extent (geographic location)</h6>
+        {% if has_geometry %}
+          <div class="alert alert-info mb-2">
+            <i class="fas fa-info-circle"></i> This publication already has a geospatial extent. You can update or replace it if needed using the drawing tools on the map above.
+          </div>
+        {% endif %}
         <p class="text-muted small">Use the drawing tools on the map above to mark the geographic area covered by this research.</p>
         <div id="paste-geoextents-row" class="mb-2" style="display:none;">
           <button type="button" class="btn btn-sm btn-outline-info" id="paste-geoextents-btn">
@@ -296,13 +281,9 @@
           </button>
           <small class="form-text text-muted" id="paste-geoextents-help"></small>
         </div>
-        <div id="geometry-status" class="alert alert-warning">
-          <i class="fas fa-info-circle"></i> <span id="geometry-status-text">No geometry drawn yet. Use the map tools above to add spatial extent.</span>
-        </div>
       </div>
-      {% endif %}
 
-      <div class="mb-4">
+      <div class="mb-4" id="contribute-temporal">
         <h6 class="font-weight-bold"><i class="fas fa-calendar"></i> Temporal extent (time period)</h6>
         {% if has_temporal %}
           <div class="alert alert-info mb-2">
@@ -329,11 +310,7 @@
           <i class="fas fa-paper-plane"></i> Submit contribution
         </button>
         <p class="text-muted mt-2 small">
-          {% if not has_geometry %}
-            You can submit spatial extent, temporal extent, or both together.
-          {% else %}
-            Submit temporal extent data for this publication.
-          {% endif %}
+          You can submit spatial extent, temporal extent, or both together.
         </p>
       </div>
     </form>
@@ -426,34 +403,8 @@
       });
       map.addControl(drawControl);
 
-      // Handle drawing events and update the status indicator
       map.on(L.Draw.Event.CREATED, function (event) {
         drawnItems.addLayer(event.layer);
-        const geometryStatusText = document.getElementById('geometry-status-text');
-        const geometryStatus = document.getElementById('geometry-status');
-        if (geometryStatusText && geometryStatus) {
-          const count = drawnItems.getLayers().length;
-          const noun = count === 1 ? 'geometric feature' : 'geometric features';
-          geometryStatusText.textContent = `${count} ${noun} drawn. Ready to submit.`;
-          geometryStatus.classList.remove('alert-warning');
-          geometryStatus.classList.add('alert-success');
-        }
-      });
-
-      map.on('draw:deleted', function(e) {
-        const geometryStatusText = document.getElementById('geometry-status-text');
-        const geometryStatus = document.getElementById('geometry-status');
-        if (geometryStatusText && geometryStatus) {
-          const count = drawnItems.getLayers().length;
-          if (count === 0) {
-            geometryStatusText.textContent = 'No geometry drawn yet. Use the map tools above to add spatial extent.';
-            geometryStatus.classList.remove('alert-success');
-            geometryStatus.classList.add('alert-warning');
-          } else {
-            const noun = count === 1 ? 'geometric feature' : 'geometric features';
-            geometryStatusText.textContent = `${count} ${noun} drawn. Ready to submit.`;
-          }
-        }
       });
 
       // "Paste geoextents" — pulls geometries previously copied from the
@@ -534,16 +485,6 @@
               map.fitBounds(bounds.pad(0.2));
             }
           } catch (e) { /* point-only collections may have no bounds */ }
-
-          const geometryStatusText = document.getElementById('geometry-status-text');
-          const geometryStatus = document.getElementById('geometry-status');
-          if (geometryStatusText && geometryStatus) {
-            const count = drawnItems.getLayers().length;
-            const noun = count === 1 ? 'geometric feature' : 'geometric features';
-            geometryStatusText.textContent = `${count} ${noun} drawn. Ready to submit.`;
-            geometryStatus.classList.remove('alert-warning');
-            geometryStatus.classList.add('alert-success');
-          }
         });
       }
 
@@ -564,11 +505,11 @@
         const startDate = document.getElementById('start-date').value.trim();
         const endDate = document.getElementById('end-date').value.trim();
 
-        // Collect geometry data if applicable
+        // Collect geometry data — anything the user has drawn (re-edits
+        // replace the existing geometry; the server-side endpoint
+        // accepts a new geometry on works that already had one).
         let geometryCollection = null;
-        const needsGeometry = !hasGeometry;
-
-        if (needsGeometry && drawnItems) {
+        if (drawnItems) {
           const layers = drawnItems.getLayers();
           if (layers.length > 0) {
             const geojson = drawnItems.toGeoJSON();
@@ -582,9 +523,8 @@
 
         // Validate that at least something is being contributed
         if (!geometryCollection && !startDate && !endDate) {
-          OPTIMAP_FLASH('error', needsGeometry
-            ? 'Please provide at least spatial extent (draw on map) or temporal extent (enter dates).'
-            : 'Please provide at least a start date or end date for temporal extent.');
+          OPTIMAP_FLASH('error',
+            'Please provide at least spatial extent (draw on map) or temporal extent (enter dates).');
           return;
         }
 

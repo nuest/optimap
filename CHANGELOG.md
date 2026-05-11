@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Contribution editor open to logged-in users on both Harvested *and* Contributed works** so a second contributor can fill a different gap (e.g. add temporal extent after someone else added a geometry). Pre-existing extents no longer close the form: user B may replace user A's geometry, with the provenance log recording attribution.
+
 - **Filter the contribute page by collection** with `/contribute/?collection=<identifier|id|short_slug>`; collection landing pages link into it.
 
 - **Copy/paste geometries between the geoextent tool and the contribution form.** A new "Copy extents" button on `/geoextent/` saves all extracted geometries to the browser; a "Paste geoextents" button on the work landing page (when contributing spatial extent) pastes them into the map as editable layers ready to submit.
