@@ -179,20 +179,36 @@ def render_zenodo_package(project_root: Path | None = None, stdout_callback=None
     version = f"v{last + 1}"
     version_file.write_text(version, encoding="utf-8")
 
-    # Zip snapshot
+    # Zip snapshot — the deposit must include a copy of the OPTIMAP source
+    # tree (issue #63, last checklist item). A silent empty-zip fallback
+    # would upload a 0-byte optimap-main.zip and look like a successful
+    # deposit, so failures here propagate as a CommandError-friendly
+    # RuntimeError instead.
     archive_path = data_dir / "optimap-main.zip"
     log(f"Generating {archive_path.name}...")
+    import subprocess
     try:
-        import subprocess
-        subprocess.run(
+        result = subprocess.run(
             ["git", "archive", "--format=zip", "HEAD", "-o", str(archive_path)],
             cwd=str(project_root),
             check=True,
+            capture_output=True,
+            text=True,
         )
-    except Exception:
-        pass
-    if not archive_path.exists():
-        archive_path.write_bytes(b"")
+    except FileNotFoundError as ex:
+        raise RuntimeError(
+            "Cannot produce optimap-main.zip: the `git` binary is not on PATH"
+        ) from ex
+    except subprocess.CalledProcessError as ex:
+        raise RuntimeError(
+            f"`git archive HEAD` failed (exit {ex.returncode}) in {project_root}: "
+            f"{(ex.stderr or '').strip()}"
+        ) from ex
+    if not archive_path.exists() or archive_path.stat().st_size == 0:
+        raise RuntimeError(
+            f"`git archive HEAD` produced no archive at {archive_path}; "
+            f"stderr={(result.stderr or '').strip()!r}"
+        )
 
     # Gather statistics
     article_count = Work.objects.count()

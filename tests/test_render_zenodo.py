@@ -61,13 +61,24 @@ class RenderZenodoTest(TestCase):
     def tearDown(self):
         self._tmpdir.cleanup()
 
-    def test_render_produces_clean_readme_and_assets(self):
-        # Don't actually run `git archive`
-        def _noop(*a, **k): return None
+    def _fake_git_archive(self, *args, **kwargs):
+        """Stand-in for subprocess.run([git archive…]) that writes a small
+        non-empty zip at the path given via the `-o` argument, so the render
+        step's hard failure-on-empty check stays satisfied."""
+        argv = args[0] if args else kwargs.get("args", [])
+        if "-o" in argv:
+            out_path = Path(argv[argv.index("-o") + 1])
+            out_path.write_bytes(b"PK\x03\x04stub")
+        class _R:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+        return _R()
 
+    def test_render_produces_clean_readme_and_assets(self):
         with patch.object(self.zenodo_mod, "__file__", new=self.zenodo_file), \
              patch.object(self.zenodo_mod, "Path", self.FakePath), \
-             patch("subprocess.run", _noop):
+             patch("subprocess.run", self._fake_git_archive):
             call_command("render_zenodo")
 
         readme_path = self.data_dir / "README.md"
@@ -99,10 +110,9 @@ class RenderZenodoTest(TestCase):
             ]
         }), encoding="utf-8")
 
-        def _noop(*a, **k): return None
         with patch.object(self.zenodo_mod, "__file__", new=self.zenodo_file), \
              patch.object(self.zenodo_mod, "Path", self.FakePath), \
-             patch("subprocess.run", _noop):
+             patch("subprocess.run", self._fake_git_archive):
             call_command("render_zenodo")
 
         dyn = json.loads((self.data_dir / "zenodo_dynamic.json").read_text(encoding="utf-8"))
@@ -141,10 +151,9 @@ class RenderZenodoTest(TestCase):
             homepage_url="https://example.com/journal",
         )
 
-        def _noop(*a, **k): return None
         with patch.object(self.zenodo_mod, "__file__", new=self.zenodo_file), \
              patch.object(self.zenodo_mod, "Path", self.FakePath), \
-             patch("subprocess.run", _noop):
+             patch("subprocess.run", self._fake_git_archive):
             call_command("render_zenodo")
 
         dyn = json.loads((self.data_dir / "zenodo_dynamic.json").read_text(encoding="utf-8"))
@@ -172,3 +181,38 @@ class RenderZenodoTest(TestCase):
             sum(1 for s, i in idents if "example.org" in i), 1,
             "Duplicate example.org Sources should collapse to one describes entry",
         )
+
+    def test_render_raises_when_git_archive_fails(self):
+        """A failed `git archive` must propagate so the deposit doesn't ship
+        an empty optimap-main.zip (issue #63, last checklist item)."""
+        import subprocess
+
+        def _failing(*a, **k):
+            raise subprocess.CalledProcessError(
+                returncode=128, cmd=a[0] if a else [], stderr="fatal: not a git repository"
+            )
+
+        with patch.object(self.zenodo_mod, "__file__", new=self.zenodo_file), \
+             patch.object(self.zenodo_mod, "Path", self.FakePath), \
+             patch("subprocess.run", _failing):
+            with self.assertRaisesRegex(Exception, r"git archive HEAD.*failed"):
+                call_command("render_zenodo")
+
+    def test_render_raises_when_git_archive_writes_empty_file(self):
+        """If `git archive` exits 0 but writes a 0-byte file (corrupt repo,
+        SIGPIPE, …) we still fail rather than uploading an empty zip."""
+        def _empty_archive(*args, **kwargs):
+            argv = args[0] if args else kwargs.get("args", [])
+            if "-o" in argv:
+                out_path = Path(argv[argv.index("-o") + 1])
+                out_path.write_bytes(b"")
+            class _R:
+                returncode = 0
+                stderr = "warning: empty tree"
+            return _R()
+
+        with patch.object(self.zenodo_mod, "__file__", new=self.zenodo_file), \
+             patch.object(self.zenodo_mod, "Path", self.FakePath), \
+             patch("subprocess.run", _empty_archive):
+            with self.assertRaisesRegex(Exception, r"produced no archive"):
+                call_command("render_zenodo")
