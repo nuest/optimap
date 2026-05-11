@@ -1,0 +1,45 @@
+{
+  "GIST": {
+    "id": "GIST",
+    "name": "Geographic Information Science and Technology",
+    "uri": "http://bok.eo4geo.eu/GIST",
+    "description": "The umbrella concept covering all GIScience and geospatial technology areas.",
+    "relations": []
+  },
+  "CV": {
+    "id": "CV",
+    "name": "Cartography and Visualization",
+    "uri": "http://bok.eo4geo.eu/CV",
+    "description": "Geo-data visualisation including cartography and maps.",
+    "relations": [
+      {"name": "is subconcept of", "source": "CV", "target": "GIST"}
+    ]
+  },
+  "AM": {
+    "id": "AM",
+    "name": "Analytical Methods",
+    "uri": "http://bok.eo4geo.eu/AM",
+    "description": "Operations whose objective is to derive analytical results from geospatial data.",
+    "relations": [
+      {"name": "is subconcept of", "source": "AM", "target": "GIST"}
+    ]
+  },
+  "AM10": {
+    "id": "AM10",
+    "name": "Spatial Statistics",
+    "uri": "http://bok.eo4geo.eu/AM10",
+    "description": "Statistical methods applied to spatial data.",
+    "relations": [
+      {"name": "is subconcept of", "source": "AM10", "target": "AM"}
+    ]
+  },
+  "AM10-3": {
+    "id": "AM10-3",
+    "name": "Spatial Autocorrelation",
+    "uri": "http://bok.eo4geo.eu/AM10-3",
+    "description": "Measure of dependence among nearby observations.",
+    "relations": [
+      {"name": "is subconcept of", "source": "AM10-3", "target": "AM10"}
+    ]
+  }
+}

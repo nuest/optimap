@@ -220,6 +220,37 @@
   <p>{{ work.abstract }}</p>
 {% endif %}
 
+{# Topics — EO4GEO Body of Knowledge concepts (issue #245). Read-only chips. #}
+{% if bok_concepts_resolved %}
+<div class="bok-topics" id="bok-topics-display">
+  <p class="meta muted mb-1">
+    <i class="fas fa-book"></i>
+    <strong>Topics:</strong>
+    <small class="text-muted">EO4GEO Body of Knowledge</small>
+  </p>
+  <ul class="bok-chip-list" aria-label="EO4GEO BoK concept tags">
+    {% for c in bok_concepts_resolved %}
+      <li>
+        {% if c.breadcrumb %}
+          <small class="bok-breadcrumb text-muted">
+            {% for b in c.breadcrumb %}{{ b.name }}{% if not forloop.last %} ›{% endif %}{% endfor %} ›
+          </small>
+        {% endif %}
+        {% if c.orphan %}
+          <span class="bok-chip bok-chip-orphan" title="No longer in current EO4GEO BoK">
+            {{ c.code }}
+          </span>
+        {% else %}
+          <a class="bok-chip" href="{{ c.uri }}" target="_blank" rel="noopener" title="{{ c.description|truncatechars:160 }}">
+            {{ c.name }} <small class="bok-chip-code">{{ c.code }}</small>
+          </a>
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
 <!-- Leaflet assets -->
 <link rel="stylesheet" href="{% static 'css/leaflet.css' %}">
 <!-- Leaflet Draw plugin for geometry editing -->
@@ -316,6 +347,79 @@
     </form>
   </div>
 </div>
+{% endif %}
+
+{# Topics (EO4GEO BoK) editor (#245) for logged-in users on harvested or contributed works. #}
+{% if can_tag_bok %}
+<div class="card mt-3" id="bok-edit-card">
+  <div class="card-header">
+    <h5 class="mb-0">
+      <i class="fas fa-book"></i> Contribute topics <small class="text-muted">(EO4GEO Body of Knowledge)</small>
+    </h5>
+  </div>
+  <div class="card-body">
+    {% if bok_concepts_resolved %}
+      <div class="alert alert-info mb-2">
+        <i class="fas fa-info-circle"></i> This publication already has topics metadata. You can update it if needed.
+      </div>
+    {% endif %}
+    <p class="text-muted small">
+      Tag this work with concepts from the
+      <a href="https://eo4geo.eu/bok/" target="_blank" rel="noopener">EO4GEO Body of Knowledge</a>.
+      Start typing (3+ characters) to search; click or press Enter to add.
+    </p>
+
+    <div class="bok-combobox" role="combobox" aria-haspopup="listbox"
+         aria-owns="bok-suggestions" aria-expanded="false">
+      <input type="text" id="bok-search-input"
+             class="form-control"
+             autocomplete="off" spellcheck="false"
+             placeholder="Search topics (e.g. cartography, AM10)…"
+             aria-controls="bok-suggestions"
+             aria-autocomplete="list">
+      <ul id="bok-suggestions" class="bok-suggestions" role="listbox" hidden></ul>
+    </div>
+
+    <ul id="bok-selected" class="bok-chip-list mt-3" aria-label="Selected concepts">
+      {% for c in bok_concepts_resolved %}
+        <li data-code="{{ c.code }}">
+          {% if c.orphan %}
+            <span class="bok-chip bok-chip-orphan" title="No longer in current EO4GEO BoK">{{ c.code }}</span>
+          {% else %}
+            <a class="bok-chip" href="{{ c.uri }}" target="_blank" rel="noopener">
+              {{ c.name }} <small class="bok-chip-code">{{ c.code }}</small>
+            </a>
+          {% endif %}
+          <button type="button" class="bok-chip-remove" aria-label="Remove {{ c.name|default:c.code }}">×</button>
+        </li>
+      {% endfor %}
+    </ul>
+
+    <div class="text-center mt-3">
+      <button type="button" id="bok-save-btn" class="btn btn-primary btn-lg">
+        <i class="fas fa-paper-plane"></i> Save topics
+      </button>
+      <p class="text-muted mt-2 small">
+        {% if work.status == 'h' %}
+          Adding the first topic moves this work from Harvested to Contributed for admin review.
+        {% else %}
+          Updates take effect immediately and are visible to admins.
+        {% endif %}
+      </p>
+    </div>
+  </div>
+</div>
+<link rel="stylesheet" href="{% static 'css/bok.css' %}">
+<script>
+  window.OPTIMAP_BOK = {
+    workId: {{ work.id }},
+    doi: "{{ work.doi|default:'' }}",
+    useIdUrls: {{ use_id_urls|default:"false"|yesno:"true,false" }},
+    minQueryLength: 3,
+    initialCodes: {{ bok_initial_codes_json|safe }}
+  };
+</script>
+<script src="{% static 'js/bok-tagger.js' %}"></script>
 {% endif %}
 
   <script src="{% static 'js/leaflet.js' %}"></script>

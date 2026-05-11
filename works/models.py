@@ -144,6 +144,11 @@ class Work(models.Model):
     authors = ArrayField(models.CharField(max_length=255), blank=True, null=True, help_text="Author names (from original source or OpenAlex)")
     keywords = ArrayField(models.CharField(max_length=255), blank=True, null=True, help_text="Keywords/subjects (from original source or OpenAlex)")
     topics = ArrayField(models.CharField(max_length=255), blank=True, null=True, help_text="Research topics (typically from OpenAlex)")
+    # EO4GEO Body of Knowledge concept codes (e.g. 'CV', 'AM10-3'). Resolved
+    # to human-readable name + URI at render time via the cached BoK snapshot
+    # (see works/bok/). Populated via user contribution on the work landing page.
+    bok_concepts = ArrayField(models.CharField(max_length=32), blank=True, null=True,
+        help_text="EO4GEO BoK concept codes contributed by users (resolved against the active BoK snapshot at render time).")
 
     # Reverse-geocoded placename + region for the geometry centroid (issue
     # #222). Populated by ``works.signals.update_work_placename`` on geometry
@@ -740,9 +745,13 @@ class Contribution(models.Model):
     """
     SPATIAL = "spatial"
     TEMPORAL = "temporal"
+    # Generic "ontology" bucket covers any controlled-vocabulary tagging
+    # (EO4GEO BoK today; e.g. GCMD, Wikidata QIDs in the future).
+    ONTOLOGY = "ontology"
     KIND_CHOICES = [
         (SPATIAL, "Spatial metadata"),
         (TEMPORAL, "Temporal metadata"),
+        (ONTOLOGY, "Ontology contributions"),
     ]
 
     user = models.ForeignKey(

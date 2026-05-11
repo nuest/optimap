@@ -220,6 +220,7 @@ Continent and ocean slugs match `GlobalRegion.identifier`; list them via
         {'name': 'Geoextent', 'description': 'Extract a spatial / temporal extent from an uploaded file or a remote DOI/URL. Powered by the [geoextent](https://nuest.github.io/geoextent/) Python library.'},
         {'name': 'Gazetteer', 'description': 'Server-side proxy for forward / reverse geocoding via Nominatim or Photon.'},
         {'name': 'Downloads', 'description': 'Flat-file dumps of the full work corpus (GeoJSON, GeoPackage, CSV).'},
+        {'name': 'Body of Knowledge', 'description': 'Search the cached [EO4GEO Body of Knowledge](https://eo4geo.eu/bok/) for concept tagging.'},
     ],
     'SWAGGER_UI_DIST': 'SIDECAR',  # shorthand to use the sidecar instead
     'SWAGGER_UI_FAVICON_HREF': 'SIDECAR',
@@ -403,6 +404,25 @@ GEOEXTENT_GEONAMES_USERNAME = os.getenv("OPTIMAP_GEOEXTENT_GEONAMES_USERNAME", "
 # anything older than this. Intentionally not env-var configurable —
 # change in code only (small UX number, no per-deploy reason to tune).
 GEOEXTENT_COPY_TTL_SECONDS = 5 * 60
+
+# EO4GEO Body of Knowledge — controlled vocabulary used for concept tagging
+# on the work landing page. The cached snapshot lives in the `default` cache
+# (DB-backed, lazy on miss) and is refreshed by `manage.py refresh_bok_snapshot`.
+# Set to "current", "v1", "v2", "v3", … (see https://eo4geo-uji.web.app/documentation/API.pdf).
+# `v3` is pinned as the default so chip labels stay stable across upstream
+# churn; set to `current` to auto-follow upstream renames/additions.
+BOK_VERSION = os.getenv("OPTIMAP_BOK_VERSION", "v3")
+BOK_API_BASE = os.getenv("OPTIMAP_BOK_API_BASE", "https://eo4geo-bok.firebaseio.com")
+BOK_CONCEPT_BASE_URL = os.getenv("OPTIMAP_BOK_CONCEPT_BASE_URL", "http://bok.eo4geo.eu")
+# Gate: comma-separated list of `Collection.identifier` slugs (e.g.
+# "mountain-wetlands,essd"). The BoK editor is restricted to works that
+# belong to at least one of those collections; the `/contribute-bok/`
+# endpoint enforces the same rule with a 403. **Empty (default) = BoK
+# editor disabled site-wide** — opt-in by listing the collections you
+# want to enable. Read-only chips remain visible regardless.
+BOK_ENABLED_COLLECTIONS = [
+    s.strip() for s in os.getenv("OPTIMAP_BOK_ENABLED_COLLECTIONS", "").split(",") if s.strip()
+]
 
 # Browser Referrer-Policy. Django's SecurityMiddleware defaults this to
 # "same-origin", which strips the Referer on cross-origin requests — and the

@@ -11,6 +11,7 @@ from works import views_geometry
 from works import views_feeds
 from works import views_collections
 from works import views_gazetteer
+from works.bok import views as bok_views
 from optimap import views as general_views
 from .feeds import GlobalGeoFeed, RegionalGeoFeed
 from django.views.generic import RedirectView
@@ -43,6 +44,9 @@ urlpatterns = [
     # API v1 Gazetteer proxy endpoints
     path('api/v1/gazetteer/<str:provider>/search/', views_gazetteer.gazetteer_search, name='gazetteer-search'),
     path('api/v1/gazetteer/<str:provider>/reverse/', views_gazetteer.gazetteer_reverse, name='gazetteer-reverse'),
+
+    # API v1 Body of Knowledge (EO4GEO BoK) autosuggest
+    path('api/v1/bok/search/', bok_views.bok_search, name='bok-search'),
 
     # API v1 Feed endpoints - GeoRSS format (with .rss extension)
     path('api/v1/feeds/optimap-global.rss', GlobalGeoFeed(feed_type_variant="georss"), name='api-feed-georss'),
@@ -84,6 +88,7 @@ urlpatterns = [
     # Unified work URLs - accepts DOI, ID, or other identifiers
     # Note: path:identifier accepts any string including slashes (for DOIs) and numbers (for IDs)
     path("work/<path:identifier>/contribute-geometry/", views_geometry.contribute_geometry, name="contribute-geometry"),
+    path("work/<path:identifier>/contribute-bok/", views_geometry.contribute_bok, name="contribute-bok"),
     path("work/<path:identifier>/publish/", views_geometry.publish_work, name="publish-work"),
     path("work/<path:identifier>/unpublish/", views_geometry.unpublish_work, name="unpublish-work"),
     path("work/<path:identifier>/preview.png", work_views.work_preview_png, name="work-preview"),

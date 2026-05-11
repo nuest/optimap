@@ -62,3 +62,29 @@ def append_event(work, event_type, **fields):
     event.update({k: v for k, v in fields.items() if v is not None})
     provenance.setdefault("events", []).append(event)
     work.provenance = provenance
+
+
+def user_has_contributed_kind(work, user_id, kind) -> bool:
+    """True if ``user_id`` has already contributed ``kind`` to ``work``.
+
+    Source of truth is the provenance event log — survives both account
+    deletion (Contribution.user goes NULL) and Recognition Board row
+    deletion. Used by the contribution endpoints to dedupe Recognition
+    Board counters: same user repeatedly editing the same property type
+    on the same work counts once. Different users editing the same
+    property each count once.
+
+    Call this *before* ``append_event`` so the event being recorded now
+    is not in the log yet.
+    """
+    if user_id is None or kind is None:
+        return False
+    provenance = _ensure_dict(work.provenance)
+    for evt in provenance.get("events", []) or []:
+        if evt.get("type") != "contribution":
+            continue
+        if evt.get("user_id") != user_id:
+            continue
+        if kind in (evt.get("kinds") or []):
+            return True
+    return False

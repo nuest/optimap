@@ -262,6 +262,20 @@ def _build_work_landing_cacheable(request, work, identifier_type):
         }
         feature_json = json.dumps(feature)
 
+    bok_codes = list(work.bok_concepts or [])
+    if bok_codes:
+        try:
+            from works.bok import client as bok_client
+            bok_resolved = bok_client.resolve(bok_codes)
+        except Exception:
+            bok_resolved = [
+                {"code": c, "name": c, "uri": "", "parent_code": "",
+                 "breadcrumb": [], "orphan": True}
+                for c in bok_codes
+            ]
+    else:
+        bok_resolved = []
+
     return {
         "feature_json": feature_json,
         "timeperiod_label": _format_timeperiod(work),
@@ -277,6 +291,8 @@ def _build_work_landing_cacheable(request, work, identifier_type):
         "canonical_url": request.build_absolute_uri(
             reverse("optimap:work-landing", args=[work.get_identifier()])
         ),
+        "bok_concepts_resolved": bok_resolved,
+        "bok_initial_codes_json": json.dumps(bok_codes),
     }
 
 
@@ -354,25 +370,48 @@ def work_landing(request, identifier):
     )
     can_unpublish = is_admin and work.status == 'p'
 
+    # BoK tagging is open to any logged-in user while a work is still in the
+    # contribution pipeline (h or c). Admins keep full control via the admin.
+    # When OPTIMAP_BOK_ENABLED_COLLECTIONS is set, only works belonging to one
+    # of the configured collections expose the editor.
+    from works.bok import eligibility as bok_eligibility
+    bok_eligible = bok_eligibility.is_work_eligible(work)
+    can_tag_bok = (
+        request.user.is_authenticated
+        and work.status in ('h', 'c')
+        and bok_eligible
+    )
+    prompt_login_to_tag_bok = (
+        not request.user.is_authenticated
+        and work.status in ('h', 'c')
+        and bok_eligible
+    )
+
     # Single source of truth for the "missing information" alert on the
     # landing page — items the *current* viewer could fix if they were to
     # use the contribution form (or log in first). Anonymous viewers see
     # the same item list with a "log in to contribute" CTA. Each item
     # carries the in-page anchor for a "jump to that section" link.
-    _GEOM = {"label": "geographic location",           "anchor": "contribute-spatial"}
+    has_bok = bool(cacheable.get("bok_concepts_resolved"))
+    _GEOM = {"label": "geographic location",        "anchor": "contribute-spatial"}
     _TIME = {"label": "temporal extent (time period)", "anchor": "contribute-temporal"}
+    _BOK  = {"label": "topics (EO4GEO BoK)",        "anchor": "bok-edit-card"}
 
     missing_for_logged_in = []
     if can_contribute and not cacheable["has_geometry"]:
         missing_for_logged_in.append(_GEOM)
     if can_contribute and not cacheable["has_temporal"]:
         missing_for_logged_in.append(_TIME)
+    if can_tag_bok and not has_bok:
+        missing_for_logged_in.append(_BOK)
 
     missing_for_anonymous = []
     if prompt_login_to_contribute and not cacheable["has_geometry"]:
         missing_for_anonymous.append(_GEOM)
     if prompt_login_to_contribute and not cacheable["has_temporal"]:
         missing_for_anonymous.append(_TIME)
+    if prompt_login_to_tag_bok and not has_bok:
+        missing_for_anonymous.append(_BOK)
 
     latest_wikidata_export = work.wikidata_exports.filter(
         action__in=['created', 'updated']
@@ -398,6 +437,8 @@ def work_landing(request, identifier):
         "prompt_login_to_contribute": prompt_login_to_contribute,
         "can_publish": can_publish,
         "can_unpublish": can_unpublish,
+        "can_tag_bok": can_tag_bok,
+        "prompt_login_to_tag_bok": prompt_login_to_tag_bok,
         "missing_for_logged_in": missing_for_logged_in,
         "missing_for_anonymous": missing_for_anonymous,
         "geoextent_copy_ttl_seconds": getattr(settings, 'GEOEXTENT_COPY_TTL_SECONDS', 300),

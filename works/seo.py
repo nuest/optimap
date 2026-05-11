@@ -182,6 +182,9 @@ def _build_schema_org(work, request, canonical, image, authors, keywords, descri
         payload["author"] = [{"@type": "Person", "name": a} for a in authors]
     if keywords:
         payload["keywords"] = list(keywords)
+    bok_about = _bok_defined_terms(work)
+    if bok_about:
+        payload["about"] = bok_about
     if image:
         payload["image"] = image
     if work.source and getattr(work.source, "name", None):
@@ -504,3 +507,40 @@ def build_feed_page_meta(request, *, region_name: str | None,
         schema["about"] = {"@type": "Place", "name": region_name}
     meta.schema = schema
     return meta
+
+
+def _bok_defined_terms(work) -> list[dict]:
+    """Render `Work.bok_concepts` as schema.org `DefinedTerm` entries.
+
+    Returns an empty list when no concepts are tagged or the snapshot is
+    unreachable. Orphan codes (no longer in the cached snapshot) are
+    rendered with `termCode` only — no `url` — and a name equal to the code.
+    """
+    codes = getattr(work, "bok_concepts", None) or []
+    if not codes:
+        return []
+    try:
+        from works.bok import client as bok_client
+        resolved = bok_client.resolve(codes)
+    except Exception:
+        return []
+
+    term_set = {
+        "@type": "DefinedTermSet",
+        "name": "EO4GEO Body of Knowledge",
+        "url": "https://eo4geo.eu/bok/",
+    }
+    out: list[dict] = []
+    for c in resolved:
+        term: dict = {
+            "@type": "DefinedTerm",
+            "termCode": c["code"],
+            "name": c.get("name") or c["code"],
+            "inDefinedTermSet": term_set,
+        }
+        if c.get("uri"):
+            term["url"] = c["uri"]
+        if c.get("description"):
+            term["description"] = c["description"]
+        out.append(term)
+    return out

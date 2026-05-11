@@ -514,6 +514,64 @@ When to clear which:
 - `python manage.py update_openalex_journals` — enriches `Source` records from the OpenAlex API.
 - When to re-run each (e.g. after adding a new source, on a quarterly cadence).
 
+### EO4GEO BoK snapshot
+
+OPTIMAP caches the public [EO4GEO Body of Knowledge](https://eo4geo.eu/bok/)
+so the autosuggest combobox on the work landing page (issue #245) and the
+contribution endpoint can validate concept codes without hitting upstream
+on every request. The cache is **lazy on miss** — first request after
+deploy fetches and writes; the management command below makes that
+explicit.
+
+**Settings (env vars, see `optimap/.env.example`):**
+
+- `OPTIMAP_BOK_VERSION` — which BoK version to follow. Default `v3`
+  (pinned for label stability). Set to `current` to auto-follow
+  upstream renames/additions; pin to another `vN` if upstream churn
+  breaks chips.
+- `OPTIMAP_BOK_API_BASE` — root of the Firebase API. Default
+  `https://eo4geo-bok.firebaseio.com`.
+- `OPTIMAP_BOK_CONCEPT_BASE_URL` — base for the public concept pages.
+  Default `http://bok.eo4geo.eu`. Used as a fallback when a concept's
+  `uri` field is missing.
+- `OPTIMAP_BOK_ENABLED_COLLECTIONS` — **opt-in allow-list** of
+  `Collection.identifier` slugs (comma-separated, no spaces; e.g.
+  `mountain-wetlands,essd`). The editor is shown only on works that
+  belong to at least one of the listed collections; the
+  `/contribute-bok/` endpoint enforces the same rule with 403.
+  **Empty (default) = editor disabled site-wide** — list the
+  collections you want to enable. Read-only chips on already-tagged
+  works remain visible regardless. Update the env var and restart to
+  apply; no migration needed.
+
+**Refresh:**
+
+```bash
+python manage.py refresh_bok_snapshot               # use settings.BOK_VERSION
+python manage.py refresh_bok_snapshot --version v3  # pin a version explicitly
+python manage.py refresh_bok_snapshot --dry-run     # fetch + report without writing
+```
+
+The snapshot lives in the `default` (DB) cache under
+`bok:concepts:<version>:v1`. Clearing the cache forces a refetch on the
+next request:
+
+```bash
+python manage.py clear_caches --cache default      # also drops other DB-cache rows
+```
+
+**When to refresh:**
+
+- After a known upstream change (new concepts, renames).
+- If the autosuggest input returns "No matches" for terms you expect.
+- On a quarterly cadence (mostly to keep names in sync with upstream).
+
+**Orphan codes.** If upstream removes a concept that's already stored on
+a work, the chip on the landing page renders as a greyed plain-text chip
+with a *"No longer in current EO4GEO BoK"* tooltip. The code stays in
+the DB so admins can decide whether to remove it, swap to a successor,
+or wait for upstream to restore it.
+
 ### Operate the geoextent service
 
 - Configuration knobs from CLAUDE.md §[Geoextent API Endpoints](../CLAUDE.md): `GEOEXTENT_MAX_FILE_SIZE_MB`, `GEOEXTENT_MAX_BATCH_SIZE_MB`, `GEOEXTENT_MAX_DOWNLOAD_SIZE_MB`, `GEOEXTENT_DOWNLOAD_WORKERS`.

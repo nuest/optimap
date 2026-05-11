@@ -9,7 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Tag works with EO4GEO Body of Knowledge concepts** (closes #245). New `bok_concepts` field on `Work` plus an autosuggest combobox on the work landing page (≥3-character query, full keyboard, multi-select) backed by `GET /api/v1/bok/search/`. Tagged concepts render as chips that link to the canonical concept page on `bok.eo4geo.eu`, surface in the public Work API as `bok_concepts` / `bok_concepts_resolved`, and emit JSON-LD `about: [DefinedTerm,…]` on the landing page. Adding the first concept on a harvested work flips its status from Harvested to Contributed for admin review; Recognition Board credit is recorded under a new generic *Ontology contributions* kind (so the same bucket can later cover other controlled vocabularies) and deduped per (user, work) so the same user adding more concepts later does not double-count. The cached BoK snapshot is refreshed by `python manage.py refresh_bok_snapshot` (pinned to `v3` by default; configurable via `OPTIMAP_BOK_VERSION`). The editor is **opt-in**: set `OPTIMAP_BOK_ENABLED_COLLECTIONS` to a comma-separated list of `Collection.identifier` slugs to enable it on works in those collections — empty (default) disables the editor site-wide. Read-only chips on already-tagged works remain visible regardless.
+
+### Changed
+
 - **Contribution editor open to logged-in users on both Harvested *and* Contributed works** so a second contributor can fill a different gap (e.g. add temporal extent after someone else added a geometry). Pre-existing extents no longer close the form: user B may replace user A's geometry, with the provenance log recording attribution.
+- **Recognition Board credit dedupes per (user, work, kind) via the provenance log.** Re-editing the same property type on the same work counts once for that user; different users editing the same property each count separately. Applies to spatial, temporal, and the new ontology bucket.
 
 - **Filter the contribute page by collection** with `/contribute/?collection=<identifier|id|short_slug>`; collection landing pages link into it.
 

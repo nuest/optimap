@@ -35,6 +35,9 @@ class SourceSerializer(serializers.ModelSerializer):
 class WorkSerializer(GeoFeatureModelSerializer):
     source_details = serializers.SerializerMethodField(help_text="Embedded source row (same shape as `/api/v1/sources/<id>/`).")
     status_display = serializers.CharField(source="get_status_display", read_only=True)
+    bok_concepts_resolved = serializers.SerializerMethodField(
+        help_text="Each BoK code resolved against the active EO4GEO BoK snapshot: code, name, uri, parent_code, breadcrumb, orphan flag."
+    )
 
     class Meta:
         model = Work
@@ -58,6 +61,8 @@ class WorkSerializer(GeoFeatureModelSerializer):
             "authors",
             "keywords",
             "topics",
+            "bok_concepts",
+            "bok_concepts_resolved",
             "openalex_id",
             "openalex_match_info",
             "openalex_fulltext_origin",
@@ -72,6 +77,24 @@ class WorkSerializer(GeoFeatureModelSerializer):
         if not source:
             return {}
         return SourceSerializer(source, context=self.context).data
+
+    @extend_schema_field(serializers.ListField(child=serializers.DictField()))
+    def get_bok_concepts_resolved(self, obj):
+        codes = obj.bok_concepts or []
+        if not codes:
+            return []
+        # Late import to avoid circular dependency at module load.
+        from works.bok import client as bok_client
+        try:
+            return bok_client.resolve(codes)
+        except Exception:
+            # If the BoK snapshot is unreachable, fall back to bare codes
+            # so the API stays responsive.
+            return [
+                {"code": c, "name": c, "uri": "", "parent_code": "",
+                 "breadcrumb": [], "orphan": True}
+                for c in codes
+            ]
 
 class SubscriptionSerializer(GeoFeatureModelSerializer):
     class Meta:

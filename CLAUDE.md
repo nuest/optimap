@@ -40,6 +40,7 @@ Part of the KOMET project (<https://projects.tib.eu/komet>), continuing from OPT
   - **Other tasks** ([tasks.py](works/tasks.py)) — non-harvest Django-Q tasks: monthly email digest, subscription emails, GeoJSON / GeoPackage cache regeneration, schedule helpers.
   - **API** ([api.py](works/api.py), [viewsets.py](works/viewsets.py), [serializers.py](works/serializers.py)) - DRF REST API at `/api/v1/`
   - **Feeds** ([feeds.py](works/feeds.py), [feeds_geometry.py](works/feeds_geometry.py)) - GeoRSS/GeoAtom feed generation
+  - **EO4GEO BoK** ([bok/](works/bok/)) — thin client + cached trimmed snapshot of the [Body of Knowledge](https://eo4geo.eu/bok/) (`client.py`), public autosuggest endpoint at `/api/v1/bok/search/` (`views.py`), code validators (`validators.py`). Cached in the `default` DB cache, lazy on miss; refresh via `python manage.py refresh_bok_snapshot`. See [docs/manage.md](docs/manage.md#eo4geo-bok-snapshot).
 
 ### Key Technologies
 
@@ -356,6 +357,7 @@ All deployment-specific config uses `OPTIMAP_*` environment variables loaded fro
 - **Email debugging**: Set `EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend` in `.env`
 - **Django-Q cluster**: Must be running separately for harvesting/scheduled tasks to execute
 - **Data dumps retention**: Controlled by `OPTIMAP_DATA_DUMP_RETENTION` (default: 3)
+- **Django template comments `{# … #}` must be on a single line.** The parser does not support multi-line `{# #}` blocks — a newline inside the comment is rendered verbatim and may break the page. For multi-line notes use `{% comment %}…{% endcomment %}` instead.
 
 ## File Structure Highlights
 

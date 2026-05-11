@@ -6,6 +6,7 @@ Views for geometry contribution and work management.
 """
 import logging
 import json
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.admin.views.decorators import staff_member_required
@@ -16,7 +17,8 @@ from django.contrib.gis.geos import GEOSGeometry
 from django.utils import timezone
 from works.models import Work, Contribution
 from works.utils.identifiers import get_work_by_identifier
-from works.utils.provenance import append_event
+from works.utils.provenance import append_event, user_has_contributed_kind
+from works.bok import client as bok_client
 
 logger = logging.getLogger(__name__)
 
@@ -29,10 +31,13 @@ def contribute_geometry_by_id(request, work_id):
     API endpoint for users to contribute geometry and/or temporal extent to a work by ID.
     Used for publications without a DOI.
 
-    Open to logged-in users while a work is Harvested or Contributed —
-    different contributors can fill different gaps, and pre-existing
-    extents are not a barrier (user B may replace user A's geometry,
-    with the provenance log carrying attribution).
+    Open to logged-in users while a work is Harvested or Contributed. The
+    first time a user contributes spatial/temporal/ontology to a work
+    they get a Recognition Board row (deduped via the provenance log);
+    repeated edits of the same property by the same user are recorded in
+    provenance but do not double-count on the board. Pre-existing
+    extents are not a barrier — replacing user A's geometry as user B is
+    explicitly allowed, with the provenance log carrying attribution.
     """
     if not request.user.is_authenticated:
         return JsonResponse({'error': 'Authentication required'}, status=401)
@@ -86,6 +91,17 @@ def contribute_geometry_by_id(request, work_id):
                 changes_made.append(f"Set end date to {end_date}")
                 temporal_contributed = True
 
+        # Recognition Board dedup decisions taken BEFORE we record this
+        # event, so the new event doesn't count against itself.
+        record_spatial_row = (
+            spatial_contributed
+            and not user_has_contributed_kind(work, request.user.id, "spatial")
+        )
+        record_temporal_row = (
+            temporal_contributed
+            and not user_has_contributed_kind(work, request.user.id, "temporal")
+        )
+
         status_from = work.status
         # Harvested works flip to Contributed on the first contribution;
         # already-Contributed works stay there.
@@ -104,9 +120,9 @@ def contribute_geometry_by_id(request, work_id):
         work.status = status_to
         work.save()
 
-        if spatial_contributed:
+        if record_spatial_row:
             Contribution.objects.create(user=request.user, work=work, kind=Contribution.SPATIAL)
-        if temporal_contributed:
+        if record_temporal_row:
             Contribution.objects.create(user=request.user, work=work, kind=Contribution.TEMPORAL)
 
         logger.info(
@@ -320,3 +336,147 @@ def unpublish_work(request, identifier):
         return JsonResponse({'error': 'Work not found'}, status=404)
 
     return unpublish_work_by_id(request, work.id)
+
+
+# BoK concept contribution ----------------------------------------------------
+
+@require_POST
+def contribute_bok_by_id(request, work_id):
+    """Add or remove EO4GEO BoK concept tags on a work.
+
+    Body: ``{"add": ["CV","AM10-3"], "remove": ["GIST"]}`` (both optional).
+    Codes are validated against the cached BoK snapshot. The first BoK
+    contribution on a harvested work flips the status `h → c`; later
+    edits leave the status alone.
+    """
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    try:
+        work = Work.objects.get(id=work_id)
+    except Work.DoesNotExist:
+        return JsonResponse({'error': 'Work not found'}, status=404)
+
+    # Collection gate (OPTIMAP_BOK_ENABLED_COLLECTIONS). Opt-in allow-list:
+    # empty -> editor disabled site-wide; populated -> restricted to those
+    # collections.
+    from works.bok import eligibility as bok_eligibility
+    if not bok_eligibility.is_work_eligible(work):
+        allowed = bok_eligibility.enabled_collection_identifiers()
+        if not allowed:
+            msg = 'BoK tagging is not enabled on this OPTIMAP instance.'
+        else:
+            msg = (
+                'BoK tagging is restricted to works in specific collection(s) '
+                f'({", ".join(allowed)}); this work is not in any of them.'
+            )
+        return JsonResponse({'error': msg}, status=403)
+
+    try:
+        data = json.loads(request.body or b"{}")
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    add = data.get("add") or []
+    remove = data.get("remove") or []
+    if not isinstance(add, list) or not isinstance(remove, list):
+        return JsonResponse({'error': '`add` and `remove` must be arrays of concept codes'}, status=400)
+    add = [str(c).strip() for c in add if str(c).strip()]
+    remove = [str(c).strip() for c in remove if str(c).strip()]
+
+    if not add and not remove:
+        return JsonResponse({'error': 'No concepts provided in `add` or `remove`'}, status=400)
+
+    # Validate `add` codes against the cached snapshot. We don't validate
+    # `remove` codes — the user may legitimately be cleaning up an orphan.
+    snapshot = bok_client.get_concepts()
+    unknown = [c for c in add if c not in snapshot]
+    if unknown:
+        return JsonResponse({
+            'error': f'Unknown BoK concept code(s): {", ".join(sorted(set(unknown)))}'
+        }, status=400)
+
+    current = list(work.bok_concepts or [])
+    current_set = set(current)
+    add_set = set(add) - current_set
+    remove_set = set(remove) & current_set
+
+    if not add_set and not remove_set:
+        return JsonResponse({
+            'success': True,
+            'message': 'No changes — concepts already in the requested state.',
+            'bok_concepts': sorted(current),
+        })
+
+    new_concepts = sorted((current_set | add_set) - remove_set)
+
+    # Status transition: only flip `h → c` when adding (not pure removal).
+    status_from = work.status
+    status_to = work.status
+    if work.status == 'h' and add_set:
+        status_to = 'c'
+
+    # Recognition Board dedup decided BEFORE appending the event. The
+    # ontology bucket is per-user-per-work (not per-concept) — adding 5
+    # concepts in one POST = 1 row, adding 1 more later by the same user
+    # = 0 new rows. Removals never count.
+    record_ontology_row = (
+        bool(add_set)
+        and not user_has_contributed_kind(work, request.user.id, "bok")
+    )
+
+    work.bok_concepts = new_concepts
+    append_event(
+        work,
+        "contribution",
+        user_id=request.user.id,
+        user_email=request.user.email,
+        kinds=["bok"],
+        vocabulary="eo4geo_bok",
+        version=getattr(settings, 'BOK_VERSION', 'current'),
+        added=sorted(add_set),
+        removed=sorted(remove_set),
+        status_from=status_from,
+        status_to=status_to,
+    )
+    work.status = status_to
+    work.save()
+
+    if record_ontology_row:
+        Contribution.objects.create(
+            user=request.user, work=work, kind=Contribution.ONTOLOGY,
+        )
+
+    logger.info(
+        "User %s tagged work %s (ID: %s) BoK +%s -%s",
+        request.user.username, work.title[:50], work.id,
+        sorted(add_set), sorted(remove_set),
+    )
+
+    if add_set:
+        from works.notifications import notify_work_event
+        notify_work_event(work, "contribution", actor=request.user)
+
+    messages.success(
+        request,
+        "Thank you for your topic contribution! It is now visible to curators and admins for review.",
+    )
+
+    return JsonResponse({
+        'success': True,
+        'message': 'BoK concepts updated.',
+        'added': sorted(add_set),
+        'removed': sorted(remove_set),
+        'bok_concepts': new_concepts,
+        'status': work.status,
+    })
+
+
+@require_POST
+def contribute_bok(request, identifier):
+    """DOI-/ID-resolving wrapper for `contribute_bok_by_id`."""
+    try:
+        work = get_work_by_identifier(identifier)
+    except Http404:
+        return JsonResponse({'error': 'Work not found'}, status=404)
+    return contribute_bok_by_id(request, work.id)

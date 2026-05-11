@@ -1,0 +1,169 @@
+/* SPDX-FileCopyrightText: 2026 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ *
+ * EO4GEO Body of Knowledge concept tagging UI (issue #245).
+ * Read-only chips on the landing page + the autosuggest combobox in the
+ * contribution editor. Plain CSS — no preprocessor.
+ */
+
+.bok-topics {
+  margin: 0.75rem 0 1.25rem;
+}
+
+.bok-chip-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.6rem;
+}
+
+.bok-chip-list > li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.bok-breadcrumb {
+  display: block;
+  font-size: 0.75rem;
+  line-height: 1;
+  color: #6c757d;
+  margin-bottom: 0.15rem;
+}
+
+.bok-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: #e7f5f7;
+  color: #0c5460;
+  border: 1px solid #b9eef5;
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+  font-size: 0.85rem;
+  text-decoration: none;
+  line-height: 1.2;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.bok-chip:hover,
+.bok-chip:focus {
+  background: #d2ecf0;
+  border-color: #93dde6;
+  color: #064046;
+  text-decoration: none;
+  outline: 2px solid #158F9B;
+  outline-offset: 1px;
+}
+
+.bok-chip-code {
+  font-family: var(--font-monospace, "SFMono-Regular", Consolas, monospace);
+  font-size: 0.7rem;
+  color: #0c5460;
+  opacity: 0.75;
+}
+
+.bok-chip-orphan {
+  background: #f0f0f0;
+  color: #555;
+  border: 1px dashed #aaa;
+  cursor: help;
+}
+
+.bok-chip-orphan:hover {
+  background: #e8e8e8;
+}
+
+.bok-chip-remove {
+  background: transparent;
+  border: none;
+  font-size: 1rem;
+  line-height: 1;
+  color: #6c757d;
+  padding: 0 0.35rem;
+  cursor: pointer;
+  border-radius: 50%;
+}
+
+.bok-chip-remove:hover,
+.bok-chip-remove:focus {
+  color: #842029;
+  background: #f8d7da;
+  outline: none;
+}
+
+/* Combobox -------------------------------------------------------------- */
+
+.bok-combobox {
+  position: relative;
+}
+
+.bok-suggestions {
+  position: absolute;
+  z-index: 1050;
+  top: 100%;
+  left: 0;
+  right: 0;
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0.25rem 0;
+  background: #fff;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  max-height: 22rem;
+  overflow-y: auto;
+}
+
+.bok-suggestion {
+  padding: 0.4rem 0.7rem;
+  cursor: pointer;
+  border-bottom: 1px solid #f1f3f5;
+}
+
+.bok-suggestion:last-child {
+  border-bottom: none;
+}
+
+.bok-suggestion[aria-selected="true"],
+.bok-suggestion:hover {
+  background: #e7f5f7;
+}
+
+.bok-suggestion-name {
+  font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.bok-suggestion-code {
+  font-family: var(--font-monospace, "SFMono-Regular", Consolas, monospace);
+  font-size: 0.75rem;
+  color: #6c757d;
+}
+
+.bok-suggestion-breadcrumb {
+  font-size: 0.75rem;
+  color: #6c757d;
+  margin-top: 0.1rem;
+}
+
+.bok-suggestion-description {
+  font-size: 0.8rem;
+  color: #495057;
+  margin-top: 0.15rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.bok-suggestion-empty {
+  padding: 0.5rem 0.7rem;
+  color: #6c757d;
+  font-style: italic;
+}
