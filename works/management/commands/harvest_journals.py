@@ -120,7 +120,7 @@ SOURCE_CONFIG = {
         'default_work_type': 'proceedings-article',
     },
     'agile-giss-openalex': {
-        'name': 'AGILE GIScience Series (OpenAlex)',
+        'name': 'AGILE GIScience Series',
         # The harvester resolves S<digits> from openalex_id (preferred) or
         # url_field (fallback). The public Source API derives the display URL
         # from openalex_id on the fly.

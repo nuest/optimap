@@ -74,7 +74,7 @@ class MountainWetlandsAutoCreatesCollectionTests(TestCase):
 class OpenalexSourceAutoCreatesCollectionTests(TestCase):
     def setUp(self):
         self.source = Source.objects.create(
-            name='AGILE GIScience Series (OpenAlex)',
+            name='AGILE GIScience Series',
             url_field='https://api.openalex.org/sources/S4210203054',
             source_type='openalex',
             openalex_id='S4210203054',
@@ -92,7 +92,7 @@ class OpenalexSourceAutoCreatesCollectionTests(TestCase):
 
         self.source.refresh_from_db()
         self.assertIsNotNone(self.source.collection)
-        self.assertEqual(self.source.collection.identifier, 'agile-giscience-series-openalex')
+        self.assertEqual(self.source.collection.identifier, 'agile-giscience-series')
         self.assertFalse(self.source.collection.is_published)
         self.assertEqual(Collection.objects.count(), 1)
 
