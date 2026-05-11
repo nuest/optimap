@@ -291,6 +291,42 @@ class GeometryContributionTests(TestCase):
             1,
         )
 
+    def test_repeated_contribution_by_same_user_dedupes_recognition(self):
+        """The same user editing the same property twice yields one row."""
+        from works.models import Contribution
+
+        self.client.login(username='contributor@example.com', password='testpass123')
+        url = f'/work/{self.pub_harvested.doi}/contribute-geometry/'
+
+        # First contribution — counts.
+        self.client.post(
+            url,
+            data=json.dumps({'geometry': self.test_geometry}),
+            content_type='application/json',
+        )
+        # Second contribution (replacement) — provenance records it,
+        # Recognition Board does not double-count.
+        other_geom = {
+            "type": "GeometryCollection",
+            "geometries": [{"type": "Point", "coordinates": [10.0, 50.0]}],
+        }
+        self.client.post(
+            url,
+            data=json.dumps({'geometry': other_geom}),
+            content_type='application/json',
+        )
+        rows = Contribution.objects.filter(
+            user=self.regular_user, work=self.pub_harvested, kind=Contribution.SPATIAL,
+        )
+        self.assertEqual(rows.count(), 1)
+
+        # And the provenance log carries both events.
+        self.pub_harvested.refresh_from_db()
+        events = [e for e in (self.pub_harvested.provenance or {}).get("events", [])
+                  if e.get("type") == "contribution"]
+        self.assertGreaterEqual(len(events), 2)
+
+
 class PublishWorkTests(TestCase):
     """Test publish work API endpoint."""
 
