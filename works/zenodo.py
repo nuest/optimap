@@ -98,6 +98,52 @@ def _live_download_related_identifiers() -> list[dict]:
     ]
 
 
+def _source_identifier(source: dict) -> tuple[str, str] | None:
+    """
+    Pick the best Zenodo `(scheme, identifier)` for a Source row.
+
+    Preference order: linking ISSN, then journal homepage URL, then the
+    harvest endpoint URL. Returns ``None`` for self-references to
+    optimap.science (the portal isn't a source it describes) and for
+    sources that expose no usable identifier.
+    """
+    issn = (source.get("issn_l") or "").strip()
+    if issn:
+        return ("issn", issn)
+    for raw in (source.get("homepage_url"), source.get("url_field")):
+        url = _canonical_url(raw)
+        if not url:
+            continue
+        if _extract_domain(url) == "optimap.science":
+            continue
+        return ("url", url)
+    return None
+
+
+def _describes_related_identifiers(sources: Iterable[dict]) -> list[dict]:
+    """
+    One Zenodo `related_identifiers` entry per harvested Source with
+    relation=describes, resource_type=publication — i.e. "this record
+    describes Journal X". Wording follows the 2025-07-14 issue comment
+    on #63.
+    """
+    seen: set[tuple[str, str]] = set()
+    out: list[dict] = []
+    for s in sources:
+        ident = _source_identifier(s)
+        if ident is None or ident in seen:
+            continue
+        seen.add(ident)
+        scheme, value = ident
+        out.append({
+            "scheme": scheme,
+            "identifier": value,
+            "relation": "describes",
+            "resource_type": "publication",
+        })
+    return out
+
+
 # ================== Rendering ==================
 
 def render_zenodo_package(project_root: Path | None = None, stdout_callback=None) -> dict:
@@ -158,15 +204,19 @@ def render_zenodo_package(project_root: Path | None = None, stdout_callback=None
         Work.objects.order_by("-publicationDate").values_list("publicationDate", flat=True).first() or ""
     )
 
-    # Sources (dedupe by domain)
-    seen = set()
+    # Sources for the README — dedupe by canonical domain so the same
+    # publisher doesn't appear twice in the visible list.
+    source_rows = list(
+        Source.objects.all().values("name", "url_field", "homepage_url", "issn_l")
+    )
+    seen_domains: set[str] = set()
     sources: list[dict] = []
-    for s in Source.objects.all().only("name", "url_field").values("name", "url_field"):
+    for s in source_rows:
         url = _canonical_url(s.get("url_field"))
         dom = _extract_domain(url)
-        if not dom or dom in seen:
+        if not dom or dom in seen_domains:
             continue
-        seen.add(dom)
+        seen_domains.add(dom)
         sources.append({"name": _clean_label(s.get("name"), url), "url": url})
 
     # Render README.md
@@ -201,10 +251,13 @@ def render_zenodo_package(project_root: Path | None = None, stdout_callback=None
     ]
 
     # `related_identifiers` is always derived from current state — the live
-    # download URLs come from settings.BASE_URL + URL config, so a stale
-    # zenodo_dynamic.json from another environment (e.g. localhost) cannot
-    # leak into the deposit.
-    related_identifiers = _live_download_related_identifiers()
+    # download URLs come from settings.BASE_URL + URL config, and the
+    # "describes" entries are recomputed from the Source table on every run.
+    # A stale zenodo_dynamic.json from another environment cannot leak in.
+    related_identifiers = [
+        *_live_download_related_identifiers(),
+        *_describes_related_identifiers(source_rows),
+    ]
 
     dyn = {
         **existing_dyn,

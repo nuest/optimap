@@ -106,14 +106,69 @@ class RenderZenodoTest(TestCase):
             call_command("render_zenodo")
 
         dyn = json.loads((self.data_dir / "zenodo_dynamic.json").read_text(encoding="utf-8"))
-        identifiers = {r["identifier"] for r in dyn["related_identifiers"]}
-
-        self.assertEqual(identifiers, {
+        live_urls = {
+            r["identifier"]
+            for r in dyn["related_identifiers"]
+            if r["relation"] == "isSupplementTo"
+        }
+        self.assertEqual(live_urls, {
             "https://optimap.science/download/geojson/",
             "https://optimap.science/download/geopackage/",
             "https://optimap.science/download/csv/",
         })
         for r in dyn["related_identifiers"]:
-            self.assertEqual(r["relation"], "isSupplementTo")
-            self.assertEqual(r["resource_type"], "dataset")
-            self.assertEqual(r["scheme"], "url")
+            if r["relation"] == "isSupplementTo":
+                self.assertEqual(r["resource_type"], "dataset")
+                self.assertEqual(r["scheme"], "url")
+
+    @override_settings(BASE_URL="https://optimap.science")
+    def test_render_includes_describes_entry_per_source(self):
+        """Each Source becomes one related_identifiers entry with
+        relation=describes. ISSN-L wins over URL; sources sharing a
+        canonical identifier are deduped; optimap.science is skipped
+        (issue #63, item 6 / comment 2025-07-14)."""
+        # Source with an ISSN-L → scheme=issn
+        Source.objects.create(
+            name="Earth System Science Data",
+            url_field="https://essd.copernicus.org/oai",
+            homepage_url="https://www.earth-system-science-data.net/",
+            issn_l="1866-3508",
+        )
+        # Source without ISSN-L but with homepage → scheme=url, identifier=homepage
+        Source.objects.create(
+            name="Some Repository",
+            url_field="https://example.org/oai",
+            homepage_url="https://example.com/journal",
+        )
+
+        def _noop(*a, **k): return None
+        with patch.object(self.zenodo_mod, "__file__", new=self.zenodo_file), \
+             patch.object(self.zenodo_mod, "Path", self.FakePath), \
+             patch("subprocess.run", _noop):
+            call_command("render_zenodo")
+
+        dyn = json.loads((self.data_dir / "zenodo_dynamic.json").read_text(encoding="utf-8"))
+        describes = [
+            r for r in dyn["related_identifiers"] if r["relation"] == "describes"
+        ]
+        for r in describes:
+            self.assertEqual(r["resource_type"], "publication")
+
+        idents = {(r["scheme"], r["identifier"]) for r in describes}
+
+        # ISSN-L wins over homepage URL
+        self.assertIn(("issn", "1866-3508"), idents)
+        # Homepage URL is the fallback (canonicalised to https + lowercased host)
+        self.assertIn(("url", "https://example.com/journal"), idents)
+        # optimap.science (seeded in setUp via numeric-name source) must not
+        # appear — the portal isn't a source it describes.
+        for scheme, ident in idents:
+            self.assertNotIn("optimap.science", ident)
+        # Two sources point at example.org and example.com but the dedupe key
+        # is the resolved identifier, so they coexist; the duplicate
+        # example.org seed in setUp has no homepage_url so falls back to its
+        # url_field once after dedupe.
+        self.assertEqual(
+            sum(1 for s, i in idents if "example.org" in i), 1,
+            "Duplicate example.org Sources should collapse to one describes entry",
+        )
