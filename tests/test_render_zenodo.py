@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from django.core.management import call_command
 from django.test import TestCase, override_settings
-from works.models import Work, Source
+from works.models import Work, Source, ZenodoDepositionLog
 
 
 class RenderZenodoTest(TestCase):
@@ -211,6 +211,50 @@ class RenderZenodoTest(TestCase):
             "Open Access", "Open Science", "Open Research Information",
             "ORI", "Open Data", "FAIR",
         ])
+
+    def test_render_version_starts_at_v1_with_no_prior_deposits(self):
+        """Fresh DB, no ZenodoDepositionLog rows → render emits v1.
+        The data/last_version.txt file was removed in favour of DB state."""
+        with patch.object(self.zenodo_mod, "__file__", new=self.zenodo_file), \
+             patch.object(self.zenodo_mod, "Path", self.FakePath), \
+             patch("subprocess.run", self._fake_git_archive):
+            call_command("render_zenodo")
+
+        dyn = json.loads((self.data_dir / "zenodo_dynamic.json").read_text(encoding="utf-8"))
+        self.assertEqual(dyn["version"], "v1")
+        # And the legacy tracking file must not be created either.
+        self.assertFalse((self.data_dir / "last_version.txt").exists())
+
+    def test_render_version_increments_from_latest_successful_log(self):
+        """Render reads the latest successful ZenodoDepositionLog for the
+        target api_base and emits the next vN. Sandbox and production
+        increment independently; failed depositions don't burn a version."""
+        api_base = "https://sandbox.zenodo.org/api"
+        # Successful logs at v1 and v2 for this api_base; the latest wins.
+        ZenodoDepositionLog.objects.create(
+            deposition_id="42", api_base=api_base, status="success", version="v1",
+        )
+        ZenodoDepositionLog.objects.create(
+            deposition_id="42", api_base=api_base, status="success", version="v2",
+        )
+        # A failed deposit at v3 must not advance the counter.
+        ZenodoDepositionLog.objects.create(
+            deposition_id="42", api_base=api_base, status="failed", version="v3",
+        )
+        # A successful deposit at a different api_base must not advance it either.
+        ZenodoDepositionLog.objects.create(
+            deposition_id="99", api_base="https://zenodo.org/api",
+            status="success", version="v50",
+        )
+
+        with patch.object(self.zenodo_mod, "__file__", new=self.zenodo_file), \
+             patch.object(self.zenodo_mod, "Path", self.FakePath), \
+             patch("subprocess.run", self._fake_git_archive), \
+             override_settings(ZENODO_API_BASE=api_base):
+            call_command("render_zenodo")
+
+        dyn = json.loads((self.data_dir / "zenodo_dynamic.json").read_text(encoding="utf-8"))
+        self.assertEqual(dyn["version"], "v3")
 
     def test_render_emits_grants_for_optimeta_and_komet(self):
         """Render emits structured `grants` for OPTIMETA (BMBF 16TOA028B)

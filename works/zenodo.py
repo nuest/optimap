@@ -76,6 +76,44 @@ def _clean_label(name: str | None, url: str | None) -> str:
     return _label_from_domain(domain) if domain else "Source"
 
 
+def _resolve_api_base(api_base: str | None = None) -> str:
+    """Resolve the Zenodo API base URL with the same env/settings/default
+    cascade that `deposit_to_zenodo` uses, so render and deposit always
+    look at the same target when scoping per-target state (e.g. version).
+    """
+    if api_base is not None:
+        return api_base
+    return (
+        os.getenv("ZENODO_API_BASE")
+        or getattr(settings, "ZENODO_API_BASE", "https://sandbox.zenodo.org/api")
+    )
+
+
+def _next_version_for(api_base: str) -> str:
+    """
+    Compute the next `vN` label by reading the latest successful
+    `ZenodoDepositionLog.version` for `api_base`. Sandbox and production
+    have separate counters because they target different deposits; a
+    failed deposit doesn't burn a version number.
+    """
+    last = (
+        ZenodoDepositionLog.objects
+        .filter(status="success", api_base=api_base)
+        .exclude(version__isnull=True)
+        .exclude(version="")
+        .order_by("-deposition_date")
+        .values_list("version", flat=True)
+        .first()
+    )
+    last_n = 0
+    if last:
+        try:
+            last_n = int(last.lstrip("v") or 0)
+        except ValueError:
+            last_n = 0
+    return f"v{last_n + 1}"
+
+
 def _live_download_related_identifiers() -> list[dict]:
     """
     Build Zenodo `related_identifiers` entries pointing at the always-current
@@ -218,11 +256,19 @@ def _describes_related_identifiers(sources: Iterable[dict]) -> list[dict]:
 
 # ================== Rendering ==================
 
-def render_zenodo_package(project_root: Path | None = None, stdout_callback=None) -> dict:
+def render_zenodo_package(
+    project_root: Path | None = None,
+    stdout_callback=None,
+    api_base: str | None = None,
+) -> dict:
     """
     Render Zenodo data package (README, metadata, archive).
 
     Returns dict with paths to generated files.
+
+    `api_base` scopes the version counter so sandbox and production
+    increment independently. Defaults to the same env/settings cascade
+    that `deposit_to_zenodo` uses.
     """
     def log(msg):
         if stdout_callback:
@@ -238,17 +284,11 @@ def render_zenodo_package(project_root: Path | None = None, stdout_callback=None
     data_dir = project_root / "data"
     data_dir.mkdir(exist_ok=True)
 
-    # Version bump
-    version_file = data_dir / "last_version.txt"
-    if version_file.exists():
-        try:
-            last = int((version_file.read_text(encoding="utf-8").strip() or "").lstrip("v") or 0)
-        except ValueError:
-            last = 0
-    else:
-        last = 0
-    version = f"v{last + 1}"
-    version_file.write_text(version, encoding="utf-8")
+    # Version: source of truth is the latest successful ZenodoDepositionLog
+    # for this api_base. A tracked file would drift across environments and
+    # silently restart at v1 on a fresh checkout.
+    api_base = _resolve_api_base(api_base)
+    version = _next_version_for(api_base)
 
     # Zip snapshot — the deposit must include a copy of the OPTIMAP source
     # tree (issue #63, last checklist item). A silent empty-zip fallback
@@ -699,11 +739,6 @@ def deposit_to_zenodo(
         status='failed',
     )
 
-    # Track version
-    version_file = data_dir / "last_version.txt"
-    if version_file.exists():
-        log_entry.version = version_file.read_text(encoding="utf-8").strip()
-
     log_entry.works_count = Work.objects.count()
 
     upload_start = time.time()
@@ -715,6 +750,13 @@ def deposit_to_zenodo(
             raise FileNotFoundError(f"{dyn_path} not found. Run render_zenodo_package() first.")
 
         incoming = json.loads(dyn_path.read_text(encoding="utf-8"))
+
+        # Version: written into the rendered metadata by render_zenodo_package
+        # — the previous file-based tracker (data/last_version.txt) was
+        # removed in favour of ZenodoDepositionLog as source of truth.
+        version_str = (incoming.get("version") or "").strip()
+        if version_str:
+            log_entry.version = version_str
 
         # Fetch existing deposition
         dep = _get_deposition(api_base, token, str(deposition_id))

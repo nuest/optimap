@@ -74,7 +74,6 @@ class ZenodoIntegrationTest(TestCase):
             encoding="utf-8"
         )
         (self.data_dir / "optimap-main.zip").write_bytes(b"TEST_ZIP_CONTENT")
-        (self.data_dir / "last_version.txt").write_text("v1.0.0-test", encoding="utf-8")
 
         # Create dynamic metadata
         (self.data_dir / "zenodo_dynamic.json").write_text(json.dumps({
@@ -123,7 +122,6 @@ class ZenodoIntegrationTest(TestCase):
             # Verify generated files exist
             data_dir = Path(settings.BASE_DIR) / 'data'
             self.assertTrue((data_dir / 'README.md').exists(), "README.md should be generated")
-            self.assertTrue((data_dir / 'last_version.txt').exists(), "last_version.txt should exist")
             self.assertTrue((data_dir / 'zenodo_dynamic.json').exists(), "zenodo_dynamic.json should exist")
 
     @override_settings(
@@ -225,7 +223,6 @@ class ZenodoFullDepositTest(TestCase):
                 encoding="utf-8"
             )
             (data_dir / "optimap-main.zip").write_bytes(b"TEST_ZIP_CONTENT_INTEGRATION")
-            (data_dir / "last_version.txt").write_text("v1.0.0-integration-test", encoding="utf-8")
 
             # Create dynamic metadata
             import json

@@ -171,7 +171,6 @@ data/*.csv
 data/*.csv.gz
 data/README.md
 data/zenodo_dynamic.json
-data/last_version.txt
 
 # Test environment files (may contain secrets)
 tests/.env

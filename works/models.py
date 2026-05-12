@@ -824,7 +824,7 @@ class ZenodoDepositionLog(models.Model):
         max_length=100,
         blank=True,
         null=True,
-        help_text='Version string from last_version.txt'
+        help_text='Zenodo deposit version label (e.g. "v1", "v2"); next-version counter for this api_base.'
     )
     files_uploaded = models.JSONField(
         blank=True,

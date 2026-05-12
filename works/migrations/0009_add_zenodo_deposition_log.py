@@ -73,7 +73,7 @@ class Migration(migrations.Migration):
                     "version",
                     models.CharField(
                         blank=True,
-                        help_text="Version string from last_version.txt",
+                        help_text='Zenodo deposit version label (e.g. "v1", "v2"); next-version counter for this api_base.',
                         max_length=100,
                         null=True,
                     ),
