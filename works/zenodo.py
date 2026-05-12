@@ -121,6 +121,44 @@ def _source_identifier(source: dict) -> tuple[str, str] | None:
     return None
 
 
+# OPTIMAP's grants for the Zenodo deposit. Funder DOIs are Crossref-registered
+# IDs (BMBF 10.13039/501100002347; BMFTR uses the same Crossref entity until
+# the 2025 rename propagates — we still keep both labels for the free-text
+# fallback). The 2025-08-21 issue comment on #63 settled on KOMET + OPTIMETA
+# only; NFDI4Earth is intentionally excluded.
+#
+# Zenodo's legacy deposit API accepts grants as `[{"id": "<funder_doi>::<grant_id>"}]`,
+# but it only resolves IDs that are in its curated grants vocabulary. If a
+# grant isn't there, the metadata PUT returns 400 — we catch that below and
+# fall back to a free-text `notes` entry so the funding info isn't lost.
+_FUNDING = [
+    {
+        "id": "10.13039/501100002347::16TOA028B",
+        "name": "OPTIMETA",
+        "funder": "BMBF",
+        "grant": "16TOA028B",
+    },
+    {
+        "id": "10.13039/501100002347::16KOA009A",
+        "name": "KOMET",
+        "funder": "BMFTR",
+        "grant": "16KOA009A",
+    },
+]
+
+
+def _grants_payload() -> list[dict]:
+    """Zenodo-compatible grants list — only the `id` key."""
+    return [{"id": g["id"]} for g in _FUNDING]
+
+
+def _funding_fallback_text() -> str:
+    """Human-readable funding statement for `metadata.notes` when Zenodo
+    can't resolve the structured grant IDs."""
+    parts = [f"{g['name']} ({g['funder']} grant {g['grant']})" for g in _FUNDING]
+    return "Funding: " + ", ".join(parts) + "."
+
+
 # Static "Note" description that documents the license split. Wording follows
 # the 2025-07-21 issue comment on #63 — both licenses are listed on the
 # Zenodo record, the data files are CC0 and only the software snapshot is
@@ -331,6 +369,7 @@ def render_zenodo_package(project_root: Path | None = None, stdout_callback=None
         "keywords": existing_dyn.get("keywords") or default_keywords,
         "related_identifiers": related_identifiers,
         "additional_descriptions": _license_additional_descriptions(),
+        "grants": _grants_payload(),
         "description_markdown": readme_path.read_text(encoding="utf-8"),
     }
     dyn_path.write_text(json.dumps(dyn, indent=2), encoding="utf-8")
@@ -685,8 +724,8 @@ def deposit_to_zenodo(
         if patch_fields is None:
             patch_fields = (
                 "description,version,keywords,related_identifiers,"
-                "additional_descriptions,title,upload_type,publication_date,"
-                "creators"
+                "additional_descriptions,grants,title,upload_type,"
+                "publication_date,creators"
             )
 
         fields_to_patch = {x.strip() for x in patch_fields.split(",") if x.strip()}
@@ -727,14 +766,38 @@ def deposit_to_zenodo(
 
         log_entry.metadata_merged = {k: merged[k] for k in changed} if changed else {}
 
-        # PUT metadata
+        # PUT metadata — with a one-shot fallback for the curated `grants`
+        # vocabulary. Zenodo only resolves grants in its preloaded list; if a
+        # specific BMBF/BMFTR ID isn't there yet, the API returns 400 and we
+        # retry once with `grants` removed and the funding info moved to a
+        # free-text `notes` paragraph so the deposit still succeeds.
         put_url = f"{api_base}/deposit/depositions/{deposition_id}"
-        res = requests.put(
-            put_url,
-            params={"access_token": token},
-            headers={"Content-Type": "application/json"},
-            data=json.dumps({"metadata": merged}),
-        )
+
+        def _put(payload: dict):
+            return requests.put(
+                put_url,
+                params={"access_token": token},
+                headers={"Content-Type": "application/json"},
+                data=json.dumps({"metadata": payload}),
+            )
+
+        res = _put(merged)
+        if res.status_code == 400 and "grants" in merged and "grants" in res.text.lower():
+            fallback = _funding_fallback_text()
+            log(
+                "Zenodo rejected the structured grants metadata; "
+                "falling back to free-text in `notes`."
+            )
+            del merged["grants"]
+            existing_notes = (merged.get("notes") or "").strip()
+            merged["notes"] = (
+                f"{existing_notes}\n\n{fallback}".strip() if existing_notes else fallback
+            )
+            log_entry.notes = (
+                (log_entry.notes + "\n" if log_entry.notes else "")
+                + f"[fallback] {fallback}"
+            )
+            res = _put(merged)
         res.raise_for_status()
         log("Metadata updated.")
 

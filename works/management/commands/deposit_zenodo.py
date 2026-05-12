@@ -17,8 +17,8 @@ class Command(BaseCommand):
             dest="patch",
             default=(
                 "description,version,keywords,related_identifiers,"
-                "additional_descriptions,title,upload_type,publication_date,"
-                "creators"
+                "additional_descriptions,grants,title,upload_type,"
+                "publication_date,creators"
             ),
             help="Comma-separated list of metadata fields to patch (others are preserved).",
         )

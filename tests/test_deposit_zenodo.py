@@ -337,3 +337,97 @@ class DepositZenodoTest(TestCase):
                         "Version should be updated (in default patch list)")
         self.assertIn("<p>Updated</p>", merged.get("description", ""),
                      "Description should be updated (in default patch list)")
+
+    def test_grants_metadata_falls_back_to_notes_when_zenodo_rejects(self):
+        """If Zenodo's curated grants vocabulary doesn't include a BMBF /
+        BMFTR grant ID, the metadata PUT returns 400 — the deposit must
+        retry once without `grants` and append a free-text funding
+        statement to `metadata.notes` so the info isn't lost (issue #63
+        Q2 decision)."""
+        existing = {
+            "submitted": False,
+            "state": "unsubmitted",
+            "links": {"edit": "http://edit", "bucket": "http://bucket"},
+            "metadata": {
+                "title": "T", "upload_type": "dataset",
+                "publication_date": "2025-01-01",
+                "creators": [{"name": "OPTIMAP"}],
+                "version": "v1", "description": "<p>x</p>",
+            },
+        }
+
+        (self.data_dir / "zenodo_dynamic.json").write_text(json.dumps({
+            "title": "T", "version": "v2",
+            "grants": [
+                {"id": "10.13039/501100002347::16TOA028B"},
+                {"id": "10.13039/501100002347::16KOA009A"},
+            ],
+        }), encoding="utf-8")
+
+        puts: list[dict] = []
+
+        def _fake_get(url, params=None, **kwargs):
+            class R:
+                status_code = 200; text = "ok"
+                def json(self_): return deepcopy(existing)
+                def raise_for_status(self_): return None
+            return R()
+
+        def _fake_put(url, params=None, data=None, headers=None, **kwargs):
+            payload = json.loads(data) if data else {}
+            puts.append(payload)
+            class R:
+                # First PUT: 400 because the grants list isn't curated.
+                # Second PUT: 200 because the fallback removed `grants`.
+                status_code = 400 if len(puts) == 1 else 200
+                text = (
+                    '{"errors":[{"field":"metadata.grants","message":"not found"}]}'
+                    if len(puts) == 1 else "ok"
+                )
+                def raise_for_status(self_):
+                    if self_.status_code >= 400:
+                        import requests
+                        raise requests.HTTPError(f"{self_.status_code} {self_.text}")
+            return R()
+
+        def _fake_update_zenodo(deposition_id, paths, sandbox=True, access_token=None, publish=False):
+            class R:
+                def json(self_):
+                    return {"links": {"html": f"https://sandbox.zenodo.org/deposit/{deposition_id}"}}
+            return R()
+
+        mock_zenodo = type('MockZenodo', (), {
+            'access_token': None,
+            'update': lambda *a, **kw: _fake_update_zenodo(**kw),
+        })()
+
+        with patch.object(self.zenodo_mod, "__file__", new=self.zenodo_file), \
+             patch.object(self.zenodo_mod, "Path", self.FakePath), \
+             patch.object(self.zenodo_mod.requests, "get", _fake_get), \
+             patch.object(self.zenodo_mod.requests, "put", _fake_put), \
+             patch.object(self.zenodo_mod.requests, "delete",
+                          lambda *a, **k: type('R', (), {'status_code': 204})()), \
+             patch.object(self.zenodo_mod, "Zenodo", return_value=mock_zenodo), \
+             patch.object(self.zenodo_mod, "_markdown_to_html", lambda s: "<p>x</p>"), \
+             override_settings(
+                 ZENODO_UPLOADS_ENABLED=True,
+                 ZENODO_API_TOKEN="tok",
+                 ZENODO_API_BASE="https://sandbox.zenodo.org/api",
+             ):
+            call_command("deposit_zenodo", "--deposition-id", "123456", "--token", "tok")
+
+        # Two PUTs: one with grants (rejected), one without (succeeded)
+        self.assertEqual(len(puts), 2)
+        first, second = puts[0]["metadata"], puts[1]["metadata"]
+
+        # First attempt sent both grant IDs
+        self.assertEqual(
+            [g["id"] for g in first.get("grants", [])],
+            ["10.13039/501100002347::16TOA028B", "10.13039/501100002347::16KOA009A"],
+        )
+        # Fallback PUT carries no `grants`, but funding info lives in `notes`
+        self.assertNotIn("grants", second)
+        self.assertIn("OPTIMETA", second.get("notes", ""))
+        self.assertIn("KOMET", second.get("notes", ""))
+        self.assertIn("16TOA028B", second.get("notes", ""))
+        self.assertIn("16KOA009A", second.get("notes", ""))

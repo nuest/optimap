@@ -212,6 +212,26 @@ class RenderZenodoTest(TestCase):
             "ORI", "Open Data", "FAIR",
         ])
 
+    def test_render_emits_grants_for_optimeta_and_komet(self):
+        """Render emits structured `grants` for OPTIMETA (BMBF 16TOA028B)
+        and KOMET (BMFTR 16KOA009A), per the 2025-08-21 issue comment on
+        #63 (NFDI4Earth intentionally excluded)."""
+        with patch.object(self.zenodo_mod, "__file__", new=self.zenodo_file), \
+             patch.object(self.zenodo_mod, "Path", self.FakePath), \
+             patch("subprocess.run", self._fake_git_archive):
+            call_command("render_zenodo")
+
+        dyn = json.loads((self.data_dir / "zenodo_dynamic.json").read_text(encoding="utf-8"))
+        grant_ids = [g["id"] for g in dyn.get("grants", [])]
+        self.assertEqual(grant_ids, [
+            "10.13039/501100002347::16TOA028B",  # OPTIMETA
+            "10.13039/501100002347::16KOA009A",  # KOMET
+        ])
+        # Only `id` keys are exposed to Zenodo — the human-readable
+        # name/funder/grant labels live in the _FUNDING constant.
+        for g in dyn["grants"]:
+            self.assertEqual(list(g.keys()), ["id"])
+
     def test_render_emits_license_split_additional_description(self):
         """License split (CC0 for data, GPL-3.0 for code) is documented as a
         Zenodo `additional_descriptions` entry of type=notes — per the
