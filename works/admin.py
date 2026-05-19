@@ -41,19 +41,16 @@ def trigger_zenodo_deposition(modeladmin, request, queryset):
         # Step 2: Deposit to Zenodo
         messages.info(request, "Step 2/2: Depositing to Zenodo...")
 
-        # Resolve deposition ID from settings
+        # Resolve deposition ID from settings — optional. When unset,
+        # deposit_to_zenodo() reuses the latest from the log or bootstraps
+        # a fresh draft via POST /deposit/depositions.
         deposition_id = os.getenv("ZENODO_SANDBOX_DEPOSITION_ID") or getattr(
             settings, "ZENODO_SANDBOX_DEPOSITION_ID", None
         )
 
-        if not deposition_id:
-            messages.error(
-                request,
-                "No deposition ID configured. Set ZENODO_SANDBOX_DEPOSITION_ID in environment or settings."
-            )
-            return
-
-        log_entry = deposit_to_zenodo(deposition_id=str(deposition_id))
+        log_entry = deposit_to_zenodo(
+            deposition_id=str(deposition_id) if deposition_id else None
+        )
 
         if log_entry.status == 'success':
             messages.success(

@@ -28,26 +28,25 @@ class Command(BaseCommand):
         parser.add_argument("--token", dest="token", help="Zenodo API token (overrides env/settings).")
 
     def handle(self, *args, **opts):
-        # Resolve deposition ID
+        # Resolve deposition ID — optional. When unset, deposit_to_zenodo()
+        # falls back to the latest successful log row for this api_base, and
+        # if there is none, bootstraps a fresh draft via POST /deposit/depositions.
         deposition_id = opts.get("deposition_id") or os.getenv("ZENODO_SANDBOX_DEPOSITION_ID") or getattr(
             settings, "ZENODO_SANDBOX_DEPOSITION_ID", None
         )
-
-        if not deposition_id:
-            raise CommandError(
-                "No deposition ID. Set ZENODO_SANDBOX_DEPOSITION_ID in env "
-                "or settings, or use --deposition-id."
-            )
 
         # Resolve API base
         api_base = os.getenv("ZENODO_API_BASE") or getattr(settings, "ZENODO_API_BASE", "https://sandbox.zenodo.org/api")
 
         self.stdout.write(f"Depositing OPTIMAP data dump to {api_base} (configured via settings/default)")
-        self.stdout.write(f"Using deposition ID {deposition_id}")
+        if deposition_id:
+            self.stdout.write(f"Using deposition ID {deposition_id}")
+        else:
+            self.stdout.write("No deposition ID configured — will reuse the latest from the log or bootstrap a new draft.")
 
         try:
             log_entry = deposit_to_zenodo(
-                deposition_id=str(deposition_id),
+                deposition_id=str(deposition_id) if deposition_id else None,
                 api_base=api_base,
                 token=opts.get("token"),
                 patch_fields=opts.get("patch"),

@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from django.core.management import call_command
 from django.test import TestCase, SimpleTestCase, override_settings
-from works.models import Work, Source
+from works.models import Work, Source, ZenodoDepositionLog
 from works.zenodo import _build_upload_list, _latest_dump_files
 
 
@@ -431,3 +431,317 @@ class DepositZenodoTest(TestCase):
         self.assertIn("KOMET", second.get("notes", ""))
         self.assertIn("16TOA028B", second.get("notes", ""))
         self.assertIn("16KOA009A", second.get("notes", ""))
+
+
+class DepositionIdResolutionTest(TestCase):
+    """Resolution + bootstrap + new-version flow (issue #63 item 2)."""
+
+    def setUp(self):
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self.project_root = Path(self._tmpdir.name)
+        self.templates_dir = self.project_root / "works" / "templates"
+        self.data_dir = self.project_root / "data"
+        self.templates_dir.mkdir(parents=True, exist_ok=True)
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+
+        (self.data_dir / "README.md").write_text("# Title\n\nSome text.", encoding="utf-8")
+        (self.data_dir / "optimap-main.zip").write_bytes(b"ZIP")
+        (self.data_dir / "zenodo_dynamic.json").write_text(json.dumps({
+            "title": "OPTIMAP FAIR Data Package",
+            "version": "v1",
+            "related_identifiers": [],
+        }), encoding="utf-8")
+        (self.data_dir / "optimap_data_dump_20250101.geojson").write_text("{}", encoding="utf-8")
+
+        Work.objects.create(title="A", publicationDate="2010-10-10")
+
+        import importlib
+        self.zenodo_mod = importlib.import_module("works.zenodo")
+
+        class FakePath(Path):
+            _flavour = Path(".")._flavour
+            def resolve(self):
+                return self
+        self.FakePath = FakePath
+        self.zenodo_file = str(self.project_root / "works" / "zenodo.py")
+
+    def tearDown(self):
+        self._tmpdir.cleanup()
+
+    def _draft_metadata(self):
+        return {
+            "submitted": False,
+            "state": "unsubmitted",
+            "links": {"edit": "http://edit"},
+            "metadata": {
+                "title": "OPTIMAP",
+                "upload_type": "dataset",
+                "publication_date": "2025-01-01",
+                "creators": [{"name": "OPTIMAP"}],
+                "version": "v0",
+                "description": "<p>x</p>",
+            },
+        }
+
+    def _patches(self, *, fake_get, fake_post, fake_put, mock_zenodo):
+        return [
+            patch.object(self.zenodo_mod, "__file__", new=self.zenodo_file),
+            patch.object(self.zenodo_mod, "Path", self.FakePath),
+            patch.object(self.zenodo_mod.requests, "get", fake_get),
+            patch.object(self.zenodo_mod.requests, "post", fake_post),
+            patch.object(self.zenodo_mod.requests, "put", fake_put),
+            patch.object(
+                self.zenodo_mod.requests, "delete",
+                lambda *a, **k: type("R", (), {"status_code": 204})(),
+            ),
+            patch.object(self.zenodo_mod, "Zenodo", return_value=mock_zenodo),
+            patch.object(self.zenodo_mod, "_markdown_to_html", lambda s: "<p>x</p>"),
+        ]
+
+    def test_bootstrap_creates_new_draft_when_no_id_and_no_prior_log(self):
+        """Issue #63 item 2: ``write code to create a new deposition``.
+        With no env/setting ID and no successful log row, the deposit must
+        POST /deposit/depositions to bootstrap a fresh draft, then use the
+        returned id for the rest of the cycle."""
+        from works.zenodo import deposit_to_zenodo
+
+        posted_urls: list[str] = []
+
+        def _fake_post(url, params=None, headers=None, data=None, **kwargs):
+            posted_urls.append(url)
+            class R:
+                status_code = 201
+                text = "ok"
+                def json(self_): return {"id": 987654, "links": {"self": "http://x/987654"}}
+                def raise_for_status(self_): return None
+            return R()
+
+        outer_self = self
+        def _fake_get(url, params=None, **kwargs):
+            class R:
+                status_code = 200
+                text = "ok"
+                def json(self_): return deepcopy(outer_self._draft_metadata())
+                def raise_for_status(self_): return None
+            return R()
+
+        def _fake_put(url, params=None, data=None, headers=None, **kwargs):
+            class R:
+                status_code = 200
+                text = "ok"
+                def raise_for_status(self_): return None
+            return R()
+
+        captured = {}
+        def _fake_update(deposition_id, paths, sandbox=True, access_token=None, publish=False):
+            captured["deposition_id"] = deposition_id
+            class R:
+                def json(self_): return {"links": {"html": f"https://sandbox.zenodo.org/deposit/{deposition_id}"}}
+            return R()
+
+        mock_zenodo = type("MockZenodo", (), {
+            "access_token": None,
+            "update": lambda *a, **kw: _fake_update(**kw),
+        })()
+
+        ctx = self._patches(
+            fake_get=_fake_get, fake_post=_fake_post, fake_put=_fake_put,
+            mock_zenodo=mock_zenodo,
+        )
+        from contextlib import ExitStack
+        with ExitStack() as stack, override_settings(
+            ZENODO_API_TOKEN="tok",
+            ZENODO_API_BASE="https://sandbox.zenodo.org/api",
+        ):
+            for p in ctx:
+                stack.enter_context(p)
+            log_entry = deposit_to_zenodo()
+
+        # POST to /deposit/depositions was made
+        self.assertTrue(any(u.endswith("/deposit/depositions") for u in posted_urls),
+                        f"Expected bootstrap POST, got: {posted_urls}")
+        # The log row uses the bootstrapped ID
+        self.assertEqual(log_entry.deposition_id, "987654")
+        self.assertEqual(log_entry.status, "success")
+        self.assertEqual(captured.get("deposition_id"), "987654")
+
+    def test_resolves_from_latest_log_when_no_id_supplied(self):
+        """When no explicit ID is set but a prior successful log exists for
+        the same api_base, reuse that ID (no bootstrap POST)."""
+        from works.zenodo import deposit_to_zenodo
+
+        api_base = "https://sandbox.zenodo.org/api"
+        ZenodoDepositionLog.objects.create(
+            deposition_id="555555", api_base=api_base, status="success", version="v3",
+        )
+
+        outer = self
+        def _fake_post(url, **kw):
+            raise AssertionError(f"Bootstrap POST should not happen; got {url}")
+
+        def _fake_get(url, params=None, **kwargs):
+            class R:
+                status_code = 200
+                text = "ok"
+                def json(self_): return deepcopy(outer._draft_metadata())
+                def raise_for_status(self_): return None
+            return R()
+
+        def _fake_put(url, params=None, data=None, headers=None, **kwargs):
+            class R:
+                status_code = 200
+                text = "ok"
+                def raise_for_status(self_): return None
+            return R()
+
+        captured = {}
+        def _fake_update(deposition_id, paths, sandbox=True, access_token=None, publish=False):
+            captured["deposition_id"] = deposition_id
+            class R:
+                def json(self_): return {"links": {"html": "https://sandbox.zenodo.org/deposit/555555"}}
+            return R()
+
+        mock_zenodo = type("MockZenodo", (), {
+            "access_token": None,
+            "update": lambda *a, **kw: _fake_update(**kw),
+        })()
+
+        from contextlib import ExitStack
+        with ExitStack() as stack, override_settings(
+            ZENODO_API_TOKEN="tok", ZENODO_API_BASE=api_base,
+        ):
+            for p in self._patches(
+                fake_get=_fake_get, fake_post=_fake_post,
+                fake_put=_fake_put, mock_zenodo=mock_zenodo,
+            ):
+                stack.enter_context(p)
+            log_entry = deposit_to_zenodo()
+
+        self.assertEqual(log_entry.deposition_id, "555555")
+        self.assertEqual(captured.get("deposition_id"), "555555")
+
+    def test_new_version_when_target_is_already_published(self):
+        """Once the previously deposited record has been manually published,
+        the next run must POST .../actions/newversion and target the new
+        draft instead — otherwise the PUT/upload would 400."""
+        from works.zenodo import deposit_to_zenodo
+
+        published = {
+            "submitted": True,
+            "state": "done",
+            "links": {
+                "edit": "http://edit",
+                "self": "https://sandbox.zenodo.org/api/deposit/depositions/111",
+            },
+            "metadata": {
+                "title": "OPTIMAP",
+                "upload_type": "dataset",
+                "publication_date": "2025-01-01",
+                "creators": [{"name": "OPTIMAP"}],
+                "version": "v1",
+                "description": "<p>x</p>",
+                "doi": "10.5281/zenodo.111",
+            },
+        }
+        new_draft = {
+            "submitted": False,
+            "state": "unsubmitted",
+            "links": {"edit": "http://edit"},
+            "metadata": {
+                "title": "OPTIMAP",
+                "upload_type": "dataset",
+                "publication_date": "2025-01-01",
+                "creators": [{"name": "OPTIMAP"}],
+                "version": "v1",
+                "description": "<p>x</p>",
+            },
+        }
+
+        gets: list[str] = []
+
+        def _fake_get(url, params=None, **kwargs):
+            gets.append(url)
+            payload = published if "/depositions/111" in url else new_draft
+            class R:
+                status_code = 200
+                text = "ok"
+                def json(self_): return deepcopy(payload)
+                def raise_for_status(self_): return None
+            return R()
+
+        posted: list[str] = []
+
+        def _fake_post(url, params=None, headers=None, data=None, **kwargs):
+            posted.append(url)
+            class R:
+                status_code = 201
+                text = "ok"
+                def json(self_):
+                    # newversion response carries latest_draft pointing at the new ID
+                    return {"links": {
+                        "latest_draft": "https://sandbox.zenodo.org/api/deposit/depositions/222"
+                    }}
+                def raise_for_status(self_): return None
+            return R()
+
+        def _fake_put(url, params=None, data=None, headers=None, **kwargs):
+            class R:
+                status_code = 200
+                text = "ok"
+                def raise_for_status(self_): return None
+            return R()
+
+        captured = {}
+        def _fake_update(deposition_id, paths, sandbox=True, access_token=None, publish=False):
+            captured["deposition_id"] = deposition_id
+            class R:
+                def json(self_): return {"links": {"html": f"https://sandbox.zenodo.org/deposit/{deposition_id}"}}
+            return R()
+
+        mock_zenodo = type("MockZenodo", (), {
+            "access_token": None,
+            "update": lambda *a, **kw: _fake_update(**kw),
+        })()
+
+        from contextlib import ExitStack
+        with ExitStack() as stack, override_settings(
+            ZENODO_API_TOKEN="tok",
+            ZENODO_API_BASE="https://sandbox.zenodo.org/api",
+        ):
+            for p in self._patches(
+                fake_get=_fake_get, fake_post=_fake_post,
+                fake_put=_fake_put, mock_zenodo=mock_zenodo,
+            ):
+                stack.enter_context(p)
+            log_entry = deposit_to_zenodo(deposition_id="111")
+
+        # The newversion POST landed on the published deposit
+        self.assertTrue(
+            any(u.endswith("/depositions/111/actions/newversion") for u in posted),
+            f"Expected newversion POST; got: {posted}",
+        )
+        # The log row tracks the new draft ID, not the old published one
+        self.assertEqual(log_entry.deposition_id, "222")
+        self.assertEqual(captured.get("deposition_id"), "222")
+        # And the upload+PUT targeted the new draft (verified via update call)
+
+
+class ResolveHelpersTest(SimpleTestCase):
+    """Sanity-check the URL/ID helpers in isolation."""
+
+    def test_extract_id_from_url(self):
+        from works.zenodo import _extract_id_from_url
+        self.assertEqual(_extract_id_from_url(
+            "https://sandbox.zenodo.org/api/deposit/depositions/12345"), "12345")
+        self.assertEqual(_extract_id_from_url(
+            "https://sandbox.zenodo.org/api/deposit/depositions/12345/"), "12345")
+        self.assertIsNone(_extract_id_from_url(None))
+        self.assertIsNone(_extract_id_from_url(""))
+
+    def test_is_published_only_when_both_flags_match(self):
+        from works.zenodo import _is_published
+        self.assertTrue(_is_published({"submitted": True, "state": "done"}))
+        self.assertFalse(_is_published({"submitted": False, "state": "done"}))
+        self.assertFalse(_is_published({"submitted": True, "state": "inprogress"}))
+        self.assertFalse(_is_published({"submitted": True, "state": "unsubmitted"}))
+        self.assertFalse(_is_published({}))

@@ -482,6 +482,104 @@ def _get_deposition(api_base: str, token: str, deposition_id: str) -> dict:
     return r.json()
 
 
+def _is_published(dep: dict) -> bool:
+    """
+    Zenodo marks a published deposition with ``submitted=true`` and ``state="done"``.
+    Drafts (`unsubmitted` / `inprogress`) are still editable; published records
+    require a `newversion` call before we can change anything.
+    """
+    return bool(dep.get("submitted")) and dep.get("state") == "done"
+
+
+def _extract_id_from_url(url: str | None) -> str | None:
+    """Pull the trailing numeric ID off a Zenodo deposition URL."""
+    if not url:
+        return None
+    tail = url.rstrip("/").rsplit("/", 1)[-1]
+    return tail or None
+
+
+def _create_new_draft(api_base: str, token: str) -> str:
+    """
+    POST /deposit/depositions with an empty body — creates a fresh draft and
+    returns its numeric ID. Used to bootstrap the very first deposit when no
+    deposition_id is configured and no prior log exists for this api_base.
+    """
+    r = requests.post(
+        f"{api_base}/deposit/depositions",
+        params={"access_token": token},
+        headers={"Content-Type": "application/json"},
+        data=json.dumps({}),
+        timeout=30,
+    )
+    try:
+        r.raise_for_status()
+    except Exception as ex:
+        raise Exception(
+            f"Failed to create new Zenodo draft: {r.status_code} {r.text}"
+        ) from ex
+    payload = r.json()
+    new_id = payload.get("id") or _extract_id_from_url(
+        payload.get("links", {}).get("self")
+    )
+    if not new_id:
+        raise Exception(
+            f"Zenodo create-draft response did not include an id: {payload!r}"
+        )
+    return str(new_id)
+
+
+def _create_new_version(api_base: str, token: str, deposition_id: str) -> str:
+    """
+    POST /deposit/depositions/{id}/actions/newversion — fork a new editable
+    draft off a published deposition. The response carries the new draft URL
+    in `links.latest_draft` (Zenodo legacy API); the new ID is the trailing
+    numeric segment. The new draft inherits files and metadata from the
+    published version; the caller is expected to delete the inherited files
+    and re-PUT updated metadata, which the existing deposit flow already
+    does.
+    """
+    r = requests.post(
+        f"{api_base}/deposit/depositions/{deposition_id}/actions/newversion",
+        params={"access_token": token},
+        timeout=30,
+    )
+    try:
+        r.raise_for_status()
+    except Exception as ex:
+        raise Exception(
+            f"Failed to create new version of deposition {deposition_id}: "
+            f"{r.status_code} {r.text}"
+        ) from ex
+    payload = r.json()
+    new_url = payload.get("links", {}).get("latest_draft")
+    new_id = _extract_id_from_url(new_url)
+    if not new_id:
+        raise Exception(
+            f"newversion response for {deposition_id} did not include "
+            f"a latest_draft link: {payload!r}"
+        )
+    return str(new_id)
+
+
+def _latest_log_deposition_id(api_base: str) -> str | None:
+    """
+    Most-recent successful ZenodoDepositionLog deposition_id for the given
+    api_base. Used to recover the current draft / latest-published ID when
+    no explicit env/setting deposition_id is configured — so scheduled and
+    re-triggered runs land on the same record without manual env edits.
+    """
+    return (
+        ZenodoDepositionLog.objects
+        .filter(status="success", api_base=api_base)
+        .exclude(deposition_id__isnull=True)
+        .exclude(deposition_id="")
+        .order_by("-deposition_date")
+        .values_list("deposition_id", flat=True)
+        .first()
+    )
+
+
 _DUMP_PATTERNS = (
     "optimap_data_dump_*.geojson",
     "optimap_data_dump_*.geojson.gz",
@@ -675,7 +773,7 @@ def _send_admin_notification(log_entry: ZenodoDepositionLog, stdout_callback=Non
 
 
 def deposit_to_zenodo(
-    deposition_id: str,
+    deposition_id: str | None = None,
     api_base: str | None = None,
     token: str | None = None,
     patch_fields: str | None = None,
@@ -687,8 +785,23 @@ def deposit_to_zenodo(
     """
     Deposit rendered files to Zenodo.
 
+    Resolution / bootstrap flow for ``deposition_id``:
+
+    1. Explicit argument wins.
+    2. Else fall back to the latest successful ZenodoDepositionLog for this
+       ``api_base`` — so scheduled and re-triggered runs find the same draft
+       (or the previously published record, see step 4) without manual env
+       edits.
+    3. Else POST /deposit/depositions to bootstrap a fresh draft.
+    4. After resolving the ID, GET the deposition. If it's already published
+       (``submitted=true`` AND ``state="done"``), POST .../actions/newversion
+       to fork an editable draft and target *that* instead — issue #63 only
+       requires manual *publication*, so the next deposit cycle should
+       silently start the next version.
+
     Args:
-        deposition_id: Zenodo deposition ID
+        deposition_id: Zenodo deposition ID (optional — resolved/bootstrapped
+            when omitted, per the flow above).
         api_base: Zenodo API base URL (default: from settings)
         token: Zenodo API token (default: from settings/env)
         patch_fields: Comma-separated fields to update (default: description,version,keywords,related_identifiers)
@@ -732,9 +845,25 @@ def deposit_to_zenodo(
 
     data_dir = project_root / "data"
 
+    # Resolve deposition_id: explicit arg → latest successful log for this
+    # api_base → bootstrap a fresh draft. Done before log_entry creation so
+    # the log row records the *actual* target ID even on bootstrap.
+    bootstrapped = False
+    deposition_id_str = str(deposition_id) if deposition_id else ""
+    if not deposition_id_str:
+        recovered = _latest_log_deposition_id(api_base)
+        if recovered:
+            log(f"No deposition_id supplied; reusing latest from log: {recovered}")
+            deposition_id_str = recovered
+        else:
+            log("No deposition_id supplied and no prior log; creating new draft...")
+            deposition_id_str = _create_new_draft(api_base, token)
+            bootstrapped = True
+            log(f"Created new draft {deposition_id_str}")
+
     # Initialize log
     log_entry = ZenodoDepositionLog(
-        deposition_id=str(deposition_id),
+        deposition_id=deposition_id_str,
         api_base=api_base,
         status='failed',
     )
@@ -758,8 +887,23 @@ def deposit_to_zenodo(
         if version_str:
             log_entry.version = version_str
 
-        # Fetch existing deposition
-        dep = _get_deposition(api_base, token, str(deposition_id))
+        # Fetch existing deposition (skip when we just bootstrapped it — the
+        # POST response would already be a known-good empty draft, but the
+        # GET keeps the rest of the flow uniform).
+        dep = _get_deposition(api_base, token, deposition_id_str)
+
+        # New-version handoff: if the targeted record is already published,
+        # fork a new draft and switch to it before patching/uploading.
+        if _is_published(dep):
+            log(
+                f"Deposition {deposition_id_str} is already published; "
+                "creating a new version draft..."
+            )
+            deposition_id_str = _create_new_version(api_base, token, deposition_id_str)
+            log_entry.deposition_id = deposition_id_str
+            log(f"New version draft: {deposition_id_str}")
+            dep = _get_deposition(api_base, token, deposition_id_str)
+
         existing_meta = dep.get("metadata", {}) or {}
 
         # Determine fields to patch
@@ -813,7 +957,7 @@ def deposit_to_zenodo(
         # specific BMBF/BMFTR ID isn't there yet, the API returns 400 and we
         # retry once with `grants` removed and the funding info moved to a
         # free-text `notes` paragraph so the deposit still succeeds.
-        put_url = f"{api_base}/deposit/depositions/{deposition_id}"
+        put_url = f"{api_base}/deposit/depositions/{deposition_id_str}"
 
         def _put(payload: dict):
             return requests.put(
@@ -849,7 +993,7 @@ def deposit_to_zenodo(
         for file_obj in existing_files:
             file_id = file_obj.get("id")
             if file_id:
-                delete_url = f"{api_base}/deposit/depositions/{deposition_id}/files/{file_id}"
+                delete_url = f"{api_base}/deposit/depositions/{deposition_id_str}/files/{file_id}"
                 del_res = requests.delete(delete_url, params={"access_token": token})
                 if del_res.status_code == 204:
                     log(f" - Deleted: {file_obj.get('filename')}")
@@ -878,7 +1022,7 @@ def deposit_to_zenodo(
         # Use zenodo_client for upload
         z = Zenodo(sandbox=("sandbox." in api_base))
         z.access_token = token
-        resp = z.update(deposition_id=str(deposition_id), paths=[str(p) for p in paths], publish=False)
+        resp = z.update(deposition_id=deposition_id_str, paths=[str(p) for p in paths], publish=False)
 
         upload_duration = time.time() - upload_start
         log_entry.upload_duration_seconds = upload_duration
@@ -898,17 +1042,18 @@ def deposit_to_zenodo(
 
         # Mark success
         log_entry.status = 'success'
+        bootstrap_note = " (bootstrapped a new draft)" if bootstrapped else ""
         log_entry.deposition_summary = (
             f"Successfully uploaded {len(files_info)} files "
-            f"({_format_bytes(total_size)}) to Zenodo deposition {deposition_id}. "
+            f"({_format_bytes(total_size)}) to Zenodo deposition {deposition_id_str}{bootstrap_note}. "
             f"Updated metadata fields: {', '.join(changed) if changed else '(none)'}. "
             f"Upload duration: {upload_duration:.2f}s"
         )
 
         if html:
-            log(f"✅ Updated deposition {deposition_id} at {html}")
+            log(f"✅ Updated deposition {deposition_id_str} at {html}")
         else:
-            log(f"✅ Updated deposition {deposition_id}")
+            log(f"✅ Updated deposition {deposition_id_str}")
 
     except Exception as ex:
         log_entry.status = 'failed'

@@ -55,12 +55,6 @@ class Command(BaseCommand):
         deposition_id = opts.get("deposition_id") or os.getenv("ZENODO_SANDBOX_DEPOSITION_ID")
         token = opts.get("token")
 
-        if not deposition_id:
-            raise CommandError(
-                "No deposition ID provided. Set ZENODO_SANDBOX_DEPOSITION_ID environment variable "
-                "or use --deposition-id option."
-            )
-
         api_base = os.getenv("ZENODO_API_BASE") or getattr(
             settings, "ZENODO_API_BASE", "https://sandbox.zenodo.org/api"
         )
@@ -69,7 +63,12 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS("  Zenodo Deposition Manager"))
         self.stdout.write(self.style.SUCCESS("="*70))
         self.stdout.write(f"\nTarget: {api_base}")
-        self.stdout.write(f"Deposition ID: {deposition_id}\n")
+        if deposition_id:
+            self.stdout.write(f"Deposition ID: {deposition_id}\n")
+        else:
+            self.stdout.write(
+                "Deposition ID: (none configured — will reuse latest from log or bootstrap a new draft)\n"
+            )
 
         # Step 1: Render (unless skipped)
         if not opts.get("skip_render"):
@@ -87,11 +86,12 @@ class Command(BaseCommand):
         self.stdout.write(self.style.WARNING("[Step 2/2] Uploading to Zenodo..."))
         try:
             deposit_opts = {
-                "deposition_id": deposition_id,
                 "patch": opts.get("patch"),
                 "merge_keywords": opts.get("merge_keywords", False),
                 "merge_related": opts.get("merge_related", False),
             }
+            if deposition_id:
+                deposit_opts["deposition_id"] = deposition_id
             if token:
                 deposit_opts["token"] = token
 
@@ -106,7 +106,10 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS("  Zenodo deposition completed successfully!"))
         self.stdout.write(self.style.SUCCESS("="*70))
         self.stdout.write("\nNext steps:")
-        self.stdout.write("  • Check the deposition at: " + api_base.replace("/api", f"/deposit/{deposition_id}"))
+        if deposition_id:
+            self.stdout.write("  • Check the deposition at: " + api_base.replace("/api", f"/deposit/{deposition_id}"))
+        else:
+            self.stdout.write("  • Check the admin → Zenodo Deposition Logs for the new draft URL")
         self.stdout.write("  • Review files and metadata")
         self.stdout.write("  • Publish when ready (cannot be undone!)")
         self.stdout.write(self.style.WARNING("\nNote: This deposition is in DRAFT state and not yet published.\n"))
