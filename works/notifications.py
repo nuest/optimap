@@ -1,18 +1,16 @@
 # SPDX-FileCopyrightText: 2026 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Notifications for ``Work`` state changes.
+"""Admin-routed email notifications.
 
-Two kinds today:
+``Work`` state changes (today: ``contribution`` and ``publish``) dispatch via
+``notify_work_event(work, event_type, actor=user)`` after ``work.save()``; add a
+third by writing a private ``_enqueue_<event>`` function and adding it to
+``WORK_EVENT_HANDLERS``.
 
-- ``contribution`` — admins and curators of any collection the work belongs to
-  receive an email when a user contributes spatial / temporal metadata.
-- ``publish`` — every contributor (besides the actor performing the publish) is
-  notified the first time the work flips to ``status='p'``.
-
-Add a third by writing a private ``_enqueue_<event>`` function and adding it to
-``WORK_EVENT_HANDLERS``. Sites that flip the state should call
-``notify_work_event(work, event_type, actor=user)`` once after ``work.save()``.
+User-lifecycle events dispatch separately — see
+``notify_admins_new_user_registered(user)`` further down, called from the
+magic-link view when a brand-new account is persisted for the first time.
 
 Email sending happens inside Django-Q tasks (``send_*`` below) so the request
 that triggered the state change stays fast. Recipient resolution stays in the
@@ -283,6 +281,109 @@ def send_publication_to_contributor_emails(contributor_ids: Iterable[int], work_
     new_provenance = dict(work.provenance) if isinstance(work.provenance, dict) else {}
     new_provenance["publication_notified_at"] = timezone.now().isoformat(timespec="seconds")
     Work.objects.filter(pk=work.pk).update(provenance=new_provenance)
+
+
+# ---------------------------------------------------------------------------
+# User lifecycle — admins on first confirmed login (new account persisted).
+# ---------------------------------------------------------------------------
+
+def notify_admins_new_user_registered(user) -> None:
+    """Queue an admin notification for a freshly persisted user account.
+
+    Called from ``authenticate_via_magic_link`` immediately after
+    ``User.objects.create_user(...)``. A new ``CustomUser`` row is *only*
+    created when a magic-link recipient clicks the "confirm" step of the
+    two-step new-account flow, so reaching this code path is by construction
+    a first-time confirmed registration — no separate "first login" check is
+    needed.
+
+    Failures must never break the login. Same defensive ``except Exception``
+    wrapper as ``notify_work_event``.
+    """
+    try:
+        from django_q.tasks import async_task
+
+        admin_ids = list(
+            User.objects.filter(is_staff=True)
+            .exclude(email__exact="")
+            .exclude(pk=getattr(user, "pk", None))  # the new user *could* be staff, e.g. a fixture seed
+            .values_list("id", flat=True)
+            .distinct()
+        )
+        if not admin_ids:
+            logger.info(
+                "New user %s registered — no staff recipients to notify.",
+                getattr(user, "email", "(unknown)"),
+            )
+            return
+        async_task(
+            "works.notifications.send_new_user_admin_email",
+            admin_ids,
+            user.pk,
+        )
+    except Exception:  # noqa: BLE001 — notification must never crash login
+        logger.exception(
+            "notify_admins_new_user_registered failed for user id=%s; "
+            "login is unaffected.", getattr(user, "pk", None),
+        )
+
+
+def send_new_user_admin_email(recipient_ids: Iterable[int], user_id: int) -> None:
+    """Django-Q task: tell each admin that a new user just confirmed registration.
+
+    Bypasses ``notify_work_events`` — the per-user flag is opt-out for *work*
+    events; user-management notifications go to every staff member with an
+    email address.
+    """
+    from works.models import EmailLog
+
+    try:
+        user = User.objects.get(pk=user_id)
+    except User.DoesNotExist:
+        logger.warning(
+            "send_new_user_admin_email: user id=%s vanished before send.", user_id,
+        )
+        return
+
+    user_admin_url = (
+        f"{settings.BASE_URL}{reverse('admin:works_customuser_change', args=[user.pk])}"
+    )
+    subject = f"OPTIMAP: new user registered — {user.email}"
+    body = (
+        f"A new user just confirmed their first login on OPTIMAP.\n\n"
+        f"Email: {user.email}\n"
+        f"Username: {user.username}\n"
+        f"Registered at: {user.date_joined.isoformat(timespec='seconds')}\n\n"
+        f"Open the admin user page to review:\n"
+        f"  {user_admin_url}\n\n"
+        f"(Sent to all staff users.)\n"
+    )
+
+    admin_emails = list(
+        User.objects.filter(pk__in=list(recipient_ids))
+        .exclude(email__exact="")
+        .values_list("email", flat=True)
+    )
+    for admin_email in admin_emails:
+        try:
+            send_mail(subject, body, settings.EMAIL_HOST_USER, [admin_email], fail_silently=False)
+            EmailLog.log_email(
+                recipient=admin_email,
+                subject=subject,
+                content=body,
+                trigger_source="scheduled",
+                status="success",
+            )
+        except Exception as ex:  # noqa: BLE001
+            logger.exception("Failed to send new-user admin email to %s.", admin_email)
+            EmailLog.log_email(
+                recipient=admin_email,
+                subject=subject,
+                content=body,
+                trigger_source="scheduled",
+                status="failed",
+                error_message=str(ex),
+            )
 
 
 # ---------------------------------------------------------------------------
