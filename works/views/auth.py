@@ -56,7 +56,9 @@ EMAIL_CONFIRMATION_TOKEN_PREFIX = "email_confirmation_"
 
 
 def loginres(request):
-    email = request.POST.get('email', False)
+    if request.method != 'POST':
+        return redirect('/')
+    email = request.POST.get('email', '')
     if is_email_blocked(email):
         logger.warning('Attempted login with blocked email: %s', email)
         return render(request, "error.html", {
@@ -164,6 +166,11 @@ def authenticate_via_magic_link(request, token):
         user = User.objects.create_user(username=email, email=email)
         is_new = True
         needs_confirmation = False
+        # First-time confirmed registration: tell the admins. Imported
+        # locally to keep this view import-graph free of django_q at import
+        # time. Errors inside notify_* never propagate (defensive try/except).
+        from works.notifications import notify_admins_new_user_registered
+        notify_admins_new_user_registered(user)
         login_user(request, user)
         # Redirect to next URL after successful login
         logger.info('User %s logged in successfully, redirecting to %s', email, next_url)

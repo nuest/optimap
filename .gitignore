@@ -169,3 +169,9 @@ works/management/commands/goas_v01.gpkg
 works/management/commands/marine_regions_testing.qgz
 
 .claude/
+
+data/optimap-main.zip
+
+data/zenodo_dynamic.json
+
+data/README.md
