@@ -2,6 +2,45 @@
 
 This document describes how to deploy OPTIMAP as a native Django application behind nginx, with a natively running PostgreSQL/PostGIS database.
 
+## TL;DR — day-to-day operations
+
+Once the deployment is running, these are the commands you'll reach for most often. See the relevant section below for context and prerequisites.
+
+### Update the codebase
+
+Pulls latest `main`, updates dependencies, runs migrations, collects static files, restarts services, and clears caches. See [Update procedures](#update-procedures) for the script body.
+
+```bash
+sudo /opt/optimap/scripts/update-app.sh
+```
+
+### Monitor and restart services
+
+```bash
+# Status of all four services
+sudo systemctl status optimap optimap-worker nginx postgresql
+
+# Tail Django / worker logs
+sudo journalctl -u optimap -f
+sudo journalctl -u optimap-worker -f
+
+# Tail gunicorn and nginx logs
+sudo tail -f /opt/optimap/logs/gunicorn-*.log
+sudo tail -f /var/log/nginx/optimap-*.log
+
+# Run end-to-end health check (services up + HTTP responds + disk space)
+sudo /opt/optimap/scripts/health-check.sh
+
+# Restart application after a config change
+sudo systemctl restart optimap optimap-worker
+
+# Reload nginx after editing its config
+sudo systemctl reload nginx
+
+# Full restart of everything
+sudo systemctl restart postgresql optimap optimap-worker nginx
+```
+
 ## Overview
 
 This deployment approach runs all components directly on the host system:
