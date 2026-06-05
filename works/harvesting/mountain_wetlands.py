@@ -180,26 +180,30 @@ def parse_mountain_wetlands_response_and_save_works(
         if api_authors:
             existing_metadata['authors'] = api_authors
 
-        openalex_fields, metadata_provenance = build_openalex_fields(
-            title=title,
-            doi=api_doi,
-            author=first_author_surname,
-            existing_metadata=existing_metadata,
-        )
-
-        if openalex_fields.get('openalex_id'):
-            match_status = 'verified'
-        elif openalex_fields.get('openalex_match_info'):
-            match_status = 'candidate'
+        # Skip OpenAlex when the API already supplies both a DOI and authors —
+        # no extra metadata to recover, and the call is wasted rate-limit budget.
+        if api_doi and api_authors:
+            openalex_fields, metadata_provenance = {}, {}
+            match_status = 'skipped'
         else:
-            match_status = 'none'
+            openalex_fields, metadata_provenance = build_openalex_fields(
+                title=title,
+                doi=api_doi,
+                author=first_author_surname,
+                existing_metadata=existing_metadata,
+            )
+            if openalex_fields.get('openalex_id'):
+                match_status = 'verified'
+            elif openalex_fields.get('openalex_match_info'):
+                match_status = 'candidate'
+            else:
+                match_status = 'none'
 
         doi_value = api_doi
         if not doi_value:
             ids_blob = openalex_fields.get('openalex_ids') or {}
             if match_status == 'verified' and ids_blob.get('doi'):
-                raw = ids_blob['doi']
-                doi_value = raw.split('doi.org/', 1)[-1].lstrip('/') if 'doi.org/' in raw else raw.lstrip('/')
+                doi_value = _mwr_clean_doi(ids_blob['doi'])
 
         if not metadata_provenance.get('authors') and api_authors:
             metadata_provenance['authors'] = 'original_source'

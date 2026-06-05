@@ -59,7 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Mountain Wetlands harvester reads DOIs from the API** (now populated upstream) and feeds them to the OpenAlex matcher; title-only fallback retained for records without one.
+- **Mountain Wetlands harvester simplified now that MaRESS exposes DOIs** (closes #244). The harvester reads DOIs directly from the API (normalising `https://doi.org/…` → bare `10.x/y`). When the API already supplies both a DOI *and* authors, OpenAlex is skipped entirely — no extra metadata to recover and no wasted rate-limit budget. Records missing a DOI or authors fall back to the OpenAlex title+author path. `Work.provenance.openalex_match.status` gains a `skipped` value for the fast path.
 
 - **`/collections/` work counts** show only published works to regular users; admins and curators of a collection get a per-status breakdown (zero-count rows hidden).
 

@@ -299,8 +299,9 @@ The MaRESS harvester is bespoke because the API is Zotero-shaped, not OAI-PMH/RS
 - **Run it manually:** `python manage.py harvest_journals --journal mountain-wetlands` (also available as a one-click admin action on the Source). Auto-scheduling is intentionally off — `harvest_interval_minutes` defaults to 0 for this source type and the issue (#192) requires the harvest to be manual.
 - **Geometry:** built from each item's `study_sites[].location.{latitude, longitude}`. One Point per site, wrapped in a `GeometryCollection`. Records without sites get an empty geometry.
 - **Dates:** the API's `date` field is free-text and often year-only (e.g. `"1993"`). The harvester parses the four-digit prefix and stores Jan 1 of that year; both `timeperiod_startdate` and `_enddate` are set to the year string.
-- **DOI / OpenAlex enrichment:** every MaRESS record currently has `DOI=null` and an empty `url`, so OpenAlex is the *only* path to a DOI. The harvester calls `build_openalex_fields(title, doi=None, author=<first author surname>)`. Results land in `Work.provenance.openalex_match.status`:
-  - `verified` — strong title+author match; DOI extracted from `openalex_ids` and saved on the Work,
+- **DOI / OpenAlex enrichment:** the MaRESS API now populates `DOI` for most records. The harvester persists the API DOI directly (normalising `https://doi.org/…` → bare `10.x/y` via `_mwr_clean_doi`). When both a DOI *and* authors come from the API, OpenAlex is **skipped entirely** — no extra metadata to recover and the call wastes rate-limit budget. For records that still lack a DOI or authors, `build_openalex_fields(title, doi=<api_doi_or_None>, author=<first author surname>)` is called as a fallback. Results land in `Work.provenance.openalex_match.status`:
+  - `skipped` — API supplied DOI + authors; OpenAlex not contacted,
+  - `verified` — strong DOI or title+author match; DOI extracted from `openalex_ids` and saved on the Work,
   - `candidate` — only partial matches; top hits stored in `Work.openalex_match_info` for curator follow-up,
   - `none` — no plausible match; the Work is still saved with the API metadata.
 - **Idempotency:** the harvester uses each item's stable API URL (`<source.url_field>/<item-uuid>`) as `Work.url`. Re-running on the same payload is a no-op.

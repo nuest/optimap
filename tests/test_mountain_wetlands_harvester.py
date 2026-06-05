@@ -115,7 +115,8 @@ class MountainWetlandsHarvesterTests(TestCase):
         self.assertEqual(prov['harvest']['external_id'], 'a88d9783-0606-4bb9-a6ec-35610f9172e5')
         # Original API record stored verbatim so curators can re-run enrichment.
         self.assertEqual(prov['harvest']['original_record']['id'], 'a88d9783-0606-4bb9-a6ec-35610f9172e5')
-        self.assertEqual(prov['openalex_match']['status'], 'none')
+        # Baied has DOI + authors from the API — OpenAlex is skipped.
+        self.assertEqual(prov['openalex_match']['status'], 'skipped')
         self.assertEqual(prov['openalex_match']['first_author_surname_used'], 'Baied')
 
     def test_first_author_surname_skips_et_al(self):
@@ -191,23 +192,26 @@ class MountainWetlandsOpenAlexMatchTests(TestCase):
         session.get.return_value = _mock_response(payload)
         return patch('works.harvesting.mountain_wetlands._mwr_session', return_value=session)
 
-    def test_api_doi_persisted_on_work(self):
-        captured = {}
-
-        def fake_build(title, doi, author, existing_metadata=None):
-            captured.setdefault(title, []).append(doi)
-            return ({}, {})
+    def test_api_doi_persisted_on_work_and_openalex_skipped(self):
+        """When the API carries both DOI and authors, the DOI is saved and
+        OpenAlex is not called (rate-limit budget preserved)."""
+        mock_build = MagicMock(return_value=({}, {}))
 
         with self._patched_session(self.payload), \
-             patch('works.harvesting.mountain_wetlands.build_openalex_fields',
-                   side_effect=fake_build):
+             patch('works.harvesting.mountain_wetlands.build_openalex_fields', mock_build):
             from works.tasks import harvest_mountain_wetlands
             harvest_mountain_wetlands(self.source.id)
 
         baied = Work.objects.get(title__startswith='Evolution of High Andean')
         self.assertEqual(baied.doi, '10.2307/3673632')
         self.assertEqual(baied.provenance['metadata_sources'].get('doi'), 'original_source')
-        self.assertIn('10.2307/3673632', captured.get(baied.title, []))
+        self.assertEqual(baied.provenance['openalex_match']['status'], 'skipped')
+
+        barros = Work.objects.get(title__startswith='Short-Term Effects')
+        self.assertEqual(barros.provenance['openalex_match']['status'], 'skipped')
+
+        # Only the no-DOI / no-author record triggers an OpenAlex call.
+        self.assertEqual(mock_build.call_count, 1)
 
     def test_api_doi_normalised_from_https_form(self):
         with self._patched_session(self.payload), \
@@ -244,7 +248,9 @@ class MountainWetlandsOpenAlexMatchTests(TestCase):
         self.assertEqual(no_sites.provenance['openalex_match']['status'], 'verified')
         self.assertEqual(no_sites.provenance['metadata_sources'].get('doi'), 'openalex')
 
-    def test_candidate_match_with_api_doi_keeps_api_doi(self):
+    def test_candidate_match_on_no_doi_record_stores_info_but_no_doi(self):
+        """A candidate OpenAlex match on a no-DOI record stores the candidate
+        info for curators but does not write a DOI (only verified matches do)."""
         candidate_fields = {
             'openalex_id': None,
             'openalex_match_info': [
@@ -255,13 +261,13 @@ class MountainWetlandsOpenAlexMatchTests(TestCase):
              patch('works.harvesting.mountain_wetlands.build_openalex_fields',
                    side_effect=lambda title, doi, author, existing_metadata=None: (
                        (dict(candidate_fields), {})
-                       if title.startswith('Evolution of High Andean')
+                       if title == 'Record Without Study Sites'
                        else ({}, {})
                    )):
             from works.tasks import harvest_mountain_wetlands
             harvest_mountain_wetlands(self.source.id)
 
-        baied = Work.objects.get(title__startswith='Evolution of High Andean')
-        self.assertEqual(baied.doi, '10.2307/3673632')
-        self.assertEqual(baied.provenance['openalex_match']['status'], 'candidate')
-        self.assertTrue(baied.openalex_match_info)
+        no_sites = Work.objects.get(title='Record Without Study Sites')
+        self.assertIsNone(no_sites.doi)
+        self.assertEqual(no_sites.provenance['openalex_match']['status'], 'candidate')
+        self.assertTrue(no_sites.openalex_match_info)
