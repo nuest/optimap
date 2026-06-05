@@ -341,6 +341,61 @@ All deployment-specific config uses `OPTIMAP_*` environment variables loaded fro
 - Email confirmation for account changes
 - CSRF tokens required - use `localhost` domain during development (not 127.0.0.1)
 
+### Email notifications
+
+All outgoing emails use file-based plain-text templates in `works/templates/email/`. Adding a new email notification follows a fixed pattern:
+
+**1. Create the template** at `works/templates/email/<name>.en.txt`. The **first line is the subject**, a **blank line separates it from the body**. Subjects use `[OPTIMAP]` prefix and an emoji:
+
+```
+[OPTIMAP] 🔔 Something happened — {{ title }}
+
+Hello {{ username }},
+
+Here is the detail: {{ detail_url }}
+```
+
+Autoescape is disabled (see `works/utils/email.py`), so URLs with `&` render correctly without `&amp;`.
+
+**2. Render the template** using the shared helper:
+
+```python
+from works.utils.email import render_email
+
+subject, body = render_email('email/<name>.en.txt', {
+    'title': work.title,
+    'detail_url': absolute_url,
+})
+send_mail(subject, body, settings.EMAIL_HOST_USER, [recipient])
+```
+
+For harvest completion/failure emails use `render_harvest_email` from `works.harvesting.common` (same helper, re-exported for convenience).
+
+**3. Queue it** via `django_q.tasks.async_task` for any email that is not a direct user-action response (i.e. everything except magic-link and email-change confirmation). This keeps request latency low and survives SMTP hiccups.
+
+**4. Write a content assertion test.** Every email must have at least one test that checks a key substring in `mail.outbox[0].body` — not just that an email was sent. See `tests/test_auth_emails.py`, `tests/test_work_notifications.py`, and `tests/test_regular_harvesting.py` for examples. Use `@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")`.
+
+**Complete email inventory** (12 templates, 20 distinct sends):
+
+| Template | Trigger | Sender |
+|----------|---------|--------|
+| `harvest_success.en.txt` | Harvest completes (OAI, RSS, Crossref, MaRESS, OpenAlex) | `render_harvest_email` in each harvester |
+| `harvest_failure.en.txt` | Harvest fails (same 5 harvesters) | same |
+| `magic_link.en.txt` | User requests login | `works/views/auth.py::loginres` (synchronous) |
+| `email_change_confirm.en.txt` | User requests email change | `works/views/auth.py::change_useremail` |
+| `email_changed_notify.en.txt` | Email change confirmed | `works/views/auth.py::confirm_email_change` |
+| `account_deletion_confirm.en.txt` | User requests account deletion | `works/views/auth.py::request_delete` |
+| `contribution_review.en.txt` | Work contributed — notifies admins/curators | `works/notifications.py` via Django-Q |
+| `publication_to_contributor.en.txt` | Work published — notifies contributor | same |
+| `curator_change.en.txt` | Curator added/removed from collection | same |
+| `new_user_admin.en.txt` | New user confirmed first login | same |
+| `monthly_digest.en.txt` | Scheduled monthly digest | `works/tasks.py::send_monthly_email` |
+| `subscription_regional.en.txt` | Scheduled regional subscription digest | `works/tasks.py::send_subscription_based_email` |
+
+**Opt-out**: work-event emails (contribution/publish) respect `UserProfile.notify_work_events` (opt-out, default True). Monthly digest respects `UserProfile.notify_new_manuscripts`. Blocked senders are checked via `BlockedEmail`/`BlockedDomain`. All sends are logged to `EmailLog` for audit (harvest emails are the exception).
+
+**Future i18n**: swap `.en.txt` for `.de.txt` etc. and pick the template name based on the user's locale — no other code change needed.
+
 ### Testing Notes
 
 - UI tests use Helium/Selenium (set `headless=False` for debugging)

@@ -30,6 +30,7 @@ from django.core.mail import EmailMessage, send_mail
 from django.core.serializers import serialize
 from django.urls import reverse
 from django.utils import timezone
+from works.utils.email import render_email
 from django_q.models import Schedule
 from django_q.tasks import schedule
 
@@ -215,9 +216,8 @@ def send_monthly_email(trigger_source="manual", sent_by=None):
             return f"https://doi.org/{work.doi}"
         return work.url or ""
 
-    lines = [f"- {work.title}: {link_for(work)}" for work in new_manuscripts]
-    content = "Here are the new manuscripts:\n" + "\n".join(lines)
-    subject = "📚 New manuscripts on OPTIMAP"
+    manuscripts = [{'title': w.title, 'link': link_for(w)} for w in new_manuscripts]
+    subject, content = render_email('email/monthly_digest.en.txt', {'manuscripts': manuscripts})
 
     delay_seconds = getattr(settings, "EMAIL_SEND_DELAY", 0)
 
@@ -300,51 +300,34 @@ def send_subscription_based_email(trigger_source='manual', sent_by=None, user_id
         unsubscribe_all = f"{BASE_URL}{reverse('optimap:unsubscribe')}?all=true"
         manage_subscriptions = f"{BASE_URL}{reverse('optimap:subscriptions')}"
 
-        subject = f"🌍 {total_publications} New Publications in Your Subscribed Regions"
-
-        content_lines = [
-            f"Dear {subscription.user.username},",
-            "",
-            f"You have {total_publications} new work(s) in your subscribed regions:",
-            ""
-        ]
-
+        region_groups = []
         for region in sorted(region_publications.keys(), key=lambda r: r.name):
             pubs = region_publications[region]
             region_url = f"{BASE_URL}{region.get_absolute_url()}"
-            region_type = region.get_region_type_display()
+            pub_items = [
+                {
+                    'title': (w.title[:100] + '...' if len(w.title) > 100 else w.title),
+                    'link': _get_article_link(w),
+                }
+                for w in pubs[:10]
+            ]
+            region_groups.append({
+                'name': region.name,
+                'region_type': region.get_region_type_display(),
+                'pub_count': len(pubs),
+                'region_url': region_url,
+                'pubs': pub_items,
+                'extra_count': max(0, len(pubs) - 10),
+            })
 
-            content_lines.append(f"📍 {region.name} ({region_type}) - {len(pubs)} work(s)")
-            content_lines.append(f"   View all publications in this region: {region_url}")
-            content_lines.append("")
-
-            for work in pubs[:10]:
-                link = _get_article_link(work)
-                title = work.title[:100] + "..." if len(work.title) > 100 else work.title
-                content_lines.append(f"   • {title}")
-                content_lines.append(f"     {link}")
-                content_lines.append("")
-
-            if len(pubs) > 10:
-                content_lines.append(f"   ... and {len(pubs) - 10} more in {region.name}")
-                content_lines.append(f"   View all: {region_url}")
-                content_lines.append("")
-
-        content_lines.extend([
-            "───────────────────────────────────────",
-            "",
-            "Manage your regional subscriptions:",
-            f"  {manage_subscriptions}",
-            "",
-            "Unsubscribe from all notifications:",
-            f"  {unsubscribe_all}",
-            "",
-            "---",
-            "OPTIMAP - Open Platform for Geospatial Manuscripts",
-            f"{BASE_URL}"
-        ])
-
-        content = "\n".join(content_lines)
+        subject, content = render_email('email/subscription_regional.en.txt', {
+            'total_publications': total_publications,
+            'username': subscription.user.username,
+            'region_groups': region_groups,
+            'manage_subscriptions': manage_subscriptions,
+            'unsubscribe_all': unsubscribe_all,
+            'base_url': BASE_URL,
+        })
 
         try:
             email = EmailMessage(subject, content, settings.EMAIL_HOST_USER, [user_email])

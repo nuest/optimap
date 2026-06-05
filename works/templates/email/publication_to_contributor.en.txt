@@ -1,0 +1,12 @@
+[OPTIMAP] 🎉 A work you contributed to has been published — {{ work_title }}
+
+Thank you! A work you contributed to has just been published.
+
+Title: {{ work_title }}
+DOI: {{ work_doi }}
+Your contribution: {{ kind_label }}
+
+Open the public landing page:
+  {{ work_url }}
+
+(Sent only to you.)

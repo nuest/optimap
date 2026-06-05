@@ -434,3 +434,13 @@ def send_harvest_email(user, subject, body, fail_silently=False):
         )
     except Exception as e:  # noqa: BLE001 — email failure must not crash the harvest
         logger.error("Failed to send harvest email to %s: %s", user.email, e)
+
+
+def render_harvest_email(template_name, context):
+    """Render a harvest email template and split subject from body.
+
+    Returns ``(subject, body)``. Delegates to ``works.utils.email.render_email``
+    so autoescape is off (plain-text output — no HTML entities in URLs, etc.).
+    """
+    from works.utils.email import render_email
+    return render_email(template_name, context)

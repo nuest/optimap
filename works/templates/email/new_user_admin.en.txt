@@ -1,0 +1,12 @@
+[OPTIMAP] 👤 New user registered — {{ user_email }}
+
+A new user just confirmed their first login on OPTIMAP.
+
+Email: {{ user_email }}
+Username: {{ username }}
+Registered at: {{ registered_at }}
+
+Open the admin user page to review:
+  {{ user_admin_url }}
+
+(Sent to all staff users.)

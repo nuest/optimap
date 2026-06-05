@@ -1,0 +1,15 @@
+[OPTIMAP] ❌ {{ subject_prefix }}Harvesting Failed for {{ source_label }}
+
+The {{ source_type_label }} harvest failed.
+
+Source: {{ source_name }}
+{% if source_url %}URL: {{ source_url }}
+{% endif %}{% if collection_label %}Collection: {{ collection_label }}
+{% endif %}{% if resolved_prefix %}DOI prefix: {{ resolved_prefix }}
+{% endif %}{% if event_started %}Started: {{ event_started }}
+{% endif %}{% if event_failed %}Failed:  {{ event_failed }}
+{% endif %}Error: {{ error }}
+{% if event_failed %}
+Please check the source configuration and try again, or contact support if the issue persists.
+{% endif %}{% if warning_summary %}
+{{ warning_summary }}{% endif %}

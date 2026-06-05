@@ -1,0 +1,10 @@
+[OPTIMAP] 🔑 Login link
+
+Hello {{ email }} !
+
+You requested that we send you a link to log in to OPTIMAP at {{ domain }}:
+
+{{ link }}
+
+Please click on the link to log in.
+The link is valid for {{ valid }} minutes.

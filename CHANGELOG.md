@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **All outgoing emails now use file-based Django templates** (closes #110). Email bodies and subjects are stored in `works/templates/email/*.en.txt` — one file per email type (12 templates total). Subject lines are on the first line of each template; a blank line separates them from the body. Every subject now carries a `[OPTIMAP]` prefix and a relevant emoji. Autoescape is disabled for plain-text output so URLs are never HTML-encoded. Future language variants drop in as `*.de.txt` etc. with no code changes required. Missing content assertions for the magic-link, email-change, and account-deletion emails were added as part of this change.
+
 - **Login, logout, and email-change flows now redirect to `/` with a flash message** instead of rendering dedicated single-alert pages. Removed `login_response.html`, `logout.html`, `changeuser.html`, and dead `deleteaccount.html` templates; removed corresponding dead `delete_account` view. Login and email-change messages use `extra_tags="persist"` so they stay visible until manually dismissed.
 - **Per-message auto-close TTL for flash alerts.** Pass `extra_tags="persist"` to any `messages.*()` call to suppress auto-close entirely; `error` and `warning` level messages default to 8 s, `info`/`success` to 5 s (previously all server-rendered alerts shared a single 5 s timeout). `OPTIMAP_FLASH` JS alerts for `warning` now also get 8 s to match. The Bootstrap level tag (`alert-danger` etc.) is now derived from `message.level_tag` rather than the combined `message.tags` string, so `extra_tags` values no longer bleed into the CSS class.
 

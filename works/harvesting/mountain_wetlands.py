@@ -28,6 +28,7 @@ from .common import (
     ensure_collection_for_source,
     fail_harvest,
     get_or_create_admin_command_user,
+    render_harvest_email,
     resolve_user,
     send_harvest_email,
 )
@@ -354,41 +355,52 @@ def harvest_mountain_wetlands(source_id, user=None, max_records=None, update_exi
         )
 
         collection_label = source.collection.name if source.collection else source.name
-        send_harvest_email(
-            user,
-            f"✅ Harvesting Completed for {collection_label}",
-            (
-                f"MaRESS harvest details:\n\n"
-                f"Source: {source.name}\n"
-                f"URL: {source.url_field}\n"
-                f"Records processed: {total_processed}\n"
-                f"New works saved: {stats.created}\n"
-                f"Updated works: {stats.updated}\n"
-                f"With spatial extent: {spatial_count}\n"
-                f"With temporal extent: {temporal_count}\n"
-                f"Started:   {event.started_at:%Y-%m-%d %H:%M:%S}\n"
-                f"Completed: {event.completed_at:%Y-%m-%d %H:%M:%S}\n"
-                f"\n{warning_collector.get_summary()}"
-            ),
-        )
+        subject, body = render_harvest_email('email/harvest_success.en.txt', {
+            'subject_prefix': '',
+            'source_label': collection_label,
+            'detail_header': 'MaRESS harvest details:',
+            'source_name': source.name,
+            'source_url': source.url_field,
+            'url_label': 'URL',
+            'collection_label': None,
+            'records_added_label': 'New works saved',
+            'records_added': stats.created,
+            'records_updated_label': 'Updated works',
+            'records_updated': stats.updated,
+            'spatial_label': 'With spatial extent',
+            'spatial_count': spatial_count,
+            'temporal_label': 'With temporal extent',
+            'temporal_count': temporal_count,
+            'event_started': f'{event.started_at:%Y-%m-%d %H:%M:%S}',
+            'event_completed': f'{event.completed_at:%Y-%m-%d %H:%M:%S}',
+            'warning_summary': warning_collector.get_summary(),
+            'resolved_prefix': None,
+            'container_title_filters': None,
+            'openalex_source_id': None,
+            'records_seen': None,
+            'records_processed': total_processed,
+        })
+        send_harvest_email(user, subject, body)
 
     except Exception as e:
         logger.error(
             "MaRESS harvesting failed for source %s: %s", source.url_field, str(e),
         )
         fail_harvest(event, e, warning_collector)
-        send_harvest_email(
-            user,
-            f"❌ Harvesting Failed for {source.name}",
-            (
-                f"The MaRESS harvest failed.\n\n"
-                f"Source: {source.name}\n"
-                f"URL: {source.url_field}\n"
-                f"Error: {e}\n"
-                f"\n{warning_collector.get_summary()}"
-            ),
-            fail_silently=True,
-        )
+        subject, body = render_harvest_email('email/harvest_failure.en.txt', {
+            'subject_prefix': '',
+            'source_label': source.name,
+            'source_type_label': 'MaRESS',
+            'source_name': source.name,
+            'source_url': source.url_field,
+            'collection_label': None,
+            'resolved_prefix': None,
+            'event_started': None,
+            'event_failed': None,
+            'error': str(e),
+            'warning_summary': warning_collector.get_summary(),
+        })
+        send_harvest_email(user, subject, body, fail_silently=True)
         raise
     finally:
         logger.removeHandler(warning_collector)

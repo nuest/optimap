@@ -5,7 +5,8 @@ import os
 import django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "optimap.settings")
 django.setup()
-from django.test import TestCase, Client
+from django.core import mail
+from django.test import TestCase, Client, override_settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.urls import reverse
@@ -21,11 +22,24 @@ class AccountDeletionTests(TestCase):
         self.delete_token = uuid.uuid4().hex
         cache.set(f"user_delete_token_{self.delete_token}", self.user.id, timeout=600)
 
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
     def test_request_delete_account(self):
         """Test that a user can request account deletion"""
+        mail.outbox = []
         response = self.client.post(reverse("optimap:request_delete"))
         self.assertEqual(response.status_code, 302)
         self.assertIn("message=Check%20your%20email", response.url)
+
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+    def test_deletion_email_contains_confirmation_link(self):
+        """Deletion confirmation email includes the token link and timeout."""
+        mail.outbox = []
+        self.client.post(reverse("optimap:request_delete"))
+        self.assertEqual(len(mail.outbox), 1)
+        email = mail.outbox[0]
+        self.assertIn("deletion", email.subject.lower())
+        self.assertIn("/confirm-delete/", email.body)
+        self.assertIn("10", email.body)  # timeout_minutes
 
     def test_confirm_delete_account(self):
         """Test that a user can confirm account deletion"""

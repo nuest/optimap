@@ -1,0 +1,12 @@
+[OPTIMAP] 📧 Confirm your email change
+
+Hello,
+
+You requested to change your email from {{ email_old }} to {{ email_new }}.
+Please confirm the new email by clicking on this link:
+
+{{ confirm_url }}
+
+This link will expire in 10 minutes.
+
+Thank you for using OPTIMAP!

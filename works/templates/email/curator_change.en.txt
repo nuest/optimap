@@ -1,0 +1,10 @@
+[OPTIMAP] 👥 Curator {{ action }} — {{ collection_name }}
+
+{{ changed_label }} {{ verb }} the curators of '{{ collection_name }}'.
+
+Action by: {{ actor_label }}
+Collection: {{ collection_url }}
+
+Current curators: {{ curators_line }}
+
+(Sent to all curators, admins, and the {{ action }} curator.)

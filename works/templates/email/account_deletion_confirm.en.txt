@@ -1,0 +1,5 @@
+[OPTIMAP] ⚠️ Confirm your account deletion
+
+Click the link to confirm deletion: {{ confirm_url }}
+
+This link is valid for {{ timeout_minutes }} minutes. If you did not request this, ignore this email.

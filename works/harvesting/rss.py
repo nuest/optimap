@@ -20,6 +20,7 @@ from .common import (
     fail_harvest,
     get_or_create_admin_command_user,
     parse_publication_date,
+    render_harvest_email,
     resolve_user,
     send_harvest_email,
 )
@@ -236,39 +237,49 @@ def harvest_rss_endpoint(source_id, user=None, max_records=None, update_existing
         new_count = stats.created
         updated_count = stats.updated
 
-        completed_str = event.completed_at.strftime('%Y-%m-%d %H:%M:%S')
-        send_harvest_email(
-            user,
-            f"✅ RSS Feed Harvesting Completed for {source.name}",
-            (
-                f"RSS/Atom feed harvesting job details:\n\n"
-                f"Number of added articles: {new_count}\n"
-                f"Number of updated articles: {updated_count}\n"
-                f"Number of articles with spatial metadata: {spatial_count}\n"
-                f"Number of articles with temporal metadata: {temporal_count}\n"
-                f"Source: {source.name}\n"
-                f"Feed URL: {source.url_field}\n"
-                f"Job started at: {event.started_at.strftime('%Y-%m-%d %H:%M:%S')}\n"
-                f"Job completed at: {completed_str}\n"
-                f"\n{warning_collector.get_summary()}"
-            ),
-        )
+        subject, body = render_harvest_email('email/harvest_success.en.txt', {
+            'subject_prefix': 'RSS Feed ',
+            'source_label': source.name,
+            'detail_header': 'RSS/Atom feed harvesting job details:',
+            'source_name': source.name,
+            'source_url': source.url_field,
+            'url_label': 'Feed URL',
+            'collection_label': None,
+            'records_added_label': 'Number of added articles',
+            'records_added': new_count,
+            'records_updated_label': 'Number of updated articles',
+            'records_updated': updated_count,
+            'spatial_label': 'Number of articles with spatial metadata',
+            'spatial_count': spatial_count,
+            'temporal_label': 'Number of articles with temporal metadata',
+            'temporal_count': temporal_count,
+            'event_started': event.started_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'event_completed': event.completed_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'warning_summary': warning_collector.get_summary(),
+            'resolved_prefix': None,
+            'container_title_filters': None,
+            'openalex_source_id': None,
+            'records_seen': None,
+            'records_processed': None,
+        })
+        send_harvest_email(user, subject, body)
 
     except Exception as e:
         logger.error("RSS feed harvesting failed for source %s: %s", source.url_field, str(e))
         fail_harvest(event, e, warning_collector)
-        failure_message = (
-            f"RSS feed harvesting failed for {source.name}\n\n"
-            f"Error: {str(e)}\n\n"
-            f"Feed URL: {source.url_field}"
-        )
-        if warning_collector.has_issues():
-            failure_message += f"\n{warning_collector.get_summary()}"
-        send_harvest_email(
-            user,
-            f"❌ RSS Feed Harvesting Failed for {source.name}",
-            failure_message,
-            fail_silently=True,
-        )
+        subject, body = render_harvest_email('email/harvest_failure.en.txt', {
+            'subject_prefix': 'RSS Feed ',
+            'source_label': source.name,
+            'source_type_label': 'RSS/Atom',
+            'source_name': source.name,
+            'source_url': source.url_field,
+            'collection_label': None,
+            'resolved_prefix': None,
+            'event_started': None,
+            'event_failed': None,
+            'error': str(e),
+            'warning_summary': warning_collector.get_summary() if warning_collector.has_issues() else '',
+        })
+        send_harvest_email(user, subject, body, fail_silently=True)
     finally:
         logger.removeHandler(warning_collector)

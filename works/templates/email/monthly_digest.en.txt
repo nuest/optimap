@@ -1,0 +1,5 @@
+[OPTIMAP] 📚 New manuscripts
+
+Here are the new manuscripts:
+{% for item in manuscripts %}- {{ item.title }}: {{ item.link }}
+{% endfor %}

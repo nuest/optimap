@@ -1,0 +1,26 @@
+[OPTIMAP] 🌍 {{ total_publications }} new publications in your subscribed regions
+
+Dear {{ username }},
+
+You have {{ total_publications }} new work(s) in your subscribed regions:
+
+{% for group in region_groups %}📍 {{ group.name }} ({{ group.region_type }}) - {{ group.pub_count }} work(s)
+   View all publications in this region: {{ group.region_url }}
+
+{% for pub in group.pubs %}   • {{ pub.title }}
+     {{ pub.link }}
+
+{% endfor %}{% if group.extra_count %}   ... and {{ group.extra_count }} more in {{ group.name }}
+   View all: {{ group.region_url }}
+
+{% endif %}{% endfor %}───────────────────────────────────────
+
+Manage your regional subscriptions:
+  {{ manage_subscriptions }}
+
+Unsubscribe from all notifications:
+  {{ unsubscribe_all }}
+
+---
+OPTIMAP - Open Platform for Geospatial Manuscripts
+{{ base_url }}

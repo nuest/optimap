@@ -1,0 +1,14 @@
+[OPTIMAP] 🔍 Contribution to review — {{ work_title }}
+
+{{ actor_label }} just contributed metadata to a work in OPTIMAP.
+
+Title: {{ work_title }}
+DOI: {{ work_doi }}
+Submitted at: {{ submitted_at }}
+
+Open the work page to review:
+  {{ work_url }}
+
+This notification was sent to: {{ role_summary }}.
+Any of the listed admins or curators can publish the work, so by the time you
+open the link the contribution may already have been reviewed.

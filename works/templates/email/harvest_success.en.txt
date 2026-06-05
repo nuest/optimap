@@ -1,0 +1,19 @@
+[OPTIMAP] ✅ {{ subject_prefix }}Harvesting Completed for {{ source_label }}
+
+{{ detail_header }}
+
+{% if resolved_prefix %}DOI prefix: {{ resolved_prefix }}
+{% endif %}{% if container_title_filters %}Container-title filters: {{ container_title_filters }}
+{% endif %}{% if openalex_source_id %}OpenAlex source: {{ openalex_source_id }}
+{% endif %}{% if records_seen is not None %}Records seen: {{ records_seen }}
+{% endif %}{% if records_processed is not None %}Records processed: {{ records_processed }}
+{% endif %}{% if collection_label %}Collection used: {{ collection_label }}
+{% endif %}{{ records_added_label }}: {{ records_added }}
+{{ records_updated_label }}: {{ records_updated }}
+{% if url_label and source_url %}{{ url_label }}: {{ source_url }}
+{% endif %}{{ spatial_label }}: {{ spatial_count }}
+{{ temporal_label }}: {{ temporal_count }}
+Started:   {{ event_started }}
+Completed: {{ event_completed }}
+{% if warning_summary %}
+{{ warning_summary }}{% endif %}

@@ -75,7 +75,7 @@ class NewUserAdminNotificationTests(TestCase):
             recipients, ["admin1@optimap.example", "admin2@optimap.example"]
         )
         subject = mail.outbox[0].subject
-        self.assertIn("new user registered", subject)
+        self.assertIn("New user registered", subject)
         self.assertIn("brand-new@example.org", subject)
         # Body carries the admin user page link.
         body = mail.outbox[0].body
@@ -83,7 +83,7 @@ class NewUserAdminNotificationTests(TestCase):
         self.assertIn("/admin/works/customuser/", body)
 
         # EmailLog rows recorded.
-        logs = EmailLog.objects.filter(subject__contains="new user registered")
+        logs = EmailLog.objects.filter(subject__contains="New user registered")
         self.assertEqual(logs.count(), 2)
         self.assertTrue(all(log.status == "success" for log in logs))
 
@@ -100,7 +100,7 @@ class NewUserAdminNotificationTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(len(mail.outbox), 0)
         self.assertFalse(
-            EmailLog.objects.filter(subject__contains="new user registered").exists()
+            EmailLog.objects.filter(subject__contains="New user registered").exists()
         )
 
     def test_unconfirmed_first_visit_does_not_notify(self):

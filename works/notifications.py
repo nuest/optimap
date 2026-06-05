@@ -33,6 +33,8 @@ from django.core.mail import send_mail
 from django.urls import reverse
 from django.utils import timezone
 
+from works.utils.email import render_email
+
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
@@ -174,18 +176,14 @@ def send_contribution_review_email(
     actor = User.objects.filter(pk=actor_id).first() if actor_id else None
     actor_label = actor.email if actor and actor.email else (actor.username if actor else "(unknown)")
 
-    subject = f"OPTIMAP: contribution to review — {work.title[:120]}"
-    body = (
-        f"{actor_label} just contributed metadata to a work in OPTIMAP.\n\n"
-        f"Title: {work.title}\n"
-        f"DOI: {work.doi or '(none)'}\n"
-        f"Submitted at: {timezone.now().isoformat(timespec='seconds')}\n\n"
-        f"Open the work page to review:\n"
-        f"  {_absolute_work_url(work)}\n\n"
-        f"This notification was sent to: {role_summary}.\n"
-        f"Any of the listed admins or curators can publish the work, so by the time you "
-        f"open the link the contribution may already have been reviewed.\n"
-    )
+    subject, body = render_email('email/contribution_review.en.txt', {
+        'actor_label': actor_label,
+        'work_title': work.title[:120],
+        'work_doi': work.doi or '(none)',
+        'submitted_at': timezone.now().isoformat(timespec='seconds'),
+        'work_url': _absolute_work_url(work),
+        'role_summary': role_summary,
+    })
 
     recipients = list(
         User.objects.filter(pk__in=list(recipient_ids))
@@ -245,7 +243,6 @@ def send_publication_to_contributor_emails(contributor_ids: Iterable[int], work_
         logger.warning("send_publication_to_contributor_emails: work id=%s vanished.", work_id)
         return
 
-    subject = f"OPTIMAP: a work you contributed to has been published — {work.title[:120]}"
     work_url = _absolute_work_url(work)
 
     for contributor_id in contributor_ids:
@@ -259,15 +256,12 @@ def send_publication_to_contributor_emails(contributor_ids: Iterable[int], work_
             .distinct()
         )
         kind_label = ", ".join(sorted(kinds)) if kinds else "metadata"
-        body = (
-            f"Thank you! A work you contributed to has just been published.\n\n"
-            f"Title: {work.title}\n"
-            f"DOI: {work.doi or '(none)'}\n"
-            f"Your contribution: {kind_label}\n\n"
-            f"Open the public landing page:\n"
-            f"  {work_url}\n\n"
-            f"(Sent only to you.)\n"
-        )
+        subject, body = render_email('email/publication_to_contributor.en.txt', {
+            'work_title': work.title[:120],
+            'work_doi': work.doi or '(none)',
+            'kind_label': kind_label,
+            'work_url': work_url,
+        })
         try:
             send_mail(subject, body, settings.EMAIL_HOST_USER, [contributor.email], fail_silently=False)
         except Exception:  # noqa: BLE001
@@ -348,16 +342,12 @@ def send_new_user_admin_email(recipient_ids: Iterable[int], user_id: int) -> Non
     user_admin_url = (
         f"{settings.BASE_URL}{reverse('admin:works_customuser_change', args=[user.pk])}"
     )
-    subject = f"OPTIMAP: new user registered — {user.email}"
-    body = (
-        f"A new user just confirmed their first login on OPTIMAP.\n\n"
-        f"Email: {user.email}\n"
-        f"Username: {user.username}\n"
-        f"Registered at: {user.date_joined.isoformat(timespec='seconds')}\n\n"
-        f"Open the admin user page to review:\n"
-        f"  {user_admin_url}\n\n"
-        f"(Sent to all staff users.)\n"
-    )
+    subject, body = render_email('email/new_user_admin.en.txt', {
+        'user_email': user.email,
+        'username': user.username,
+        'registered_at': user.date_joined.isoformat(timespec='seconds'),
+        'user_admin_url': user_admin_url,
+    })
 
     admin_emails = list(
         User.objects.filter(pk__in=list(recipient_ids))
@@ -474,14 +464,15 @@ def send_curator_change_email(
     curators_line = ", ".join(sorted(current_curators)) if current_curators else "(none)"
 
     collection_url = f"{settings.BASE_URL}{collection.get_absolute_url()}"
-    subject = f"OPTIMAP: curator {action} — {collection.name}"
-    body = (
-        f"{changed_label} {verb} the curators of '{collection.name}'.\n\n"
-        f"Action by: {actor_label}\n"
-        f"Collection: {collection_url}\n\n"
-        f"Current curators: {curators_line}\n\n"
-        f"(Sent to all curators, admins, and the {action} curator.)\n"
-    )
+    subject, body = render_email('email/curator_change.en.txt', {
+        'action': action,
+        'collection_name': collection.name,
+        'changed_label': changed_label,
+        'verb': verb,
+        'actor_label': actor_label,
+        'collection_url': collection_url,
+        'curators_line': curators_line,
+    })
 
     from works.models import EmailLog  # local: avoid circular import
 

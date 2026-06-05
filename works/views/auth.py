@@ -23,6 +23,7 @@ from urllib.parse import unquote
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_GET
 from django.core.mail import EmailMessage, get_connection, send_mail
+from works.utils.email import render_email
 import secrets
 import uuid
 from django.contrib import messages
@@ -69,18 +70,14 @@ def loginres(request):
                 }
         })
     else:
-        subject = 'OPTIMAP Login'
         link = get_login_link(request, email)
         valid = floor(LOGIN_TOKEN_TIMEOUT_SECONDS / 60)
-        body = f"""Hello {email} !
-
-You requested that we send you a link to log in to OPTIMAP at {request.site.domain}:
-
-{link}
-
-Please click on the link to log in.
-The link is valid for {valid} minutes.
-"""
+        subject, body = render_email('email/magic_link.en.txt', {
+            'email': email,
+            'domain': request.site.domain,
+            'link': link,
+            'valid': valid,
+        })
         logger.info('Login process started for user %s', email)
         # Login (and the other auth-adjacent flows below) sends the email
         # synchronously on purpose: SMTP failure must surface to the user
@@ -428,18 +425,11 @@ def change_useremail(request):
     confirm_url = request.build_absolute_uri(
         reverse("optimap:confirm_email_change", args=[token, email_new])
     )
-    subject = 'Confirm Your Email Change'
-    message = f"""Hello,
-
-You requested to change your email from {email_old} to {email_new}.
-Please confirm the new email by clicking on this link:
-
-{confirm_url}
-
-This link will expire in 10 minutes.
-
-Thank you for using OPTIMAP!
-"""
+    subject, message = render_email('email/email_change_confirm.en.txt', {
+        'email_old': email_old,
+        'email_new': email_new,
+        'confirm_url': confirm_url,
+    })
     send_mail(subject, message, settings.EMAIL_HOST_USER, [email_new])
     messages.info(request, f"We sent a confirmation link to {email_new}. Please click it to complete the email change.", extra_tags="persist")
     logout(request)
@@ -465,15 +455,11 @@ def confirm_email_change(request, token, email_new):
     user.email = email_new
     user.username = email_new
     user.save()
-    contactURL = f"{settings.BASE_URL}/contact"
-    notify_subject = 'Your OPTIMAP Email Was Changed'
-    notify_message = f"""Hello,
-
-Your email associated with OPTIMAP was changed from {old_email} to {email_new}.
-If you did NOT request this change, please contact us immediately at {contactURL}.
-
-Thank you for using OPTIMAP!
-"""
+    notify_subject, notify_message = render_email('email/email_changed_notify.en.txt', {
+        'old_email': old_email,
+        'email_new': email_new,
+        'contact_url': f"{settings.BASE_URL}/contact",
+    })
     send_mail(
         notify_subject,
         notify_message,
@@ -516,13 +502,11 @@ def request_delete(request):
     cache.set(f"{USER_DELETE_TOKEN_PREFIX}_{token}", user.id, timeout=ACCOUNT_DELETE_TOKEN_TIMEOUT_SECONDS)
     confirm_url = request.build_absolute_uri(reverse('optimap:confirm_delete', args=[token]))
     timeout_minutes = ACCOUNT_DELETE_TOKEN_TIMEOUT_SECONDS // 60
-    send_mail(
-        'Confirm Your Account Deletion',
-        f'Click the link to confirm deletion: {confirm_url}\n\n'
-        f'This link is valid for {timeout_minutes} minutes. If you did not request this, ignore this email.',
-        'no-reply@optimap.com',
-        [user.email],
-    )
+    subject, deletion_body = render_email('email/account_deletion_confirm.en.txt', {
+        'confirm_url': confirm_url,
+        'timeout_minutes': timeout_minutes,
+    })
+    send_mail(subject, deletion_body, 'no-reply@optimap.com', [user.email])
     return redirect(reverse('optimap:usersettings') + '?message=Check your email for a confirmation link.')
 
 @login_required(login_url='/')

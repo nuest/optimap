@@ -1,0 +1,8 @@
+[OPTIMAP] 📧 Your email address was changed
+
+Hello,
+
+Your email associated with OPTIMAP was changed from {{ old_email }} to {{ email_new }}.
+If you did NOT request this change, please contact us immediately at {{ contact_url }}.
+
+Thank you for using OPTIMAP!

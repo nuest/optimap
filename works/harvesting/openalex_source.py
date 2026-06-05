@@ -37,6 +37,7 @@ from .common import (
     ensure_collection_for_source,
     fail_harvest,
     get_or_create_admin_command_user,
+    render_harvest_email,
     resolve_user,
     send_harvest_email,
 )
@@ -362,22 +363,32 @@ def harvest_openalex_source(
 
         spatial_count, temporal_count = complete_harvest(event, stats, warning_collector)
 
-        send_harvest_email(
-            user,
-            f"✅ OpenAlex Harvesting Completed for {source.name}",
-            (
-                f"OpenAlex harvest details:\n\n"
-                f"OpenAlex source: {openalex_source_id}\n"
-                f"Records seen: {seen}\n"
-                f"New works saved: {stats.created}\n"
-                f"Updated works: {stats.updated}\n"
-                f"Articles with spatial metadata: {spatial_count}\n"
-                f"Articles with temporal metadata: {temporal_count}\n"
-                f"Started:   {event.started_at:%Y-%m-%d %H:%M:%S}\n"
-                f"Completed: {event.completed_at:%Y-%m-%d %H:%M:%S}\n"
-                f"\n{warning_collector.get_summary()}"
-            ),
-        )
+        subject, body = render_harvest_email('email/harvest_success.en.txt', {
+            'subject_prefix': 'OpenAlex ',
+            'source_label': source.name,
+            'detail_header': 'OpenAlex harvest details:',
+            'source_name': source.name,
+            'source_url': None,
+            'url_label': None,
+            'collection_label': None,
+            'records_added_label': 'New works saved',
+            'records_added': stats.created,
+            'records_updated_label': 'Updated works',
+            'records_updated': stats.updated,
+            'spatial_label': 'Articles with spatial metadata',
+            'spatial_count': spatial_count,
+            'temporal_label': 'Articles with temporal metadata',
+            'temporal_count': temporal_count,
+            'event_started': f'{event.started_at:%Y-%m-%d %H:%M:%S}',
+            'event_completed': f'{event.completed_at:%Y-%m-%d %H:%M:%S}',
+            'warning_summary': warning_collector.get_summary(),
+            'resolved_prefix': None,
+            'container_title_filters': None,
+            'openalex_source_id': openalex_source_id,
+            'records_seen': seen,
+            'records_processed': None,
+        })
+        send_harvest_email(user, subject, body)
 
     except Exception as e:
         logger.error(
@@ -385,16 +396,20 @@ def harvest_openalex_source(
             source.url_field, str(e),
         )
         fail_harvest(event, e, warning_collector)
-        send_harvest_email(
-            user,
-            f"❌ OpenAlex Harvesting Failed for {source.name}",
-            (
-                f"The OpenAlex harvest failed.\n\n"
-                f"Source: {source.name}\n"
-                f"Error: {e}\n"
-            ),
-            fail_silently=True,
-        )
+        subject, body = render_harvest_email('email/harvest_failure.en.txt', {
+            'subject_prefix': 'OpenAlex ',
+            'source_label': source.name,
+            'source_type_label': 'OpenAlex',
+            'source_name': source.name,
+            'source_url': None,
+            'collection_label': None,
+            'resolved_prefix': None,
+            'event_started': None,
+            'event_failed': None,
+            'error': str(e),
+            'warning_summary': '',
+        })
+        send_harvest_email(user, subject, body, fail_silently=True)
         raise
     finally:
         logger.removeHandler(warning_collector)

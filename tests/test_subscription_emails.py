@@ -125,7 +125,7 @@ class SubscriptionEmailTests(TestCase):
 
         # Check subject
         subject = call_args[0][0]
-        self.assertIn("New Publications", subject)
+        self.assertIn("new publications", subject)
 
         # Check content includes region name and publication
         content = call_args[0][1]
@@ -260,7 +260,7 @@ class SubscriptionEmailTests(TestCase):
 
         # Check count in subject
         subject = mock_email.call_args[0][0]
-        self.assertIn("2 New Publications", subject)
+        self.assertIn("2 new publications", subject)
 
         # Check count per region
         self.assertIn("Africa (Continent) - 2 work(s)", content)
