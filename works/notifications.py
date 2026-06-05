@@ -387,6 +387,132 @@ def send_new_user_admin_email(recipient_ids: Iterable[int], user_id: int) -> Non
 
 
 # ---------------------------------------------------------------------------
+# Curator change notification — all curators + admins + actor + changed user
+# ---------------------------------------------------------------------------
+
+def notify_curator_change(collection, changed_user, action: str, actor) -> None:
+    """Queue a notification when a curator is added to or removed from a collection.
+
+    action: 'added' or 'removed'
+    Recipients: all curators currently on the collection (post-change state)
+    + all admins + the actor + the changed user. Everyone in one email —
+    no separate "you were added" message.
+    Never crashes the calling request.
+    """
+    try:
+        from django_q.tasks import async_task
+
+        curator_ids = set(
+            collection.curators.exclude(email__exact="").values_list("id", flat=True)
+        )
+        admin_ids = set(
+            User.objects.filter(is_staff=True)
+            .exclude(email__exact="")
+            .values_list("id", flat=True)
+        )
+        candidate_ids = curator_ids | admin_ids
+        if getattr(actor, "pk", None):
+            candidate_ids.add(actor.pk)
+        if getattr(changed_user, "pk", None):
+            candidate_ids.add(changed_user.pk)
+
+        # Filter to users that actually have a valid email address.
+        recipient_ids = list(
+            User.objects.filter(pk__in=candidate_ids)
+            .exclude(email__exact="")
+            .values_list("id", flat=True)
+        )
+        if not recipient_ids:
+            logger.info(
+                "Curator %s on collection id=%s — no recipients to notify.",
+                action, collection.pk,
+            )
+            return
+
+        async_task(
+            "works.notifications.send_curator_change_email",
+            recipient_ids,
+            collection.pk,
+            changed_user.pk,
+            action,
+            getattr(actor, "pk", None),
+        )
+    except Exception:  # noqa: BLE001 — notification must never crash the request
+        logger.exception(
+            "notify_curator_change failed for collection id=%s; action is unaffected.",
+            getattr(collection, "pk", None),
+        )
+
+
+def send_curator_change_email(
+    recipient_ids: Iterable[int],
+    collection_id: int,
+    changed_user_id: int,
+    action: str,
+    actor_id: int | None,
+) -> None:
+    """Django-Q task: notify everyone about a curator list change."""
+    from works.models import Collection  # local: avoid circular import
+
+    try:
+        collection = Collection.objects.get(pk=collection_id)
+    except Collection.DoesNotExist:
+        logger.warning("send_curator_change_email: collection id=%s vanished.", collection_id)
+        return
+
+    changed_user = User.objects.filter(pk=changed_user_id).first()
+    if not changed_user:
+        logger.warning("send_curator_change_email: changed_user id=%s vanished.", changed_user_id)
+        return
+
+    actor = User.objects.filter(pk=actor_id).first() if actor_id else None
+    actor_label = actor.email if actor and actor.email else (actor.username if actor else "(unknown)")
+    changed_label = changed_user.email or changed_user.username
+    verb = "was added to" if action == "added" else "was removed from"
+
+    current_curators = list(collection.curators.exclude(email__exact="").values_list("email", flat=True))
+    curators_line = ", ".join(sorted(current_curators)) if current_curators else "(none)"
+
+    collection_url = f"{settings.BASE_URL}{collection.get_absolute_url()}"
+    subject = f"OPTIMAP: curator {action} — {collection.name}"
+    body = (
+        f"{changed_label} {verb} the curators of '{collection.name}'.\n\n"
+        f"Action by: {actor_label}\n"
+        f"Collection: {collection_url}\n\n"
+        f"Current curators: {curators_line}\n\n"
+        f"(Sent to all curators, admins, and the {action} curator.)\n"
+    )
+
+    from works.models import EmailLog  # local: avoid circular import
+
+    recipients = list(
+        User.objects.filter(pk__in=list(recipient_ids))
+        .exclude(email__exact="")
+        .values_list("email", flat=True)
+    )
+    for email in recipients:
+        try:
+            send_mail(subject, body, settings.EMAIL_HOST_USER, [email], fail_silently=False)
+            EmailLog.log_email(
+                recipient=email,
+                subject=subject,
+                content=body,
+                trigger_source="scheduled",
+                status="success",
+            )
+        except Exception as ex:  # noqa: BLE001
+            logger.exception("Failed to send curator-change email to %s.", email)
+            EmailLog.log_email(
+                recipient=email,
+                subject=subject,
+                content=body,
+                trigger_source="scheduled",
+                status="failed",
+                error_message=str(ex),
+            )
+
+
+# ---------------------------------------------------------------------------
 # Registry — extend by adding entries here.
 # ---------------------------------------------------------------------------
 

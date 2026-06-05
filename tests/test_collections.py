@@ -340,24 +340,22 @@ class CollectionDescriptionTests(TestCase):
         self.assertNotIn('id="collection-description-form"', body)
         self.assertNotIn('id="collection-description-edit-btn"', body)
 
-    def test_admin_sees_manage_curators_link(self):
-        # Admin gets a one-click jump to the admin change page anchored on
-        # the curators field — but curators don't, since they cannot manage
-        # other curators.
+    def test_admin_sees_inline_curator_ui(self):
+        # Admin sees the inline add/remove curator form; the old Django Admin
+        # "Manage curators" anchored link was replaced by this in-page UI.
         self.client.login(username='admin@x.com', password='p123')
         resp = self.client.get(reverse('optimap:collection-page', args=[self.col.identifier]))
         self.assertEqual(resp.status_code, 200)
         body = resp.content.decode()
-        self.assertIn(f'/admin/works/collection/{self.col.id}/change/#id_curators', body)
-        self.assertIn('Manage curators', body)
+        self.assertIn('add-curator-form', body)
+        self.assertNotIn('#id_curators', body)
 
-    def test_curator_does_not_see_manage_curators_link(self):
+    def test_curator_sees_inline_curator_ui(self):
         self.client.login(username='c@x.com', password='p123')
         resp = self.client.get(reverse('optimap:collection-page', args=[self.col.identifier]))
         self.assertEqual(resp.status_code, 200)
         body = resp.content.decode()
-        self.assertNotIn('Manage curators', body)
-        self.assertNotIn('/admin/works/collection/', body)
+        self.assertIn('add-curator-form', body)
 
 
 class CollectionByIdRedirectTests(TestCase):
@@ -824,6 +822,151 @@ class ProvenanceHelperTests(TestCase):
         self.assertEqual([e['type'] for e in events], ['contribution', 'publish'])
         # Existing harvest section preserved.
         self.assertEqual(work.provenance['harvest']['harvester'], 'harvest_oai_endpoint')
+
+
+class CollectionCuratorManagementTests(TestCase):
+    """Tests for the inline add/remove curator endpoints on the collection page."""
+
+    def setUp(self):
+        self.client = Client()
+        self.col = Collection.objects.create(
+            identifier='test-col', name='Test Collection', is_published=True,
+        )
+        self.admin = User.objects.create_user(
+            username='admin@example.com', email='admin@example.com',
+            password='admin123', is_staff=True,
+        )
+        self.curator = User.objects.create_user(
+            username='curator@example.com', email='curator@example.com', password='c',
+        )
+        self.col.curators.add(self.curator)
+        self.other_user = User.objects.create_user(
+            username='other@example.com', email='other@example.com', password='o',
+        )
+        self.add_url = reverse('optimap:collection-add-curator', args=[self.col.id])
+        self.remove_url = reverse('optimap:collection-remove-curator',
+                                  args=[self.col.id, self.curator.id])
+
+    # --- add_curator ---
+
+    def test_admin_can_add_curator(self):
+        self.client.force_login(self.admin)
+        resp = self.client.post(self.add_url, {'email': self.other_user.email})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data['success'])
+        self.assertIn(self.other_user, self.col.curators.all())
+
+    def test_existing_curator_can_add_another_curator(self):
+        self.client.force_login(self.curator)
+        resp = self.client.post(self.add_url, {'email': self.other_user.email})
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()['success'])
+        self.assertIn(self.other_user, self.col.curators.all())
+
+    def test_non_curator_gets_403(self):
+        self.client.force_login(self.other_user)
+        resp = self.client.post(self.add_url, {'email': self.admin.email})
+        self.assertEqual(resp.status_code, 403)
+        self.assertNotIn(self.admin, self.col.curators.all())
+
+    def test_anonymous_redirected(self):
+        resp = self.client.post(self.add_url, {'email': self.other_user.email})
+        self.assertEqual(resp.status_code, 302)
+
+    def test_unknown_email_returns_404(self):
+        self.client.force_login(self.admin)
+        resp = self.client.post(self.add_url, {'email': 'nobody@nowhere.example'})
+        self.assertEqual(resp.status_code, 404)
+        data = resp.json()
+        self.assertIn('error', data)
+
+    def test_add_already_curator_is_idempotent(self):
+        self.client.force_login(self.admin)
+        resp = self.client.post(self.add_url, {'email': self.curator.email})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data['success'])
+        self.assertTrue(data.get('already_curator'))
+        self.assertEqual(self.col.curators.count(), 1)
+
+    def test_missing_email_returns_400(self):
+        self.client.force_login(self.admin)
+        resp = self.client.post(self.add_url, {})
+        self.assertEqual(resp.status_code, 400)
+
+    def test_notification_queued_on_add(self):
+        from unittest.mock import patch
+        self.client.force_login(self.admin)
+        with patch('django_q.tasks.async_task') as mock_task:
+            self.client.post(self.add_url, {'email': self.other_user.email})
+        mock_task.assert_called_once()
+        args = mock_task.call_args[0]
+        self.assertEqual(args[0], 'works.notifications.send_curator_change_email')
+        self.assertEqual(args[3], self.other_user.pk)   # changed_user_id
+        self.assertEqual(args[4], 'added')
+
+    # --- remove_curator ---
+
+    def test_admin_can_remove_curator(self):
+        self.client.force_login(self.admin)
+        resp = self.client.post(self.remove_url)
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()['success'])
+        self.assertNotIn(self.curator, self.col.curators.all())
+
+    def test_curator_can_remove_another_curator(self):
+        extra = User.objects.create_user(
+            username='extra@example.com', email='extra@example.com', password='e',
+        )
+        self.col.curators.add(extra)
+        url = reverse('optimap:collection-remove-curator', args=[self.col.id, extra.id])
+        self.client.force_login(self.curator)
+        resp = self.client.post(url)
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()['success'])
+        self.assertNotIn(extra, self.col.curators.all())
+
+    def test_non_curator_cannot_remove_curator(self):
+        self.client.force_login(self.other_user)
+        resp = self.client.post(self.remove_url)
+        self.assertEqual(resp.status_code, 403)
+        self.assertIn(self.curator, self.col.curators.all())
+
+    def test_remove_non_curator_returns_400(self):
+        self.client.force_login(self.admin)
+        url = reverse('optimap:collection-remove-curator',
+                      args=[self.col.id, self.other_user.id])
+        resp = self.client.post(url)
+        self.assertEqual(resp.status_code, 400)
+
+    def test_notification_queued_on_remove(self):
+        from unittest.mock import patch
+        self.client.force_login(self.admin)
+        with patch('django_q.tasks.async_task') as mock_task:
+            self.client.post(self.remove_url)
+        mock_task.assert_called_once()
+        args = mock_task.call_args[0]
+        self.assertEqual(args[0], 'works.notifications.send_curator_change_email')
+        self.assertEqual(args[3], self.curator.pk)   # changed_user_id
+        self.assertEqual(args[4], 'removed')
+
+    # --- curator UI visible on collection page ---
+
+    def test_curator_section_shown_for_admin(self):
+        self.client.force_login(self.admin)
+        resp = self.client.get(reverse('optimap:collection-page', args=['test-col']))
+        self.assertContains(resp, 'add-curator-form')
+        self.assertContains(resp, 'curator-remove-btn')
+
+    def test_curator_section_shown_for_curator(self):
+        self.client.force_login(self.curator)
+        resp = self.client.get(reverse('optimap:collection-page', args=['test-col']))
+        self.assertContains(resp, 'add-curator-form')
+
+    def test_curator_section_hidden_for_anonymous(self):
+        resp = self.client.get(reverse('optimap:collection-page', args=['test-col']))
+        self.assertNotContains(resp, 'add-curator-form')
 
 
 class SourceCollectionPropagationTests(TestCase):

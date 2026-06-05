@@ -11,8 +11,8 @@ from django.contrib.gis.geos import GeometryCollection, Point
 from django.core import mail
 from django.test import TestCase, override_settings
 
-from works.models import Collection, Contribution, Source, Work
-from works.notifications import notify_work_event
+from works.models import Collection, Contribution, EmailLog, Source, Work
+from works.notifications import notify_work_event, notify_curator_change
 
 User = get_user_model()
 
@@ -305,3 +305,113 @@ class WorkEventOptOutTests(TestCase):
         # with notify_work_events=True, so they receive the emails by default.
         self.assertTrue(self.opted_in_admin.userprofile.notify_work_events)
         self.assertTrue(self.opted_in_curator.userprofile.notify_work_events)
+
+
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    EMAIL_HOST_USER="optimap@example.org",
+    BASE_URL="http://testserver",
+)
+class CuratorChangeNotificationTests(TestCase):
+    """Tests for notify_curator_change / send_curator_change_email."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin = User.objects.create_user(
+            username="curator-admin", email="curator-admin@example.org",
+            password="x", is_staff=True,
+        )
+        cls.existing_curator = User.objects.create_user(
+            username="existing-curator", email="existing@example.org", password="x",
+        )
+        cls.new_curator = User.objects.create_user(
+            username="new-curator", email="new@example.org", password="x",
+        )
+        cls.col = Collection.objects.create(identifier="notify-col", name="Notify Col")
+        cls.col.curators.add(cls.existing_curator)
+
+    def setUp(self):
+        mail.outbox = []
+
+    def _add_and_notify(self, actor=None):
+        """Add new_curator then fire the notification synchronously."""
+        self.col.curators.add(self.new_curator)
+        with patch("django_q.tasks.async_task", side_effect=_run_async_synchronously):
+            notify_curator_change(self.col, self.new_curator, "added", actor=actor or self.admin)
+
+    def _remove_and_notify(self, actor=None):
+        """Remove new_curator (assumes already added) then fire synchronously."""
+        self.col.curators.remove(self.new_curator)
+        with patch("django_q.tasks.async_task", side_effect=_run_async_synchronously):
+            notify_curator_change(self.col, self.new_curator, "removed", actor=actor or self.admin)
+
+    def tearDown(self):
+        # Keep the curator list clean between tests.
+        self.col.curators.remove(self.new_curator)
+
+    # --- recipients ---
+
+    def test_add_notifies_all_curators_admins_and_actor(self):
+        self._add_and_notify()
+        recipients = sorted(addr for m in mail.outbox for addr in m.to)
+        self.assertIn("curator-admin@example.org", recipients)    # admin + actor
+        self.assertIn("existing@example.org", recipients)         # existing curator
+        self.assertIn("new@example.org", recipients)              # newly added curator
+
+    def test_remove_notifies_removed_curator_too(self):
+        self.col.curators.add(self.new_curator)
+        self._remove_and_notify()
+        recipients = sorted(addr for m in mail.outbox for addr in m.to)
+        self.assertIn("new@example.org", recipients)              # removed — still gets mail
+
+    def test_no_duplicate_emails_when_actor_is_also_admin(self):
+        # Admin acting as actor: only one email per address.
+        self._add_and_notify(actor=self.admin)
+        admin_mails = [m for m in mail.outbox if "curator-admin@example.org" in m.to]
+        self.assertEqual(len(admin_mails), 1)
+
+    # --- subject / body ---
+
+    def test_subject_contains_action_and_collection_name(self):
+        self._add_and_notify()
+        subjects = [m.subject for m in mail.outbox]
+        self.assertTrue(all("added" in s and "Notify Col" in s for s in subjects))
+
+    def test_body_names_changed_user_and_actor(self):
+        self._add_and_notify()
+        body = mail.outbox[0].body
+        self.assertIn("new@example.org", body)
+        self.assertIn("curator-admin@example.org", body)
+
+    def test_body_lists_current_curators_after_add(self):
+        self._add_and_notify()
+        body = mail.outbox[0].body
+        self.assertIn("existing@example.org", body)
+        self.assertIn("new@example.org", body)
+
+    # --- EmailLog ---
+
+    def test_emaillog_written_on_successful_send(self):
+        before = EmailLog.objects.count()
+        self._add_and_notify()
+        after = EmailLog.objects.count()
+        self.assertGreater(after, before)
+        log = EmailLog.objects.filter(subject__icontains="curator added").last()
+        self.assertIsNotNone(log)
+        self.assertEqual(log.status, "success")
+        self.assertEqual(log.trigger_source, "scheduled")
+
+    def test_emaillog_written_for_every_recipient(self):
+        self._add_and_notify()
+        logs = EmailLog.objects.filter(subject__icontains="curator added")
+        logged_recipients = set(logs.values_list("recipient_email", flat=True))
+        self.assertIn("curator-admin@example.org", logged_recipients)
+        self.assertIn("existing@example.org", logged_recipients)
+        self.assertIn("new@example.org", logged_recipients)
+
+    def test_emaillog_written_on_remove(self):
+        self.col.curators.add(self.new_curator)
+        self._remove_and_notify()
+        log = EmailLog.objects.filter(subject__icontains="curator removed").last()
+        self.assertIsNotNone(log)
+        self.assertEqual(log.status, "success")

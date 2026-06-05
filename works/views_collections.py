@@ -24,7 +24,11 @@ from django.utils.cache import add_never_cache_headers
 from django.utils.html import strip_tags
 from django.views.decorators.http import require_POST
 
+from django.contrib.auth import get_user_model
+
 from .models import Collection, STATUS_CHOICES, Work
+
+User = get_user_model()
 from .seo import coins_title
 from .views_feeds import _publications_to_geojson
 
@@ -131,6 +135,7 @@ def collection_page(request, collection_slug):
         'can_edit_description': is_admin or is_curator,
         'publishable_count': publishable_count,
         'canonical_url': request.build_absolute_uri(collection.get_absolute_url()),
+        'curators': list(collection.curators.all()),
     }
     response = render(request, 'collection_page.html', context)
     if can_curate:
@@ -262,3 +267,55 @@ def remove_work_from_collection(request, work_id, collection_id):
         return JsonResponse({'error': 'Work is not in this collection.'}, status=400)
     work.collections.remove(collection)
     return JsonResponse({'success': True, 'work_id': work.id})
+
+
+@login_required
+@require_POST
+def add_curator(request, collection_id):
+    """Admin or existing curator adds another curator by email address."""
+    from .notifications import notify_curator_change
+
+    collection = get_object_or_404(Collection, pk=collection_id)
+    if not _user_can_curate(request.user, collection):
+        return JsonResponse({'error': 'Not a curator of this collection.'}, status=403)
+
+    email = request.POST.get('email', '').strip()
+    if not email:
+        return JsonResponse({'error': 'Email address is required.'}, status=400)
+
+    try:
+        new_curator = User.objects.get(email=email)
+    except User.DoesNotExist:
+        return JsonResponse({'error': f'No user found with email: {email}'}, status=404)
+
+    if collection.curators.filter(pk=new_curator.pk).exists():
+        return JsonResponse({'success': True, 'already_curator': True,
+                             'user_id': new_curator.pk, 'email': new_curator.email})
+
+    collection.curators.add(new_curator)
+    notify_curator_change(collection, new_curator, 'added', actor=request.user)
+    return JsonResponse({
+        'success': True,
+        'user_id': new_curator.pk,
+        'email': new_curator.email,
+        'display_name': new_curator.get_full_name() or new_curator.email,
+    })
+
+
+@login_required
+@require_POST
+def remove_curator(request, collection_id, user_id):
+    """Admin or existing curator removes a curator by user ID."""
+    from .notifications import notify_curator_change
+
+    collection = get_object_or_404(Collection, pk=collection_id)
+    if not _user_can_curate(request.user, collection):
+        return JsonResponse({'error': 'Not a curator of this collection.'}, status=403)
+
+    curator_to_remove = get_object_or_404(User, pk=user_id)
+    if not collection.curators.filter(pk=curator_to_remove.pk).exists():
+        return JsonResponse({'error': 'User is not a curator of this collection.'}, status=400)
+
+    collection.curators.remove(curator_to_remove)
+    notify_curator_change(collection, curator_to_remove, 'removed', actor=request.user)
+    return JsonResponse({'success': True, 'user_id': curator_to_remove.pk})
