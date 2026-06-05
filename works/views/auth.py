@@ -122,7 +122,8 @@ The link is valid for {valid} minutes.
             logger.exception('Error saving sent email to %s for %s', email, settings.EMAIL_HOST_USER)
             logger.error(ex)
 
-        return render(request, 'login_response.html', {'email': email, 'valid_minutes': valid})
+        messages.success(request, f"We sent a login link to {email}. Please check your email and click the link within {valid} minutes.", extra_tags="persist")
+        return redirect('/')
 
 def confirmation_login(request):
     return render(request, 'confirmation_login.html')
@@ -199,7 +200,7 @@ def authenticate_via_magic_link(request, token):
 def customlogout(request):
     logout(request)
     messages.info(request, "You have successfully logged out.")
-    return render(request, "logout.html")
+    return redirect('/')
 
 @never_cache
 def user_settings(request):
@@ -384,13 +385,6 @@ def unsubscribe(request):
 
     return HttpResponse("Invalid request.", status=400)
 
-def delete_account(request):
-    email = request.user.email
-    logger.info('Delete account for %s', email)
-    User.objects.filter(email=email).delete()
-    messages.info(request, 'Your account has been successfully deleted.')
-    return render(request, 'deleteaccount.html')
-
 @login_required
 
 def change_useremail(request):
@@ -447,9 +441,9 @@ This link will expire in 10 minutes.
 Thank you for using OPTIMAP!
 """
     send_mail(subject, message, settings.EMAIL_HOST_USER, [email_new])
-    messages.info(request, "A confirmation email has been sent.")
+    messages.info(request, f"We sent a confirmation link to {email_new}. Please click it to complete the email change.", extra_tags="persist")
     logout(request)
-    return render(request, 'changeuser.html')
+    return redirect('/')
 
 def confirm_email_change(request, token, email_new):
     cached_data = cache.get(f"{EMAIL_CONFIRMATION_TOKEN_PREFIX}_{email_new}")

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Login, logout, and email-change flows now redirect to `/` with a flash message** instead of rendering dedicated single-alert pages. Removed `login_response.html`, `logout.html`, `changeuser.html`, and dead `deleteaccount.html` templates; removed corresponding dead `delete_account` view. Login and email-change messages use `extra_tags="persist"` so they stay visible until manually dismissed.
+- **Per-message auto-close TTL for flash alerts.** Pass `extra_tags="persist"` to any `messages.*()` call to suppress auto-close entirely; `error` and `warning` level messages default to 8 s, `info`/`success` to 5 s (previously all server-rendered alerts shared a single 5 s timeout). `OPTIMAP_FLASH` JS alerts for `warning` now also get 8 s to match. The Bootstrap level tag (`alert-danger` etc.) is now derived from `message.level_tag` rather than the combined `message.tags` string, so `extra_tags` values no longer bleed into the CSS class.
+
 ### Added
 
 - **Inline curator management on collection pages** (closes #234). Admins and existing curators can add curators by email address and remove them directly from the collection landing page. When the curator list changes, all current curators, all admins, the actor, and the added/removed curator receive a notification email. The former Django Admin "Manage curators" link has been replaced by this in-page UI.

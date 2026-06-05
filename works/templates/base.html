@@ -139,7 +139,9 @@
       {% if messages %}
         <div class="container pt-3" id="flash-messages">
           {% for message in messages %}
-            <div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible alert-autoclose fade show m-3" role="alert">
+            <div class="alert alert-{% if message.level_tag == 'error' %}danger{% else %}{{ message.level_tag }}{% endif %} alert-dismissible{% if not message.extra_tags or 'persist' not in message.extra_tags %} alert-autoclose{% endif %} fade show m-3"
+                 {% if not message.extra_tags or 'persist' not in message.extra_tags %}data-ttl="{% if message.level_tag == 'error' or message.level_tag == 'warning' %}8000{% else %}5000{% endif %}"{% endif %}
+                 role="alert">
               {{ message }}
               <button type="button" class="close" data-dismiss="alert" aria-label="Close">
                 <span aria-hidden="true">&times;</span>
@@ -156,15 +158,36 @@
     <script>
       // Self-closing flash messages — global behaviour for every page.
       //
-      // (a) Server-rendered alerts tagged with .alert-autoclose (see the
-      //     messages block above) close after 5s.
+      // (a) Server-rendered alerts tagged with .alert-autoclose close after
+      //     their data-ttl ms (5 s for info/success, 8 s for error/warning).
+      //     Pass extra_tags="persist" in Python to suppress auto-close.
       // (b) Runtime alerts created by JS via OPTIMAP_FLASH(level, msg) drop
       //     into the same flash-messages host, with the same look and the
       //     same auto-close behaviour. Use this in place of native browser
       //     `alert(...)` so errors / info pop up consistently with framework
       //     messages.
       $(function () {
-        setTimeout(function () { $(".alert-autoclose").alert('close'); }, 5000);
+        document.querySelectorAll('.alert-autoclose').forEach(function (el) {
+          const ttl = parseInt(el.dataset.ttl, 10) || 5000;
+          setTimeout(function () {
+            try { $(el).alert('close'); } catch (_) { el.remove(); }
+          }, ttl);
+        });
+
+        // Remove the flash-messages container once its last alert is gone so
+        // it doesn't leave an empty box (padding-top) above the page content.
+        // Bootstrap 4 fires closed.bs.alert *after* detach(), so that event
+        // never bubbles. A MutationObserver on the container is the reliable
+        // cross-version alternative — it fires when Bootstrap detaches the
+        // child, at which point we check whether any alerts remain.
+        function watchFlashHost(host) {
+          if (!host || host._flashWatcher) return;
+          host._flashWatcher = true;
+          new MutationObserver(function (mutations, obs) {
+            if (!host.querySelector('.alert')) { host.remove(); obs.disconnect(); }
+          }).observe(host, { childList: true });
+        }
+        watchFlashHost(document.getElementById('flash-messages'));
       });
 
       window.OPTIMAP_FLASH = function (level, message) {
@@ -191,9 +214,10 @@
           const main = document.getElementById('main-content');
           (main || document.body).prepend(host);
         }
+        watchFlashHost(host);
         host.appendChild(div);
-        // Errors get a longer dwell than the 5s server flashes.
-        const ttl = (level === 'error') ? 8000 : 5000;
+        // Errors and warnings get a longer dwell; matches the server-rendered defaults.
+        const ttl = (level === 'error' || level === 'warning') ? 8000 : 5000;
         setTimeout(function () {
           try { $(div).alert('close'); } catch (_) { div.remove(); }
         }, ttl);
