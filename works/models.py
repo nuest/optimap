@@ -470,7 +470,7 @@ class Collection(models.Model):
     """
     A curated grouping of Works.
 
-    Concrete examples: a journal (`scientific-data`), a thematic dataset
+    Concrete examples: a source (`scientific-data`), a thematic dataset
     (`mountain-wetlands`), or a community-curated series (`agile-gi`).
 
     A Work can belong to multiple Collections (`Work.collections`, M2M).
@@ -599,11 +599,11 @@ class Source(models.Model):
     )
     homepage_url             = models.URLField(
         max_length=512, blank=True, null=True,
-        help_text='Public homepage of the journal/repository. Display only.',
+        help_text='Public homepage of the source. Display only.',
     )
     abbreviated_title        = models.CharField(
         max_length=255, blank=True, null=True,
-        help_text='Abbreviated journal title (display only).',
+        help_text='Abbreviated title (display only).',
     )
 
     is_oa                    = models.BooleanField(

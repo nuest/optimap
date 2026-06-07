@@ -456,7 +456,7 @@ class MapInteractionManager {
       }
 
       if (s.homepage_url) {
-        html += `<div style="margin-bottom: 5px;"><a href="${s.homepage_url}" target="_blank"><i class="fas fa-external-link-alt"></i> Visit journal site</a></div>`;
+        html += `<div style="margin-bottom: 5px;"><a href="${s.homepage_url}" target="_blank"><i class="fas fa-external-link-alt"></i> Visit source website</a></div>`;
       }
 
       if (s.issn_l) {

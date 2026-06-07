@@ -112,7 +112,7 @@ def parse_oai_xml_and_save_works(content, event: HarvestingEvent, max_records=No
 
             title_value    = get_field("title")       or get_field("dc:title")
             abstract_text  = get_field("description") or get_field("dc:description")
-            journal_value  = get_field("publisher")   or get_field("dc:publisher")
+            publisher_value  = get_field("publisher")   or get_field("dc:publisher")
             raw_date_value = get_field("date")        or get_field("dc:date")
             date_value     = parse_publication_date(raw_date_value)
 
@@ -148,24 +148,24 @@ def parse_oai_xml_and_save_works(content, event: HarvestingEvent, max_records=No
                     src_obj = Source.objects.get(issn_l=issn_text)
                     logger.debug("Matched source by ISSN %s: %s", issn_text, src_obj.name)
                 except Source.DoesNotExist:
-                    if journal_value:
+                    if publisher_value:
                         src_obj, created = Source.objects.get_or_create(
                             issn_l=issn_text,
-                            defaults={'name': journal_value}
+                            defaults={'name': publisher_value}
                         )
                         if created:
-                            logger.debug("Created new source with ISSN %s: %s", issn_text, journal_value)
+                            logger.debug("Created new source with ISSN %s: %s", issn_text, publisher_value)
                     else:
                         src_obj, created = Source.objects.get_or_create(
                             issn_l=issn_text,
-                            defaults={'name': f'Unknown Journal (ISSN: {issn_text})'}
+                            defaults={'name': f'Unknown Source (ISSN: {issn_text})'}
                         )
                         if created:
                             logger.debug("Created new source with ISSN %s", issn_text)
-            elif journal_value:
-                src_obj, created = Source.objects.get_or_create(name=journal_value)
+            elif publisher_value:
+                src_obj, created = Source.objects.get_or_create(name=publisher_value)
                 if created:
-                    logger.debug("Created new source by name: %s", journal_value)
+                    logger.debug("Created new source by name: %s", publisher_value)
 
             geom_obj = GeometryCollection()
             period_start, period_end = [], []
@@ -289,7 +289,7 @@ def harvest_oai_endpoint(source_id, user=None, max_records=None, update_existing
     # endpoint on first run if the admin hasn't pre-assigned one. The new
     # Collection starts unpublished so the admin can review the auto-derived
     # name/description before flipping it on. No-op when source.collection is
-    # already set (e.g. via harvest_journals --insert-sources).
+    # already set (e.g. via harvest_sources --insert-sources).
     ensure_collection_for_source(source)
     event  = HarvestingEvent.objects.create(source=source, status="in_progress")
 

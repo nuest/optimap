@@ -282,7 +282,7 @@ def harvest_mountain_wetlands(source_id, user=None, max_records=None, update_exi
     """Bespoke harvester for the Mountain Wetlands Repository (MaRESS API).
 
     Manual-only — the issue #192 explicitly forbids auto-scheduling. Run via
-    ``python manage.py harvest_journals --journal mountain-wetlands`` or via
+    ``python manage.py harvest_sources --source mountain-wetlands`` or via
     the Django admin "Trigger harvesting" action.
     """
     user = resolve_user(user)

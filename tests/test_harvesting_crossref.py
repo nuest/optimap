@@ -76,10 +76,10 @@ class BuildCrossrefFilterTests(TestCase):
     def test_only_prefix(self):
         self.assertEqual(_build_crossref_filter("10.5194"), "prefix:10.5194")
 
-    def test_with_journal_titles(self):
+    def test_with_source_titles(self):
         out = _build_crossref_filter(
             "10.5194",
-            journal_titles=["Earth System Science Data", "AGILE GIScience Series"],
+            source_titles=["Earth System Science Data", "AGILE GIScience Series"],
         )
         self.assertIn("prefix:10.5194", out)
         self.assertIn("container-title:Earth System Science Data", out)
@@ -356,7 +356,7 @@ class HarvestCrossrefPrefixEndToEndTests(TestCase):
         )
         harvest_crossref_prefix(
             self.source.id,
-            journal_titles=["Earth System Science Data"],
+            source_titles=["Earth System Science Data"],
             fetch_abstract_from_publisher=False,
         )
         # Only one request was made; check its query string.

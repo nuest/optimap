@@ -977,7 +977,7 @@ class SourceCollectionPropagationTests(TestCase):
     ``ensure_collection_for_source`` first, see
     ``tests/test_oai_collection_auto_create.py``. Source types that aren't
     auto-created (``rss``, ``crossref-prefix``, ``mountain-wetlands``) get
-    their Collection from ``harvest_journals --insert-sources``.
+    their Collection from ``harvest_sources --insert-sources``.
     """
 
     def setUp(self):

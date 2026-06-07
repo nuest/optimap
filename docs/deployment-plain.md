@@ -890,8 +890,8 @@ python manage.py collectstatic --noinput
 # Update global regions if needed
 python manage.py load_global_regions
 
-# Insert / update built-in journal sources from SOURCE_CONFIG.
-python manage.py harvest_journals --insert-sources
+# Insert / update built-in sources from SOURCE_CONFIG.
+python manage.py harvest_sources --insert-sources
 ' #end of bash command
 
 # Start services

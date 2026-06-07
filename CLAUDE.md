@@ -241,13 +241,13 @@ python manage.py regenerate_data_dumps --format csv
 python manage.py regenerate_data_dumps --dry-run
 # Report what would be regenerated without writing
 
-# Harvest from real journals
-python manage.py harvest_journals --list
-# Lists all available journal sources (OAI-PMH and RSS/Atom)
-python manage.py harvest_journals --all --max-records 50
-# Harvests from all configured journals with record limit
-python manage.py harvest_journals --journal essd --journal geo-leo
-# Harvests from specific journals by identifier
+# Harvest from real sources
+python manage.py harvest_sources --list
+# Lists all available sources (OAI-PMH, RSS/Atom, Crossref, OpenAlex)
+python manage.py harvest_sources --all --max-records 50
+# Harvests from all configured sources with record limit
+python manage.py harvest_sources --source essd --source geo-leo
+# Harvests from specific sources by identifier
 # Supports: essd, agile-giss, geo-leo, eartharxiv, scientific-data
 
 # Source synchronization
@@ -255,10 +255,10 @@ python manage.py sync_source_metadata
 # Syncs metadata from configured OAI-PMH sources
 # Updates Source model with latest information from endpoints
 
-# OpenAlex journal updates
-python manage.py update_openalex_journals
-# Fetches and updates journal metadata from OpenAlex API
-# Enriches Source records with additional journal information
+# OpenAlex source updates
+python manage.py update_openalex_sources
+# Fetches and updates source metadata from OpenAlex API
+# Enriches Source records with additional information
 
 # Reset harvest schedules
 python manage.py reset_harvest_schedules
@@ -328,7 +328,7 @@ All deployment-specific config uses `OPTIMAP_*` environment variables loaded fro
 ### Harvesting Flow
 
 1. Create/configure `Source` in admin with OAI-PMH URL, RSS/Atom feed URL, Crossref prefix, MaRESS API URL, or OpenAlex source identifier (`S<digits>` on `openalex_id`; the public `openalex_url` is now a derived property).
-2. Django-Q task creates `HarvestingEvent` (or use `harvest_journals` command for direct harvesting)
+2. Django-Q task creates `HarvestingEvent` (or use `harvest_sources` command for direct harvesting)
 3. Fetch XML/RSS/JSON → parse → extract DOI, spatial, temporal metadata → save `Work` records with status `h` (Harvested)
 4. Track status in `HarvestingEvent.status` (pending/in_progress/completed/failed)
 5. Works with spatial/temporal metadata can be published directly, or users can contribute missing metadata

@@ -46,7 +46,7 @@ function publicationPopup(feature, layer) {
 
     // Homepage link
     if (s.homepage_url) {
-      html += `<div><a href="${s.homepage_url}" target="_blank"><i class="fas fa-external-link-alt"></i> Visit journal site</a></div>`;
+      html += `<div><a href="${s.homepage_url}" target="_blank"><i class="fas fa-external-link-alt"></i> Visit source website</a></div>`;
     }
 
     // ISSN-L link

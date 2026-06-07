@@ -55,14 +55,14 @@ def _strip_jats(jats_html):
     return soup.get_text(separator=" ", strip=True) or None
 
 
-def _build_crossref_filter(prefix, journal_titles=None, since=None):
+def _build_crossref_filter(prefix, source_titles=None, since=None):
     """Assemble a Crossref ``filter=...`` parameter value."""
     parts = [f"prefix:{prefix}"]
-    if journal_titles:
+    if source_titles:
         # Crossref lets the same filter key repeat — each title becomes its
         # own clause, and Crossref ORs same-key filters. So a multi-title
         # request widens the result set rather than narrowing it.
-        for title in journal_titles:
+        for title in source_titles:
             parts.append(f"container-title:{title}")
     if since:
         parts.append(f"from-update-date:{since}")
@@ -223,7 +223,7 @@ def _crossref_item_to_work_kwargs(
 
 
 def parse_crossref_response_and_save_works(
-    source, event, prefix, journal_titles=None,
+    source, event, prefix, source_titles=None,
     fetch_abstract_from_publisher=True, max_records=None,
     warning_collector=None, update_existing=False, stats=None,
     sort=None, order=None,
@@ -247,7 +247,7 @@ def parse_crossref_response_and_save_works(
     if stats is None:
         stats = HarvestStats()
 
-    filter_value = _build_crossref_filter(prefix, journal_titles=journal_titles)
+    filter_value = _build_crossref_filter(prefix, source_titles=source_titles)
 
     while True:
         params = {
@@ -316,7 +316,7 @@ def parse_crossref_response_and_save_works(
 
 def harvest_crossref_prefix(
     source_id, user=None, max_records=None,
-    journal_titles=None, prefix=None,
+    source_titles=None, prefix=None,
     fetch_abstract_from_publisher=True,
     update_existing=False,
     sort=None, order=None,
@@ -342,13 +342,13 @@ def harvest_crossref_prefix(
     try:
         logger.info(
             "Starting Crossref harvest: prefix=%s titles=%s max_records=%s",
-            resolved_prefix, journal_titles, max_records,
+            resolved_prefix, source_titles, max_records,
         )
         stats = HarvestStats()
         saved, seen = parse_crossref_response_and_save_works(
             source, event,
             prefix=resolved_prefix,
-            journal_titles=journal_titles,
+            source_titles=source_titles,
             fetch_abstract_from_publisher=fetch_abstract_from_publisher,
             max_records=max_records,
             warning_collector=warning_collector,
@@ -379,7 +379,7 @@ def harvest_crossref_prefix(
             'event_completed': f'{event.completed_at:%Y-%m-%d %H:%M:%S}',
             'warning_summary': warning_collector.get_summary(),
             'resolved_prefix': resolved_prefix,
-            'container_title_filters': ', '.join(journal_titles) if journal_titles else '<all>',
+            'container_title_filters': ', '.join(source_titles) if source_titles else '<all>',
             'openalex_source_id': None,
             'records_seen': seen,
             'records_processed': None,

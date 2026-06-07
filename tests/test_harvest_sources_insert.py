@@ -1,14 +1,14 @@
 # SPDX-FileCopyrightText: 2026 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Tests for `python manage.py harvest_journals --insert-sources`."""
+"""Tests for `python manage.py harvest_sources --insert-sources`."""
 
 from io import StringIO
 
 from django.core.management import call_command
 from django.test import TestCase
 
-from works.management.commands.harvest_journals import SOURCE_CONFIG, _is_enabled
+from works.management.commands.harvest_sources import SOURCE_CONFIG, _is_enabled
 from works.models import Source
 
 
@@ -17,9 +17,9 @@ def _enabled_keys():
 
 
 class InsertSourcesTest(TestCase):
-    def test_insert_sources_creates_one_row_per_enabled_journal(self):
+    def test_insert_sources_creates_one_row_per_enabled_source(self):
         out = StringIO()
-        call_command("harvest_journals", "--insert-sources", stdout=out)
+        call_command("harvest_sources", "--insert-sources", stdout=out)
 
         for key in _enabled_keys():
             name = SOURCE_CONFIG[key]["name"]
@@ -29,18 +29,18 @@ class InsertSourcesTest(TestCase):
             )
 
     def test_insert_sources_is_idempotent(self):
-        call_command("harvest_journals", "--insert-sources", stdout=StringIO())
+        call_command("harvest_sources", "--insert-sources", stdout=StringIO())
         first_count = Source.objects.count()
 
         out = StringIO()
-        call_command("harvest_journals", "--insert-sources", stdout=out)
+        call_command("harvest_sources", "--insert-sources", stdout=out)
 
         self.assertEqual(Source.objects.count(), first_count)
         self.assertIn("already exists", out.getvalue())
 
     def test_insert_sources_skips_disabled_by_default(self):
         out = StringIO()
-        call_command("harvest_journals", "--insert-sources", stdout=out)
+        call_command("harvest_sources", "--insert-sources", stdout=out)
 
         for key, config in SOURCE_CONFIG.items():
             if _is_enabled(config):
@@ -54,7 +54,7 @@ class InsertSourcesTest(TestCase):
     def test_insert_sources_with_include_disabled_inserts_everything(self):
         out = StringIO()
         call_command(
-            "harvest_journals",
+            "harvest_sources",
             "--insert-sources",
             "--include-disabled",
             stdout=out,
@@ -75,7 +75,7 @@ class InsertSourcesTest(TestCase):
         self.assertEqual(broken.source_type, 'oai-pmh')
 
         out = StringIO()
-        call_command("harvest_journals", "--insert-sources", stdout=out)
+        call_command("harvest_sources", "--insert-sources", stdout=out)
 
         broken.refresh_from_db()
         self.assertEqual(broken.source_type, 'mountain-wetlands')
@@ -90,7 +90,7 @@ class InsertSourcesTest(TestCase):
             homepage_url=admin_chosen_url,
         )
 
-        call_command("harvest_journals", "--insert-sources", stdout=StringIO())
+        call_command("harvest_sources", "--insert-sources", stdout=StringIO())
 
         existing.refresh_from_db()
         self.assertEqual(existing.homepage_url, admin_chosen_url)
@@ -104,7 +104,7 @@ class InsertSourcesTest(TestCase):
         )
         self.assertIsNone(existing.collection)
 
-        call_command("harvest_journals", "--insert-sources", stdout=StringIO())
+        call_command("harvest_sources", "--insert-sources", stdout=StringIO())
 
         existing.refresh_from_db()
         self.assertIsNotNone(existing.collection)
@@ -115,7 +115,7 @@ class InsertSourcesTest(TestCase):
         # the command should warn that the auto-schedule won't work for them.
         out = StringIO()
         call_command(
-            "harvest_journals",
+            "harvest_sources",
             "--insert-sources",
             "--include-disabled",
             stdout=out,

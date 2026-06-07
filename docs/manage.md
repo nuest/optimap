@@ -52,7 +52,7 @@ For each type, only mandatory and type-specific fields are listed; defaults / di
 
 - **`url_field`** — currently **display only**. The harvester ignores it.
 - ⚠️ **The DOI prefix is hard-coded to `10.5194` (Copernicus).** [`works/harvesting/crossref.py:335-339`](../works/harvesting/crossref.py) falls back to `"10.5194"` because `Source` has no `crossref_prefix` field today. **Adding a non-Copernicus crossref-prefix source through the admin alone will not work** — open an issue / extend the model if you need this.
-- For the Copernicus path, leave `url_field` as something representative (e.g. `https://api.crossref.org/works?filter=prefix:10.5194`); harvest with `python manage.py harvest_journals --journal copernicus [--journal-title "<journal name>"]` to filter to a specific Copernicus journal.
+- For the Copernicus path, leave `url_field` as something representative (e.g. `https://api.crossref.org/works?filter=prefix:10.5194`); harvest with `python manage.py harvest_sources --source copernicus [--source-title "<title>"]` to filter to a specific Copernicus title.
 
 ##### Mountain Wetlands Repository (`mountain-wetlands`)
 
@@ -83,11 +83,11 @@ Minimum-viable example for **AGILE GIScience Series**:
 | `publisher_name`, `homepage_url` | optional display fields |
 
 > **Common error:** if you create the source with `source_type=oai-pmh` and the AGILE-GISS OAI URL (`https://oai-pmh.copernicus.org/oai.php?…&set=agile-giss`), the harvester will fail with HTTP 404 — Copernicus's OAI-PMH endpoint has been dark since 2025-12. Switch `source_type` to `openalex` and fill the OpenAlex fields above.
-> **Faster than typing it in:** `python manage.py harvest_journals --insert-sources` creates this exact AGILE-GISS-OpenAlex row (and every other built-in entry from `SOURCE_CONFIG`) idempotently — see "Bootstrap the admin from the journal config" below. Only do the manual admin route when you need a source that's not in `SOURCE_CONFIG`.
+> **Faster than typing it in:** `python manage.py harvest_sources --insert-sources` creates this exact AGILE-GISS-OpenAlex row (and every other built-in entry from `SOURCE_CONFIG`) idempotently — see "Bootstrap the admin from the source config" below. Only do the manual admin route when you need a source that's not in `SOURCE_CONFIG`.
 
 > **Source.collection is optional at create time, but always populated by the time the first harvest finishes.** Leaving the collection field blank when you create a Source is **not** an error:
 > - **OAI-PMH / OJS / Janeway sources** auto-create a Collection on first harvest, slugged from the source name (e.g. `"Earth System Science Data"` → identifier `earth-system-science-data`). The new Collection starts **unpublished** so it does not show up on `/collections/` until you review the auto-derived name and description and flip `is_published`. Review auto-created collections at `/admin/works/collection/?is_published__exact=0` before publishing.
-> - **RSS / Crossref / MaRESS / OpenAlex sources** don't auto-create — they get their Collection from `harvest_journals --insert-sources` instead. If you leave `Source.collection` blank for one of these and run a harvest, the works simply aren't added to any collection, and curators can add them by hand from each work landing page later.
+> - **RSS / Crossref / MaRESS / OpenAlex sources** don't auto-create — they get their Collection from `harvest_sources --insert-sources` instead. If you leave `Source.collection` blank for one of these and run a harvest, the works simply aren't added to any collection, and curators can add them by hand from each work landing page later.
 > 
 > Either way, when a collection **is** set on the source, every work created during harvest is automatically added to it (additive — pre-existing memberships under other collections are preserved). To put a fresh source's harvest into a specific Collection, create the target Collection first under `/admin/works/collection/` and link it from the Source change page; see "Create a new collection (no harvest needed)" below.
 
@@ -105,11 +105,11 @@ All three actions are **non-blocking**: they queue work and return. Progress is 
 
 > **Why async?** Earlier versions ran the harvest synchronously inside the admin request, which routinely tripped gunicorn's worker timeout on non-trivial sources. The new actions hand off to Django-Q immediately. The cluster must be running for them to actually execute.
 
-CLI alternatives still work and are documented in README §[Harvest Publications from real journals](../README.md#harvest-publications-from-real-journals): `python manage.py harvest_journals --journal <slug>` (with `--list`, `--all`, `--create-sources`, `--user-email`, `--max-records`).
+CLI alternatives still work and are documented in README §[Harvest publications from real sources](../README.md#harvest-publications-from-real-sources): `python manage.py harvest_sources --source <slug>` (with `--list`, `--all`, `--create-sources`, `--user-email`, `--max-records`).
 
 **Recover from a thundering-herd schedule state:** `python manage.py reset_harvest_schedules` rebuilds every `Harvest Source <id>` recurring schedule with a properly deferred `next_run` and (by default) staggers them across the smallest harvest interval so the cluster doesn't get hit with every source at once. Use this after a bulk `--insert-sources` run on a deployment that pre-dated the `Source.save()` fix, or any time you find every source firing simultaneously. Flags: `--dry-run` (preview), `--no-stagger` (set every `next_run` to `now + its own interval`), `--clear-manual` (also delete leftover `Manual Harvest Source <id>` one-off rows from the admin "Schedule harvesting" action).
 
-**Bootstrap the admin from the journal config:** `python manage.py harvest_journals --insert-sources` creates one `Source` row per (enabled) entry in `harvest_journals`'s `SOURCE_CONFIG` without harvesting. Each insert also gets-or-creates a `Collection` from the entry's `collection_name`. After running it, every configured journal appears at `/admin/works/source/` (linked to its collection) and can be triggered with the actions above. Re-running is idempotent (existing rows by name or URL are left alone). Add `--include-disabled` to insert journals whose upstream is currently broken (e.g. the Copernicus OAI-PMH 404). All inserts default to `harvest_interval_minutes = 0` (manual-only) so the cluster is not flooded after a bulk insert; `Source.save()` dispatches to the correct task per source type when you later raise the interval.
+**Bootstrap the admin from the source config:** `python manage.py harvest_sources --insert-sources` creates one `Source` row per (enabled) entry in `harvest_sources`'s `SOURCE_CONFIG` without harvesting. Each insert also gets-or-creates a `Collection` from the entry's `collection_name`. After running it, every configured source appears at `/admin/works/source/` (linked to its collection) and can be triggered with the actions above. Re-running is idempotent (existing rows by name or URL are left alone). Add `--include-disabled` to insert sources whose upstream is currently broken (e.g. the Copernicus OAI-PMH 404). All inserts default to `harvest_interval_minutes = 0` (manual-only) so the cluster is not flooded after a bulk insert; `Source.save()` dispatches to the correct task per source type when you later raise the interval.
 
 ### Inspect harvesting events
 
@@ -145,7 +145,7 @@ Every harvester (OAI-PMH, RSS, Crossref, MaRESS) routes its inserts through a sh
 
 #### Careful update (`--update` flag)
 
-`python manage.py harvest_journals --update` (or `update_existing=True` on the task functions) refreshes existing same-source works in place. The update is deliberately conservative:
+`python manage.py harvest_sources --update` (or `update_existing=True` on the task functions) refreshes existing same-source works in place. The update is deliberately conservative:
 
 - **Preserved when the new harvest brings nothing for them:** `geometry`, `timeperiod_startdate`, `timeperiod_enddate`. These often come from a user contribution through OPTIMAP that the source still does not provide; we don't want to wipe a curator's work because the upstream record is silent on coordinates.
 - **Never overwritten:** `status` (a Published Work stays Published, never flips back to Harvested) and `created_by` (audit trail).
@@ -289,14 +289,14 @@ OpenAlex is most useful in OPTIMAP as an *enrichment* layer (DOI-based matching 
 - **Pagination:** cursor-based (`cursor=*`), 200 records per page, polite-pool User-Agent. Honors `--max-records` and accepts a `sort` kwarg (`publication_date:desc` is the default for the comparison command, unset for production runs).
 - **What you get from OpenAlex:** title, abstract (reconstructed from `abstract_inverted_index`), publication date, authors, keywords, AI-derived topics, biblio (volume / issue / pages), `openalex_id`, `openalex_ids` (DOI / PMID / etc.), `openalex_open_access_status`, `openalex_fulltext_origin`, `openalex_is_retracted`, work type.
 - **What you don't get:** OpenAlex carries no spatial or temporal coverage. The harvester deliberately does **not** fetch publisher landing pages — for AGILE-GISS we verified that the Copernicus landing pages also carry no `DC.SpatialCoverage` / `DC.box` / schema.org `spatialCoverage` / `geo+json` link, so the round-trip would be wasted work. If you point the harvester at a journal whose landing pages *do* carry spatial metadata, leave a follow-up issue: a per-source toggle for landing-page extraction is the obvious extension.
-- **Run it manually:** `python manage.py harvest_journals --journal agile-giss-openalex --create-sources` (or trigger from the admin once the Source row exists).
+- **Run it manually:** `python manage.py harvest_sources --source agile-giss-openalex --create-sources` (or trigger from the admin once the Source row exists).
 - **Compare against the Crossref route:** `python manage.py compare_agile_giss_routes` runs both harvesters end-to-end inside a transaction that is rolled back at the end (savepoint-isolated so the second route doesn't see the first route's writes). Useful any time you change the harvester or want to A/B-test field coverage on a new journal.
 
 #### Mountain Wetlands Repository (MaRESS) — `mountain-wetlands` source type
 
 The MaRESS harvester is bespoke because the API is Zotero-shaped, not OAI-PMH/RSS/Crossref:
 
-- **Run it manually:** `python manage.py harvest_journals --journal mountain-wetlands` (also available as a one-click admin action on the Source). Auto-scheduling is intentionally off — `harvest_interval_minutes` defaults to 0 for this source type and the issue (#192) requires the harvest to be manual.
+- **Run it manually:** `python manage.py harvest_sources --source mountain-wetlands` (also available as a one-click admin action on the Source). Auto-scheduling is intentionally off — `harvest_interval_minutes` defaults to 0 for this source type and the issue (#192) requires the harvest to be manual.
 - **Geometry:** built from each item's `study_sites[].location.{latitude, longitude}`. One Point per site, wrapped in a `GeometryCollection`. Records without sites get an empty geometry.
 - **Dates:** the API's `date` field is free-text and often year-only (e.g. `"1993"`). The harvester parses the four-digit prefix and stores Jan 1 of that year; both `timeperiod_startdate` and `_enddate` are set to the year string.
 - **DOI / OpenAlex enrichment:** the MaRESS API now populates `DOI` for most records. The harvester persists the API DOI directly (normalising `https://doi.org/…` → bare `10.x/y` via `_mwr_clean_doi`). When both a DOI *and* authors come from the API, OpenAlex is **skipped entirely** — no extra metadata to recover and the call wastes rate-limit budget. For records that still lack a DOI or authors, `build_openalex_fields(title, doi=<api_doi_or_None>, author=<first author surname>)` is called as a fallback. Results land in `Work.provenance.openalex_match.status`:
@@ -404,7 +404,7 @@ python manage.py qinfo      # one-shot stats: cluster status, queue depth, last 
 **Common failure modes:**
 
 - **Stale dotted paths.** Pre-v0.12.0 schedules referenced `publications.tasks.*` instead of `works.tasks.*`. Long-lived deployments may still have these — the cluster fails them with `ImportError`. Delete them from `/admin/django_q/schedule/` and re-create them by saving the corresponding `Source` (or run `python manage.py reset_harvest_schedules`).
-- **Thundering herd after `harvest_journals --insert-sources`.** Pre-fix `Source.save()` created Schedule rows with `next_run = now`. Recover with `python manage.py reset_harvest_schedules` (see "Manage harvesting" → "Recover from a thundering-herd schedule state").
+- **Thundering herd after `harvest_sources --insert-sources`.** Pre-fix `Source.save()` created Schedule rows with `next_run = now`. Recover with `python manage.py reset_harvest_schedules` (see "Manage harvesting" → "Recover from a thundering-herd schedule state").
 - **Cluster down, queue grows.** Restart `qcluster` and watch `qinfo` — the queue drains in roughly the order tasks were enqueued. To skip the backlog, truncate `django_q_ormq` from the dbshell or via the `/admin/django_q/` views.
 
 ---
@@ -512,7 +512,7 @@ When to clear which:
 ### Sync external metadata
 
 - `python manage.py sync_source_metadata` — syncs metadata from configured OAI-PMH endpoints back into the `Source` rows.
-- `python manage.py update_openalex_journals` — enriches `Source` records from the OpenAlex API.
+- `python manage.py update_openalex_sources` — enriches `Source` records from the OpenAlex API.
 - When to re-run each (e.g. after adding a new source, on a quarterly cadence).
 
 ### EO4GEO BoK snapshot

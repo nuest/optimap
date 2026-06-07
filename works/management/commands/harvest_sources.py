@@ -1,10 +1,10 @@
 # SPDX-FileCopyrightText: 2025 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# publications/management/commands/harvest_journals.py
+# publications/management/commands/harvest_sources.py
 
 """
-Django management command to harvest publications from real journal sources.
+Django management command to harvest publications from real sources.
 
 Supports OAI-PMH, RSS/Atom and (since the Copernicus OAI-PMH endpoint went
 404 between Dec 2025 and Apr 2026) Crossref-prefix harvesting. Sources can
@@ -13,16 +13,16 @@ be marked ``enabled: False`` to keep their config visible but skip them on
 
 Usage:
     # all currently-enabled sources
-    python manage.py harvest_journals --all
+    python manage.py harvest_sources --all
 
     # explicit selection
-    python manage.py harvest_journals --journal copernicus --max-records 50
-    python manage.py harvest_journals --journal geo-leo --journal eartharxiv
+    python manage.py harvest_sources --source copernicus --max-records 50
+    python manage.py harvest_sources --source geo-leo --source eartharxiv
 
-    # narrow a Crossref-prefix source to specific journals
-    python manage.py harvest_journals --journal copernicus \
-        --journal-title "Earth System Science Data" \
-        --journal-title "Atmospheric Chemistry and Physics"
+    # narrow a Crossref-prefix source to specific container titles
+    python manage.py harvest_sources --source copernicus \
+        --source-title "Earth System Science Data" \
+        --source-title "Atmospheric Chemistry and Physics"
 """
 
 import logging
@@ -59,7 +59,7 @@ SOURCE_CONFIG = {
         'publisher_name': 'Copernicus Publications',
         'source_type': 'crossref-prefix',
         'crossref_prefix': '10.5194',
-        # Default behaviour: fetch the full abstract from the journal
+        # Default behaviour: fetch the full abstract from the source
         # landing page rather than the Crossref-supplied <jats:p> render.
         'fetch_abstract_from_publisher': True,
         'is_oa': True,
@@ -78,11 +78,11 @@ SOURCE_CONFIG = {
         # at least Dec 2025 (last Wayback success: 2025-12-15). Use the
         # `copernicus` source above (Crossref prefix 10.5194) to reach the
         # same content while the upstream is dark, and narrow with
-        # `--journal-title "Earth System Science Data"` if needed.
+        # `--source-title "Earth System Science Data"` if needed.
         'enabled': False,
         'disabled_reason': (
             'Upstream OAI-PMH endpoint returns HTTP 404 since 2025-12. '
-            'Use --journal copernicus --journal-title "Earth System Science Data" instead.'
+            'Use --source copernicus --source-title "Earth System Science Data" instead.'
         ),
     },
     'agile-giss': {
@@ -114,7 +114,7 @@ SOURCE_CONFIG = {
         # without the operator having to remember the title string. Note the
         # colon: Crossref records the title as 'AGILE: GIScience Series'
         # (verified 2026-05-06); without the colon the filter returns zero hits.
-        'journal_titles': ['AGILE: GIScience Series'],
+        'source_titles': ['AGILE: GIScience Series'],
         'fetch_abstract_from_publisher': True,
         'is_oa': True,
         'default_work_type': 'proceedings-article',
@@ -201,20 +201,20 @@ def _get_or_create_collection(config):
 
 
 class Command(BaseCommand):
-    help = 'Harvest publications from real journal sources into the current database'
+    help = 'Harvest publications from real sources into the current database'
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--journal',
+            '--source',
             action='append',
             choices=list(SOURCE_CONFIG.keys()),
             help=(
-                f'Journal to harvest (choices: {", ".join(SOURCE_CONFIG.keys())}). '
+                f'Source to harvest (choices: {", ".join(SOURCE_CONFIG.keys())}). '
                 'Can be specified multiple times.'
             ),
         )
         parser.add_argument(
-            '--journal-title',
+            '--source-title',
             action='append',
             default=None,
             help=(
@@ -226,7 +226,7 @@ class Command(BaseCommand):
         parser.add_argument(
             '--all',
             action='store_true',
-            help='Harvest from all enabled journals (skips entries marked enabled: False)',
+            help='Harvest from all enabled sources (skips entries marked enabled: False)',
         )
         parser.add_argument(
             '--include-disabled',
@@ -237,7 +237,7 @@ class Command(BaseCommand):
             '--max-records',
             type=int,
             default=None,
-            help='Maximum number of records to harvest per journal (default: unlimited)',
+            help='Maximum number of records to harvest per source (default: unlimited)',
         )
         parser.add_argument(
             '--update',
@@ -277,24 +277,24 @@ class Command(BaseCommand):
         parser.add_argument(
             '--list',
             action='store_true',
-            help='List available journals and exit',
+            help='List available sources and exit',
         )
         parser.add_argument(
             '--insert-sources',
             action='store_true',
             help=(
-                'Insert all journals from SOURCE_CONFIG as Source rows (so they '
+                'Insert all sources from SOURCE_CONFIG as Source rows (so they '
                 'show up in the Django admin and can be triggered from there) '
                 'and exit without harvesting. Existing rows (matched by name or '
-                'URL) are left untouched. Disabled journals are skipped unless '
+                'URL) are left untouched. Disabled sources are skipped unless '
                 '--include-disabled is also given.'
             ),
         )
 
     def handle(self, *args, **options):
-        # List journals and exit
+        # List sources and exit
         if options['list']:
-            self.stdout.write(self.style.SUCCESS('\nAvailable journals for harvesting:\n'))
+            self.stdout.write(self.style.SUCCESS('\nAvailable sources for harvesting:\n'))
             for key, config in SOURCE_CONFIG.items():
                 source_type = config.get('source_type', 'oai-pmh').upper()
                 is_preprint = ' (preprint)' if config.get('is_preprint', False) else ''
@@ -313,7 +313,7 @@ class Command(BaseCommand):
             return
 
         include_disabled = options['include_disabled']
-        journal_titles = options['journal_title']
+        source_titles = options['source_title']
         no_publisher_abstract = options['no_publisher_abstract']
 
         # Bulk-insert sources and exit (no harvesting)
@@ -321,21 +321,21 @@ class Command(BaseCommand):
             self._insert_sources(include_disabled=include_disabled)
             return
 
-        # Determine which journals to harvest
+        # Determine which sources to harvest
         if options['all']:
             if include_disabled:
-                journals_to_harvest = list(SOURCE_CONFIG.keys())
+                sources_to_harvest = list(SOURCE_CONFIG.keys())
             else:
-                journals_to_harvest = [
+                sources_to_harvest = [
                     k for k, c in SOURCE_CONFIG.items() if _is_enabled(c)
                 ]
-        elif options['journal']:
-            journals_to_harvest = options['journal']
+        elif options['source']:
+            sources_to_harvest = options['source']
         else:
             raise CommandError(
-                'Please specify --all to harvest all enabled journals, or '
-                '--journal <name> for specific journals.\n'
-                'Use --list to see available journals.'
+                'Please specify --all to harvest all enabled sources, or '
+                '--source <name> for specific sources.\n'
+                'Use --list to see available sources.'
             )
 
         # Get user if specified
@@ -358,12 +358,12 @@ class Command(BaseCommand):
         results = []
 
         self.stdout.write(self.style.SUCCESS(f'\n{"="*70}'))
-        self.stdout.write(self.style.SUCCESS(f'Starting harvest of {len(journals_to_harvest)} journal(s)'))
+        self.stdout.write(self.style.SUCCESS(f'Starting harvest of {len(sources_to_harvest)} source(s)'))
         self.stdout.write(self.style.SUCCESS(f'{"="*70}\n'))
 
-        # Harvest each journal
-        for journal_key in journals_to_harvest:
-            config = SOURCE_CONFIG[journal_key]
+        # Harvest each source
+        for source_key in sources_to_harvest:
+            config = SOURCE_CONFIG[source_key]
 
             # Skip explicitly-disabled sources unless the operator opted in.
             if not _is_enabled(config) and not include_disabled:
@@ -374,7 +374,7 @@ class Command(BaseCommand):
                     self.stdout.write(f'  Reason: {config["disabled_reason"]}')
                 total_skipped += 1
                 results.append({
-                    'journal': config['name'],
+                    'source': config['name'],
                     'status': 'skipped',
                     'count': 0,
                 })
@@ -413,9 +413,9 @@ class Command(BaseCommand):
                     )
                 elif source_type == 'crossref-prefix':
                     self.stdout.write('Source type: Crossref by DOI prefix')
-                    # CLI --journal-title takes precedence; otherwise fall back
+                    # CLI --source-title takes precedence; otherwise fall back
                     # to titles baked into the config (e.g. agile-giss-crossref).
-                    effective_titles = journal_titles or config.get('journal_titles')
+                    effective_titles = source_titles or config.get('source_titles')
                     if effective_titles:
                         self.stdout.write(
                             f'  Filtering to titles: {", ".join(effective_titles)}'
@@ -432,7 +432,7 @@ class Command(BaseCommand):
                         source.id,
                         user=user,
                         max_records=max_records,
-                        journal_titles=effective_titles,
+                        source_titles=effective_titles,
                         prefix=config.get('crossref_prefix'),
                         fetch_abstract_from_publisher=fetch_abstract,
                         update_existing=update_existing,
@@ -468,7 +468,7 @@ class Command(BaseCommand):
                     ))
                     total_harvested += pub_count
                     results.append({
-                        'journal': config['name'],
+                        'source': config['name'],
                         'status': 'success',
                         'count': pub_count,
                         'duration': duration,
@@ -479,7 +479,7 @@ class Command(BaseCommand):
                     ))
                     total_failed += 1
                     results.append({
-                        'journal': config['name'],
+                        'source': config['name'],
                         'status': 'failed',
                         'count': 0,
                         'duration': duration,
@@ -503,10 +503,10 @@ class Command(BaseCommand):
 
             except Exception as e:
                 self.stdout.write(self.style.ERROR(f'✗ Error: {str(e)}'))
-                logger.exception(f'Failed to harvest {journal_key}')
+                logger.exception(f'Failed to harvest {source_key}')
                 total_failed += 1
                 results.append({
-                    'journal': config['name'],
+                    'source': config['name'],
                     'status': 'error',
                     'count': 0,
                     'error': str(e),
@@ -521,25 +521,25 @@ class Command(BaseCommand):
             if result['status'] == 'success':
                 symbol, style = '✓', self.style.SUCCESS
                 self.stdout.write(style(
-                    f"{symbol} {result['journal']:30} {result['count']:5} publications "
+                    f"{symbol} {result['source']:30} {result['count']:5} publications "
                     f"({result['duration']:.1f}s)"
                 ))
             elif result['status'] == 'skipped':
                 self.stdout.write(self.style.WARNING(
-                    f"⊘ {result['journal']:30} skipped (disabled)"
+                    f"⊘ {result['source']:30} skipped (disabled)"
                 ))
             else:
                 error_msg = result.get('error', result['status'])
                 self.stdout.write(self.style.ERROR(
-                    f"✗ {result['journal']:30} Failed: {error_msg}"
+                    f"✗ {result['source']:30} Failed: {error_msg}"
                 ))
 
         self.stdout.write(f'\nTotal publications harvested: {total_harvested}')
         if total_failed > 0:
-            self.stdout.write(self.style.WARNING(f'Failed journals: {total_failed}'))
+            self.stdout.write(self.style.WARNING(f'Failed sources: {total_failed}'))
         if total_skipped > 0:
             self.stdout.write(self.style.WARNING(
-                f'Skipped (disabled) journals: {total_skipped}. '
+                f'Skipped (disabled) sources: {total_skipped}. '
                 'Use --include-disabled to attempt them anyway.'
             ))
 
@@ -550,12 +550,12 @@ class Command(BaseCommand):
 
         Existing rows (matched by name or URL) are reported and left untouched.
         Note: Source.save() always schedules harvest_oai_endpoint, so RSS and
-        Crossref-prefix sources still need the --journal CLI route to harvest
+        Crossref-prefix sources still need the --source CLI route to harvest
         correctly — they will appear in the admin but the auto-schedule will
         not work for them until the dispatch logic is generalised.
         """
         self.stdout.write(self.style.SUCCESS(f'\n{"="*70}'))
-        self.stdout.write(self.style.SUCCESS('Inserting journal sources into the database'))
+        self.stdout.write(self.style.SUCCESS('Inserting sources into the database'))
         self.stdout.write(self.style.SUCCESS(f'{"="*70}\n'))
 
         created = 0
@@ -621,7 +621,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f'\n{"="*70}\n'))
 
     def _get_or_create_source(self, config, create_if_missing):
-        """Get or optionally create a Source for the journal."""
+        """Get or optionally create a Source for the given config entry."""
         source = Source.objects.filter(name=config['name']).first()
 
         if not source:

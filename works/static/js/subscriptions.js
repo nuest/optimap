@@ -60,7 +60,7 @@ async function rendersubscriptions() {
         }   
     } else { 
         temp = document.getElementById("accordion1");
-        temp.innerHTML += '<br>'+'<p class = "lead">'+ "You do not have any active subscriptions yet. Please click on Add New Subcription to add journals you want!" + '</p>'
+        temp.innerHTML += '<br>'+'<p class = "lead">'+ "You do not have any active subscriptions yet. Please click on Add New Subscription to add regions you want!" + '</p>'
     }
 }
 rendersubscriptions();
@@ -125,7 +125,7 @@ async function rendersubscriptions() {
         }   
     } else { 
         temp = document.getElementById("accordion1");
-        temp.innerHTML += '<br>'+'<p class = "lead">'+ "You do not have any active subscriptions yet. Please click on Add New Subcription to add journals you want!" + '</p>'
+        temp.innerHTML += '<br>'+'<p class = "lead">'+ "You do not have any active subscriptions yet. Please click on Add New Subscription to add regions you want!" + '</p>'
     }
 }
 rendersubscriptions();

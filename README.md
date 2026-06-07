@@ -178,10 +178,10 @@ python manage.py qcluster
 # Delete the cached files in that directory to force a fresh download / re-simplification.
 python manage.py load_global_regions
 
-# Harvest publications from real OAI-PMH journal sources
-python manage.py harvest_journals --list  # List available journals
-python manage.py harvest_journals --all --max-records 20 --create-sources  # Initial harvesting of all journals (limited to 20 records each)
-python manage.py harvest_journals --journal essd --journal geo-leo  # Harvest specific journals
+# Harvest publications from real sources
+python manage.py harvest_sources --list  # List available sources
+python manage.py harvest_sources --all --max-records 20 --create-sources  # Initial harvesting of all sources (limited to 20 records each)
+python manage.py harvest_sources --source essd --source geo-leo  # Harvest specific sources
 
 # Start the Django development server
 python manage.py runserver
@@ -278,63 +278,63 @@ OPTIMAP_EMAIL_PORT=5587
 
 Visit the URL - <http://127.0.0.1:8000/works/>
 
-### Harvest Publications from real journals
+### Harvest publications from real sources
 
 > Triggering harvests from the Django admin (rather than the CLI) and inspecting harvesting events / logs is documented in [docs/manage.md → Manage harvesting](docs/manage.md#manage-harvesting).
 
-The `harvest_journals` management command allows you to harvest publications from real OAI-PMH journal sources directly into your database. This is useful for:
+The `harvest_sources` management command allows you to harvest publications from real sources (OAI-PMH, RSS/Atom, Crossref, OpenAlex) directly into your database. This is useful for:
 
 - Populating your database with real data for testing and development
 - Testing harvesting functionality against live endpoints
 - Initial data loading for production deployment
 
-**List available journals**:
+**List available sources**:
 
 ```bash
-python manage.py harvest_journals --list
+python manage.py harvest_sources --list
 ```
 
-**Harvest all configured journals** (with record limit):
+**Harvest all configured sources** (with record limit):
 
 ```bash
-python manage.py harvest_journals --all --max-records 50
+python manage.py harvest_sources --all --max-records 50
 ```
 
-**Harvest specific journals**:
+**Harvest specific sources**:
 
 ```bash
-# Single journal
-python manage.py harvest_journals --journal essd --max-records 100
+# Single source
+python manage.py harvest_sources --source essd --max-records 100
 
-# Multiple journals
-python manage.py harvest_journals --journal essd --journal geo-leo --journal agile-giss
+# Multiple sources
+python manage.py harvest_sources --source essd --source geo-leo --source agile-giss
 ```
 
 **Create source entries automatically**:
 
 ```bash
-python manage.py harvest_journals --journal essd --create-sources
+python manage.py harvest_sources --source essd --create-sources
 ```
 
-**Bulk-insert all configured journals as Source rows (no harvesting)**:
+**Bulk-insert all configured sources as Source rows (no harvesting)**:
 
 ```bash
-# Insert every enabled journal from SOURCE_CONFIG so it appears in /admin/works/source/
-python manage.py harvest_journals --insert-sources
+# Insert every enabled source from SOURCE_CONFIG so it appears in /admin/works/source/
+python manage.py harvest_sources --insert-sources
 
-# Also insert journals whose upstream is currently disabled
-python manage.py harvest_journals --insert-sources --include-disabled
+# Also insert sources whose upstream is currently disabled
+python manage.py harvest_sources --insert-sources --include-disabled
 ```
 
-This is the fastest way to bootstrap a fresh deployment so the journal list shows up in the Django admin and can be triggered from there. Existing rows (matched by name or URL) are left untouched; the command is idempotent. RSS and Crossref-prefix entries are inserted as plain `Source` rows; the auto-schedule and the admin "Trigger harvesting" action call `works.tasks.harvest_oai_endpoint`, so those non-OAI sources still need the CLI route (`--journal <key>`) to harvest until the dispatch logic is generalised — the command prints a warning naming each affected source.
+This is the fastest way to bootstrap a fresh deployment so the source list shows up in the Django admin and can be triggered from there. Existing rows (matched by name or URL) are left untouched; the command is idempotent. RSS and Crossref-prefix entries are inserted as plain `Source` rows; the auto-schedule and the admin "Trigger harvesting" action call `works.tasks.harvest_oai_endpoint`, so those non-OAI sources still need the CLI route (`--source <key>`) to harvest until the dispatch logic is generalised — the command prints a warning naming each affected source.
 
 **Associate with specific user**:
 
 ```bash
-python manage.py harvest_journals --all --user-email admin@optimap.science
+python manage.py harvest_sources --all --user-email admin@optimap.science
 ```
 
-**Currently configured journals**:
+**Currently configured sources**:
 
 - `essd` - Earth System Science Data (OAI-PMH) ([Issue #59](https://github.com/GeoinformationSystems/optimap/issues/59))
 - `agile-giss` - AGILE-GISS conference series (OAI-PMH) ([Issue #60](https://github.com/GeoinformationSystems/optimap/issues/60))
@@ -342,7 +342,7 @@ python manage.py harvest_journals --all --user-email admin@optimap.science
 - `eartharxiv` - EarthArXiv preprint repository (OAI-PMH, ~6,000+ preprints)
 - `scientific-data` - Scientific Data (RSS/Atom) ([Issue #58](https://github.com/GeoinformationSystems/optimap/issues/58))
 
-The command supports both OAI-PMH and RSS/Atom feeds, automatically detecting the feed type for each journal.
+The command supports OAI-PMH, RSS/Atom, Crossref-prefix, and OpenAlex sources, automatically dispatching to the correct harvester for each source.
 
 **Harvesting EarthArxiv preprints**:
 
@@ -350,13 +350,13 @@ EarthArxiv is a preprint server for Earth Sciences hosted by the California Digi
 
 ```bash
 # Harvest first 100 preprints for testing
-python manage.py harvest_journals --journal eartharxiv --max-records 100 --create-sources
+python manage.py harvest_sources --source eartharxiv --max-records 100 --create-sources
 
 # Harvest all EarthArxiv preprints (6,000+)
-python manage.py harvest_journals --journal eartharxiv --create-sources
+python manage.py harvest_sources --source eartharxiv --create-sources
 
-# Harvest EarthArxiv along with other journals
-python manage.py harvest_journals --journal eartharxiv --journal essd --journal geo-leo
+# Harvest EarthArxiv along with other sources
+python manage.py harvest_sources --source eartharxiv --source essd --source geo-leo
 ```
 
 EarthArxiv provides comprehensive coverage of Earth Science preprints via its OAI-PMH API endpoint. Each publication is automatically matched with OpenAlex to retrieve:
@@ -372,7 +372,7 @@ The command provides detailed progress reporting including:
 - Number of publications harvested
 - Harvesting duration
 - Spatial and temporal metadata statistics
-- Success/failure status for each journal
+- Success/failure status for each source
 
 When the command runs mutiple times, it will only add new publications that are not already in the database as part of the regular harvesting process.
 
