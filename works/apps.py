@@ -34,6 +34,20 @@ def schedule_data_dump(sender, **kwargs):
             settings.DATA_DUMP_INTERVAL_HOURS,
         )
 
+def ensure_deleted_user_sentinel(sender, **kwargs):
+    from works.models import CustomUser
+    CustomUser.objects.get_or_create(
+        username="deleted",
+        defaults={"email": "", "is_active": False, "is_staff": False},
+    )
+
+
+def schedule_inactivity_tasks(sender, **kwargs):
+    from works.tasks import schedule_inactivity_warning_task, schedule_inactivity_deletion_task
+    schedule_inactivity_warning_task()
+    schedule_inactivity_deletion_task()
+
+
 class WorksConfig(AppConfig):
     name               = "works"
     default_auto_field = "django.db.models.BigAutoField"
@@ -45,4 +59,16 @@ class WorksConfig(AppConfig):
             sender=self,
             weak=False,
             dispatch_uid="works.schedule_data_dump",
+        )
+        post_migrate.connect(
+            ensure_deleted_user_sentinel,
+            sender=self,
+            weak=False,
+            dispatch_uid="works.ensure_deleted_user_sentinel",
+        )
+        post_migrate.connect(
+            schedule_inactivity_tasks,
+            sender=self,
+            weak=False,
+            dispatch_uid="works.schedule_inactivity_tasks",
         )

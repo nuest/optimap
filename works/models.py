@@ -88,6 +88,11 @@ class CustomUser(AbstractUser):
     groups = models.ManyToManyField(Group, related_name="works_users", blank=True)
     user_permissions = models.ManyToManyField(Permission, related_name="works_users_permissions", blank=True)
 
+    @classmethod
+    def deleted_user(cls):
+        """Return the sentinel account that holds contributions of deleted users."""
+        return cls.objects.get(username="deleted")
+
 class Work(models.Model):
     title = models.TextField()
     status = models.CharField(max_length=1, choices=STATUS_CHOICES, default="d")

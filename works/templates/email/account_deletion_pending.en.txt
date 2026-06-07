@@ -1,0 +1,20 @@
+[OPTIMAP] 🗑️ Accounts pending deletion — {{ count }} user(s)
+
+The following {{ count }} OPTIMAP user(s) have not logged in for over 13 months
+and should be reviewed for deletion.
+
+{% for u in users %}  - {{ u.email }}
+    last login: {{ u.last_login|date:"Y-m-d" }}, joined: {{ u.date_joined|date:"Y-m-d" }}
+    warning email: {% if u.warning_log %}{{ u.warning_log.sent_at|date:"Y-m-d" }} ({{ u.warning_log.status }}){% else %}none on record{% endif %}
+
+{% endfor %}
+Open the admin panel to delete:
+  {{ admin_url }}
+
+Note: OPTIMAP only detects send-time delivery failures. Please also check
+the outgoing mailbox for bounce messages (undeliverable address notices)
+that arrived after the warning emails were accepted by the mail server —
+those users may not have received their warning and should be noted before
+deletion.
+
+(Sent weekly to all staff users with an email address.)

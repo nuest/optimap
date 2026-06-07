@@ -345,6 +345,8 @@ OPTIMAP_EMAIL_SEND_DELAY = env("OPTIMAP_EMAIL_SEND_DELAY", default=2)
 BASE_URL = env("BASE_URL", default="http://127.0.0.1:8000")
 EMAIL_SEND_DELAY = 2
 DATA_DUMP_INTERVAL_HOURS = 6
+INACTIVITY_WARNING_DAYS  = env.int("OPTIMAP_INACTIVITY_WARNING_DAYS",  default=365)
+INACTIVITY_DELETION_DAYS = env.int("OPTIMAP_INACTIVITY_DELETION_DAYS", default=396)
 
 # Contact email for API user agents (OpenAlex, Wikidata, etc.)
 CONTACT_EMAIL = "login@optimap.science"

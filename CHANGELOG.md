@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Weekly inactivity warning email to users** (closes #120). Users who have not logged in for 12–13 months receive a warning that their account will be deleted if they do not log in within 30 days. The email explains what happens to their data (credentials removed; contributions remain but become anonymous; recognition board entry removed). Scheduled automatically via Django-Q every Monday.
+
+- **Weekly deletion list for admins** (closes #121). Users inactive for over 13 months are reported in a weekly email to all staff users with an email address. The list includes each user's email, last-login date, and join date, with a link to the Django admin. If no users are pending deletion, no email is sent.
+
+- **Sentinel "Deleted User" account for de-identified contributions.** When any user account is deleted, their contributions (spatial/temporal/ontology metadata on publications) are reassigned to a permanent `username="deleted"` sentinel account rather than set to `NULL`. This preserves contributed metadata in the admin UI with a clear "Deleted User" label instead of a blank. The sentinel is created automatically on each `migrate` run via a `post_migrate` signal and is accessible via `CustomUser.deleted_user()`. A `pre_delete` signal on `CustomUser` handles the reassignment for both user-initiated and admin-initiated deletions.
+
 - **Inline curator management on collection pages** (closes #234). Admins and existing curators can add curators by email address and remove them directly from the collection landing page. When the curator list changes, all current curators, all admins, the actor, and the added/removed curator receive a notification email. The former Django Admin "Manage curators" link has been replaced by this in-page UI.
 
 - **Admin notification on new user registration.** When a brand-new account is persisted (i.e. a magic-link recipient completes the second "confirm" step of the new-account flow), every `is_staff` user with an email address receives a notification with the new user's email and a link to the admin user page. Sent asynchronously via Django-Q and logged in `EmailLog` (`trigger_source="scheduled"`). The send failure path never blocks login.

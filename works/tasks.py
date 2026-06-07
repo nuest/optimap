@@ -372,6 +372,122 @@ def schedule_subscription_email_task(sent_by=None):
 
 
 # -----------------------------------------------------------------------------
+# Inactivity warning (#120) and deletion list (#121).
+# -----------------------------------------------------------------------------
+
+def _next_monday():
+    """Return next Monday at 08:00 (always at least 1 day ahead)."""
+    now = timezone.now()
+    days_ahead = (7 - now.weekday()) % 7 or 7
+    return (now + timedelta(days=days_ahead)).replace(hour=8, minute=0, second=0, microsecond=0)
+
+
+def send_inactivity_warning_emails(trigger_source="scheduled"):
+    """Email users in the 12-to-13-month inactivity window (#120)."""
+    from django.contrib.auth import get_user_model
+    from works.models import EmailLog
+    from works.views.auth import is_email_blocked
+
+    User = get_user_model()
+    now = timezone.now()
+    warning_cutoff  = now - timedelta(days=settings.INACTIVITY_WARNING_DAYS)
+    deletion_cutoff = now - timedelta(days=settings.INACTIVITY_DELETION_DAYS)
+
+    users = User.objects.filter(
+        is_active=True,
+        last_login__lt=warning_cutoff,
+        last_login__gte=deletion_cutoff,
+    ).exclude(email="")
+
+    login_url = settings.BASE_URL
+
+    for user in users:
+        if is_email_blocked(user.email):
+            logger.info("Skipping blocked address %s for inactivity warning.", user.email)
+            continue
+        subject, body = render_email("email/account_inactivity_warning.en.txt", {
+            "email": user.email,
+            "login_url": login_url,
+        })
+        try:
+            send_mail(subject, body, settings.EMAIL_HOST_USER, [user.email], fail_silently=False)
+            EmailLog.log_email(user.email, subject, body, trigger_source=trigger_source, status="success")
+        except Exception as ex:  # noqa: BLE001
+            logger.exception("Failed to send inactivity warning to %s.", user.email)
+            EmailLog.log_email(user.email, subject, body, trigger_source=trigger_source, status="failed", error_message=str(ex))
+        time.sleep(settings.EMAIL_SEND_DELAY)
+
+
+def send_inactivity_deletion_list_to_admins(trigger_source="scheduled"):
+    """Email admins a list of users inactive for 13+ months (#121)."""
+    from django.contrib.auth import get_user_model
+    from works.models import EmailLog
+
+    User = get_user_model()
+    now = timezone.now()
+    deletion_cutoff = now - timedelta(days=settings.INACTIVITY_DELETION_DAYS)
+
+    stale_users = list(
+        User.objects.filter(is_active=True, last_login__lt=deletion_cutoff)
+        .exclude(email="")
+        .order_by("last_login")
+    )
+    if not stale_users:
+        logger.info("send_inactivity_deletion_list_to_admins: no users pending deletion.")
+        return
+
+    admin_emails = list(
+        User.objects.filter(is_staff=True)
+        .exclude(email="")
+        .values_list("email", flat=True)
+    )
+    if not admin_emails:
+        logger.warning("send_inactivity_deletion_list_to_admins: no admin emails configured.")
+        return
+
+    # Attach the date of the most recent successful warning email to each user.
+    stale_emails = [u.email for u in stale_users]
+    warning_log_by_email = {}
+    for log in (
+        EmailLog.objects
+        .filter(recipient_email__in=stale_emails, subject__icontains="account will be deleted", status="success")
+        .order_by("-sent_at")
+    ):
+        warning_log_by_email.setdefault(log.recipient_email, log)
+    for user in stale_users:
+        user.warning_log = warning_log_by_email.get(user.email)
+
+    admin_url = f"{settings.BASE_URL}{reverse('admin:works_customuser_changelist')}"
+    subject, body = render_email("email/account_deletion_pending.en.txt", {
+        "count": len(stale_users),
+        "users": stale_users,
+        "admin_url": admin_url,
+    })
+    for admin_email in admin_emails:
+        try:
+            send_mail(subject, body, settings.EMAIL_HOST_USER, [admin_email], fail_silently=False)
+            EmailLog.log_email(admin_email, subject, body, trigger_source=trigger_source, status="success")
+        except Exception as ex:  # noqa: BLE001
+            logger.exception("Failed to send deletion list to admin %s.", admin_email)
+            EmailLog.log_email(admin_email, subject, body, trigger_source=trigger_source, status="failed", error_message=str(ex))
+        time.sleep(settings.EMAIL_SEND_DELAY)
+
+
+def schedule_inactivity_warning_task():
+    if not Schedule.objects.filter(func="works.tasks.send_inactivity_warning_emails").exists():
+        schedule("works.tasks.send_inactivity_warning_emails",
+                 schedule_type="W", repeats=-1, next_run=_next_monday())
+        logger.info("Scheduled send_inactivity_warning_emails weekly.")
+
+
+def schedule_inactivity_deletion_task():
+    if not Schedule.objects.filter(func="works.tasks.send_inactivity_deletion_list_to_admins").exists():
+        schedule("works.tasks.send_inactivity_deletion_list_to_admins",
+                 schedule_type="W", repeats=-1, next_run=_next_monday())
+        logger.info("Scheduled send_inactivity_deletion_list_to_admins weekly.")
+
+
+# -----------------------------------------------------------------------------
 # Data dump regeneration.
 # -----------------------------------------------------------------------------
 

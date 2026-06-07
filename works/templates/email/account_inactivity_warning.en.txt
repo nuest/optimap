@@ -1,0 +1,20 @@
+[OPTIMAP] ⚠️ Your OPTIMAP account will be deleted — please log in
+
+Hello {{ email }},
+
+You have not logged in to OPTIMAP for over 12 months.
+
+If you do not log in within the next 30 days, your account will be deleted.
+
+Log in at:
+  {{ login_url }}
+
+What happens when your account is deleted:
+- Your email address and login credentials are permanently removed from OPTIMAP.
+- Any spatial or temporal metadata you contributed to publications is kept and
+  continues to benefit the community, but is attributed to an anonymous
+  "Deleted User" — no longer linked to your name or email address.
+- Your entry on the contributor recognition board is removed.
+
+If you no longer use OPTIMAP, no action is needed — your account will be
+removed automatically.
