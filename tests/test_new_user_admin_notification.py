@@ -160,3 +160,49 @@ class NewUserAdminNotificationTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertTrue(User.objects.filter(email="resilient@example.org").exists())
+
+    def test_existing_user_normalised_email_is_found(self):
+        """loginres normalises email to lowercase before caching, so the exact
+        lookup in authenticate_via_magic_link always sees a lowercase value and
+        finds the existing account without showing the consent screen."""
+        User.objects.create_user(
+            username="case@example.org", email="case@example.org",
+        )
+        # Simulate loginres: the original input "Case@Example.ORG" is lowercased
+        # before being written to cache.
+        token = self._prime_magic_link("case@example.org", token="tok-case")
+
+        with patch("django_q.tasks.async_task", side_effect=_run_async_synchronously):
+            response = self.client.get(reverse("optimap:magic_link", args=[token]))
+
+        self.assertEqual(response.status_code, 302)
+        # No duplicate created.
+        self.assertEqual(User.objects.filter(email="case@example.org").count(), 1)
+        # No new-user notification for a returning user.
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_confirmed_true_for_existing_user_does_not_crash(self):
+        """If ?confirmed=true reaches the view for an already-existing account
+        (e.g. direct URL manipulation or a stale link), the view must log the
+        user in rather than raising IntegrityError (the original bug).
+
+        With normalised email the initial lookup succeeds, so the elif branch
+        is skipped entirely — but the test guards against regression."""
+        User.objects.create_user(
+            username="dup@example.org", email="dup@example.org",
+        )
+        # Cache holds the normalised (lowercase) email, as loginres produces.
+        token = self._prime_magic_link("dup@example.org", token="tok-dup")
+
+        with patch("django_q.tasks.async_task", side_effect=_run_async_synchronously):
+            response = self.client.get(
+                reverse("optimap:magic_link", args=[token]) + "?confirmed=true"
+            )
+
+        self.assertEqual(response.status_code, 302)
+        # Exactly one user — no duplicate.
+        self.assertEqual(User.objects.filter(email="dup@example.org").count(), 1)
+        # No new-user email for an already-existing account.
+        self.assertFalse(
+            EmailLog.objects.filter(subject__contains="New user registered").exists()
+        )

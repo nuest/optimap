@@ -62,6 +62,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Returning users with mixed-case emails no longer see the consent screen or crash on login.** Email addresses are now normalised to lowercase at intake (`loginres`, `change_useremail`, `EmailChangeSerializer`) so the DB always stores lowercase values. The `?confirmed=true` branch uses `get_or_create` instead of `create_user` as a race-condition guard. Migration `0009` back-fills `LOWER()` on all existing `CustomUser.email`, `CustomUser.username`, and `BlockedEmail.email` rows; user lookups revert to exact `=` matches so the B-tree index is used again.
+
 - **Admin "Trigger / Schedule / Retry harvesting" actions and `harvest_journals` now dispatch by `source_type`** instead of hardcoding the OAI task, so non-OAI sources (MaRESS, RSS, Crossref, OpenAlex) run the right harvester. `harvest_journals` also reconciles stale Source rows against `SOURCE_CONFIG` (rewrites `source_type`, fills blank soft fields, preserves admin edits).
 
 - **Inline mutation buttons reflect the new state immediately on production.** Authenticated responses on `/collections/`, the work landing page, and `/subscriptions/` are no longer captured by the site-wide cache, so publish/unpublish/contribute/subscribe state flips on reload. Anonymous responses still cached.

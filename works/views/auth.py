@@ -59,7 +59,7 @@ EMAIL_CONFIRMATION_TOKEN_PREFIX = "email_confirmation_"
 def loginres(request):
     if request.method != 'POST':
         return redirect('/')
-    email = request.POST.get('email', '')
+    email = request.POST.get('email', '').lower().strip()
     if is_email_blocked(email):
         logger.warning('Attempted login with blocked email: %s', email)
         return render(request, "error.html", {
@@ -161,14 +161,17 @@ def authenticate_via_magic_link(request, token):
         # Store next URL in session for redirect after confirmation
         request.session['login_redirect_url'] = next_url
     elif request.GET.get('confirmed', None) == 'true':
-        user = User.objects.create_user(username=email, email=email)
-        is_new = True
+        user, is_new = User.objects.get_or_create(
+            username=email,
+            defaults={'username': email, 'email': email},
+        )
         needs_confirmation = False
         # First-time confirmed registration: tell the admins. Imported
         # locally to keep this view import-graph free of django_q at import
         # time. Errors inside notify_* never propagate (defensive try/except).
-        from works.notifications import notify_admins_new_user_registered
-        notify_admins_new_user_registered(user)
+        if is_new:
+            from works.notifications import notify_admins_new_user_registered
+            notify_admins_new_user_registered(user)
         login_user(request, user)
         # Redirect to next URL after successful login
         logger.info('User %s logged in successfully, redirecting to %s', email, next_url)
@@ -385,7 +388,7 @@ def unsubscribe(request):
 @login_required
 
 def change_useremail(request):
-    email_new = request.POST.get('email_new', False)
+    email_new = request.POST.get('email_new', '').lower().strip()
     currentuser = request.user
     email_old = currentuser.email
     if is_email_blocked(email_new):
@@ -488,7 +491,7 @@ def get_login_link(request, email):
 
 def is_email_blocked(email):
     domain = email.split('@')[-1]
-    if BlockedEmail.objects.filter(email=email).exists():
+    if BlockedEmail.objects.filter(email__iexact=email).exists():
         return True
     if BlockedDomain.objects.filter(domain=domain).exists():
         return True

@@ -123,6 +123,7 @@ class EmailChangeSerializer(serializers.ModelSerializer):
 
     def validate_email(self, value):
         """Ensure the new email is not already in use."""
+        value = value.lower().strip()
         if User.objects.filter(email=value).exists():
             raise drf_serializers.ValidationError("This email is already registered.")
         return value
