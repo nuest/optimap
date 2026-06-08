@@ -88,8 +88,16 @@ def contribute(request):
     except EmptyPage:
         page_obj = paginator.page(paginator.num_pages)
 
+    works = list(page_obj)
+    for w in works:
+        w.has_geo = bool(w.geometry and not w.geometry.empty)
+        w.has_temporal = (
+            any(d is not None for d in (w.timeperiod_startdate or []))
+            or any(d is not None for d in (w.timeperiod_enddate or []))
+        )
+
     context = {
-        'works': page_obj,
+        'works': works,
         'page_obj': page_obj,
         'page_size': page_size,
         'page_size_options': settings.WORKS_PAGE_SIZE_OPTIONS,
@@ -184,6 +192,7 @@ def works_list(request):
         page_obj = paginator.page(paginator.num_pages)
 
     # Build work data for current page
+    is_authenticated = request.user.is_authenticated
     works = []
     for work in page_obj:
         work_data = {
@@ -198,6 +207,13 @@ def works_list(request):
         if is_admin:
             work_data["status"] = work.get_status_display()
             work_data["status_code"] = work.status
+
+        if is_authenticated:
+            work_data["has_geo"] = bool(work.geometry and not work.geometry.empty)
+            work_data["has_temporal"] = (
+                any(d is not None for d in (work.timeperiod_startdate or []))
+                or any(d is not None for d in (work.timeperiod_enddate or []))
+            )
 
         works.append(work_data)
 
@@ -218,6 +234,7 @@ def works_list(request):
         "page_size": page_size,
         "page_size_options": settings.WORKS_PAGE_SIZE_OPTIONS,
         "is_admin": is_admin,
+        "is_authenticated": is_authenticated,
         "statistics": stats,
         "api_url": api_url,
     }

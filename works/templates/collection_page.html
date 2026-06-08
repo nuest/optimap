@@ -239,23 +239,41 @@
                 </div>
               </div>
               <div class="card-footer">
-                <small class="text-muted">
-                  {% if work.publicationDate %}
-                    <div class="mb-1">
-                      <i class="fas fa-calendar"></i> {{ work.publicationDate|date:"M d, Y" }}
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                  <small class="text-muted">
+                    {% if work.publicationDate %}
+                      <div class="mb-1">
+                        <i class="fas fa-calendar"></i> {{ work.publicationDate|date:"M d, Y" }}
+                      </div>
+                    {% endif %}
+                    {% if work.source %}
+                      <div class="mb-1">
+                        <i class="fas fa-book"></i> {{ work.source.name }}
+                      </div>
+                    {% endif %}
+                    {% if work.doi %}
+                      <div class="mb-1">
+                        <i class="fas fa-fingerprint"></i> <span class="doi-text">{{ work.doi }}</span>
+                      </div>
+                    {% endif %}
+                  </small>
+                  {% if can_curate %}
+                    <div class="text-right ml-2 flex-shrink-0">
+                      <div class="mb-1">
+                        <span class="badge {% if work.has_geo %}badge-success{% else %}badge-secondary{% endif %}"
+                              title="{% if work.has_geo %}Has spatial extent{% else %}No spatial extent{% endif %}">
+                          <i class="fas fa-map-marker-alt"></i> Spatial
+                        </span>
+                      </div>
+                      <div>
+                        <span class="badge {% if work.has_temporal %}badge-success{% else %}badge-secondary{% endif %}"
+                              title="{% if work.has_temporal %}Has temporal extent{% else %}No temporal extent{% endif %}">
+                          <i class="fas fa-clock"></i> Temporal
+                        </span>
+                      </div>
                     </div>
                   {% endif %}
-                  {% if work.source %}
-                    <div class="mb-1">
-                      <i class="fas fa-book"></i> {{ work.source.name }}
-                    </div>
-                  {% endif %}
-                  {% if work.doi %}
-                    <div class="mb-1">
-                      <i class="fas fa-fingerprint"></i> <span class="doi-text">{{ work.doi }}</span>
-                    </div>
-                  {% endif %}
-                </small>
+                </div>
                 <a href="{% url 'optimap:work-landing' work.get_identifier %}" class="btn btn-primary btn-sm">
                   <i class="fas fa-map-marked-alt"></i> View work's page
                 </a>
@@ -374,10 +392,13 @@
       var id = b.getAttribute('data-collection-id');
       var csrf = b.getAttribute('data-csrf');
       b.disabled = true;
-      fetch('/collections/' + id + '/publish-works-with-extent/', {
+      var body = new URLSearchParams();
+      body.append('extent_only', '1');
+      fetch('/collections/' + id + '/publish-works/', {
         method: 'POST',
-        headers: {'X-CSRFToken': csrf, 'Accept': 'application/json'},
+        headers: {'X-CSRFToken': csrf, 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded'},
         credentials: 'same-origin',
+        body: body.toString(),
       }).then(function (r) { return r.json(); }).then(function (data) {
         if (data && data.success) {
           OPTIMAP_FLASH('success', 'Published ' + data.published_count + ' work(s) with extent.');

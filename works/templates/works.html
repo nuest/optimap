@@ -135,6 +135,17 @@
                 </a>
               </span>
             {% endif %}
+            {% if is_authenticated %}
+              <span class="mx-2">·</span>
+              <span class="badge {% if work.has_geo %}badge-success{% else %}badge-secondary{% endif %}"
+                    title="{% if work.has_geo %}Has spatial extent{% else %}No spatial extent{% endif %}">
+                <i class="fas fa-map-marker-alt" aria-hidden="true"></i> Spatial
+              </span>
+              <span class="badge {% if work.has_temporal %}badge-success{% else %}badge-secondary{% endif %} ml-1"
+                    title="{% if work.has_temporal %}Has temporal extent{% else %}No temporal extent{% endif %}">
+                <i class="fas fa-clock" aria-hidden="true"></i> Temporal
+              </span>
+            {% endif %}
           </div>
         </div>
       {% empty %}

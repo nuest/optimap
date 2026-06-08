@@ -115,6 +115,11 @@ def collection_page(request, collection_slug):
     works = list(works_qs.order_by('-creationDate', '-id')[: settings.FEED_MAX_ITEMS])
     for w in works:
         w.coins_ctx = coins_title(w)
+        w.has_geo = bool(w.geometry and not w.geometry.empty)
+        w.has_temporal = (
+            any(d is not None for d in (w.timeperiod_startdate or []))
+            or any(d is not None for d in (w.timeperiod_enddate or []))
+        )
 
     # Count of works that the bulk "Publish all" admin button would publish:
     # only Harvested ('h') and Contributed ('c') — Draft / Testing / Withdrawn
@@ -123,6 +128,18 @@ def collection_page(request, collection_slug):
         Work.objects.filter(collections=collection, status__in=['h', 'c']).count()
         if is_admin else 0
     )
+    # Count of the above that also have at least one real geometry or temporal value.
+    publishable_geo_count = 0
+    if is_admin:
+        candidate_qs = Work.objects.filter(
+            collections=collection, status__in=['h', 'c']
+        ).only('geometry', 'timeperiod_startdate', 'timeperiod_enddate')
+        publishable_geo_count = sum(
+            1 for w in candidate_qs
+            if (w.geometry and not w.geometry.empty)
+            or any(d is not None for d in (w.timeperiod_startdate or []))
+            or any(d is not None for d in (w.timeperiod_enddate or []))
+        )
 
     context = {
         'collection': collection,
@@ -134,6 +151,7 @@ def collection_page(request, collection_slug):
         'can_curate': can_curate,
         'can_edit_description': is_admin or is_curator,
         'publishable_count': publishable_count,
+        'publishable_geo_count': publishable_geo_count,
         'canonical_url': request.build_absolute_uri(collection.get_absolute_url()),
         'curators': list(collection.curators.all()),
     }
@@ -196,15 +214,29 @@ def unpublish_collection(request, collection_id):
 @staff_member_required
 @require_POST
 def publish_collection_works(request, collection_id):
-    """Admins only: bulk-set every Harvested/Contributed work in the collection
-    to Published. Curators (non-staff) get 403 from ``staff_member_required``.
+    """Admins only: bulk-set Harvested/Contributed works in the collection to Published.
+
+    POST param ``extent_only=1``: restrict to works that have at least one real
+    geometry point or a non-null temporal value (skips empty GeometryCollections
+    and ``[None]`` date arrays). Omit or set to any other value to publish all.
 
     Targets ``status__in=['h', 'c']`` only — Draft / Testing / Withdrawn are
     admin-managed states and are deliberately left untouched.
     """
     collection = get_object_or_404(Collection, pk=collection_id)
-    qs = Work.objects.filter(collections=collection, status__in=['h', 'c'])
-    count = qs.update(status='p')
+    if request.POST.get('extent_only') == '1':
+        qs = Work.objects.filter(
+            collections=collection, status__in=['h', 'c']
+        ).only('geometry', 'timeperiod_startdate', 'timeperiod_enddate')
+        qualifying_ids = [
+            w.pk for w in qs
+            if (w.geometry and not w.geometry.empty)
+            or any(d is not None for d in (w.timeperiod_startdate or []))
+            or any(d is not None for d in (w.timeperiod_enddate or []))
+        ]
+        count = Work.objects.filter(pk__in=qualifying_ids).update(status='p')
+    else:
+        count = Work.objects.filter(collections=collection, status__in=['h', 'c']).update(status='p')
     return JsonResponse({'success': True, 'published_count': count})
 
 

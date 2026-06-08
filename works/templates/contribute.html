@@ -157,18 +157,35 @@
             </div>
 
             <div class="card-footer">
-              <small class="text-muted">
-                {% if work.publicationDate %}
-                  <div class="mb-1">Published: {{ work.publicationDate|date:"M d, Y" }}</div>
+              <div class="d-flex justify-content-between align-items-start mb-2">
+                <small class="text-muted">
+                  {% if work.publicationDate %}
+                    <div class="mb-1">Published: {{ work.publicationDate|date:"M d, Y" }}</div>
+                  {% endif %}
+                  {% if work.source %}
+                    <div class="mb-1">Source: {{ work.source.name }}</div>
+                  {% endif %}
+                  {% if work.doi %}
+                    <div class="mb-1">DOI: <span class="doi-text">{{ work.doi }}</span></div>
+                  {% endif %}
+                </small>
+                {% if request.user.is_authenticated %}
+                  <div class="text-right ml-2 flex-shrink-0">
+                    <div class="mb-1">
+                      <span class="badge {% if work.has_geo %}badge-success{% else %}badge-secondary{% endif %}"
+                            title="{% if work.has_geo %}Has spatial extent{% else %}No spatial extent{% endif %}">
+                        <i class="fas fa-map-marker-alt"></i> Spatial
+                      </span>
+                    </div>
+                    <div>
+                      <span class="badge {% if work.has_temporal %}badge-success{% else %}badge-secondary{% endif %}"
+                            title="{% if work.has_temporal %}Has temporal extent{% else %}No temporal extent{% endif %}">
+                        <i class="fas fa-clock"></i> Temporal
+                      </span>
+                    </div>
+                  </div>
                 {% endif %}
-                {% if work.source %}
-                  <div class="mb-1">Source: {{ work.source.name }}</div>
-                {% endif %}
-                {% if work.doi %}
-                  <div class="mb-1">DOI: <span class="doi-text">{{ work.doi }}</span></div>
-                {% endif %}
-              </small>
-
+              </div>
               {% if request.user.is_authenticated %}
                 {% if work.doi %}
                   <a href="{% url 'optimap:work-landing' work.doi %}" class="btn btn-primary btn-sm">
