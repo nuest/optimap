@@ -17,6 +17,7 @@ from works.bok.client import (
     is_known,
     resolve,
     search,
+    match_text_to_codes,
     invalidate_cache,
     BOK_CACHE_KEY,
 )
@@ -33,6 +34,7 @@ __all__ = [
     "is_known",
     "resolve",
     "search",
+    "match_text_to_codes",
     "invalidate_cache",
     "BOK_CACHE_KEY",
     "enabled_collection_identifiers",

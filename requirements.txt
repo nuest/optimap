@@ -58,6 +58,9 @@ cairosvg>=2.7
 # Geoextent library for spatial/temporal extent extraction
 git+https://github.com/nuest/geoextent.git@main#egg=geoextent
 
+# PDF text extraction for BoK concept harvesting from AGILE GISS PDFs (issue #250)
+pdf-oxide>=0.1
+
 # OGC API - Features via pygeoapi (issue #19)
 pygeoapi>=0.21
 geoalchemy2>=0.14

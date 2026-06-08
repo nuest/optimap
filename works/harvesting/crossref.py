@@ -23,6 +23,9 @@ from django.utils import timezone
 
 from works.models import HarvestingEvent, Source
 
+from works.utils.provenance import append_event
+
+from .bok_pdf import agile_giss_doi_to_pdf_url, extract_bok_from_agile_pdf
 from .common import (
     HarvestStats,
     HarvestWarningCollector,
@@ -222,6 +225,35 @@ def _crossref_item_to_work_kwargs(
     }
 
 
+def _try_bok_pdf_extraction(work, doi: str, session) -> None:
+    """Download the AGILE GISS PDF for *work* and save extracted BoK codes.
+
+    No-op for non-AGILE DOIs or when bok_concepts are already set.
+    All errors are swallowed so harvest never fails due to PDF issues.
+    """
+    if not agile_giss_doi_to_pdf_url(doi):
+        return
+    if work.bok_concepts:
+        return
+    codes = extract_bok_from_agile_pdf(doi, session=session)
+    if not codes:
+        return
+    pdf_url = agile_giss_doi_to_pdf_url(doi)
+    work.bok_concepts = codes
+    prov = work.provenance if isinstance(work.provenance, dict) else {}
+    prov.setdefault("metadata_sources", {})["bok_concepts"] = "pdf_extraction"
+    work.provenance = prov
+    append_event(
+        work,
+        "bok_pdf_extract",
+        source="pdf",
+        pdf_url=pdf_url,
+        codes_found=codes,
+    )
+    work.save(update_fields=["bok_concepts", "provenance"])
+    logger.info("BoK PDF extraction: set %s on work %s", codes, work.id)
+
+
 def parse_crossref_response_and_save_works(
     source, event, prefix, source_titles=None,
     fetch_abstract_from_publisher=True, max_records=None,
@@ -299,6 +331,7 @@ def parse_crossref_response_and_save_works(
                     work.collections.add(source.collection_id)
                 if action == 'created':
                     saved += 1
+                    _try_bok_pdf_extraction(work, kwargs.get("doi", ""), session)
             except Exception as e:
                 logger.warning(
                     "Failed to persist Crossref work %s: %s", kwargs.get("doi"), e,

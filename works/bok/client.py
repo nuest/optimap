@@ -256,3 +256,25 @@ def search(query: str, limit: int = 10, version: str | None = None) -> list[dict
     scored.sort(key=lambda x: (x[0], x[1]))
     limit = max(1, min(limit, 50))
     return [c for _, _, c in scored[:limit]]
+
+
+def match_text_to_codes(names: list[str], version: str | None = None) -> list[str]:
+    """Resolve a list of human-readable concept names to known BoK codes.
+
+    Only exact name matches (case-insensitive) are accepted — fuzzy matches
+    are dropped. Returns de-duplicated codes in input order, skipping blanks
+    and names that don't resolve to any known concept.
+    """
+    seen: set[str] = set()
+    out: list[str] = []
+    for name in names:
+        name = name.strip()
+        if not name:
+            continue
+        hits = search(name, limit=1, version=version)
+        if hits and hits[0]["name"].lower() == name.lower():
+            code = hits[0]["code"]
+            if code not in seen:
+                seen.add(code)
+                out.append(code)
+    return out

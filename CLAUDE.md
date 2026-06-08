@@ -277,6 +277,13 @@ python manage.py clear_caches
 # See docs/manage.md → "Manage data dumps and caches" for which backend
 # stores what and when to clear which.
 
+# Extract BoK concepts from AGILE GISS PDFs (backfill existing works)
+python manage.py extract_agile_bok
+# Downloads the full-text PDF for each AGILE GISS work and parses the
+# "BoK Concepts" section. Skips works that already have bok_concepts set
+# unless --force is given. Throttles PDF downloads (default: 2 s).
+# Flags: --limit N, --throttle SECONDS, --force, --dry-run.
+
 # Generate pygeoapi OpenAPI document (required for /ogcapi/ endpoint)
 python manage.py generate_pygeoapi_openapi
 # Reads etc/pygeoapi-config.yml and writes etc/pygeoapi-openapi.yml.

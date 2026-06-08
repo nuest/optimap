@@ -97,7 +97,7 @@ SOURCE_CONFIG = {
         'enabled': False,
         'disabled_reason': (
             'Upstream OAI-PMH endpoint returns HTTP 404 since 2025-12. '
-            'Use agile-giss-crossref or agile-giss-openalex instead.'
+            'Use agile-giss-crossref instead.'
         ),
     },
     'agile-giss-crossref': {
@@ -116,20 +116,6 @@ SOURCE_CONFIG = {
         # (verified 2026-05-06); without the colon the filter returns zero hits.
         'source_titles': ['AGILE: GIScience Series'],
         'fetch_abstract_from_publisher': True,
-        'is_oa': True,
-        'default_work_type': 'proceedings-article',
-    },
-    'agile-giss-openalex': {
-        'name': 'AGILE GIScience Series',
-        # The harvester resolves S<digits> from openalex_id (preferred) or
-        # url_field (fallback). The public Source API derives the display URL
-        # from openalex_id on the fly.
-        'url': 'https://api.openalex.org/sources/S4210203054',
-        'collection_name': 'AGILE-GISS',
-        'homepage_url': 'https://www.agile-giscience-series.net/articles/index.html',
-        'publisher_name': 'Copernicus Publications',
-        'source_type': 'openalex',
-        'openalex_id': 'S4210203054',
         'is_oa': True,
         'default_work_type': 'proceedings-article',
     },
