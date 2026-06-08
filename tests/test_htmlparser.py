@@ -116,6 +116,30 @@ class SimpleTest(TestCase):
         self.assertEqual(label, 'schema.org JSON-LD')
         self.assertEqual(geom[0].geom_type, 'Polygon')
 
+    def test_content_location_rejects_projected_coordinates(self):
+        """GeoCoordinates with projected (non-WGS84) values must be silently dropped.
+
+        Some BDJ articles mix valid decimal-degree points with UTM/projected
+        coordinates (values in the millions) in the same contentLocation block.
+        Only the valid WGS84 points should end up in the geometry.
+        """
+        html_doc = """
+        <script type="application/ld+json">
+        {"@type": "ScholarlyArticle",
+         "contentLocation": {"@type": "Place", "geo": [
+           {"@type": "GeoCoordinates", "latitude": 781272.6, "longitude": 2373393.7},
+           {"@type": "GeoCoordinates", "latitude": 21.441017, "longitude": -90.286299},
+           {"@type": "GeoCoordinates", "latitude": 780535.1, "longitude": 2373588.2}
+         ]}}
+        </script>
+        """
+        soup = BeautifulSoup(html_doc, 'html.parser')
+        geom, label = extract_geometry_from_html(soup)
+        self.assertEqual(label, 'schema.org contentLocation')
+        self.assertEqual(geom.num_geom, 1)
+        self.assertAlmostEqual(geom[0].x, -90.286299, places=4)
+        self.assertAlmostEqual(geom[0].y, 21.441017, places=4)
+
     def test_content_location_missing(self):
         html_doc = """
         <meta name="DC.Identifier.pageNumber" content="1-2"/>

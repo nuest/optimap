@@ -66,6 +66,11 @@ def _geom_from_geojson_dict(geo: dict) -> GEOSGeometry | None:
         try:
             lat = float(geo["latitude"])
             lon = float(geo["longitude"])
+            # Reject coordinates outside WGS84 bounds — some BDJ articles embed
+            # projected coordinates (e.g. UTM, millions of metres) alongside valid
+            # decimal-degree coordinates in the same contentLocation block.
+            if not (-90 <= lat <= 90) or not (-180 <= lon <= 180):
+                return None
             return _wrap_in_collection(GEOSGeometry(f"POINT({lon} {lat})", srid=4326))
         except Exception:
             return None
