@@ -318,6 +318,83 @@ The MaRESS harvester is bespoke because the API is Zotero-shaped, not OAI-PMH/RS
 - Migration: [works/migrations/0004_collections.py](../works/migrations/0004_collections.py) (`atomic = False`).
 - Tests: [tests/test_collections.py](../tests/test_collections.py).
 
+## Work provenance
+
+Every `Work` carries a structured `provenance` JSON field that records where it came from, how its metadata was assembled, and what happened to it over time. The schema is documented in [works/utils/provenance.py](../works/utils/provenance.py).
+
+### Provenance API endpoint
+
+```
+GET /api/v1/works/<id>/provenance/
+```
+
+Returns the work's provenance record as JSON. No authentication required. The response varies by caller:
+
+| Caller | Response |
+|--------|----------|
+| Anonymous / regular authenticated user | Public subset (see below) |
+| Staff (`is_staff=True`) | Full provenance |
+| Curator of any collection this work belongs to | Full provenance |
+
+**Public subset** — keys stripped from the response for non-privileged callers:
+
+- `harvest.original_record` — raw upstream harvest payload (can be large; internal)
+- `openalex_match.top_candidate` — verbose raw OpenAlex API response
+- `events[*].user_id` — personal data
+
+**HTTP caching:**
+
+- Anonymous responses: `Cache-Control: public, max-age=3600` (1 hour).
+- Authenticated responses: `Cache-Control: private, no-store`.
+
+### Provenance on the work landing page
+
+On every work landing page (`/work/<id>/`), a collapsible **"Show source information"** button appears below the source/collection line. It is visible to all users (anonymous, logged-in, curator). Clicking it fetches `/api/v1/works/<id>/provenance/` once and renders the result inline — the full page does not reload and the provenance payload is not embedded in the initial HTML response.
+
+Staff users additionally see the full provenance (including `original_record`, Wikidata export history, and admin controls) inside the status banner at the top of the page, rendered server-side.
+
+### Provenance schema quick reference
+
+```jsonc
+{
+  "harvest": {
+    "harvester": "harvest_oai_endpoint",   // function name
+    "source_name": "Earth System Science Data",
+    "source_type": "oai-pmh",
+    "source_url": "https://essd.copernicus.org/oai/",
+    "harvested_at": "2026-04-30T12:00:00+00:00",
+    "harvesting_event_id": 42,
+    "doi": "10.5194/essd-16-1",
+    "original_record": { ... }             // staff/curators only
+  },
+  "metadata_sources": {                    // per-field attribution
+    "authors": "openalex",
+    "geometry": "DC.SpatialCoverage"
+  },
+  "openalex_match": {
+    "status": "verified",                  // verified | unverified | none | skipped
+    "score": 0.95,
+    "matched_id": "https://openalex.org/W123",
+    "top_candidate": { ... }               // staff/curators only
+  },
+  "geocoding": {
+    "gazetteer": "nominatim",
+    "placename": "Sulawesi, Indonesia",
+    "country_code": "ID",
+    "n_geocoded": 3,
+    "geocoded_at": "2026-04-30T12:00:05+00:00",
+    "matches": [ ... ]                     // per-point Nominatim results
+  },
+  "events": [                              // chronological audit log
+    { "type": "harvest",      "at": "..." },
+    { "type": "contribution", "at": "...", "user_id": 42, "kind": "spatial" },
+    { "type": "publish",      "at": "...", "user_id": 1 }
+  ],
+}
+```
+
+All keys are optional; fresh works start with `{}`.
+
 ## Reference-manager / Zotero compatibility
 
 Work landing pages (`/work/<id>/` and `/work/<doi>/`) and collection detail pages (`/collections/<id>/`) emit the metadata that the [Zotero browser connector](https://www.zotero.org/download/connectors) and other reference managers (Mendeley, ReadCube, Citation Web Linker, etc.) read. No setup required — when a reader visits a work landing page with the connector installed, the connector recognises it as a journal article and offers "Save to Zotero". On a published collection page it offers "Save to Zotero (multiple items)" so a curator's curated set can be imported in one click.

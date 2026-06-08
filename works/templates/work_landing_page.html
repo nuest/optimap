@@ -216,6 +216,25 @@
   </p>
 {% endif %}
 
+{% if work.provenance and not is_admin %}
+<div class="mt-2 mb-2">
+  <a class="btn btn-sm btn-outline-secondary collapse-toggle"
+     data-toggle="collapse" href="#provenance-public-details" role="button"
+     aria-expanded="false" aria-controls="provenance-public-details"
+     data-label-show="Show source information"
+     data-label-hide="Hide source information">
+    <i class="fas fa-history"></i> <span class="collapse-toggle-label">Show source information</span>
+  </a>
+  <div class="collapse mt-2" id="provenance-public-details"
+       data-provenance-url="/api/v1/works/{{ work.id }}/provenance/"
+       style="background: rgba(255,255,255,0.5); padding: 10px; border-radius: 4px;">
+    <div id="provenance-public-body" class="provenance-rendered">
+      <span class="text-muted small"><i class="fas fa-spinner fa-spin"></i> Loading…</span>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 {% if work.abstract %}
   <p>{{ work.abstract }}</p>
 {% endif %}
@@ -816,6 +835,133 @@
         }).catch(function (err) { OPTIMAP_FLASH('error', 'Action failed: ' + err); btn.disabled = false; });
       });
     });
+    // Lazy-load provenance on first expand of the "Source information" card.
+    (function () {
+      var provenancePanel = document.getElementById('provenance-public-details');
+      if (!provenancePanel) { return; }
+      var provenanceUrl = provenancePanel.getAttribute('data-provenance-url');
+      var body = document.getElementById('provenance-public-body');
+      var loaded = false;
+
+      function escHtml(s) {
+        return String(s)
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      }
+
+      function mkDl(title, pairs) {
+        if (!pairs || !pairs.length) { return ''; }
+        var rows = pairs.map(function (p) {
+          return '<dt class="col-sm-3 text-muted">' + escHtml(p[0]) + '</dt>'
+               + '<dd class="col-sm-9">' + escHtml(p[1]) + '</dd>';
+        }).join('');
+        return '<h6 class="mt-2 mb-1">' + escHtml(title) + '</h6>'
+             + '<dl class="row mb-2 small">' + rows + '</dl>';
+      }
+
+      function renderProvenanceData(data) {
+        var html = '';
+
+        var harvest = data.harvest;
+        if (harvest && typeof harvest === 'object') {
+          var pairs = [
+            ['Harvester',    harvest.harvester],
+            ['Source name',  harvest.source_name],
+            ['Source type',  harvest.source_type],
+            ['Source URL',   harvest.source_url],
+            ['Harvested at', harvest.harvested_at],
+            ['Event ID',     harvest.harvesting_event_id],
+            ['DOI',          harvest.doi],
+          ].filter(function (p) { return p[1] != null && p[1] !== ''; });
+          html += mkDl('Harvest', pairs);
+          if (harvest.original_record) {
+            html += '<details class="small mb-2"><summary>Original record</summary>'
+                  + '<pre class="provenance-pre">' + escHtml(JSON.stringify(harvest.original_record, null, 2)) + '</pre>'
+                  + '</details>';
+          }
+        }
+
+        var ms = data.metadata_sources;
+        if (ms && typeof ms === 'object' && Object.keys(ms).length) {
+          var pairs = Object.keys(ms).sort().map(function (k) { return [k, ms[k]]; });
+          html += mkDl('Metadata sources', pairs);
+        }
+
+        var oam = data.openalex_match;
+        if (oam && typeof oam === 'object' && Object.keys(oam).length) {
+          var pairs = Object.keys(oam).filter(function (k) { return k !== 'top_candidate'; })
+            .map(function (k) {
+              var v = oam[k];
+              return [k, typeof v === 'string' ? v : JSON.stringify(v)];
+            });
+          html += mkDl('OpenAlex match', pairs);
+          if (oam.top_candidate) {
+            html += '<details class="small mb-2"><summary>Top candidate</summary>'
+                  + '<pre class="provenance-pre">' + escHtml(JSON.stringify(oam.top_candidate, null, 2)) + '</pre>'
+                  + '</details>';
+          }
+        }
+
+        var geo = data.geocoding;
+        if (geo && typeof geo === 'object' && Object.keys(geo).length) {
+          var geoKeys = ['gazetteer', 'gazetteer_url', 'placename', 'country_code', 'n_geocoded', 'geocoded_at'];
+          var pairs = geoKeys.map(function (k) { return [k, geo[k]]; })
+            .filter(function (p) { return p[1] != null && p[1] !== ''; });
+          html += mkDl('Reverse geocoding', pairs);
+          if (Array.isArray(geo.matches) && geo.matches.length) {
+            var items = geo.matches.map(function (m) {
+              var display = m.display_name || '(no display name)';
+              var loc = (m.lat != null && m.lon != null) ? '(' + m.lat + ', ' + m.lon + ') → ' : '';
+              var osm = (m.osm_url && m.osm_type && m.osm_id)
+                ? ' <a href="' + escHtml(m.osm_url) + '" target="_blank" rel="noopener">OSM ' + escHtml(m.osm_type) + '/' + escHtml(String(m.osm_id)) + '</a>'
+                : '';
+              return '<li><code>' + escHtml(loc) + '</code>' + escHtml(display) + osm + '</li>';
+            }).join('');
+            html += '<details class="small mb-2"><summary>Per-point Nominatim matches (' + geo.matches.length + ')</summary>'
+                  + '<ul class="small">' + items + '</ul></details>';
+          }
+        }
+
+        var events = data.events;
+        if (Array.isArray(events) && events.length) {
+          var items = events.map(function (ev) {
+            var kind = escHtml(ev.type || '?');
+            var at = escHtml(ev.at || '');
+            var extra = Object.keys(ev).filter(function (k) { return k !== 'type' && k !== 'at'; })
+              .map(function (k) {
+                var v = ev[k];
+                return '<span class="text-muted">' + escHtml(k) + '</span>=<code>'
+                     + escHtml(typeof v === 'string' ? v : JSON.stringify(v)) + '</code>';
+              }).join(' ');
+            return '<li class="mb-1"><strong>' + kind + '</strong>'
+                 + ' <small class="text-muted">' + at + '</small> ' + extra + '</li>';
+          }).join('');
+          html += '<h6 class="mt-2 mb-1">Events</h6><ul class="list-unstyled small">' + items + '</ul>';
+        }
+
+        if (!html) {
+          html = '<span class="text-muted small">No provenance information available.</span>';
+        }
+        return html;
+      }
+
+      $(provenancePanel).one('show.bs.collapse', function () {
+        if (loaded) { return; }
+        loaded = true;
+        fetch(provenanceUrl, { credentials: 'same-origin' })
+          .then(function (r) {
+            if (!r.ok) { throw new Error('HTTP ' + r.status); }
+            return r.json();
+          })
+          .then(function (data) {
+            body.innerHTML = renderProvenanceData(data);
+          })
+          .catch(function (err) {
+            body.innerHTML = '<span class="text-danger small">Could not load provenance: ' + escHtml(err.message) + '</span>';
+          });
+      });
+    }());
+
     // Swap "Show X" ↔ "Hide X" on collapsible toggle buttons so the action
     // text matches the resulting state. Uses Bootstrap's collapse events on
     // the target panel; the trigger anchor carries data-label-show /

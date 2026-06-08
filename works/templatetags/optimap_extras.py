@@ -164,14 +164,8 @@ def render_provenance(provenance):
             mark_safe(''.join(rows)),
         ))
 
-    if 'text_log' in provenance and provenance['text_log']:
-        sections.append(format_html(
-            '<h6 class="mt-2 mb-1">Legacy text log</h6><pre class="provenance-pre">{}</pre>',
-            provenance['text_log'],
-        ))
-
     # Anything else — show raw JSON so nothing is hidden.
-    known = {'harvest', 'metadata_sources', 'openalex_match', 'geocoding', 'events', 'text_log'}
+    known = {'harvest', 'metadata_sources', 'openalex_match', 'geocoding', 'events'}
     leftover = {k: v for k, v in provenance.items() if k not in known}
     if leftover:
         sections.append(format_html(

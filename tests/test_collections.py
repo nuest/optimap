@@ -1030,3 +1030,162 @@ class SourceSourceTypeAndScheduleTests(TestCase):
         )
         sched = Schedule.objects.get(name=f'Harvest Source {s.id}')
         self.assertEqual(sched.func, 'works.tasks.harvest_rss_endpoint')
+
+
+class ProvenanceEndpointTests(TestCase):
+    """Tests for GET /api/v1/works/<id>/provenance/."""
+
+    FULL_PROVENANCE = {
+        "harvest": {
+            "harvester": "harvest_oai_endpoint",
+            "source_name": "Test Journal",
+            "source_type": "oai-pmh",
+            "source_url": "https://example.com/oai",
+            "harvested_at": "2026-01-01T12:00:00+00:00",
+            "harvesting_event_id": 99,
+            "doi": "10.1234/test",
+            "original_record": {"identifier": "oai:example.com:1"},
+        },
+        "metadata_sources": {"authors": "openalex", "geometry": "DC.SpatialCoverage"},
+        "openalex_match": {
+            "status": "verified",
+            "score": 0.95,
+            "matched_id": "https://openalex.org/W999",
+            "top_candidate": {"id": "W999", "title": "raw payload"},
+        },
+        "events": [
+            {"type": "harvest", "at": "2026-01-01T12:00:00+00:00"},
+            {"type": "contribution", "at": "2026-01-02T10:00:00+00:00",
+             "user_id": 42, "kind": "spatial"},
+            {"type": "publish", "at": "2026-01-03T09:00:00+00:00", "user_id": 1},
+        ],
+    }
+
+    def setUp(self):
+        self.client = Client()
+        self.collection = Collection.objects.create(
+            identifier='test-col', name='Test Collection', is_published=True,
+        )
+        self.other_collection = Collection.objects.create(
+            identifier='other-col', name='Other Collection', is_published=True,
+        )
+        self.staff = User.objects.create_user(
+            username='staff@example.com', email='staff@example.com',
+            password='pw', is_staff=True,
+        )
+        self.curator = User.objects.create_user(
+            username='curator@example.com', email='curator@example.com', password='pw',
+        )
+        self.collection.curators.add(self.curator)
+        self.other_curator = User.objects.create_user(
+            username='othercurator@example.com', email='othercurator@example.com', password='pw',
+        )
+        self.other_collection.curators.add(self.other_curator)
+        self.regular = User.objects.create_user(
+            username='user@example.com', email='user@example.com', password='pw',
+        )
+        self.published_work = Work.objects.create(
+            title='Published', status='p', doi='10.1234/pub',
+            provenance=self.FULL_PROVENANCE,
+        )
+        self.published_work.collections.add(self.collection)
+        self.draft_work = Work.objects.create(
+            title='Draft', status='d', doi='10.1234/draft',
+            provenance=self.FULL_PROVENANCE,
+        )
+        self.draft_work.collections.add(self.collection)
+
+    def _url(self, work):
+        return f'/api/v1/works/{work.id}/provenance/'
+
+    # --- anonymous access ---
+
+    def test_anonymous_published_returns_public_subset(self):
+        resp = self.client.get(self._url(self.published_work))
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        # public fields present
+        self.assertIn('harvested_at', data['harvest'])
+        self.assertIn('metadata_sources', data)
+        self.assertIn('openalex_match', data)
+        # private keys absent
+        self.assertNotIn('original_record', data.get('harvest', {}))
+        self.assertNotIn('top_candidate', data.get('openalex_match', {}))
+        for ev in data.get('events', []):
+            self.assertNotIn('user_id', ev)
+
+    def test_anonymous_published_cache_header_is_public(self):
+        resp = self.client.get(self._url(self.published_work))
+        self.assertIn('public', resp.get('Cache-Control', ''))
+
+    def test_anonymous_draft_returns_404(self):
+        resp = self.client.get(self._url(self.draft_work))
+        self.assertEqual(resp.status_code, 404)
+
+    def test_anonymous_empty_provenance_returns_empty_dict(self):
+        work = Work.objects.create(title='Empty', status='p', doi='10.1234/empty', provenance={})
+        resp = self.client.get(self._url(work))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json(), {})
+
+    # --- staff access ---
+
+    def test_staff_published_returns_full_provenance(self):
+        self.client.force_login(self.staff)
+        resp = self.client.get(self._url(self.published_work))
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIn('original_record', data['harvest'])
+        self.assertIn('top_candidate', data['openalex_match'])
+        # user_id must survive for staff
+        contribution_events = [e for e in data.get('events', []) if e.get('type') == 'contribution']
+        self.assertTrue(any('user_id' in e for e in contribution_events))
+
+    def test_staff_draft_returns_full_provenance(self):
+        self.client.force_login(self.staff)
+        resp = self.client.get(self._url(self.draft_work))
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('original_record', resp.json()['harvest'])
+
+    def test_staff_cache_header_is_private_no_store(self):
+        self.client.force_login(self.staff)
+        resp = self.client.get(self._url(self.published_work))
+        cc = resp.get('Cache-Control', '')
+        self.assertIn('private', cc)
+        self.assertIn('no-store', cc)
+
+    # --- curator access ---
+
+    def test_curator_of_works_collection_gets_full_provenance(self):
+        self.client.force_login(self.curator)
+        resp = self.client.get(self._url(self.published_work))
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIn('original_record', data['harvest'])
+        self.assertIn('top_candidate', data['openalex_match'])
+
+    def test_curator_of_works_collection_can_access_draft(self):
+        self.client.force_login(self.curator)
+        resp = self.client.get(self._url(self.draft_work))
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('original_record', resp.json()['harvest'])
+
+    def test_curator_of_different_collection_gets_public_subset(self):
+        self.client.force_login(self.other_curator)
+        resp = self.client.get(self._url(self.published_work))
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertNotIn('original_record', data.get('harvest', {}))
+        self.assertNotIn('top_candidate', data.get('openalex_match', {}))
+
+    def test_curator_of_different_collection_cannot_access_draft(self):
+        self.client.force_login(self.other_curator)
+        resp = self.client.get(self._url(self.draft_work))
+        self.assertEqual(resp.status_code, 404)
+
+    def test_regular_user_gets_public_subset(self):
+        self.client.force_login(self.regular)
+        resp = self.client.get(self._url(self.published_work))
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertNotIn('original_record', data.get('harvest', {}))

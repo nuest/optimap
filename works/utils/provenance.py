@@ -30,23 +30,53 @@ Schema:
             {"type": "publish", "user_id": 1, "at": "..."},
             {"type": "unpublish", "user_id": 1, "at": "..."}
         ],
-        "text_log": "..."                 # legacy free-text from pre-JSON works
     }
 
 All keys are optional; fresh Works start with ``{}``.
+
+Public subset (returned to unauthenticated callers and non-curator users):
+  - ``harvest.original_record`` is removed (raw upstream payload)
+  - ``openalex_match.top_candidate`` is removed (verbose raw API response)
+  - ``user_id`` is removed from every event (personal data)
 """
+
+import copy
 
 from django.utils import timezone
 
 
+def public_subset(provenance) -> dict:
+    """Return a privacy-safe copy of ``provenance`` suitable for anonymous API responses.
+
+    Strips: ``harvest.original_record``, ``openalex_match.top_candidate``,
+    and ``user_id`` from every event.
+    """
+    if not isinstance(provenance, dict):
+        return {}
+    result = copy.deepcopy(provenance)
+
+    harvest = result.get("harvest")
+    if isinstance(harvest, dict):
+        harvest.pop("original_record", None)
+
+    openalex = result.get("openalex_match")
+    if isinstance(openalex, dict):
+        openalex.pop("top_candidate", None)
+
+    events = result.get("events")
+    if isinstance(events, list):
+        for ev in events:
+            if isinstance(ev, dict):
+                ev.pop("user_id", None)
+
+    return result
+
+
 def _ensure_dict(value):
-    """Tolerate legacy/None values without losing them."""
+    """Tolerate None or unexpected values in the provenance field."""
     if isinstance(value, dict):
         return value
-    if value is None:
-        return {}
-    # Anything else (e.g. legacy text that escaped the migration) — preserve as text_log.
-    return {"text_log": str(value)}
+    return {}
 
 
 def append_event(work, event_type, **fields):

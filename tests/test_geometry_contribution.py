@@ -51,7 +51,7 @@ class GeometryContributionTests(TestCase):
             publicationDate=timezone.now().date(),
             geometry=GeometryCollection(),  # Empty geometry
             source=self.source,
-            provenance={"text_log": "Harvested via OAI-PMH from Test Journal (URL: https://example.com/oai) on 2025-01-01."}
+            provenance={}
         )
 
         # Create harvested publication with existing geometry
@@ -365,7 +365,7 @@ class PublishWorkTests(TestCase):
             publicationDate=timezone.now().date(),
             geometry=GeometryCollection(Point(13.4050, 52.5200)),
             source=self.source,
-            provenance={"text_log": "Geometry contributed by user@example.com on 2025-01-01."}
+            provenance={}
         )
 
         # Create harvested publication
@@ -506,7 +506,7 @@ class WorkflowIntegrationTests(TestCase):
             publicationDate=timezone.now().date(),
             geometry=GeometryCollection(),
             source=self.source,
-            provenance={"text_log": "Harvested via OAI-PMH from Test Journal (URL: https://example.com/oai) on 2025-01-01."}
+            provenance={}
         )
 
         self.test_geometry = {
@@ -563,8 +563,6 @@ class WorkflowIntegrationTests(TestCase):
             and ev.get('status_from') == 'c' and ev.get('status_to') == 'p'
             for ev in events
         ))
-        # Legacy seed text from setUp() preserved under text_log.
-        self.assertIn('Harvested via OAI-PMH', self.work.provenance.get('text_log', ''))
 
 
 class UnpublishWorkTests(TestCase):

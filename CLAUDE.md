@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 OPTIMAP is a geospatial discovery portal for research articles based on open metadata. Built with Django/GeoDjango and PostgreSQL/PostGIS, it enables users to discover scientific publications through map-based search, temporal filtering, and spatial metadata.
 
-Part of the KOMET project (<https://projects.tib.eu/komet>), continuing from OPTIMETA (<https://projects.tib.eu/optimeta>).
+Part of the KOMET project (<https://projects.tib.eu/komet>), continuing from OPTIMETA (<https://projects.tib.eu/optimeta>). Source code and issue tracker: <https://github.com/GeoinformationSystems/optimap>.
 
 ## Companion docs
 
@@ -478,6 +478,7 @@ optimap/
 > - For function-based Django views that should appear in the docs (downloads, gazetteer proxies, …), wrap them in `@api_view([…])` + `@permission_classes([...])` so drf-spectacular can pick them up.
 > - Run `python manage.py spectacular --file /tmp/optimap_schema.yaml` after the change; it must report `Errors: 0` (warnings are tolerable but should not regress).
 > - Update the Markdown intro in `SPECTACULAR_SETTINGS['DESCRIPTION']` (and the relevant `TAGS` description) when conventions change (auth, pagination, filtering, new endpoint families).
+> - **Provenance endpoint** (`GET /api/v1/works/<id>/provenance/`, `WorkViewSet.provenance` in [works/viewsets.py](works/viewsets.py)): the `@extend_schema` decorator contains the authoritative list of `metadata_sources` keys and values, `harvest` keys, `openalex_match` status values, event types, and response examples. Whenever you add a new key to `Work.provenance` (in any harvester, view, or utility), or change the set of possible values for an existing key, update all of the following in the same commit: the `description` tables in `@extend_schema`, the `help_text` on the affected `inline_serializer` field, the `OpenApiExample` values, and the schema quick reference in [docs/manage.md](docs/manage.md#work-provenance). The provenance schema is defined in [works/utils/provenance.py](works/utils/provenance.py).
 
 - `/api/v1/` - REST API root (see `/api/schema/ui/` for OpenAPI docs)
 - `/admin/` - Django admin interface

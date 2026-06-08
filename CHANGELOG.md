@@ -108,7 +108,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`Source.collection` foreign key** replaces the legacy `collection_name` string field.
 
-- **Structured `Work.provenance` (JSONField)** with a defined schema (`harvest`, `metadata_sources`, `openalex_match`, `events`, `text_log`). User contributions and admin publish/unpublish actions append to `events`. Pre-migration text values preserved under `text_log`.
+- **Structured `Work.provenance` (JSONField)** with a defined schema (`harvest`, `metadata_sources`, `openalex_match`, `events`). User contributions and admin publish/unpublish actions append to `events`.
 
 ### Fixed
 

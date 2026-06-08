@@ -29,6 +29,7 @@ from django.contrib.gis.geos import Polygon, Point, MultiPoint
 import geoextent.lib.extent as geoextent
 
 from .models import Work, Source, Subscription, GlobalRegion
+from .utils.provenance import public_subset
 from .serializers import (
     WorkSerializer,
     SourceSerializer,
@@ -103,10 +104,162 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
         """
         Return all publications for admin users, only published ones for others.
         Sorted by creation date (newest first) to match the works list page.
+
+        For the ``provenance`` action: curators can access works in their
+        collections at any publication status (not just published ones), so
+        they can view provenance for harvested/contributed/draft works too.
         """
         if self.request.user.is_authenticated and self.request.user.is_staff:
             return Work.objects.all().order_by("-creationDate", "-id").distinct()
+        if getattr(self, 'action', None) == 'provenance' and self.request.user.is_authenticated:
+            curated = Work.objects.filter(collections__curators=self.request.user)
+            public  = Work.objects.filter(status="p")
+            return (curated | public).distinct()
         return Work.objects.filter(status="p").order_by("-creationDate", "-id").distinct()
+
+    @extend_schema(
+        summary="Retrieve provenance for a work",
+        tags=["Works"],
+        description=(
+            "Returns the structured provenance record for a work — where it was harvested from, "
+            "per-field metadata attribution, OpenAlex enrichment result, reverse-geocoding details, "
+            "and a chronological audit log of re-harvest/contribution/publish events.\n\n"
+            "**Access tiers:**\n"
+            "- **Staff** and **curators of any collection this work belongs to** receive the full "
+            "provenance, including `harvest.original_record`, `openalex_match.top_candidate`, "
+            "and `user_id` / `user_email` fields in events.\n"
+            "- **All other callers** (including anonymous users) receive the public subset with "
+            "those keys removed.\n\n"
+            "**`harvest` keys:**\n"
+            "| Key | Type | Description |\n"
+            "|-----|------|-------------|\n"
+            "| `harvester` | string | Task function name: `harvest_oai_endpoint`, `harvest_rss_endpoint`, `harvest_crossref_prefix`, `harvest_mountain_wetlands`, `harvest_openalex_source` |\n"
+            "| `source_name` | string | Display name of the source |\n"
+            "| `source_type` | string | One of: `oai-pmh`, `ojs`, `janeway`, `rss`, `crossref-prefix`, `mountain-wetlands`, `openalex` |\n"
+            "| `source_url` | string | Harvest endpoint URL |\n"
+            "| `harvested_at` | string | ISO 8601 timestamp of the harvest |\n"
+            "| `harvesting_event_id` | integer | FK to the `HarvestingEvent` record |\n"
+            "| `doi` | string | DOI as recorded at harvest time |\n"
+            "| `original_record` | object | Raw upstream record (staff/curators only) |\n\n"
+            "**`metadata_sources` keys and values:**\n"
+            "Each key names a Work field; the value names where that field's data came from.\n"
+            "| Key | Possible values |\n"
+            "|-----|-----------------|\n"
+            "| `authors` | `original_source`, `openalex`, `crossref` |\n"
+            "| `keywords` | `original_source`, `openalex` |\n"
+            "| `topics` | `openalex` |\n"
+            "| `type` | `openalex` |\n"
+            "| `geometry` | `DC.SpatialCoverage`, `DC.box`, `link rel=alternate geo+json`, `study_sites` |\n"
+            "| `doi` | `original_source`, `openalex` |\n"
+            "| `date` | `original_source (year-only)` |\n"
+            "| `volume` / `issue` / `first_page` / `last_page` | `openalex` |\n"
+            "| `biblio` | `crossref` (volume/issue/pages from Crossref in one batch) |\n"
+            "| `openalex_metadata` | `openalex` (any OpenAlex enrichment was applied) |\n"
+            "| `openalex` | `primary` (work was harvested directly from OpenAlex as the primary source) |\n\n"
+            "**`openalex_match` keys:**\n"
+            "| Key | Type | Description |\n"
+            "|-----|------|-------------|\n"
+            "| `status` | string | `verified`, `unverified`, `none`, or `skipped` (skipped means the primary source already supplied DOI + authors) |\n"
+            "| `score` | number | Confidence score 0.0–1.0 (absent when status is `none` or `skipped`) |\n"
+            "| `matched_id` | string | OpenAlex work URL, e.g. `https://openalex.org/W2741809807` |\n"
+            "| `top_candidate` | object | Raw OpenAlex API response for the best candidate (staff/curators only; only present when status is `unverified`) |\n\n"
+            "**`geocoding` keys:**\n"
+            "| Key | Type | Description |\n"
+            "|-----|------|-------------|\n"
+            "| `gazetteer` | string | Always `nominatim` |\n"
+            "| `placename` | string | Human-readable location hierarchy, e.g. `Sulawesi, Indonesia` |\n"
+            "| `country_code` | string | ISO 3166-1 alpha-2, e.g. `ID` |\n"
+            "| `n_geocoded` | integer | Number of geometry points successfully reverse-geocoded |\n"
+            "| `geocoded_at` | string | ISO 8601 timestamp |\n"
+            "| `matches` | array | Per-point Nominatim results (display name, OSM type/id/url, lat, lon) |\n\n"
+            "**`events` — event types:**\n"
+            "| `type` | Extra fields | Description |\n"
+            "|--------|-------------|-------------|\n"
+            "| `harvest_update` | `harvesting_event_id` | Recorded each time an existing work is re-harvested |\n"
+            "| `doi_backfill` | `doi`, `harvesting_event_id` | DOI was added to a previously DOI-less work |\n"
+            "| `contribution` | `kinds` (array: `spatial`, `temporal`, `bok`), `user_id`\\*, `user_email`\\* | User added spatial/temporal/BoK metadata |\n"
+            "| `publish` | `status_from`, `status_to`, `user_id`\\*, `user_email`\\* | Work was published |\n"
+            "| `unpublish` | `status_from`, `user_id`\\*, `user_email`\\* | Work was unpublished |\n\n"
+            "\\* `user_id` and `user_email` are present for staff and curators only.\n\n"
+            "**Other top-level keys:**\n"
+            "| Key | Type | Description |\n"
+            "|-----|------|-------------|\n"
+            "| `publication_notified_at` | string | ISO 8601 timestamp of when the publication notification email was sent to the contributor (suppresses duplicate sends on republish) |"
+        ),
+        responses={
+            200: inline_serializer(
+                name="ProvenanceResponse",
+                fields={
+                    "harvest": drf_serializers.DictField(
+                        required=False,
+                        help_text=(
+                            "How and when this work was harvested. "
+                            "Keys: harvester, source_name, source_type, source_url, "
+                            "harvested_at, harvesting_event_id, doi. "
+                            "Staff/curators also see original_record (raw upstream payload)."
+                        ),
+                    ),
+                    "metadata_sources": drf_serializers.DictField(
+                        required=False,
+                        help_text=(
+                            "Per-field attribution map. Keys name Work fields; values name their source. "
+                            "Known keys: authors, keywords, topics, type, geometry, doi, date, "
+                            "volume, issue, first_page, last_page, biblio, openalex_metadata, openalex. "
+                            "Known values: original_source, openalex, crossref, DC.SpatialCoverage, "
+                            "DC.box, link rel=alternate geo+json, study_sites, "
+                            "original_source (year-only), primary."
+                        ),
+                    ),
+                    "openalex_match": drf_serializers.DictField(
+                        required=False,
+                        help_text=(
+                            "OpenAlex enrichment result. "
+                            "Keys: status (verified/unverified/none/skipped), score (0.0–1.0), matched_id. "
+                            "Staff/curators also see top_candidate."
+                        ),
+                    ),
+                    "geocoding": drf_serializers.DictField(
+                        required=False,
+                        help_text=(
+                            "Reverse-geocoding via Nominatim. "
+                            "Keys: gazetteer, placename, country_code, n_geocoded, geocoded_at, matches."
+                        ),
+                    ),
+                    "events": drf_serializers.ListField(
+                        child=drf_serializers.DictField(),
+                        required=False,
+                        help_text=(
+                            "Chronological audit log. Each event has type (string) and at (ISO timestamp). "
+                            "Event types: harvest_update, doi_backfill, contribution, publish, unpublish. "
+                            "user_id and user_email are present for staff/curators only."
+                        ),
+                    ),
+                    "publication_notified_at": drf_serializers.CharField(
+                        required=False,
+                        help_text="ISO 8601 timestamp of when the publication notification email was sent to the contributor.",
+                    ),
+                },
+            ),
+            404: OpenApiResponse(
+                _ERROR_RESPONSE,
+                description="No work with this ID, or not yet published and the caller is anonymous.",
+            ),
+        },
+    )
+    @action(detail=True, url_path='provenance', methods=['get'], permission_classes=[AllowAny])
+    def provenance(self, request, pk=None):
+        work = self.get_object()
+        is_privileged = request.user.is_authenticated and (
+            request.user.is_staff
+            or work.collections.filter(curators=request.user).exists()
+        )
+        data = work.provenance if is_privileged else public_subset(work.provenance or {})
+        response = Response(data)
+        if request.user.is_authenticated:
+            response['Cache-Control'] = 'private, no-store'
+        else:
+            response['Cache-Control'] = 'public, max-age=3600'
+        return response
 
 
 _SUBSCRIPTION_AUTH_RESPONSES = {
