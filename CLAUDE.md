@@ -276,6 +276,14 @@ python manage.py clear_caches
 # in-flight login-magic / email-confirmation tokens), --dry-run.
 # See docs/manage.md → "Manage data dumps and caches" for which backend
 # stores what and when to clear which.
+
+# Generate pygeoapi OpenAPI document (required for /ogcapi/ endpoint)
+python manage.py generate_pygeoapi_openapi
+# Reads etc/pygeoapi-config.yml and writes etc/pygeoapi-openapi.yml.
+# Must be run once after install and whenever the config changes.
+# The /ogcapi/ endpoint is silently disabled until this file exists.
+# Run with --force to regenerate. Docker startup (etc/manage-and-run.sh)
+# runs this automatically with --force on every deploy.
 ```
 
 #### Django-Q Task Management
@@ -458,6 +466,7 @@ optimap/
 - `/geoextent/` - Geoextent extraction web UI
 - `/pages` - Human-readable sitemap with organized page list
 - `/feeds/` - Feed landing pages for global and regional RSS/Atom feeds
+- `/ogcapi/` - OGC API - Features landing page (pygeoapi; conformance at `/ogcapi/conformance`, collections at `/ogcapi/collections`, works at `/ogcapi/collections/works/items`). Only active when `etc/pygeoapi-openapi.yml` exists — generate with `python manage.py generate_pygeoapi_openapi`. See [docs/ogcapi-clients.md](docs/ogcapi-clients.md) for Python/R/QGIS usage examples.
 
 ### Workflows
 
@@ -490,6 +499,7 @@ optimap/
 - `/sitemap-works.xml` - Sitemap for all published works
 - `/sitemap-feeds.xml` - Sitemap for all regional feeds
 - `/geoextent/` - Geoextent extraction web UI (interactive tool for file upload and remote resource extraction)
+- `/ogcapi/collections/works/items` - Published works via OGC API - Features (pygeoapi); supports `bbox`, `datetime`, `limit`/`offset` — see [docs/ogcapi-clients.md](docs/ogcapi-clients.md)
 
 ### Geoextent API Endpoints
 

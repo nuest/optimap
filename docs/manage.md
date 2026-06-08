@@ -656,6 +656,54 @@ or wait for upstream to restore it.
 - Known upstream bug (coordinate-order in `geoextent.from_remote()`); how to detect it in the wild.
 - Where logs surface for failed remote extractions.
 
+### Operate the OGC API - Features endpoint (`/ogcapi/`)
+
+OPTIMAP exposes published works via [pygeoapi](https://pygeoapi.io/) at `/ogcapi/`, conforming to the [OGC API - Features Core](https://ogcapi.ogc.org/features/) standard. GIS clients (QGIS, R `sf`, Python `geopandas`) can connect directly — see [docs/ogcapi-clients.md](ogcapi-clients.md) for examples.
+
+**How it works.** pygeoapi is mounted inside Django's URL routing (not a separate service). It connects directly to the same PostGIS database Django uses, via SQLAlchemy, reading from the `works_published` view (a `CREATE OR REPLACE VIEW` that filters `works_work` to `status = 'p'`). The endpoint is only active when `etc/pygeoapi-openapi.yml` exists.
+
+**First-time setup / after config changes:**
+
+```bash
+python manage.py generate_pygeoapi_openapi
+# Reads etc/pygeoapi-config.yml → writes etc/pygeoapi-openapi.yml.
+# Use --force to overwrite an existing file.
+```
+
+This is run automatically with `--force` by `etc/manage-and-run.sh` on every Docker startup.
+
+**Database credentials.** pygeoapi reads the database connection from `OPTIMAP_DB_*` env vars (host, port, dbname, user, pass) — the same vars shown in `.env.example`. These default to the local dev values (`localhost:5432/optimap`). In production these must match the actual database.
+
+**Verify the endpoint is active:**
+
+```bash
+# Should print PYGEOAPI_ENABLED: True
+python manage.py shell -c "from django.conf import settings; print('PYGEOAPI_ENABLED:', settings.PYGEOAPI_ENABLED)"
+
+# Smoke test (follow the redirect on conformance/items)
+curl -s http://localhost:8000/ogcapi/ | python -m json.tool
+curl -sL http://localhost:8000/ogcapi/conformance | python -m json.tool
+curl -sL "http://localhost:8000/ogcapi/collections/works/items?limit=2" | python -m json.tool
+```
+
+**Temporarily disable the endpoint** (e.g. to diagnose a startup problem) — rename or delete `etc/pygeoapi-openapi.yml`. Django will skip the `/ogcapi/` routes on the next restart and the rest of the app is unaffected.
+
+**Regenerate after DB changes.** The OpenAPI document is generated from the `works_published` view's schema. If the view is dropped and recreated (e.g. after a migration that alters `works_work`), or if `etc/pygeoapi-config.yml` changes, regenerate with `--force`:
+
+```bash
+python manage.py generate_pygeoapi_openapi --force
+# Then restart the server.
+```
+
+**Supported query parameters** on `/ogcapi/collections/works/items`:
+
+| Parameter | Effect |
+|-----------|--------|
+| `bbox=minLon,minLat,maxLon,maxLat` | Spatial filter (WGS84) |
+| `datetime=2023-01-01/2024-01-01` | Temporal filter on `publicationDate`; also accepts single date |
+| `limit=N` | Page size (default 10) |
+| `offset=N` | Pagination offset |
+
 ### Backup and restore
 
 - `pg_dump` / `pg_restore` for the PostGIS database (geometry-aware).

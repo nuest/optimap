@@ -48,12 +48,40 @@ def schedule_inactivity_tasks(sender, **kwargs):
     schedule_inactivity_deletion_task()
 
 
+def _update_pygeoapi_extent(sender=None, **kwargs):
+    """Compute the bounding box of all published works and patch PYGEOAPI_CONFIG.
+
+    Connected to request_started so it fires after app init (avoids the
+    "DB access during app initialization" warning) and disconnects itself
+    so it only runs once per process lifetime.
+    """
+    from django.core.signals import request_started
+    request_started.disconnect(_update_pygeoapi_extent)
+
+    if not getattr(settings, 'PYGEOAPI_ENABLED', False):
+        return
+    try:
+        from django.contrib.gis.db.models import Extent
+        from works.models import Work
+        result = Work.objects.filter(status='p').exclude(geometry__isnull=True).aggregate(
+            extent=Extent('geometry')
+        )
+        bbox = result.get('extent')
+        if bbox:
+            settings.PYGEOAPI_CONFIG['resources']['works']['extents']['spatial']['bbox'] = list(bbox)
+            logger.info("Updated pygeoapi works spatial extent to actual data: %s", bbox)
+    except Exception as exc:
+        logger.debug("Could not update pygeoapi extent at startup (non-fatal): %s", exc)
+
+
 class WorksConfig(AppConfig):
     name               = "works"
     default_auto_field = "django.db.models.BigAutoField"
 
     def ready(self):
         import works.signals
+        from django.core.signals import request_started
+        request_started.connect(_update_pygeoapi_extent, weak=False)
         post_migrate.connect(
             schedule_data_dump,
             sender=self,

@@ -606,3 +606,29 @@ def _calculate_page_size_options(min_size, max_size):
     return options
 
 WORKS_PAGE_SIZE_OPTIONS = _calculate_page_size_options(WORKS_PAGE_SIZE_MIN, WORKS_PAGE_SIZE_MAX)
+
+# OGC API - Features via pygeoapi (issue #19)
+# Served at /ogcapi/ when etc/pygeoapi-config.yml is present and the
+# etc/pygeoapi-openapi.yml has been generated (see manage.py generate_pygeoapi_openapi).
+PYGEOAPI_ENABLED = False
+_PYGEOAPI_CONFIG_PATH = Path(BASE_DIR) / 'etc' / 'pygeoapi-config.yml'
+_PYGEOAPI_OPENAPI_PATH = Path(BASE_DIR) / 'etc' / 'pygeoapi-openapi.yml'
+if _PYGEOAPI_CONFIG_PATH.exists() and _PYGEOAPI_OPENAPI_PATH.exists():
+    os.environ.setdefault('PYGEOAPI_CONFIG', str(_PYGEOAPI_CONFIG_PATH))
+    os.environ.setdefault('PYGEOAPI_OPENAPI', str(_PYGEOAPI_OPENAPI_PATH))
+    try:
+        from pygeoapi.config import get_config as _get_pygeoapi_config
+        from pygeoapi.openapi import load_openapi_document as _load_openapi_document
+        from pygeoapi.util import get_api_rules as _get_api_rules
+        PYGEOAPI_CONFIG = _get_pygeoapi_config()
+        OPENAPI_DOCUMENT = _load_openapi_document()
+        API_RULES = _get_api_rules(PYGEOAPI_CONFIG)
+        # Inject absolute templates path so custom templates are found regardless of cwd
+        _pygeoapi_templates = Path(BASE_DIR) / 'etc' / 'pygeoapi-templates'
+        if _pygeoapi_templates.is_dir():
+            PYGEOAPI_CONFIG.setdefault('server', {}).setdefault('templates', {})
+            PYGEOAPI_CONFIG['server'].setdefault('templates', {})['path'] = str(_pygeoapi_templates)
+        PYGEOAPI_ENABLED = True
+    except Exception as _pygeoapi_exc:
+        import logging as _logging
+        _logging.getLogger(__name__).warning('OGC API disabled: %s', _pygeoapi_exc)

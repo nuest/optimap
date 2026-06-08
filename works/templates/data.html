@@ -15,6 +15,24 @@
       (<a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank">CC-0</a>) license.
     </p>
 
+    {% if pygeoapi_enabled %}
+    <h2 class="py-2">OGC API — Features</h2>
+    <p>
+      OPTIMAP publishes its data as a standards-compliant
+      <a href="https://ogcapi.ogc.org/features/" target="_blank">OGC API — Features</a>
+      endpoint. Any WFS3-capable client (QGIS, R <code>sf</code>, Python <code>geopandas</code>) can connect directly.
+    </p>
+    <ul>
+      <li><a href="/ogcapi/?f=html">Landing page</a> — service description and links</li>
+      <li><a href="/ogcapi/collections/works/items?limit=10&f=html">Browse works</a> — published works as GeoJSON features</li>
+    </ul>
+    <p class="small text-muted">
+      Supports <code>bbox</code>, <code>datetime</code>, <code>limit</code>, and <code>offset</code> query parameters.
+      See <a href="{{ site }}/ogcapi/openapi?f=html">API documentation</a> for the full schema.
+    </p>
+    <hr>
+    {% endif %}
+
     <h2 class="py-2">API Endpoint</h2>
     <p>
       The API endpoint is <b>{{ site|addstr:"/api"|urlize }}</b>. Visit in your browser for

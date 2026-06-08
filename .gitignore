@@ -175,3 +175,5 @@ data/optimap-main.zip
 data/zenodo_dynamic.json
 
 data/README.md
+
+etc/pygeoapi-openapi.yml

@@ -107,6 +107,7 @@ def data(request):
         'last_geojson':    last_geo.name  if last_geo else None,
         'last_gpkg':       last_gpkg.name if last_gpkg else None,
         'last_csv':        last_csv.name  if last_csv  else None,
+        'pygeoapi_enabled': getattr(settings, 'PYGEOAPI_ENABLED', False),
     })
 
 def feeds_list(request):

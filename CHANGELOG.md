@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **OGC API - Features endpoint at `/ogcapi/`** (closes #19). Published works are now accessible via a standards-compliant [OGC API - Features](https://ogcapi.ogc.org/features/) interface powered by [pygeoapi](https://pygeoapi.io/) and its PostgreSQL/PostGIS provider. Supports `bbox`, `datetime`, and `limit`/`offset` query parameters. Returns proper GeoJSON FeatureCollections with `numberMatched` / `numberReturned` / pagination links. Only published works (`status='p'`) are served, via a dedicated `works_published` database view. Configuration in `etc/pygeoapi-config.yml`; generate the required OpenAPI document with `python manage.py generate_pygeoapi_openapi`. Client demo code for Python (`requests` + `geopandas` + `folium`), R (`sf` + `mapview`), and QGIS (GUI and PyQGIS console) in `docs/ogcapi-clients.md`.
+
 - **Weekly inactivity warning email to users** (closes #120). Users who have not logged in for 12–13 months receive a warning that their account will be deleted if they do not log in within 30 days. The email explains what happens to their data (credentials removed; contributions remain but become anonymous; recognition board entry removed). Scheduled automatically via Django-Q every Monday.
 
 - **Weekly deletion list for admins** (closes #121). Users inactive for over 13 months are reported in a weekly email to all staff users with an email address. The list includes each user's email, last-login date, and join date, with a link to the Django admin. If no users are pending deletion, no email is sent.

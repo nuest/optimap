@@ -23,6 +23,10 @@ python manage.py migrate
 echo "OPTIMAP ENTRYPOINT | Load global regions data"
 python manage.py load_global_regions
 
+# Generate pygeoapi OpenAPI document (required for /ogcapi/ endpoint)
+echo "OPTIMAP ENTRYPOINT | Generate pygeoapi OpenAPI document"
+python manage.py generate_pygeoapi_openapi --force || echo "WARNING: OGC API setup failed (non-fatal)"
+
 # Start server
 echo "OPTIMAP ENTRYPOINT | Starting server"
 # make the next process the main process, cf. https://www.baeldung.com/ops/docker-exec-process-replacement

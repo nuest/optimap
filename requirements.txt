@@ -57,3 +57,8 @@ cairosvg>=2.7
 
 # Geoextent library for spatial/temporal extent extraction
 git+https://github.com/nuest/geoextent.git@main#egg=geoextent
+
+# OGC API - Features via pygeoapi (issue #19)
+pygeoapi>=0.21
+geoalchemy2>=0.14
+sqlalchemy>=2.0

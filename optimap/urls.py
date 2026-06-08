@@ -19,6 +19,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, re_path, include
 from django.contrib.sitemaps import views as sitemaps_views
+from django.conf import settings
 from optimap.sitemaps import WorksSitemap, StaticViewSitemap, FeedsSitemap, CollectionsSitemap
 from optimap.views import RobotsView
 
@@ -31,7 +32,6 @@ sitemaps = {
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include(('works.urls', 'optimap'), namespace='optimap')),
     path(
         "sitemap.xml",
         sitemaps_views.index,
@@ -45,6 +45,25 @@ urlpatterns = [
         name="django.contrib.sitemaps.views.sitemap",
     ),
     re_path(r'^robots.txt', RobotsView.as_view(), name="robots_file"),
+]
+
+# OGC API - Features via pygeoapi at /ogcapi/ — registered before works.urls to
+# prevent the <slug:short_slug> catch-all in works/urls.py from intercepting it.
+if getattr(settings, 'PYGEOAPI_ENABLED', False):
+    from pathlib import Path as _Path
+    from django.views.static import serve as _static_serve
+    import pygeoapi as _pygeoapi_pkg
+    _pygeoapi_static = str(_Path(_pygeoapi_pkg.__file__).parent / 'static')
+    urlpatterns += [
+        re_path(r'^ogcapi/static/(?P<path>.*)$', _static_serve,
+                {'document_root': _pygeoapi_static}),
+    ]
+    urlpatterns += [path("ogcapi/", include("pygeoapi.django_.urls"))]
+
+# Main app URLs — must come AFTER the ogcapi prefix so the slug catch-all
+# in works/urls.py doesn't shadow /ogcapi/.
+urlpatterns += [
+    path('', include(('works.urls', 'optimap'), namespace='optimap')),
 ]
 
 # Custom error handlers

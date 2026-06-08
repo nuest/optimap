@@ -18,7 +18,7 @@ from rest_framework.permissions import IsAuthenticatedOrReadOnly, AllowAny
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from drf_spectacular.utils import (
-    extend_schema, extend_schema_view, inline_serializer, OpenApiResponse,
+    extend_schema, extend_schema_view, inline_serializer, OpenApiResponse, OpenApiExample,
 )
 from drf_spectacular.types import OpenApiTypes
 from rest_framework import serializers as drf_serializers
@@ -245,6 +245,133 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
                 description="No work with this ID, or not yet published and the caller is anonymous.",
             ),
         },
+        examples=[
+            OpenApiExample(
+                name="OAI-PMH work with OpenAlex enrichment (public response)",
+                summary="Typical response for anonymous/regular-user callers",
+                description=(
+                    "A work harvested from an OAI-PMH journal, enriched by OpenAlex, "
+                    "with a user-contributed geometry. Private keys (original_record, "
+                    "top_candidate, user_id, user_email) are absent."
+                ),
+                value={
+                    "harvest": {
+                        "harvester": "harvest_oai_endpoint",
+                        "source_name": "Earth System Science Data",
+                        "source_type": "oai-pmh",
+                        "source_url": "https://essd.copernicus.org/oai/",
+                        "harvested_at": "2026-04-30T12:00:00+00:00",
+                        "harvesting_event_id": 42,
+                        "doi": "10.5194/essd-16-1234-2024",
+                    },
+                    "metadata_sources": {
+                        "authors": "openalex",
+                        "keywords": "original_source",
+                        "topics": "openalex",
+                        "geometry": "DC.SpatialCoverage",
+                        "volume": "openalex",
+                        "issue": "openalex",
+                    },
+                    "openalex_match": {
+                        "status": "verified",
+                        "score": 0.97,
+                        "matched_id": "https://openalex.org/W2741809807",
+                    },
+                    "geocoding": {
+                        "gazetteer": "nominatim",
+                        "placename": "Sulawesi, Indonesia",
+                        "country_code": "ID",
+                        "n_geocoded": 2,
+                        "geocoded_at": "2026-04-30T12:00:05+00:00",
+                    },
+                    "events": [
+                        {
+                            "type": "harvest_update",
+                            "at": "2026-05-15T08:00:00+00:00",
+                            "harvesting_event_id": 51,
+                        },
+                        {
+                            "type": "contribution",
+                            "at": "2026-05-01T09:15:00+00:00",
+                            "kinds": ["spatial"],
+                        },
+                        {
+                            "type": "publish",
+                            "at": "2026-05-02T14:30:00+00:00",
+                            "status_from": "c",
+                            "status_to": "p",
+                        },
+                    ],
+                    "publication_notified_at": "2026-05-02T14:30:01+00:00",
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+            OpenApiExample(
+                name="MaRESS work (full response, staff/curator)",
+                summary="Full provenance returned to staff or curators — includes private keys",
+                description=(
+                    "A work harvested from the Mountain Wetlands Repository (MaRESS API). "
+                    "The geometry comes from study-site coordinates in the API record. "
+                    "Includes original_record and user_id which are stripped for public callers."
+                ),
+                value={
+                    "harvest": {
+                        "harvester": "harvest_mountain_wetlands",
+                        "source_name": "Mountain Wetlands Repository",
+                        "source_type": "mountain-wetlands",
+                        "source_url": "https://andes.mountain-wetlands-repository.info/api/v1/items/",
+                        "harvested_at": "2026-03-10T06:30:00+00:00",
+                        "harvesting_event_id": 17,
+                        "doi": "10.5281/zenodo.7654321",
+                        "original_record": {
+                            "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                            "title": "Wetland extent Himalayan foothills 1990–2020",
+                            "date": "2023",
+                            "authors": [{"name": "Smith, J."}, {"name": "Patel, R."}],
+                        },
+                    },
+                    "metadata_sources": {
+                        "authors": "original_source",
+                        "geometry": "study_sites",
+                        "date": "original_source (year-only)",
+                        "doi": "original_source",
+                        "topics": "openalex",
+                    },
+                    "openalex_match": {
+                        "status": "verified",
+                        "score": 0.91,
+                        "matched_id": "https://openalex.org/W3128445612",
+                    },
+                    "geocoding": {
+                        "gazetteer": "nominatim",
+                        "placename": "Uttarakhand, India",
+                        "country_code": "IN",
+                        "n_geocoded": 5,
+                        "geocoded_at": "2026-03-10T06:30:10+00:00",
+                    },
+                    "events": [
+                        {
+                            "type": "contribution",
+                            "at": "2026-03-12T11:00:00+00:00",
+                            "kinds": ["temporal"],
+                            "user_id": 7,
+                            "user_email": "curator@example.org",
+                        },
+                        {
+                            "type": "publish",
+                            "at": "2026-03-13T09:00:00+00:00",
+                            "status_from": "c",
+                            "status_to": "p",
+                            "user_id": 1,
+                            "user_email": "admin@optimap.science",
+                        },
+                    ],
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+        ],
     )
     @action(detail=True, url_path='provenance', methods=['get'], permission_classes=[AllowAny])
     def provenance(self, request, pk=None):

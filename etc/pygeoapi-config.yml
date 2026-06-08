@@ -1,0 +1,87 @@
+server:
+  bind:
+    host: 0.0.0.0
+    port: 5000
+  url: ${OPTIMAP_BASE_URL:-http://localhost:8000}/ogcapi
+  mimetype: application/json; charset=UTF-8
+  encoding: utf-8
+  language: en-US
+  cors: true
+  limits:
+    default_items: 10
+    max_items: 10000
+  logo: ${OPTIMAP_BASE_URL:-http://localhost:8000}/static/optimap_logo.svg
+  icon: ${OPTIMAP_BASE_URL:-http://localhost:8000}/static/favicon.ico
+  map:
+    url: https://tile.openstreetmap.org/{z}/{x}/{y}.png
+    attribution: '&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap contributors</a>'
+
+logging:
+  level: ERROR
+
+metadata:
+  identification:
+    title: OPTIMAP OGC API
+    description: Geospatial discovery portal for research articles with spatial and temporal metadata
+    keywords:
+      - geoscience
+      - open access
+      - publications
+      - spatial
+    keywords_type: theme
+    terms_of_service: https://creativecommons.org/publicdomain/zero/1.0/
+    url: ${OPTIMAP_BASE_URL:-http://localhost:8000}
+  license:
+    name: CC0 1.0
+    url: https://creativecommons.org/publicdomain/zero/1.0/
+  provider:
+    name: KOMET project
+    url: https://projects.tib.eu/komet/en/
+  contact:
+    name: KOMET project
+    email: komet@tu-dresden.de
+
+resources:
+  works:
+    type: collection
+    title: Research works
+    description: Published research articles with spatial and temporal metadata harvested from open repositories
+    keywords:
+      - publications
+      - spatial
+      - open access
+    links: []
+    extents:
+      spatial:
+        bbox: [-180, -90, 180, 90]
+        crs: http://www.opengis.net/def/crs/OGC/1.3/CRS84
+    providers:
+      - type: feature
+        name: PostgreSQL
+        data:
+          host: ${OPTIMAP_DB_HOST:-localhost}
+          port: ${OPTIMAP_DB_PORT:-5432}
+          dbname: ${OPTIMAP_DB_NAME:-optimap}
+          user: ${OPTIMAP_DB_USER:-optimap}
+          password: ${OPTIMAP_DB_PASS:-optimap}
+          search_path: [public]
+        id_field: id
+        table: works_published
+        geom_field: geometry
+        time_field: publicationDate
+        properties:
+          - id
+          - title
+          - type
+          - abstract
+          - publicationDate
+          - doi
+          - url
+          - timeperiod_startdate
+          - timeperiod_enddate
+          - placename
+          - country_code
+          - authors
+          - keywords
+          - topics
+          - openalex_open_access_status

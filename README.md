@@ -178,6 +178,11 @@ python manage.py qcluster
 # Delete the cached files in that directory to force a fresh download / re-simplification.
 python manage.py load_global_regions
 
+# Generate the OGC API - Features OpenAPI document (required once to activate /ogcapi/)
+# Re-run with --force whenever etc/pygeoapi-config.yml changes.
+# Uses the OPTIMAP_DB_* env vars; make sure they match your DATABASE_URL.
+python manage.py generate_pygeoapi_openapi
+
 # Harvest publications from real sources
 python manage.py harvest_sources --list  # List available sources
 python manage.py harvest_sources --all --max-records 20 --create-sources  # Initial harvesting of all sources (limited to 20 records each)
@@ -604,7 +609,7 @@ Colours for _highlighting_ (split complimentary): #3C159B #9B7115
 
 For future use, optional colours for variation, e.g., for different map features: #158F9B #159B71 #159B8C #158F9B #15749B #15599B
 
-The **logos** and favicon are in the repository in the folder [`publications/static/`](https://github.com/nuest/optimap/tree/main/publications/static).
+The **logos** and favicon are in the repository in the folder [`works/static/`](https://github.com/GeoinformationSystems/optimap/tree/main/works/static).
 
 ## Deployment
 
