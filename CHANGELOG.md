@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **REST API for collections at `/api/v1/collections/`**. `GET /api/v1/collections/` lists all published collections (paginated); `GET /api/v1/collections/<identifier>/` retrieves a single collection by its slug. Each response includes `works_count` (published works only), `collection_url`, and embedded `feeds` and `downloads` link objects. Staff can additionally retrieve unpublished collections. Documented in the OpenAPI schema under the *Collections* tag.
+
+- **GeoRSS and Atom feeds for individual collections** (closes #248). Each published collection now has a GeoRSS feed at `/api/v1/feeds/collection-<slug>.rss` and an Atom feed at `/api/v1/feeds/collection-<slug>.atom`. Feed autodiscovery `<link>` tags are injected into the collection detail page `<head>`, and visible feed links appear in a new "Feeds & downloads" card on the page. Both URLs are listed in `sitemap-collection-feeds.xml`.
+
+- **GeoJSON, GeoPackage, and CSV download endpoints for individual collections** (closes #217). Published collection works are downloadable at `/api/v1/collections/<slug>/download/geojson/`, `/gpkg/`, and `/csv/`. Results are cached for `FEED_CACHE_HOURS` (default 24 h); pass `?now` to force refresh. Download links appear in the new "Feeds & downloads" card on each collection page. All three endpoints are documented in the OpenAPI schema under the new *Collections* tag and indexed in `sitemap-collection-downloads.xml`.
+
 - **Biodiversity Data Journal (BDJ) added as an OAI-PMH source** (`pensoft-bdj`, closes #92). Harvest with `python manage.py harvest_sources --source pensoft-bdj`. The ARPHA OAI-PMH endpoint is filtered to the `bdj` set so only BDJ records are fetched.
 - **`extract_geometry_from_html()` now extracts `schema:contentLocation` GeoCoordinates from JSON-LD** (closes #92). Pensoft/ARPHA journals embed study-site coordinates via `contentLocation` rather than `spatialCoverage`; the new extraction step sits between `spatialCoverage` and the `geo+json` link in the priority chain and collects all points into a single `GeometryCollection`.
 

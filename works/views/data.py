@@ -15,7 +15,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 import os
-from django.http import FileResponse, Http404
+import subprocess
+from django.conf import settings
+from django.core.cache import cache
+from django.core.serializers import serialize
+from django.http import FileResponse, Http404, HttpResponse
+from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_GET
 import tempfile
 from pathlib import Path
@@ -38,7 +43,7 @@ from works.tasks import (
     regenerate_csv_cache,
 )
 from osgeo import ogr, osr
-from works.models import Work
+from works.models import Work, Collection
 
 ogr.UseExceptions()
 
@@ -175,3 +180,128 @@ def download_csv(request):
         as_attachment=True,
         filename=os.path.basename(csv_path),
     )
+
+
+# ---------------------------------------------------------------------------
+# Per-collection download endpoints (#217)
+# ---------------------------------------------------------------------------
+
+_COLLECTION_404 = OpenApiResponse(
+    inline_serializer(
+        name="CollectionNotFoundResponse",
+        fields={"detail": drf_serializers.CharField()},
+    ),
+    description="Collection not found or not published.",
+)
+
+
+def _collection_qs(collection):
+    return Work.objects.filter(collections=collection, status="p")
+
+
+def _generate_collection_converted_bytes(collection, ogr_fmt, layer_creation_options=None):
+    """Serialize collection works to an in-memory GeoJSON then convert via ogr2ogr."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        ext = ogr_fmt.lower() if ogr_fmt != "CSV" else "csv"
+        geojson_path = os.path.join(tmpdir, "data.geojson")
+        out_path = os.path.join(tmpdir, f"data.{ext}")
+        with open(geojson_path, "w") as f:
+            serialize("geojson", _collection_qs(collection), geometry_field="geometry", srid=4326, stream=f)
+        cmd = ["ogr2ogr", "-f", ogr_fmt, out_path, geojson_path]
+        for opt in layer_creation_options or []:
+            cmd.extend(["-lco", opt])
+        try:
+            subprocess.check_output(cmd, stderr=subprocess.STDOUT, text=True)
+        except subprocess.CalledProcessError as err:
+            logger.warning("ogr2ogr %s failed for collection %s: %s",
+                           ogr_fmt, collection.identifier, err.output)
+            return None
+        with open(out_path, "rb") as f:
+            return f.read()
+
+
+@extend_schema(
+    summary="Download collection works as GeoJSON",
+    description=(
+        "Returns a GeoJSON FeatureCollection of all published works in the collection. "
+        "Cached for `FEED_CACHE_HOURS` (default 24 h); pass `?now` to force refresh."
+    ),
+    tags=["Collections"],
+    responses={
+        (200, "application/json"): OpenApiTypes.BINARY,
+        404: _COLLECTION_404,
+    },
+)
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def download_collection_geojson(request, collection_slug):
+    collection = get_object_or_404(Collection, identifier=collection_slug, is_published=True)
+    cache_key = f"download:collection:{collection_slug}:geojson"
+    force = request.GET.get("now") is not None
+    data = None if force else cache.get(cache_key)
+    if data is None:
+        data = serialize("geojson", _collection_qs(collection), geometry_field="geometry", srid=4326)
+        cache.set(cache_key, data, settings.FEED_CACHE_HOURS * 3600)
+    response = HttpResponse(data, content_type="application/json")
+    response["Content-Disposition"] = f'attachment; filename="optimap_collection_{collection_slug}.geojson"'
+    return response
+
+
+@extend_schema(
+    summary="Download collection works as GeoPackage",
+    description=(
+        "Returns an OGC GeoPackage of all published works in the collection — single "
+        "layer `OGRGeoJSON`, EPSG:4326. Cached for `FEED_CACHE_HOURS` (default 24 h); "
+        "pass `?now` to force refresh."
+    ),
+    tags=["Collections"],
+    responses={
+        (200, "application/geopackage+sqlite3"): OpenApiTypes.BINARY,
+        404: _COLLECTION_404,
+    },
+)
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def download_collection_gpkg(request, collection_slug):
+    collection = get_object_or_404(Collection, identifier=collection_slug, is_published=True)
+    cache_key = f"download:collection:{collection_slug}:gpkg"
+    force = request.GET.get("now") is not None
+    data = None if force else cache.get(cache_key)
+    if data is None:
+        data = _generate_collection_converted_bytes(collection, "GPKG")
+        if data is None:
+            raise Http404("GeoPackage generation failed.")
+        cache.set(cache_key, data, settings.FEED_CACHE_HOURS * 3600)
+    response = HttpResponse(data, content_type="application/geopackage+sqlite3")
+    response["Content-Disposition"] = f'attachment; filename="optimap_collection_{collection_slug}.gpkg"'
+    return response
+
+
+@extend_schema(
+    summary="Download collection works as CSV",
+    description=(
+        "Returns a CSV of all published works in the collection with geometries as a "
+        "WKT column. UTF-8, RFC 4180. Cached for `FEED_CACHE_HOURS` (default 24 h); "
+        "pass `?now` to force refresh."
+    ),
+    tags=["Collections"],
+    responses={
+        (200, "text/csv"): OpenApiTypes.BINARY,
+        404: _COLLECTION_404,
+    },
+)
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def download_collection_csv(request, collection_slug):
+    collection = get_object_or_404(Collection, identifier=collection_slug, is_published=True)
+    cache_key = f"download:collection:{collection_slug}:csv"
+    force = request.GET.get("now") is not None
+    data = None if force else cache.get(cache_key)
+    if data is None:
+        data = _generate_collection_converted_bytes(collection, "CSV", ["GEOMETRY=AS_WKT"])
+        if data is None:
+            raise Http404("CSV generation failed.")
+        cache.set(cache_key, data, settings.FEED_CACHE_HOURS * 3600)
+    response = HttpResponse(data, content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = f'attachment; filename="optimap_collection_{collection_slug}.csv"'
+    return response

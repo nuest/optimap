@@ -84,3 +84,47 @@ class CollectionsSitemap(Sitemap):
 
     def lastmod(self, obj):
         return obj.updated_at
+
+
+class CollectionFeedsSitemap(Sitemap):
+    """Sitemap for collection GeoRSS and Atom feed URLs (#248)."""
+    priority = 0.6
+    changefreq = "daily"
+
+    def items(self):
+        return [
+            (c, fmt)
+            for c in Collection.objects.filter(is_published=True).order_by("name")
+            for fmt in ("rss", "atom")
+        ]
+
+    def location(self, item):
+        collection, fmt = item
+        name = "api-collection-georss" if fmt == "rss" else "api-collection-atom"
+        return reverse(f"optimap:{name}", kwargs={"collection_slug": collection.identifier})
+
+    def lastmod(self, item):
+        return item[0].updated_at
+
+
+class CollectionDownloadsSitemap(Sitemap):
+    """Sitemap for collection download endpoints (#217)."""
+    priority = 0.5
+    changefreq = "weekly"
+
+    def items(self):
+        return [
+            (c, fmt)
+            for c in Collection.objects.filter(is_published=True).order_by("name")
+            for fmt in ("geojson", "gpkg", "csv")
+        ]
+
+    def location(self, item):
+        collection, fmt = item
+        return reverse(
+            f"optimap:download-collection-{fmt}",
+            kwargs={"collection_slug": collection.identifier},
+        )
+
+    def lastmod(self, item):
+        return item[0].updated_at

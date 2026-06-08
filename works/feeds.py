@@ -14,7 +14,8 @@ from django.conf import settings
 from django.core.cache import cache
 from django.http import Http404
 from django.urls import reverse
-from .models import Work, GlobalRegion
+from django.shortcuts import get_object_or_404
+from .models import Work, GlobalRegion, Collection
 
 logger = logging.getLogger(__name__)
 
@@ -477,3 +478,30 @@ class RegionalGeoFeed(BaseCachedGeoFeed):
         )
 
         return filtered
+
+
+class CollectionGeoFeed(BaseCachedGeoFeed):
+    """Feed filtered by curated collection."""
+
+    def __init__(self, feed_type_variant="georss"):
+        self.feed_type_variant = feed_type_variant
+        super().__init__()
+
+    def get_object(self, request, collection_slug):
+        return get_object_or_404(Collection, identifier=collection_slug, is_published=True)
+
+    def title(self, obj):
+        return f"OPTIMAP – {obj.name}"
+
+    def link(self, obj):
+        return obj.get_absolute_url()
+
+    def description(self, obj):
+        return obj.description or f"Latest works in collection '{obj.name}'"
+
+    def items(self, obj):
+        return (
+            Work.objects.filter(collections=obj, status="p")
+            .exclude(geometry__isnull=True)
+            .order_by("-creationDate")[: settings.FEED_MAX_ITEMS]
+        )

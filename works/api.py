@@ -9,6 +9,7 @@ from works.viewsets import (
     WorkViewSet,
     SubscriptionViewSet,
     GlobalRegionViewSet,
+    CollectionViewSet,
     GeoextentViewSet,
 )
 
@@ -17,6 +18,7 @@ router.register(r"sources", SourceViewSet, basename="source")
 router.register(r"works", WorkViewSet, basename="work")
 router.register(r"subscriptions", SubscriptionViewSet, basename="subscription")
 router.register(r"global-regions", GlobalRegionViewSet, basename="global-region")
+router.register(r"collections", CollectionViewSet, basename="collection")
 router.register(r"geoextent", GeoextentViewSet, basename="geoextent")
 
 urlpatterns = router.urls

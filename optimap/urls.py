@@ -20,7 +20,10 @@ from django.contrib import admin
 from django.urls import path, re_path, include
 from django.contrib.sitemaps import views as sitemaps_views
 from django.conf import settings
-from optimap.sitemaps import WorksSitemap, StaticViewSitemap, FeedsSitemap, CollectionsSitemap
+from optimap.sitemaps import (
+    WorksSitemap, StaticViewSitemap, FeedsSitemap, CollectionsSitemap,
+    CollectionFeedsSitemap, CollectionDownloadsSitemap,
+)
 from optimap.views import RobotsView
 
 sitemaps = {
@@ -28,6 +31,8 @@ sitemaps = {
     "works": WorksSitemap,
     "feeds": FeedsSitemap,
     "collections": CollectionsSitemap,
+    "collection-feeds": CollectionFeedsSitemap,
+    "collection-downloads": CollectionDownloadsSitemap,
 }
 
 urlpatterns = [

@@ -43,6 +43,9 @@ from .data import (
     download_geopackage,
     download_csv,
     generate_geopackage,
+    download_collection_geojson,
+    download_collection_gpkg,
+    download_collection_csv,
 )
 
 # Re-export all for backward compatibility
@@ -73,4 +76,7 @@ __all__ = [
     'download_geopackage',
     'download_csv',
     'generate_geopackage',
+    'download_collection_geojson',
+    'download_collection_gpkg',
+    'download_collection_csv',
 ]

@@ -169,7 +169,8 @@ without auth). The UI is rendered by [Redoc](https://github.com/Redocly/redoc) f
 
 ## Conventions
 
-- **Base URL:** every endpoint is rooted at `/api/v1/`.
+- **Base URL:** REST endpoints are rooted at `/api/v1/`. The global bulk downloads below are an
+  exception — they sit directly under `/download/` without the `/api/v1/` prefix.
 - **Anonymous reads:** `Works`, `Sources`, `Global regions`, `Geoextent`, `Gazetteer`, and the
   feed / download endpoints accept anonymous GETs. `Subscriptions` requires session auth.
 - **Pagination:** list endpoints return a `{count, next, previous, results}` envelope with
@@ -184,7 +185,7 @@ without auth). The UI is rendered by [Redoc](https://github.com/Redocly/redoc) f
 
 ## Bulk downloads
 
-The full corpus is also available as flat-file dumps (regenerated every 6 h):
+The full corpus is available as flat-file dumps (regenerated every 6 h):
 
 | Endpoint | Format | Notes |
 | -- | -- | -- |
@@ -196,8 +197,10 @@ These are documented in the *Downloads* section below.
 
 ## Feeds (machine-readable)
 
-Region-filtered GeoRSS / GeoAtom feeds are not full REST endpoints; they are produced by the
-Django syndication framework and consumed by feed readers. The catalog:
+GeoRSS / GeoAtom feeds are produced by the Django syndication framework and consumed by feed
+readers. They are not full REST endpoints and therefore do not appear in the schema below.
+
+### Global and region-filtered feeds
 
 | URL | Format | Scope |
 | -- | -- | -- |
@@ -208,6 +211,17 @@ Django syndication framework and consumed by feed readers. The catalog:
 
 Continent and ocean slugs match `GlobalRegion.identifier`; list them via
 [`/api/v1/global-regions/`](/api/v1/global-regions/).
+
+### Collection feeds
+
+| URL | Format | Scope |
+| -- | -- | -- |
+| `/api/v1/feeds/collection-<collection-slug>.rss` | GeoRSS 2.0 | Published works in the collection |
+| `/api/v1/feeds/collection-<collection-slug>.atom` | GeoAtom | Published works in the collection |
+
+Collection slugs match `Collection.identifier`; list all published collections via
+[`/api/v1/collections/`](/api/v1/collections/). Each collection response embeds the feed and
+download URLs directly.
 """.strip(),
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
@@ -220,6 +234,7 @@ Continent and ocean slugs match `GlobalRegion.identifier`; list them via
         {'name': 'Geoextent', 'description': 'Extract a spatial / temporal extent from an uploaded file or a remote DOI/URL. Powered by the [geoextent](https://nuest.github.io/geoextent/) Python library.'},
         {'name': 'Gazetteer', 'description': 'Server-side proxy for forward / reverse geocoding via Nominatim or Photon.'},
         {'name': 'Downloads', 'description': 'Flat-file dumps of the full work corpus (GeoJSON, GeoPackage, CSV).'},
+        {'name': 'Collections', 'description': 'Curated groups of published works. The list/detail endpoints return collection metadata with a `works_count` and embedded links to feeds and downloads. Per-collection GeoRSS/GeoAtom feeds are served by the Django syndication framework and are documented in the API description above.'},
         {'name': 'Body of Knowledge', 'description': 'Search the cached [EO4GEO Body of Knowledge](https://eo4geo.eu/bok/) for concept tagging.'},
     ],
     'SWAGGER_UI_DIST': 'SIDECAR',  # shorthand to use the sidecar instead

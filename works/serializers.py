@@ -7,9 +7,10 @@ from rest_framework import serializers
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 from rest_framework import serializers as drf_serializers
 from drf_spectacular.utils import extend_schema_field
-from .models import Work, Subscription, Source, GlobalRegion
+from .models import Work, Subscription, Source, GlobalRegion, Collection
 from django.contrib.auth import get_user_model
 from django.conf import settings
+from django.urls import reverse
 
 User = get_user_model()
 
@@ -265,3 +266,68 @@ class GlobalRegionSerializer(GeoFeatureModelSerializer):
             "source_url",
             "license",
         ]
+
+
+class CollectionSerializer(serializers.ModelSerializer):
+    works_count = serializers.IntegerField(
+        read_only=True,
+        help_text="Number of published works in this collection.",
+    )
+    collection_url = serializers.SerializerMethodField(
+        help_text="Absolute URL of the collection landing page.",
+    )
+    feeds = serializers.SerializerMethodField(
+        help_text="GeoRSS and GeoAtom feed URLs for this collection.",
+    )
+    downloads = serializers.SerializerMethodField(
+        help_text="Download URLs (GeoJSON, GeoPackage, CSV) for this collection.",
+    )
+
+    class Meta:
+        model = Collection
+        fields = [
+            "id",
+            "identifier",
+            "short_slug",
+            "name",
+            "description",
+            "homepage_url",
+            "is_published",
+            "created_at",
+            "updated_at",
+            "works_count",
+            "collection_url",
+            "feeds",
+            "downloads",
+        ]
+
+    def _abs(self, url_name, slug):
+        request = self.context.get("request")
+        path = reverse(url_name, kwargs={"collection_slug": slug})
+        return request.build_absolute_uri(path) if request else path
+
+    @extend_schema_field(serializers.URLField())
+    def get_collection_url(self, obj):
+        return self._abs("optimap:collection-page", obj.identifier)
+
+    @extend_schema_field({"type": "object", "properties": {
+        "rss": {"type": "string", "format": "uri"},
+        "atom": {"type": "string", "format": "uri"},
+    }})
+    def get_feeds(self, obj):
+        return {
+            "rss": self._abs("optimap:api-collection-georss", obj.identifier),
+            "atom": self._abs("optimap:api-collection-atom", obj.identifier),
+        }
+
+    @extend_schema_field({"type": "object", "properties": {
+        "geojson": {"type": "string", "format": "uri"},
+        "gpkg": {"type": "string", "format": "uri"},
+        "csv": {"type": "string", "format": "uri"},
+    }})
+    def get_downloads(self, obj):
+        return {
+            "geojson": self._abs("optimap:download-collection-geojson", obj.identifier),
+            "gpkg": self._abs("optimap:download-collection-gpkg", obj.identifier),
+            "csv": self._abs("optimap:download-collection-csv", obj.identifier),
+        }

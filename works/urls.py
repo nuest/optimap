@@ -13,7 +13,7 @@ from works import views_collections
 from works import views_gazetteer
 from works.bok import views as bok_views
 from optimap import views as general_views
-from .feeds import GlobalGeoFeed, RegionalGeoFeed
+from .feeds import GlobalGeoFeed, RegionalGeoFeed, CollectionGeoFeed
 from django.views.generic import RedirectView
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView
 from works.api import router as publications_router
@@ -58,6 +58,10 @@ urlpatterns = [
     path('api/v1/feeds/optimap-<slug:continent_slug>.atom', RegionalGeoFeed(feed_type_variant="atom"), name='api-continent-atom'),
     path('api/v1/feeds/optimap-<slug:ocean_slug>.atom', RegionalGeoFeed(feed_type_variant="atom"), name='api-ocean-atom'),
 
+    # API v1 Feed endpoints - Collection feeds
+    path('api/v1/feeds/collection-<slug:collection_slug>.rss', CollectionGeoFeed(feed_type_variant="georss"), name='api-collection-georss'),
+    path('api/v1/feeds/collection-<slug:collection_slug>.atom', CollectionGeoFeed(feed_type_variant="atom"), name='api-collection-atom'),
+
     # Feed HTML pages (human-readable)
     path('feeds/continent/<slug:continent_slug>/', views_feeds.continent_feed_page, name='feed-continent-page'),
     path('feeds/ocean/<slug:ocean_slug>/', views_feeds.ocean_feed_page, name='feed-ocean-page'),
@@ -78,10 +82,15 @@ urlpatterns = [
     path('work/<int:work_id>/collection/<int:collection_id>/add/', views_collections.add_work_to_collection, name='add-work-to-collection'),
     path('work/<int:work_id>/collection/<int:collection_id>/remove/', views_collections.remove_work_from_collection, name='remove-work-from-collection'),
 
-    # Data downloads
+    # Data downloads (global — all published works)
     path('download/geojson/', work_views.download_geojson, name='download_geojson'),
     path('download/geopackage/', work_views.download_geopackage, name='download_geopackage'),
     path('download/csv/', work_views.download_csv, name='download_csv'),
+
+    # Data downloads (per-collection — #217)
+    path('api/v1/collections/<slug:collection_slug>/download/geojson/', work_views.download_collection_geojson, name='download-collection-geojson'),
+    path('api/v1/collections/<slug:collection_slug>/download/gpkg/', work_views.download_collection_gpkg, name='download-collection-gpkg'),
+    path('api/v1/collections/<slug:collection_slug>/download/csv/', work_views.download_collection_csv, name='download-collection-csv'),
 
     # Works
     path("works/", work_views.works_list, name="works"),

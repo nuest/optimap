@@ -28,13 +28,15 @@ from django.contrib.gis.geos import Polygon, Point, MultiPoint
 # Import geoextent at module level
 import geoextent.lib.extent as geoextent
 
-from .models import Work, Source, Subscription, GlobalRegion
+from django.db.models import Count, Q
+from .models import Work, Source, Subscription, GlobalRegion, Collection
 from .utils.provenance import public_subset
 from .serializers import (
     WorkSerializer,
     SourceSerializer,
     SubscriptionSerializer,
     GlobalRegionSerializer,
+    CollectionSerializer,
     GeoextentExtractSerializer,
     GeoextentRemoteSerializer,
     GeoextentRemoteGetSerializer,
@@ -494,6 +496,43 @@ class GlobalRegionViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = GlobalRegion.objects.all().order_by('region_type', 'name')
     serializer_class = GlobalRegionSerializer
     permission_classes = [AllowAny]
+
+
+@extend_schema_view(
+    list=extend_schema(
+        summary="List published collections",
+        description=(
+            "Returns all published collections with their work count and links to feeds and "
+            "downloads. Staff additionally see unpublished collections."
+        ),
+        tags=["Collections"],
+    ),
+    retrieve=extend_schema(
+        summary="Retrieve a collection by identifier",
+        description=(
+            "Look up a single collection by its slug `identifier` "
+            "(e.g. `mountain-wetlands`). Returns 404 for unpublished collections "
+            "unless the caller is staff."
+        ),
+        tags=["Collections"],
+        responses={
+            200: CollectionSerializer,
+            404: OpenApiResponse(_ERROR_RESPONSE, description="No published collection with this identifier."),
+        },
+    ),
+)
+class CollectionViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = CollectionSerializer
+    permission_classes = [AllowAny]
+    lookup_field = "identifier"
+
+    def get_queryset(self):
+        qs = Collection.objects.annotate(
+            works_count=Count("works", filter=Q(works__status="p"), distinct=True)
+        ).order_by("name")
+        if self.request.user.is_staff:
+            return qs
+        return qs.filter(is_published=True)
 
 
 @extend_schema(tags=["Geoextent"])
