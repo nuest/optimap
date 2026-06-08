@@ -208,7 +208,7 @@ class BaseCachedGeoFeed(Feed):
 
     def author_link(self):
         """Return feed author link."""
-        return "https://optimap.science"
+        return settings.BASE_URL
 
     def __call__(self, request, *args, **kwargs):
         """

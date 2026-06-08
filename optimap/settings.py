@@ -376,9 +376,9 @@ import optimap
 # for log diagnostics.
 OPTIMAP_USER_AGENT = (
     f"OPTIMAP/{optimap.__version__} "
-    f"(+https://optimap.science; mailto:{CONTACT_EMAIL})"
+    f"(+http://optimap.science; mailto:{CONTACT_EMAIL})"
 )
-WIKIBASE_USER_AGENT = f"OPTIMAP/{optimap.__version__} (https://optimap.science; {CONTACT_EMAIL})"
+WIKIBASE_USER_AGENT = f"OPTIMAP/{optimap.__version__} (http://optimap.science; {CONTACT_EMAIL})"
 
 
 # Geoextent API settings
