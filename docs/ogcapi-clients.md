@@ -3,7 +3,7 @@
 OPTIMAP exposes its published works through an [OGC API - Features](https://ogcapi.ogc.org/features/) endpoint
 at `/ogcapi/`. This is a standards-compliant interface that any WFS3-capable client can consume.
 
-**Base URL:** `https://optimap.science/ogcapi/`
+**Base URL:** `https://optimap.geo.tu-dresden.de/ogcapi/`
 
 Key endpoints:
 
@@ -37,7 +37,7 @@ import folium
 
 # Fetch publications within a bounding box (central Europe)
 resp = requests.get(
-    "https://optimap.science/ogcapi/collections/works/items",
+    "https://optimap.geo.tu-dresden.de/ogcapi/collections/works/items",
     params={"bbox": "5,47,15,55", "limit": 100},
 )
 resp.raise_for_status()
@@ -64,7 +64,7 @@ For **pagination** over all results:
 ```python
 import requests
 
-base = "https://optimap.science/ogcapi/collections/works/items"
+base = "https://optimap.geo.tu-dresden.de/ogcapi/collections/works/items"
 params = {"bbox": "5,47,15,55", "limit": 100, "offset": 0}
 all_features = []
 
@@ -94,7 +94,7 @@ library(mapview)
 
 # sf reads GeoJSON over HTTP via GDAL — simplest approach
 works <- read_sf(
-  "https://optimap.science/ogcapi/collections/works/items?bbox=5,47,15,55&limit=100"
+  "https://optimap.geo.tu-dresden.de/ogcapi/collections/works/items?bbox=5,47,15,55&limit=100"
 )
 print(works[, c("title", "doi", "publicationDate")])
 mapview(works)
@@ -108,7 +108,7 @@ library(jsonlite)
 library(sf)
 library(mapview)
 
-resp <- request("https://optimap.science/ogcapi/collections/works/items") |>
+resp <- request("https://optimap.geo.tu-dresden.de/ogcapi/collections/works/items") |>
   req_url_query(bbox = "5,47,15,55", limit = 100) |>
   req_perform()
 
@@ -132,7 +132,7 @@ mapview(works)
 2. **Layer → Add Layer → Add WFS / OGC API - Features Layer**
 3. Click **New** to add a connection:
    - **Name:** `OPTIMAP`
-   - **URL:** `https://optimap.science/ogcapi/`
+   - **URL:** `https://optimap.geo.tu-dresden.de/ogcapi/`
    - **WFS Version:** select **OGC API - Features** from the dropdown
 4. Click **Detect** to confirm the endpoint, then **OK**
 5. Select the `works` collection and click **Add**
@@ -146,7 +146,7 @@ from qgis.core import QgsVectorLayer, QgsProject
 from qgis.utils import iface
 
 # Production
-uri = "oapif://https://optimap.science/ogcapi/collections/works/items?bbox=5,47,15,55"
+uri = "oapif://https://optimap.geo.tu-dresden.de/ogcapi/collections/works/items?bbox=5,47,15,55"
 
 # Local development (http:// is only supported via the OGR OAPIF driver)
 # uri = "OAPIF:http://localhost:8000/ogcapi/"
