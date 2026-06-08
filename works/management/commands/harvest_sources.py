@@ -160,6 +160,22 @@ SOURCE_CONFIG = {
         'is_oa': True,
         'default_work_type': 'article',
     },
+    # Pensoft / ARPHA platform journals — all share the same OAI-PMH endpoint,
+    # filtered by the `set` query parameter. Only journals confirmed to include
+    # articles with structured geo-metadata (schema:contentLocation JSON-LD)
+    # are listed here. See issue #92 for the follow-up plan to add ZooKeys,
+    # PhytoKeys, and NeoBiota once their geo-metadata coverage is verified.
+    'pensoft-bdj': {
+        'name': 'Biodiversity Data Journal',
+        'url': 'https://bdj.pensoft.net/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=bdj',
+        'collection_name': 'Biodiversity Data Journal',
+        'homepage_url': 'https://bdj.pensoft.net/',
+        'publisher_name': 'Pensoft Publishers',
+        'source_type': 'oai-pmh',
+        'issn_l': '1314-2828',
+        'is_oa': True,
+        'default_work_type': 'article',
+    },
 }
 
 
@@ -582,6 +598,7 @@ class Command(BaseCommand):
                 is_preprint=config.get('is_preprint', False),
                 default_work_type=config.get('default_work_type', 'article'),
                 openalex_id=config.get('openalex_id'),
+                issn_l=config.get('issn_l'),
                 harvest_interval_minutes=0,
             )
             self.stdout.write(self.style.SUCCESS(

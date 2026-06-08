@@ -83,6 +83,46 @@ def _walk_jsonld(node):
             yield from _walk_jsonld(item)
 
 
+def _extract_jsonld_content_location(soup: BeautifulSoup) -> GEOSGeometry | None:
+    # Extraction logic mirrors geoextent/lib/content_providers/Pensoft.py
+    # (_extract_coordinates / _extract_coordinates_from_location).
+    # Pensoft/ARPHA journals embed study-site points via schema:contentLocation
+    # (not spatialCoverage), so we collect *all* locations into one collection.
+    geometries = []
+    for tag in soup.find_all("script", attrs={"type": "application/ld+json"}):
+        raw = tag.string or tag.get_text() or ""
+        if not raw.strip():
+            continue
+        try:
+            doc = json.loads(raw)
+        except Exception:
+            continue
+        for node in _walk_jsonld(doc):
+            cl = node.get("contentLocation")
+            if not cl:
+                continue
+            candidates = cl if isinstance(cl, list) else [cl]
+            for entry in candidates:
+                if not isinstance(entry, dict):
+                    continue
+                # geo sub-property may be a single GeoCoordinates or a list of them
+                # (BDJ uses a list); fall back to the entry itself for direct GeoCoordinates.
+                geo_val = entry.get("geo")
+                geo_list = geo_val if isinstance(geo_val, list) else ([geo_val] if geo_val is not None else [entry])
+                for geo in geo_list:
+                    geom = _geom_from_geojson_dict(geo)
+                    if geom is not None:
+                        for i in range(geom.num_geom):
+                            geometries.append(json.loads(geom[i].geojson))
+    if not geometries:
+        return None
+    try:
+        coll = {"type": "GeometryCollection", "geometries": geometries}
+        return GEOSGeometry(json.dumps(coll))
+    except Exception:
+        return None
+
+
 def _extract_jsonld_spatial(soup: BeautifulSoup) -> GEOSGeometry | None:
     for tag in soup.find_all("script", attrs={"type": "application/ld+json"}):
         raw = tag.string or tag.get_text() or ""
@@ -208,6 +248,9 @@ def extract_geometry_from_html(soup: BeautifulSoup, base_url: str | None = None)
     geom = _extract_jsonld_spatial(soup)
     if geom is not None:
         return geom, "schema.org JSON-LD"
+    geom = _extract_jsonld_content_location(soup)
+    if geom is not None:
+        return geom, "schema.org contentLocation"
     geom = _extract_geojson_link(soup, base_url)
     if geom is not None:
         return geom, "link rel=alternate geo+json"

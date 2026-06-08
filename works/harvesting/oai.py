@@ -47,6 +47,22 @@ from .sessions import (
 
 logger = logging.getLogger(__name__)
 DOI_REGEX = re.compile(r'10\.\d{4,9}/[-._;()/:A-Z0-9]+', re.IGNORECASE)
+# Matches plain ISSNs (NNNN-NNNN) and info:eu-repo URI variants used by Pensoft/ARPHA
+# and other OAI-PMH endpoints: info:eu-repo/semantics/altIdentifier/[pe]issn/<ISSN>
+_ISSN_PLAIN = re.compile(r'^\d{4}-\d{3}[\dX]$', re.IGNORECASE)
+_ISSN_URI   = re.compile(r'altIdentifier/[pe]issn/(\d{4}-\d{3}[\dX])', re.IGNORECASE)
+
+
+def _extract_issn(candidate: str | None) -> str | None:
+    """Return the ISSN string from a plain ISSN or an info:eu-repo URI, else None."""
+    if not candidate:
+        return None
+    if _ISSN_PLAIN.match(candidate.strip()):
+        return candidate.strip()
+    m = _ISSN_URI.search(candidate)
+    if m:
+        return m.group(1)
+    return None
 
 
 def parse_oai_xml_and_save_works(content, event: HarvestingEvent, max_records=None, warning_collector=None, update_existing=False, stats=None):
@@ -97,9 +113,10 @@ def parse_oai_xml_and_save_works(content, event: HarvestingEvent, max_records=No
                 get_field = lambda k: rec.metadata.get(k, [""])[0]
             else:
                 id_nodes = rec.getElementsByTagName("dc:identifier")
+                rel_nodes = rec.getElementsByTagName("dc:relation")
                 identifiers = [
                     n.firstChild.nodeValue.strip()
-                    for n in id_nodes
+                    for n in list(id_nodes) + list(rel_nodes)
                     if n.firstChild and n.firstChild.nodeValue
                 ]
                 def get_field(tag):
@@ -125,14 +142,12 @@ def parse_oai_xml_and_save_works(content, event: HarvestingEvent, max_records=No
                     doi_text = m.group(0)
                     break
 
-            issn_candidates = []
-            issn_candidates.extend(identifiers)
+            issn_candidates = list(identifiers)
             issn_candidates.append(get_field("source") or get_field("dc:source"))
-            issn_candidates.append(get_field("relation") or get_field("dc:relation"))
 
             for candidate in issn_candidates:
-                if candidate and len(candidate.replace('-', '')) == 8 and candidate.replace('-', '').isdigit():
-                    issn_text = candidate
+                issn_text = _extract_issn(candidate)
+                if issn_text:
                     break
 
             # Per-source dedup happens later in _save_or_update_work; cheap pre-check

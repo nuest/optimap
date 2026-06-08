@@ -281,7 +281,10 @@ def _build_work_landing_cacheable(request, work, identifier_type):
         "timeperiod_label": _format_timeperiod(work),
         "authors_list": _normalize_authors(work),
         "has_geometry": bool(work.geometry and not work.geometry.empty),
-        "has_temporal": bool(work.timeperiod_startdate or work.timeperiod_enddate),
+        "has_temporal": (
+            any(d is not None for d in (work.timeperiod_startdate or [])) or
+            any(d is not None for d in (work.timeperiod_enddate or []))
+        ),
         "use_id_urls": not work.doi,
         "identifier_type": identifier_type,
         "schema_org": build_schema_org_for_work(work, request),

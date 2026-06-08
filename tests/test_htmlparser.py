@@ -49,7 +49,74 @@ class SimpleTest(TestCase):
         self.assertEqual(period_end,   ['2023-06-08'])
 
 
-    def test_parse_missing(self):
+    def test_content_location_single_point(self):
+        html_doc = """
+        <script type="application/ld+json">
+        {"@type": "ScholarlyArticle",
+         "contentLocation": {"@type": "GeoCoordinates", "latitude": 60.17, "longitude": 24.94}}
+        </script>
+        """
+        soup = BeautifulSoup(html_doc, 'html.parser')
+        geom, label = extract_geometry_from_html(soup)
+        self.assertIsNotNone(geom)
+        self.assertEqual(label, 'schema.org contentLocation')
+        self.assertEqual(geom.geom_type, 'GeometryCollection')
+        self.assertEqual(geom.num_geom, 1)
+        self.assertEqual(geom[0].geom_type, 'Point')
+        self.assertAlmostEqual(geom[0].x, 24.94, places=5)
+        self.assertAlmostEqual(geom[0].y, 60.17, places=5)
+
+    def test_content_location_multiple_points(self):
+        html_doc = """
+        <script type="application/ld+json">
+        {"@type": "ScholarlyArticle",
+         "contentLocation": [
+           {"@type": "GeoCoordinates", "latitude": 51.5, "longitude": -0.1},
+           {"@type": "GeoCoordinates", "latitude": 48.8, "longitude": 2.35}
+         ]}
+        </script>
+        """
+        soup = BeautifulSoup(html_doc, 'html.parser')
+        geom, label = extract_geometry_from_html(soup)
+        self.assertIsNotNone(geom)
+        self.assertEqual(label, 'schema.org contentLocation')
+        self.assertEqual(geom.geom_type, 'GeometryCollection')
+        self.assertEqual(geom.num_geom, 2)
+
+    def test_content_location_place_with_geo(self):
+        # Pensoft/ARPHA sometimes wraps coordinates in a Place with a geo sub-property.
+        html_doc = """
+        <script type="application/ld+json">
+        {"@type": "ScholarlyArticle",
+         "contentLocation": {
+           "@type": "Place",
+           "geo": {"@type": "GeoCoordinates", "latitude": -33.87, "longitude": 151.21}
+         }}
+        </script>
+        """
+        soup = BeautifulSoup(html_doc, 'html.parser')
+        geom, label = extract_geometry_from_html(soup)
+        self.assertIsNotNone(geom)
+        self.assertEqual(label, 'schema.org contentLocation')
+        self.assertEqual(geom.num_geom, 1)
+        self.assertEqual(geom[0].geom_type, 'Point')
+        self.assertAlmostEqual(geom[0].x, 151.21, places=5)
+
+    def test_content_location_priority_below_spatial_coverage(self):
+        # spatialCoverage must win over contentLocation when both are present.
+        html_doc = """
+        <script type="application/ld+json">
+        {"@type": "ScholarlyArticle",
+         "spatialCoverage": {"geo": {"@type": "GeoShape", "box": "10 20 30 40"}},
+         "contentLocation": {"@type": "GeoCoordinates", "latitude": 5.0, "longitude": 5.0}}
+        </script>
+        """
+        soup = BeautifulSoup(html_doc, 'html.parser')
+        geom, label = extract_geometry_from_html(soup)
+        self.assertEqual(label, 'schema.org JSON-LD')
+        self.assertEqual(geom[0].geom_type, 'Polygon')
+
+    def test_content_location_missing(self):
         html_doc = """
         <meta name="DC.Identifier.pageNumber" content="1-2"/>
         <meta name="DC.Identifier.URI" content="https://journal.com/index.php/josis/article/view/1"/>

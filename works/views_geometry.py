@@ -168,7 +168,10 @@ def publish_work_by_id(request, work_id):
 
     # Check if work has any extent information
     has_geometry = work.geometry and not work.geometry.empty
-    has_temporal = bool(work.timeperiod_startdate or work.timeperiod_enddate)
+    has_temporal = (
+        any(d is not None for d in (work.timeperiod_startdate or [])) or
+        any(d is not None for d in (work.timeperiod_enddate or []))
+    )
 
     # Allow publishing of contributed publications or harvested publications with at least one extent
     if work.status == 'c':

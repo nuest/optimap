@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Biodiversity Data Journal (BDJ) added as an OAI-PMH source** (`pensoft-bdj`, closes #92). Harvest with `python manage.py harvest_sources --source pensoft-bdj`. The ARPHA OAI-PMH endpoint is filtered to the `bdj` set so only BDJ records are fetched.
+- **`extract_geometry_from_html()` now extracts `schema:contentLocation` GeoCoordinates from JSON-LD** (closes #92). Pensoft/ARPHA journals embed study-site coordinates via `contentLocation` rather than `spatialCoverage`; the new extraction step sits between `spatialCoverage` and the `geo+json` link in the priority chain and collects all points into a single `GeometryCollection`.
+
 - **OGC API - Features endpoint at `/ogcapi/`** (closes #19). Published works are now accessible via a standards-compliant [OGC API - Features](https://ogcapi.ogc.org/features/) interface powered by [pygeoapi](https://pygeoapi.io/) and its PostgreSQL/PostGIS provider. Supports `bbox`, `datetime`, and `limit`/`offset` query parameters. Returns proper GeoJSON FeatureCollections with `numberMatched` / `numberReturned` / pagination links. Only published works (`status='p'`) are served, via a dedicated `works_published` database view. Configuration in `etc/pygeoapi-config.yml`; generate the required OpenAPI document with `python manage.py generate_pygeoapi_openapi`. Client demo code for Python (`requests` + `geopandas` + `folium`), R (`sf` + `mapview`), and QGIS (GUI and PyQGIS console) in `docs/ogcapi-clients.md`.
 
 - **Weekly inactivity warning email to users** (closes #120). Users who have not logged in for 12–13 months receive a warning that their account will be deleted if they do not log in within 30 days. The email explains what happens to their data (credentials removed; contributions remain but become anonymous; recognition board entry removed). Scheduled automatically via Django-Q every Monday.
