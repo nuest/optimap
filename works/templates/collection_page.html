@@ -55,6 +55,14 @@
                   <i class="fas fa-globe"></i> Publish all {{ publishable_count }} unpublished works
                 </button>
               {% endif %}
+              {% if publishable_geo_count %}
+                <button class="btn btn-success btn-sm collection-publish-geo-works-btn"
+                        data-collection-id="{{ collection.id }}"
+                        data-publishable-count="{{ publishable_geo_count }}"
+                        data-csrf="{{ csrf_token }}">
+                  <i class="fas fa-map-marker-alt"></i> Publish {{ publishable_geo_count }} with extent
+                </button>
+              {% endif %}
               <a href="/admin/works/collection/{{ collection.id }}/change/"
                  class="btn btn-primary btn-sm" target="_blank" rel="noopener">
                 <i class="fas fa-edit"></i> Edit in Admin
@@ -174,7 +182,7 @@
       </div>
       {% endif %}
 
-      <p class="text-muted">
+      <p class="text-muted mt-4">
         <i class="fas fa-fingerprint"></i> <code>{{ collection.identifier }}</code>
         {% if collection.short_slug %}
           &middot; vanity URL: <code>/{{ collection.short_slug }}/</code>
@@ -355,6 +363,31 @@
         }
       }).catch(function (err) {
         OPTIMAP_FLASH('error', 'Publish-all failed: ' + err);
+        b.disabled = false;
+      });
+    });
+  });
+  document.querySelectorAll('.collection-publish-geo-works-btn').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var n = b.getAttribute('data-publishable-count');
+      if (!window.confirm('Publish ' + n + ' work(s) that have spatial or temporal extent? This makes them visible to anonymous users.')) { return; }
+      var id = b.getAttribute('data-collection-id');
+      var csrf = b.getAttribute('data-csrf');
+      b.disabled = true;
+      fetch('/collections/' + id + '/publish-works-with-extent/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': csrf, 'Accept': 'application/json'},
+        credentials: 'same-origin',
+      }).then(function (r) { return r.json(); }).then(function (data) {
+        if (data && data.success) {
+          OPTIMAP_FLASH('success', 'Published ' + data.published_count + ' work(s) with extent.');
+          window.location.reload();
+        } else {
+          OPTIMAP_FLASH('error', 'Publish-with-extent failed: ' + (data && data.error ? data.error : 'unknown error'));
+          b.disabled = false;
+        }
+      }).catch(function (err) {
+        OPTIMAP_FLASH('error', 'Publish-with-extent failed: ' + err);
         b.disabled = false;
       });
     });
