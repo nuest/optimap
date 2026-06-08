@@ -10,17 +10,6 @@
 // appears for them.
 
 (function (root) {
-  // Bootstrap badge classes per Work.STATUS_CHOICES (works/models.py).
-  // Mirrors the badges added to collection_page.html in commit 64491b6.
-  const STATUS_BADGE_CLASS = {
-    p: 'badge-success',   // Published
-    d: 'badge-secondary', // Draft
-    h: 'badge-info',      // Harvested
-    c: 'badge-primary',   // Contributed
-    t: 'badge-warning',   // Testing
-    w: 'badge-danger',    // Withdrawn
-  };
-
   function isUnpublished(feature) {
     const s = feature && feature.properties && feature.properties.status;
     return !!s && s !== 'p';
@@ -32,23 +21,6 @@
       fillOpacity: 0.1,
       dashArray: '4, 4',
     });
-  }
-
-  function statusBadgeHTML(feature) {
-    const props = feature.properties || {};
-    const status = props.status;
-    if (!status || status === 'p') return '';
-    const label = props.status_display || status;
-    const cls = STATUS_BADGE_CLASS[status] || 'badge-secondary';
-    return (
-      '<div class="mb-2">' +
-        '<span class="badge ' + cls + '" ' +
-              'title="Publication status — visible to admins/curators only.">' +
-          label +
-        '</span> ' +
-        '<small class="text-muted">— not visible to anonymous users</small>' +
-      '</div>'
-    );
   }
 
   class MapStatusLayersManager {
@@ -79,28 +51,20 @@
       // (interaction, keyboard, search). Not added to the map directly — its
       // children are routed to the two FeatureGroups, which ARE on the map.
       this.allLayer = L.geoJSON(features, {
+        // Render GeoJSON Points as circleMarkers (same as the work landing page)
+        // instead of the default pin-marker. The style function is not called for
+        // layers created by pointToLayer, so we compute the style here directly.
+        pointToLayer: function (feature, latlng) {
+          const base = styleFn ? styleFn(feature) : {};
+          const style = isUnpublished(feature) ? unpublishedStyle(base) : base;
+          return L.circleMarker(latlng, Object.assign({ radius: 6 }, style));
+        },
         style: function (feature) {
           const base = styleFn ? styleFn(feature) : {};
           return isUnpublished(feature) ? unpublishedStyle(base) : base;
         },
         onEachFeature: function (feature, layer) {
           if (popupFn) popupFn(feature, layer);
-          if (isUnpublished(feature)) {
-            // Prepend a status badge to the popup content so curators/admins
-            // can see at a glance that the work isn't public.
-            const popup = layer.getPopup();
-            if (popup) {
-              const original = popup.getContent() || '';
-              const badge = statusBadgeHTML(feature);
-              let next;
-              if (typeof original === 'string' && original.indexOf('<div>') === 0) {
-                next = '<div>' + badge + original.slice('<div>'.length);
-              } else {
-                next = badge + original;
-              }
-              popup.setContent(next);
-            }
-          }
         },
       });
 

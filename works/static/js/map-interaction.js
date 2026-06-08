@@ -412,7 +412,12 @@ class MapInteractionManager {
     // Pagination header
     html += '<div style="background: #f8f9fa; padding: 8px 10px; margin: -10px -10px 10px -10px; border-radius: 3px 3px 0 0; border-bottom: 2px solid #158F9B;">';
     html += '<div style="display: flex; justify-content: space-between; align-items: center;">';
-    html += `<span style="font-size: 12px; color: #666;"><i class="fas fa-layer-group"></i> ${this.currentPageIndex + 1} of ${this.overlappingFeatures.length} works</span>`;
+    const statusBadge = (typeof publicationStatusBadgeHTML === 'function')
+      ? publicationStatusBadgeHTML(properties.status, properties.status_display)
+      : '';
+    html += `<span style="font-size: 12px; color: #666;"><i class="fas fa-layer-group"></i> ${this.currentPageIndex + 1} of ${this.overlappingFeatures.length} works`;
+    if (statusBadge) html += ` &nbsp;${statusBadge}`;
+    html += '</span>';
     html += '<div class="pagination-controls" style="display: flex; gap: 5px;">';
 
     // Previous button

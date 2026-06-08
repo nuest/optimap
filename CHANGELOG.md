@@ -49,6 +49,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Separate "Unpublished works" map layer** for admins (main map) and collection curators (collection pages). Features split into two togglable layers, *Published works (N)* and *Unpublished works (N)* (dashed, muted). Popups for unpublished features show a status badge.
 
+- **Publication status badge in all map popups.** Every popup (single-click and paginated) now shows a colour-coded status badge (green Published / teal Harvested / blue Contributed / etc.) in the header. Unpublished works also carry a "not visible to anonymous users" note. When paging through a cluster of overlapping geometries, the badge updates with each page so admins and curators can tell published from unpublished works at a glance.
+
+- **Spatial and temporal extent indicators on work cards.** Collection pages (curators/admins), the Contribute listing, and the Works list now show green *Spatial* / *Temporal* badges on each work card when logged in — green if extent data is present, grey if absent — making data-completeness gaps visible at a glance without opening each work.
+
+- **Point geometries on the main map now render as circle markers** (radius 6 px, same style as the work landing page) instead of the default Leaflet pin icons. Hover, click, and paginated-popup interaction all continue to work.
+
 - **Work-state-change email notifications** — admins and collection curators receive an email when a user contributes spatial or temporal metadata; contributors receive an email when their work is later published. Per-user opt-out toggle on `/usersettings/`.
 
 - **CSV download with WKT geometry column** (closes #206) — published works are exported as CSV at `/download/csv/` alongside GeoJSON and GeoPackage. New `python manage.py regenerate_data_dumps [--format geojson|gpkg|csv] [--dry-run]` command for synchronous on-demand regeneration.

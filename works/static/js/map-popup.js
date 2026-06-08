@@ -4,6 +4,34 @@
 // publications/static/js/map-popup.js
 // Shared popup content generator for publication features on Leaflet maps
 
+// Inline-style colours that mirror Bootstrap badge variants used in the templates.
+const _STATUS_BADGE_STYLE = {
+  p: 'background:#28a745;color:#fff',          // Published  — green
+  h: 'background:#17a2b8;color:#fff',          // Harvested  — teal
+  c: 'background:#007bff;color:#fff',          // Contributed — blue
+  d: 'background:#6c757d;color:#fff',          // Draft      — grey
+  t: 'background:#ffc107;color:#212529',       // Testing    — yellow (dark text)
+  w: 'background:#dc3545;color:#fff',          // Withdrawn  — red
+};
+
+/**
+ * Return a small inline-styled status badge (and a "not public" note for
+ * unpublished statuses).  Returns '' when status is absent, so calling code
+ * needs no guard of its own.
+ * @param {string} status - Work.status code ('p','h','c','d','t','w')
+ * @param {string} statusDisplay - Human-readable label (e.g. "Harvested")
+ */
+function publicationStatusBadgeHTML(status, statusDisplay) {
+  if (!status) return '';
+  const style = _STATUS_BADGE_STYLE[status] || 'background:#6c757d;color:#fff';
+  const label = statusDisplay || status;
+  let html = `<span style="display:inline-block;padding:2px 7px;border-radius:3px;font-size:11px;font-weight:600;${style}">${label}</span>`;
+  if (status !== 'p') {
+    html += ' <small style="color:#888;">— not visible to anonymous users</small>';
+  }
+  return html;
+}
+
 /**
  * Generate popup content for a publication feature
  * @param {Object} feature - GeoJSON feature object
@@ -17,6 +45,13 @@ function publicationPopup(feature, layer) {
   // otherwise works without a DOI render no "View work details" button at all.
   const featureId = feature.id || p.id;
   let html = '<div>';
+
+  // Status badge — only present in the GeoJSON when the viewer is an admin/curator
+  // (anonymous users only see published works, so the badge would always say
+  // "Published" and adds no value for them).
+  if (p.status) {
+    html += `<div style="margin-bottom:8px;">${publicationStatusBadgeHTML(p.status, p.status_display)}</div>`;
+  }
 
   if (p.title) {
     html += `<h3>${p.title}</h3>`;
