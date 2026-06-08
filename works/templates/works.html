@@ -97,9 +97,7 @@
       {% for work in works %}
         <div class="work-item mb-3 pb-3 border-bottom">
           <h5 class="work-title mb-2">
-            <a href="{{ work.href }}" {% if not work.href|slice:":1" == "/" %}target="_blank" rel="noopener"{% endif %} title="{% if work.doi %}View details for: {% endif %}{{ work.title }}">
-              {{ work.title }}
-            </a>
+            <a href="{{ work.href }}" {% if not work.href|slice:":1" == "/" %}target="_blank" rel="noopener"{% endif %} title="{% if work.doi %}View details for: {% endif %}{{ work.title }}">{{ work.title }}</a>
             {% if is_admin and work.status %}
               <span class="badge ml-2
                 {% if work.status_code == 'p' %}badge-success
