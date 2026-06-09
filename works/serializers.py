@@ -6,7 +6,7 @@
 from rest_framework import serializers
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 from rest_framework import serializers as drf_serializers
-from drf_spectacular.utils import extend_schema_field
+from drf_spectacular.utils import extend_schema_field, inline_serializer
 from .models import Work, Subscription, Source, GlobalRegion, Collection
 from django.contrib.auth import get_user_model
 from django.conf import settings
@@ -16,6 +16,13 @@ User = get_user_model()
 
 class SourceSerializer(serializers.ModelSerializer):
     openalex_url = serializers.ReadOnlyField()
+    source_type_display = serializers.CharField(source="get_source_type_display", read_only=True)
+    source_url = serializers.SerializerMethodField(
+        help_text="Absolute URL to this source's entry in the OPTIMAP API.",
+    )
+    collection = serializers.SerializerMethodField(
+        help_text="Default collection for works harvested from this source: identifier, name, and absolute API URL. Null if no collection is set.",
+    )
 
     class Meta:
         model = Source
@@ -29,7 +36,45 @@ class SourceSerializer(serializers.ModelSerializer):
             "works_count",
             "works_api_url",
             "default_work_type",
+            "source_type",
+            "source_type_display",
+            "homepage_url",
+            "abbreviated_title",
+            "is_oa",
+            "is_preprint",
+            "source_url",
+            "collection",
         )
+
+    @extend_schema_field(serializers.URLField())
+    def get_source_url(self, obj):
+        request = self.context.get("request")
+        path = f"/api/v1/sources/{obj.pk}/"
+        return request.build_absolute_uri(path) if request else path
+
+    @extend_schema_field(
+        inline_serializer(
+            name="SourceCollectionRef",
+            fields={
+                "identifier": serializers.CharField(),
+                "name": serializers.CharField(),
+                "collection_url": serializers.URLField(),
+            },
+            allow_null=True,
+        )
+    )
+    def get_collection(self, obj):
+        if not obj.collection_id:
+            return None
+        coll = obj.collection
+        request = self.context.get("request")
+        path = f"/api/v1/collections/{coll.identifier}/"
+        coll_url = request.build_absolute_uri(path) if request else path
+        return {
+            "identifier": coll.identifier,
+            "name": coll.name,
+            "collection_url": coll_url,
+        }
 
 
 

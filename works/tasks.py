@@ -516,24 +516,53 @@ def _unwrap_geometry_collection(geom):
     return geom
 
 
+_DUMP_FIELDS = [
+    "title", "type", "doi", "url", "publicationDate", "abstract",
+    "volume", "issue", "first_page", "last_page",
+    "timeperiod_startdate", "timeperiod_enddate",
+    "authors", "keywords", "topics", "bok_concepts",
+    "placename", "country_code",
+    "openalex_id", "openalex_open_access_status", "openalex_is_retracted",
+]
+
+
 def regenerate_geojson_cache():
     cache_dir = os.path.join(tempfile.gettempdir(), "optimap_cache")
     os.makedirs(cache_dir, exist_ok=True)
 
     json_filename = generate_data_dump_filename("geojson")
     json_path = os.path.join(cache_dir, json_filename)
-    # Serialize to a string first so we can unwrap GeometryCollection wrappers
-    # before writing to disk; ogr2ogr and QGIS need primitive geometry types.
+
+    works_qs = (
+        Work.objects.filter(status="p")
+        .select_related("source")
+        .prefetch_related("collections")
+    )
+
+    base_url = settings.BASE_URL.rstrip("/")
+    extra = {
+        w.pk: {
+            "source_name": w.source.name if w.source else None,
+            "source_url": f"{base_url}/api/v1/sources/{w.source.pk}/" if w.source else None,
+            "collections": [c.identifier for c in w.collections.all()],
+        }
+        for w in works_qs
+    }
+
     raw = serialize(
-        'geojson',
-        Work.objects.filter(status="p"),
-        geometry_field='geometry',
+        "geojson",
+        works_qs,
+        geometry_field="geometry",
         srid=4326,
+        fields=_DUMP_FIELDS,
     )
     data = json.loads(raw)
     for feat in data.get("features", []):
+        info = extra.get(feat.get("id"), {})
+        props = feat.setdefault("properties", {})
+        props.update(info)
         feat["geometry"] = _unwrap_geometry_collection(feat.get("geometry"))
-    with open(json_path, 'w') as f:
+    with open(json_path, "w") as f:
         json.dump(data, f)
 
     gzip_filename = generate_data_dump_filename("geojson.gz")

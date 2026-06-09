@@ -60,7 +60,11 @@ _ERROR_RESPONSE = inline_serializer(
 
 
 @extend_schema_view(
-    list=extend_schema(summary="List harvested data sources", tags=["Sources"]),
+    list=extend_schema(
+        summary="List harvested data sources",
+        tags=["Sources"],
+        responses={200: SourceSerializer},
+    ),
     retrieve=extend_schema(
         summary="Retrieve a source by ID",
         tags=["Sources"],
@@ -73,7 +77,7 @@ _ERROR_RESPONSE = inline_serializer(
 class SourceViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Source.objects.all()
     serializer_class = SourceSerializer
-    permission_classes = [IsAuthenticatedOrReadOnly]
+    permission_classes = [AllowAny]
 
 
 @extend_schema_view(

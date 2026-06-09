@@ -11,7 +11,7 @@ from django.core.serializers import serialize
 import fiona
 from django.urls import reverse
 from django.conf import settings
-from works.models import Work, Source
+from works.models import Work, Source, Collection
 from works.views import generate_geopackage
 from works.tasks import (
     regenerate_geojson_cache,
@@ -250,3 +250,34 @@ class GeoDataAlternativeTestCase(TestCase):
         for fmt, path in result.items():
             self.assertIsNotNone(path, f"{fmt} dump should be produced")
             self.assertTrue(Path(path).exists(), f"{fmt} dump file should exist on disk")
+
+    def test_dump_has_source_and_collections_fields(self):
+        """GeoJSON dump replaces FK integer source with source_name + source_url + collections."""
+        coll = Collection.objects.create(identifier="test-coll", name="Test Collection")
+        src = Source.objects.create(name="Dump Source", url_field="http://example.com/src")
+        work = Work.objects.create(
+            title="Dump Test Work",
+            doi="10.0001/dump",
+            url="http://example.com/dump",
+            geometry="GEOMETRYCOLLECTION(POINT(7.0 51.0))",
+            source=src,
+            status="p",
+        )
+        work.collections.add(coll)
+
+        path = regenerate_geojson_cache()
+        with open(path) as f:
+            data = json.load(f)
+
+        features = data["features"]
+        self.assertEqual(len(features), 1)
+        props = features[0]["properties"]
+
+        # Meaningful source fields present
+        self.assertEqual(props["source_name"], "Dump Source")
+        self.assertRegex(props["source_url"], rf"/api/v1/sources/{src.pk}/$")
+        self.assertEqual(props["collections"], ["test-coll"])
+
+        # Raw FK integers and internal fields must be absent
+        for absent in ("source", "job", "created_by", "updated_by", "status", "provenance"):
+            self.assertNotIn(absent, props, f"'{absent}' should not appear in the dump")

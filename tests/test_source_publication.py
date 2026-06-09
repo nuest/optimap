@@ -5,7 +5,7 @@ import json
 from django.test import TestCase
 from rest_framework.test import APIClient
 from rest_framework import status
-from works.models import Source, Work
+from works.models import Source, Work, Collection
 
 class SourceAPITest(TestCase):
     """
@@ -59,19 +59,19 @@ class SourceAPITest(TestCase):
         self.assertIn("Test source A", names)
         self.assertIn("No ISSN source", names)
 
-        # Verify all eight fields for the populated source
+        # Verify all expected fields for the populated source
         populated = next(x for x in sources_list if x["name"] == "Test source A")
         for key in [
-            "id",
-            "name",
-            "issn_l",
-            "openalex_id",
-            "openalex_url",
-            "publisher_name",
-            "works_count",
-            "works_api_url",
+            "id", "name", "issn_l", "openalex_id", "openalex_url",
+            "publisher_name", "works_count", "works_api_url",
+            "source_type", "source_type_display", "homepage_url",
+            "abbreviated_title", "is_oa", "is_preprint",
+            "source_url", "collection",
         ]:
             self.assertIn(key, populated)
+
+        # source_url should be an absolute URL pointing to the source's API endpoint
+        self.assertRegex(populated["source_url"], r"http.*/api/v1/sources/\d+/$")
 
         # Verify the second source has None (null) for optional fields
         no_issn = next(x for x in sources_list if x["name"] == "No ISSN source")
@@ -99,6 +99,33 @@ class SourceAPITest(TestCase):
         self.assertEqual(jdata["publisher_name"], src.publisher_name)
         self.assertEqual(jdata["works_count"], src.works_count)
         self.assertEqual(jdata["works_api_url"], src.works_api_url)
+        self.assertEqual(jdata["source_type"], "oai-pmh")
+        self.assertEqual(jdata["source_type_display"], "OAI-PMH (generic)")
+        self.assertFalse(jdata["is_oa"])
+        self.assertFalse(jdata["is_preprint"])
+        self.assertIsNone(jdata["collection"])
+        self.assertRegex(jdata["source_url"], r"http.*/api/v1/sources/\d+/$")
+
+    def test_retrieve_source_with_collection(self):
+        """
+        GET /api/v1/sources/{pk}/ should embed the collection dict when a collection is set.
+        """
+        coll = Collection.objects.create(
+            identifier="test-coll", name="Test Collection", is_published=True
+        )
+        src = Source.objects.create(
+            name="Source with collection",
+            collection=coll,
+        )
+        url = f"/api/v1/sources/{src.pk}/"
+        response = self.client.get(url, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        coll_field = response.json()["collection"]
+        self.assertIsNotNone(coll_field)
+        self.assertEqual(coll_field["identifier"], "test-coll")
+        self.assertEqual(coll_field["name"], "Test Collection")
+        self.assertRegex(coll_field["collection_url"], r"http.*/api/v1/collections/test-coll/$")
 
 
 class PublicationAPITest(TestCase):
@@ -190,16 +217,10 @@ class PublicationAPITest(TestCase):
         details = pub_data["source_details"]
         self.assertIsInstance(details, dict)
 
-        # Check that all eight fields appear:
         for key in [
-            "id",
-            "name",
-            "issn_l",
-            "openalex_id",
-            "openalex_url",
-            "publisher_name",
-            "works_count",
-            "works_api_url",
+            "id", "name", "issn_l", "openalex_id", "openalex_url",
+            "publisher_name", "works_count", "works_api_url",
+            "source_type", "source_type_display", "source_url",
         ]:
             self.assertIn(key, details)
 
