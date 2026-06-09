@@ -160,19 +160,362 @@ SOURCE_CONFIG = {
         'is_oa': True,
         'default_work_type': 'article',
     },
-    # Pensoft / ARPHA platform journals — all share the same OAI-PMH endpoint,
-    # filtered by the `set` query parameter. Only journals confirmed to include
-    # articles with structured geo-metadata (schema:contentLocation JSON-LD)
-    # are listed here. See issue #92 for the follow-up plan to add ZooKeys,
-    # PhytoKeys, and NeoBiota once their geo-metadata coverage is verified.
+    # Pensoft / ARPHA platform journals — OAI-PMH endpoint pattern:
+    #   https://<subdomain>.pensoft.net/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=<set>
+    # All entries confirmed to embed schema:contentLocation GeoCoordinates JSON-LD
+    # in article pages. Coverage is article-type-dependent: data papers and taxonomic
+    # revisions ~80–100%; reviews and methods articles ~0%.
+    # Full audit of all 130 ARPHA OAI sets conducted 2026-06-09.
+    # Use --source-prefix pensoft to harvest all pensoft-* sources in one run.
     'pensoft-bdj': {
         'name': 'Biodiversity Data Journal',
         'url': 'https://bdj.pensoft.net/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=bdj',
-        'collection_name': 'Biodiversity Data Journal',
+        'collection_name': 'Pensoft Publishers',
         'homepage_url': 'https://bdj.pensoft.net/',
         'publisher_name': 'Pensoft Publishers',
         'source_type': 'oai-pmh',
         'issn_l': '1314-2828',
+        'is_oa': True,
+        'default_work_type': 'article',
+    },
+    'pensoft-zookeys': {
+        'name': 'ZooKeys',
+        'url': 'https://zookeys.pensoft.net/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=zookeys',
+        'collection_name': 'Pensoft Publishers',
+        'homepage_url': 'https://zookeys.pensoft.net/',
+        'publisher_name': 'Pensoft Publishers',
+        'source_type': 'oai-pmh',
+        'issn_l': '1313-2970',
+        'is_oa': True,
+        'default_work_type': 'article',
+    },
+    'pensoft-phytokeys': {
+        'name': 'PhytoKeys',
+        'url': 'https://phytokeys.pensoft.net/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=phytokeys',
+        'collection_name': 'Pensoft Publishers',
+        'homepage_url': 'https://phytokeys.pensoft.net/',
+        'publisher_name': 'Pensoft Publishers',
+        'source_type': 'oai-pmh',
+        'issn_l': '1314-2003',
+        'is_oa': True,
+        'default_work_type': 'article',
+    },
+    'pensoft-neobiota': {
+        'name': 'NeoBiota',
+        'url': 'https://neobiota.pensoft.net/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=neobiota',
+        'collection_name': 'Pensoft Publishers',
+        'homepage_url': 'https://neobiota.pensoft.net/',
+        'publisher_name': 'Pensoft Publishers',
+        'source_type': 'oai-pmh',
+        'issn_l': '1619-0033',
+        'is_oa': True,
+        'default_work_type': 'article',
+    },
+    'pensoft-mycokeys': {
+        'name': 'MycoKeys',
+        'url': 'https://mycokeys.pensoft.net/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=mycokeys',
+        'collection_name': 'Pensoft Publishers',
+        'homepage_url': 'https://mycokeys.pensoft.net/',
+        'publisher_name': 'Pensoft Publishers',
+        'source_type': 'oai-pmh',
+        'issn_l': '1314-4049',
+        'is_oa': True,
+        'default_work_type': 'article',
+    },
+    'pensoft-herpetozoa': {
+        'name': 'Herpetozoa',
+        'url': 'https://herpetozoa.pensoft.net/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=herpetozoa',
+        'collection_name': 'Pensoft Publishers',
+        'homepage_url': 'https://herpetozoa.pensoft.net/',
+        'publisher_name': 'Pensoft Publishers',
+        'source_type': 'oai-pmh',
+        'issn_l': '1013-4425',
+        'is_oa': True,
+        'default_work_type': 'article',
+    },
+    'pensoft-natureconservation': {
+        'name': 'Nature Conservation',
+        'url': 'https://natureconservation.pensoft.net/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=natureconservation',
+        'collection_name': 'Pensoft Publishers',
+        'homepage_url': 'https://natureconservation.pensoft.net/',
+        'publisher_name': 'Pensoft Publishers',
+        'source_type': 'oai-pmh',
+        'issn_l': '1314-3301',
+        'is_oa': True,
+        'default_work_type': 'article',
+    },
+    'pensoft-jhr': {
+        'name': 'Journal of Hymenoptera Research',
+        'url': 'https://jhr.pensoft.net/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=jhr',
+        'collection_name': 'Pensoft Publishers',
+        'homepage_url': 'https://jhr.pensoft.net/',
+        'publisher_name': 'Pensoft Publishers',
+        'source_type': 'oai-pmh',
+        'issn_l': '1070-9428',
+        'is_oa': True,
+        'default_work_type': 'article',
+    },
+    'pensoft-alpineentomology': {
+        'name': 'Alpine Entomology',
+        'url': 'https://alpineentomology.pensoft.net/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=alpineentomology',
+        'collection_name': 'Pensoft Publishers',
+        'homepage_url': 'https://alpineentomology.pensoft.net/',
+        'publisher_name': 'Pensoft Publishers',
+        'source_type': 'oai-pmh',
+        'issn_l': '2535-0889',
+        'is_oa': True,
+        'default_work_type': 'article',
+    },
+    'pensoft-subtbiol': {
+        'name': 'Subterranean Biology',
+        'url': 'https://subtbiol.pensoft.net/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=subtbiol',
+        'collection_name': 'Pensoft Publishers',
+        'homepage_url': 'https://subtbiol.pensoft.net/',
+        'publisher_name': 'Pensoft Publishers',
+        'source_type': 'oai-pmh',
+        'issn_l': '1768-1448',
+        'is_oa': True,
+        'default_work_type': 'article',
+    },
+    'pensoft-zse': {
+        'name': 'Zoosystematics and Evolution',
+        'url': 'https://zse.pensoft.net/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=zse',
+        'collection_name': 'Pensoft Publishers',
+        'homepage_url': 'https://zse.pensoft.net/',
+        'publisher_name': 'Pensoft Publishers',
+        'source_type': 'oai-pmh',
+        'issn_l': '1435-1935',
+        'is_oa': True,
+        'default_work_type': 'article',
+    },
+    'pensoft-jor': {
+        'name': 'Journal of Orthoptera Research',
+        'url': 'https://jor.pensoft.net/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=jor',
+        'collection_name': 'Pensoft Publishers',
+        'homepage_url': 'https://jor.pensoft.net/',
+        'publisher_name': 'Pensoft Publishers',
+        'source_type': 'oai-pmh',
+        'issn_l': '1082-6467',
+        'is_oa': True,
+        'default_work_type': 'article',
+    },
+    'pensoft-africaninvertebrates': {
+        'name': 'African Invertebrates',
+        'url': 'https://africaninvertebrates.pensoft.net/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=africaninvertebrates',
+        'collection_name': 'Pensoft Publishers',
+        'homepage_url': 'https://africaninvertebrates.pensoft.net/',
+        'publisher_name': 'Pensoft Publishers',
+        'source_type': 'oai-pmh',
+        'issn_l': '1681-5556',
+        'is_oa': True,
+        'default_work_type': 'article',
+    },
+    'pensoft-oneecosystem': {
+        'name': 'One Ecosystem',
+        'url': 'https://oneecosystem.pensoft.net/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=oneecosystem',
+        'collection_name': 'Pensoft Publishers',
+        'homepage_url': 'https://oneecosystem.pensoft.net/',
+        'publisher_name': 'Pensoft Publishers',
+        'source_type': 'oai-pmh',
+        'issn_l': '2367-8194',
+        'is_oa': True,
+        'default_work_type': 'article',
+    },
+    'pensoft-evolsyst': {
+        'name': 'Evolutionary Systematics',
+        'url': 'https://evolsyst.pensoft.net/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=evolsyst',
+        'collection_name': 'Pensoft Publishers',
+        'homepage_url': 'https://evolsyst.pensoft.net/',
+        'publisher_name': 'Pensoft Publishers',
+        'source_type': 'oai-pmh',
+        'issn_l': '2535-0730',
+        'is_oa': True,
+        'default_work_type': 'article',
+    },
+    'pensoft-dez': {
+        'name': 'Deutsche Entomologische Zeitschrift',
+        'url': 'https://dez.pensoft.net/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=dez',
+        'collection_name': 'Pensoft Publishers',
+        'homepage_url': 'https://dez.pensoft.net/',
+        'publisher_name': 'Pensoft Publishers',
+        'source_type': 'oai-pmh',
+        'issn_l': '1435-1951',
+        'is_oa': True,
+        'default_work_type': 'article',
+    },
+    'pensoft-mbmg': {
+        'name': 'Metabarcoding and Metagenomics',
+        'url': 'https://mbmg.pensoft.net/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=mbmg',
+        'collection_name': 'Pensoft Publishers',
+        'homepage_url': 'https://mbmg.pensoft.net/',
+        'publisher_name': 'Pensoft Publishers',
+        'source_type': 'oai-pmh',
+        'issn_l': '2534-9708',
+        'is_oa': True,
+        'default_work_type': 'article',
+    },
+    'pensoft-neotropical': {
+        'name': 'Neotropical Biology and Conservation',
+        'url': 'https://neotropical.pensoft.net/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=neotropical',
+        'collection_name': 'Pensoft Publishers',
+        'homepage_url': 'https://neotropical.pensoft.net/',
+        'publisher_name': 'Pensoft Publishers',
+        'source_type': 'oai-pmh',
+        'issn_l': '2236-3777',
+        'is_oa': True,
+        'default_work_type': 'article',
+    },
+    'pensoft-zoologia': {
+        'name': 'Zoologia (Curitiba)',
+        'url': 'https://zoologia.pensoft.net/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=zoologia',
+        'collection_name': 'Pensoft Publishers',
+        'homepage_url': 'https://zoologia.pensoft.net/',
+        'publisher_name': 'Pensoft Publishers',
+        'source_type': 'oai-pmh',
+        'issn_l': '1984-4670',
+        'is_oa': True,
+        'default_work_type': 'article',
+    },
+    'pensoft-biorisk': {
+        'name': 'BioRisk',
+        'url': 'https://biorisk.pensoft.net/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=biorisk',
+        'collection_name': 'Pensoft Publishers',
+        'homepage_url': 'https://biorisk.pensoft.net/',
+        'publisher_name': 'Pensoft Publishers',
+        'source_type': 'oai-pmh',
+        'issn_l': '1313-2644',
+        'is_oa': True,
+        'default_work_type': 'article',
+    },
+    'pensoft-caucasiana': {
+        'name': 'Caucasiana',
+        'url': 'https://caucasiana.pensoft.net/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=caucasiana',
+        'collection_name': 'Pensoft Publishers',
+        'homepage_url': 'https://caucasiana.pensoft.net/',
+        'publisher_name': 'Pensoft Publishers',
+        'source_type': 'oai-pmh',
+        'issn_l': '2667-9809',
+        'is_oa': True,
+        'default_work_type': 'article',
+    },
+    'pensoft-italianbotanist': {
+        'name': 'Italian Botanist',
+        'url': 'https://italianbotanist.pensoft.net/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=italianbotanist',
+        'collection_name': 'Pensoft Publishers',
+        'homepage_url': 'https://italianbotanist.pensoft.net/',
+        'publisher_name': 'Pensoft Publishers',
+        'source_type': 'oai-pmh',
+        'issn_l': '2531-4033',
+        'is_oa': True,
+        'default_work_type': 'article',
+    },
+    'pensoft-nl': {
+        'name': 'Nota Lepidopterologica',
+        'url': 'https://nl.pensoft.net/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=nl',
+        'collection_name': 'Pensoft Publishers',
+        'homepage_url': 'https://nl.pensoft.net/',
+        'publisher_name': 'Pensoft Publishers',
+        'source_type': 'oai-pmh',
+        'issn_l': '0342-7536',
+        'is_oa': True,
+        'default_work_type': 'article',
+    },
+    'pensoft-zitteliana': {
+        'name': 'Zitteliana',
+        'url': 'https://zitteliana.pensoft.net/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=zitteliana',
+        'collection_name': 'Pensoft Publishers',
+        'homepage_url': 'https://zitteliana.pensoft.net/',
+        'publisher_name': 'Pensoft Publishers',
+        'source_type': 'oai-pmh',
+        'issn_l': '2512-5338',
+        'is_oa': True,
+        'default_work_type': 'article',
+    },
+    'pensoft-abs': {
+        'name': 'Acta Biologica Sibirica',
+        'url': 'https://abs.pensoft.net/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=abs',
+        'collection_name': 'Pensoft Publishers',
+        'homepage_url': 'https://abs.pensoft.net/',
+        'publisher_name': 'Pensoft Publishers',
+        'source_type': 'oai-pmh',
+        'issn_l': '2412-1908',
+        'is_oa': True,
+        'default_work_type': 'article',
+    },
+    'pensoft-saddi': {
+        'name': 'Scientific Annals of the Danube Delta Institute',
+        'url': 'https://saddi.pensoft.net/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=saddi',
+        'collection_name': 'Pensoft Publishers',
+        'homepage_url': 'https://saddi.pensoft.net/',
+        'publisher_name': 'Pensoft Publishers',
+        'source_type': 'oai-pmh',
+        'issn_l': '1842-614X',
+        'is_oa': True,
+        'default_work_type': 'article',
+    },
+    'pensoft-vdj': {
+        'name': 'Viticulture Data Journal',
+        'url': 'https://vdj.pensoft.net/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=vdj',
+        'collection_name': 'Pensoft Publishers',
+        'homepage_url': 'https://vdj.pensoft.net/',
+        'publisher_name': 'Pensoft Publishers',
+        'source_type': 'oai-pmh',
+        'issn_l': '2603-431X',
+        'is_oa': True,
+        'default_work_type': 'article',
+    },
+    'pensoft-anhmw': {
+        'name': 'Annals of the Natural History Museum Vienna',
+        'url': 'https://anhmw.pensoft.net/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=anhmw',
+        'collection_name': 'Pensoft Publishers',
+        'homepage_url': 'https://anhmw.pensoft.net/',
+        'publisher_name': 'Naturhistorisches Museum Wien',
+        'source_type': 'oai-pmh',
+        'issn_l': '3061-0206',
+        'is_oa': True,
+        'default_work_type': 'article',
+    },
+    'pensoft-aer': {
+        'name': 'Arctic Environmental Research',
+        'url': 'https://aer.pensoft.net/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=aer',
+        'collection_name': 'Pensoft Publishers',
+        'homepage_url': 'https://aer.pensoft.net/',
+        'publisher_name': 'Pensoft Publishers',
+        'source_type': 'oai-pmh',
+        'issn_l': '2541-8416',
+        'is_oa': True,
+        'default_work_type': 'article',
+    },
+    'biosystecol': {
+        'name': 'Biosystematics and Ecology',
+        'url': 'https://biosystecol.oeaw.ac.at/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=biosystecol',
+        'collection_name': 'Biosystematics and Ecology',
+        'homepage_url': 'https://biosystecol.oeaw.ac.at/',
+        'publisher_name': 'Austrian Academy of Sciences',
+        'source_type': 'oai-pmh',
+        'issn_l': '1026-4949',
+        'is_oa': True,
+        'default_work_type': 'article',
+    },
+    'bulletinofinsectology': {
+        'name': 'Bulletin of Insectology',
+        'url': 'https://bulletinofinsectology.org/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=bulletinofinsectology',
+        'collection_name': 'Bulletin of Insectology',
+        'homepage_url': 'https://bulletinofinsectology.org/',
+        'publisher_name': 'University of Bologna',
+        'source_type': 'oai-pmh',
+        'issn_l': '1721-8861',
+        'is_oa': True,
+        'default_work_type': 'article',
+    },
+    'pensoft-nhcm': {
+        'name': 'Natural History Collections and Museomics',
+        'url': 'https://nhcm.pensoft.net/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=nhcm',
+        'collection_name': 'Pensoft Publishers',
+        'homepage_url': 'https://nhcm.pensoft.net/',
+        'publisher_name': 'Pensoft Publishers',
+        'source_type': 'oai-pmh',
+        'issn_l': '3033-0955',
         'is_oa': True,
         'default_work_type': 'article',
     },
@@ -277,6 +620,16 @@ class Command(BaseCommand):
             help='Email of user to associate with harvesting events (optional)',
         )
         parser.add_argument(
+            '--source-prefix',
+            dest='source_prefix',
+            default=None,
+            help=(
+                'Harvest all enabled sources whose key starts with this prefix '
+                '(e.g. --source-prefix pensoft selects all pensoft-* sources). '
+                'Can be combined with --include-disabled.'
+            ),
+        )
+        parser.add_argument(
             '--list',
             action='store_true',
             help='List available sources and exit',
@@ -333,9 +686,21 @@ class Command(BaseCommand):
                 ]
         elif options['source']:
             sources_to_harvest = options['source']
+        elif options['source_prefix']:
+            prefix = options['source_prefix']
+            sources_to_harvest = [
+                k for k, c in SOURCE_CONFIG.items()
+                if k.startswith(prefix) and (_is_enabled(c) or include_disabled)
+            ]
+            if not sources_to_harvest:
+                raise CommandError(
+                    f"No {'enabled ' if not include_disabled else ''}sources match "
+                    f"prefix '{prefix}'. Use --list to see available sources."
+                )
         else:
             raise CommandError(
-                'Please specify --all to harvest all enabled sources, or '
+                'Please specify --all to harvest all enabled sources, '
+                '--source-prefix <prefix> for a group, or '
                 '--source <name> for specific sources.\n'
                 'Use --list to see available sources.'
             )
@@ -653,6 +1018,7 @@ class Command(BaseCommand):
             is_preprint=config.get('is_preprint', False),
             default_work_type=config.get('default_work_type', 'article'),
             openalex_id=config.get('openalex_id'),
+            issn_l=config.get('issn_l'),
             harvest_interval_minutes=0,
         )
 
@@ -685,7 +1051,7 @@ class Command(BaseCommand):
                 source.collection = col
                 update_fields.append('collection')
 
-        for field in ('homepage_url', 'publisher_name', 'default_work_type', 'openalex_id'):
+        for field in ('homepage_url', 'publisher_name', 'default_work_type', 'openalex_id', 'issn_l'):
             new_value = config.get(field)
             if not new_value or getattr(source, field):
                 continue
