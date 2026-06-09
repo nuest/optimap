@@ -433,3 +433,45 @@ class CollectionApiTests(_CollectionFixtureMixin, TestCase):
         staff = User.objects.create_user('staff_api2', 'staff2@test.com', 'pw', is_staff=True)
         self.client.force_login(staff)
         self.assertEqual(self.client.get(self._detail('hidden-col')).status_code, 200)
+
+    # --- pagination envelope ---
+
+    def test_list_pagination_envelope(self):
+        data = self.client.get(self.LIST_URL).json()
+        for key in ('count', 'next', 'previous', 'results'):
+            self.assertIn(key, data)
+        self.assertIsInstance(data['results'], list)
+
+    # --- 404 for nonexistent identifier ---
+
+    def test_detail_404_for_unknown_identifier(self):
+        self.assertEqual(self.client.get(self._detail('does-not-exist')).status_code, 404)
+
+    # --- read-only enforcement ---
+
+    def test_list_post_not_allowed(self):
+        self.assertEqual(self.client.post(self.LIST_URL, {}, content_type='application/json').status_code, 405)
+
+    def test_detail_put_not_allowed(self):
+        self.assertEqual(
+            self.client.put(self._detail('test-col'), {}, content_type='application/json').status_code,
+            405,
+        )
+
+    def test_detail_delete_not_allowed(self):
+        self.assertEqual(self.client.delete(self._detail('test-col')).status_code, 405)
+
+    # --- API root includes collections ---
+
+    def test_api_root_has_collections_link(self):
+        data = self.client.get('/api/v1/').json()
+        self.assertIn('collections', data)
+        self.assertIn('/api/v1/collections/', data['collections'])
+
+    # --- works_count for empty collection ---
+
+    def test_works_count_zero_for_empty_collection(self):
+        empty = Collection.objects.create(identifier='empty-col', name='Empty', is_published=True)
+        data = self.client.get(self._detail('empty-col')).json()
+        self.assertEqual(data['works_count'], 0)
+        empty.delete()

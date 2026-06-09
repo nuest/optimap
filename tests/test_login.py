@@ -3,19 +3,21 @@
 
 import os
 import unittest
-from django.test import Client
+from django.test import TestCase, Client
 from django.contrib.auth import get_user_model
 User = get_user_model()
 from datetime import datetime
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'optimap.settings')
 
-class SimpleTest(unittest.TestCase):
+class SimpleTest(TestCase):
     def setUp(self):
         self.client = Client()
 
     def test_login(self):
         """Test that fields for logged in users are set correctly"""
+        # Guard against a stale row left by an earlier unittest.TestCase run on --keepdb.
+        User.objects.filter(username="test@example.com").delete()
         self.user = User.objects.create_user(username="test@example.com", email="test@example.com", password="password")
         self.client.login(username="testuser", password="password")
 

@@ -73,9 +73,8 @@ class GeoFeedTestCase(TestCase):
         return xml_content
 
     def _normalize_timestamps(self, xml_content):
-        """ Replace dynamic timestamps with placeholder for comparison """
+        """ Replace dynamic values with placeholders for stable comparison """
         import re
-        # Normalize lastBuildDate/updated timestamps to fixed value
         xml_content = re.sub(
             r'<lastBuildDate>[^<]+</lastBuildDate>',
             '<lastBuildDate>TIMESTAMP</lastBuildDate>',
@@ -86,6 +85,9 @@ class GeoFeedTestCase(TestCase):
             '<updated>TIMESTAMP</updated>',
             xml_content
         )
+        # Normalize test-server hostnames so the reference is environment-agnostic.
+        xml_content = xml_content.replace('http://testserver', 'http://TESTSERVER')
+        xml_content = xml_content.replace('http://127.0.0.1:8000', 'http://TESTSERVER')
         return xml_content
 
     def _compare_with_reference(self, generated_xml, filename):
