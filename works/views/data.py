@@ -11,6 +11,7 @@ This module handles:
 - Data download endpoints
 """
 
+import json
 import logging
 logger = logging.getLogger(__name__)
 
@@ -93,6 +94,36 @@ def download_geojson(request):
         response['Content-Disposition'] = f'attachment; filename="{Path(json_path).name}"'
     return response
 
+def _unwrap_ogr_geometry(geom):
+    """OGR-API mirror of _unwrap_geometry_collection for the global GeoPackage builder."""
+    if geom is None:
+        return None
+    if geom.GetGeometryType() != ogr.wkbGeometryCollection:
+        return geom
+    count = geom.GetGeometryCount()
+    if count == 0:
+        return None
+    if count == 1:
+        return geom.GetGeometryRef(0).Clone()
+    types = {geom.GetGeometryRef(i).GetGeometryType() for i in range(count)}
+    if len(types) == 1:
+        base = types.pop()
+        multi_map = {
+            ogr.wkbPoint: ogr.wkbMultiPoint,
+            ogr.wkbLineString: ogr.wkbMultiLineString,
+            ogr.wkbPolygon: ogr.wkbMultiPolygon,
+        }
+        if base in multi_map:
+            multi = ogr.Geometry(multi_map[base])
+            for i in range(count):
+                multi.AddGeometry(geom.GetGeometryRef(i).Clone())
+            srs = geom.GetSpatialReference()
+            if srs:
+                multi.AssignSpatialReference(srs)
+            return multi
+    return geom
+
+
 def generate_geopackage():
     cache_dir = os.path.join(tempfile.gettempdir(), "optimap_cache")
     os.makedirs(cache_dir, exist_ok=True)
@@ -104,7 +135,8 @@ def generate_geopackage():
     ds = driver.CreateDataSource(gpkg_path)
     srs = osr.SpatialReference()
     srs.ImportFromEPSG(4326)
-    layer = ds.CreateLayer("works", srs, ogr.wkbGeometryCollection)
+    # wkbUnknown allows mixed primitive types so QGIS can render features.
+    layer = ds.CreateLayer("works", srs, ogr.wkbUnknown)
 
     for name in ("title", "abstract", "doi", "source"):
         field_defn = ogr.FieldDefn(name, ogr.OFTString)
@@ -122,7 +154,9 @@ def generate_geopackage():
             wkb = work.geometry.wkb
             geom = ogr.CreateGeometryFromWkb(wkb)
             geom.AssignSpatialReference(srs)
-            feat.SetGeometry(geom)
+            geom = _unwrap_ogr_geometry(geom)
+            if geom is not None:
+                feat.SetGeometry(geom)
         layer.CreateFeature(feat)
         feat = None
 
@@ -199,14 +233,54 @@ def _collection_qs(collection):
     return Work.objects.filter(collections=collection, status="p")
 
 
+def _unwrap_geometry_collection(geom):
+    """Unwrap the GeometryCollection envelope that Django's GeometryCollectionField always emits.
+
+    Django stores every geometry as a GeometryCollection, even when a work has a
+    single Point or Polygon.  Leaving the wrapper intact causes ogr2ogr to declare
+    the GeoPackage layer type as GEOMETRYCOLLECTION, which QGIS and most GIS tools
+    cannot render with a default symbology (the layer loads but shows no features).
+
+    Transformation rules applied to each GeoJSON geometry dict:
+    - GeometryCollection([X])           → X          (unwrap single-member)
+    - GeometryCollection([X, X, ...])   → Multi* X   (same-type members → Multi*)
+    - GeometryCollection([X, Y, ...])   → unchanged  (mixed types, rare)
+    - null / non-collection             → unchanged
+    """
+    if geom is None or geom.get("type") != "GeometryCollection":
+        return geom
+    parts = [g for g in (geom.get("geometries") or []) if g is not None]
+    if not parts:
+        return None
+    if len(parts) == 1:
+        return parts[0]
+    types = {g["type"] for g in parts}
+    if len(types) == 1:
+        base = types.pop()
+        multi_map = {"Point": "MultiPoint", "LineString": "MultiLineString", "Polygon": "MultiPolygon"}
+        if base in multi_map:
+            return {"type": multi_map[base], "coordinates": [g["coordinates"] for g in parts]}
+    return geom
+
+
+def _serialize_collection_geojson(collection):
+    """Return a GeoJSON FeatureCollection string for published works in *collection*,
+    with GeometryCollection wrappers unwrapped to primitive / Multi* types."""
+    raw = serialize("geojson", _collection_qs(collection), geometry_field="geometry", srid=4326)
+    data = json.loads(raw)
+    for feat in data.get("features", []):
+        feat["geometry"] = _unwrap_geometry_collection(feat.get("geometry"))
+    return json.dumps(data)
+
+
 def _generate_collection_converted_bytes(collection, ogr_fmt, layer_creation_options=None):
-    """Serialize collection works to an in-memory GeoJSON then convert via ogr2ogr."""
+    """Serialize collection works to a GeoJSON (with unwrapped geometries) then convert via ogr2ogr."""
     with tempfile.TemporaryDirectory() as tmpdir:
         ext = ogr_fmt.lower() if ogr_fmt != "CSV" else "csv"
         geojson_path = os.path.join(tmpdir, "data.geojson")
         out_path = os.path.join(tmpdir, f"data.{ext}")
         with open(geojson_path, "w") as f:
-            serialize("geojson", _collection_qs(collection), geometry_field="geometry", srid=4326, stream=f)
+            f.write(_serialize_collection_geojson(collection))
         cmd = ["ogr2ogr", "-f", ogr_fmt, out_path, geojson_path]
         for opt in layer_creation_options or []:
             cmd.extend(["-lco", opt])
@@ -240,7 +314,7 @@ def download_collection_geojson(request, collection_slug):
     force = request.GET.get("now") is not None
     data = None if force else cache.get(cache_key)
     if data is None:
-        data = serialize("geojson", _collection_qs(collection), geometry_field="geometry", srid=4326)
+        data = _serialize_collection_geojson(collection)
         cache.set(cache_key, data, settings.FEED_CACHE_HOURS * 3600)
     response = HttpResponse(data, content_type="application/json")
     response["Content-Disposition"] = f'attachment; filename="optimap_collection_{collection_slug}.geojson"'

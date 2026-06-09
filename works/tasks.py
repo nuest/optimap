@@ -16,6 +16,7 @@ GeoPackage cache regeneration, schedule helpers) still live here.
 import calendar
 import glob
 import gzip
+import json
 import logging
 import os
 import subprocess
@@ -491,20 +492,49 @@ def schedule_inactivity_deletion_task():
 # Data dump regeneration.
 # -----------------------------------------------------------------------------
 
+def _unwrap_geometry_collection(geom):
+    """Unwrap a single-member GeometryCollection to its primitive type.
+
+    Django's GeometryCollectionField always emits a GEOMETRYCOLLECTION wrapper,
+    even for a single Point or Polygon.  GIS tools (QGIS, ArcGIS) cannot apply
+    default symbology to GEOMETRYCOLLECTION layers, so we strip the wrapper here
+    before writing any GeoJSON or GeoPackage export.
+    """
+    if geom is None or geom.get("type") != "GeometryCollection":
+        return geom
+    parts = [g for g in (geom.get("geometries") or []) if g is not None]
+    if not parts:
+        return None
+    if len(parts) == 1:
+        return parts[0]
+    types = {g["type"] for g in parts}
+    if len(types) == 1:
+        base = types.pop()
+        multi_map = {"Point": "MultiPoint", "LineString": "MultiLineString", "Polygon": "MultiPolygon"}
+        if base in multi_map:
+            return {"type": multi_map[base], "coordinates": [g["coordinates"] for g in parts]}
+    return geom
+
+
 def regenerate_geojson_cache():
     cache_dir = os.path.join(tempfile.gettempdir(), "optimap_cache")
     os.makedirs(cache_dir, exist_ok=True)
 
     json_filename = generate_data_dump_filename("geojson")
     json_path = os.path.join(cache_dir, json_filename)
+    # Serialize to a string first so we can unwrap GeometryCollection wrappers
+    # before writing to disk; ogr2ogr and QGIS need primitive geometry types.
+    raw = serialize(
+        'geojson',
+        Work.objects.filter(status="p"),
+        geometry_field='geometry',
+        srid=4326,
+    )
+    data = json.loads(raw)
+    for feat in data.get("features", []):
+        feat["geometry"] = _unwrap_geometry_collection(feat.get("geometry"))
     with open(json_path, 'w') as f:
-        serialize(
-            'geojson',
-            Work.objects.filter(status="p"),
-            geometry_field='geometry',
-            srid=4326,
-            stream=f
-        )
+        json.dump(data, f)
 
     gzip_filename = generate_data_dump_filename("geojson.gz")
     gzip_path = os.path.join(cache_dir, gzip_filename)

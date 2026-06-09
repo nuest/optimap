@@ -223,8 +223,12 @@ class GeoDataAlternativeTestCase(TestCase):
         self.assertEqual(len(rows), Work.objects.filter(status='p').count())
         self.assertIn('WKT', rows[0],
                       "CSV must carry a WKT geometry column (issue #206)")
-        self.assertTrue(rows[0]['WKT'].startswith('GEOMETRYCOLLECTION'),
-                        f"WKT column should hold a GeometryCollection, got: {rows[0]['WKT']!r}")
+        valid_prefixes = ('POINT', 'MULTIPOINT', 'LINESTRING', 'MULTILINESTRING',
+                          'POLYGON', 'MULTIPOLYGON', 'GEOMETRYCOLLECTION')
+        self.assertTrue(
+            rows[0]['WKT'].upper().startswith(valid_prefixes),
+            f"WKT column should hold a valid geometry type, got: {rows[0]['WKT']!r}",
+        )
         self.assertIn('title', rows[0],
                       "CSV should expose the work title alongside the geometry")
 

@@ -4,14 +4,17 @@
 """Tests for collection-scoped feeds (#248) and download endpoints (#217)."""
 
 import json
+import tempfile
 import xml.etree.ElementTree as ET
 
 from django.contrib.auth import get_user_model
-from django.contrib.gis.geos import GeometryCollection, Point
+from django.contrib.gis.geos import GeometryCollection, LineString, Point, Polygon
 from django.test import TestCase
 from django.urls import reverse
+from osgeo import ogr
 
 from works.models import Collection, Work
+from works.views.data import _unwrap_geometry_collection
 
 User = get_user_model()
 
@@ -475,3 +478,286 @@ class CollectionApiTests(_CollectionFixtureMixin, TestCase):
         data = self.client.get(self._detail('empty-col')).json()
         self.assertEqual(data['works_count'], 0)
         empty.delete()
+
+
+# ---------------------------------------------------------------------------
+# Unit tests for geometry-unwrapping helper
+# ---------------------------------------------------------------------------
+
+class UnwrapGeometryCollectionTests(TestCase):
+    """Unit tests for works.views.data._unwrap_geometry_collection."""
+
+    def _point(self):
+        return {"type": "Point", "coordinates": [12.0, 41.0]}
+
+    def _polygon(self):
+        return {"type": "Polygon", "coordinates": [[[0, 0], [1, 0], [1, 1], [0, 0]]]}
+
+    def test_none_passes_through(self):
+        self.assertIsNone(_unwrap_geometry_collection(None))
+
+    def test_non_collection_passes_through(self):
+        pt = self._point()
+        self.assertEqual(_unwrap_geometry_collection(pt), pt)
+
+    def test_polygon_passes_through(self):
+        pg = self._polygon()
+        self.assertEqual(_unwrap_geometry_collection(pg), pg)
+
+    def test_single_point_unwrapped(self):
+        pt = self._point()
+        gc = {"type": "GeometryCollection", "geometries": [pt]}
+        result = _unwrap_geometry_collection(gc)
+        self.assertEqual(result["type"], "Point")
+        self.assertEqual(result["coordinates"], pt["coordinates"])
+
+    def test_single_polygon_unwrapped(self):
+        pg = self._polygon()
+        gc = {"type": "GeometryCollection", "geometries": [pg]}
+        result = _unwrap_geometry_collection(gc)
+        self.assertEqual(result["type"], "Polygon")
+
+    def test_empty_collection_returns_none(self):
+        gc = {"type": "GeometryCollection", "geometries": []}
+        self.assertIsNone(_unwrap_geometry_collection(gc))
+
+    def test_two_points_become_multipoint(self):
+        pt1 = {"type": "Point", "coordinates": [0.0, 0.0]}
+        pt2 = {"type": "Point", "coordinates": [1.0, 1.0]}
+        gc = {"type": "GeometryCollection", "geometries": [pt1, pt2]}
+        result = _unwrap_geometry_collection(gc)
+        self.assertEqual(result["type"], "MultiPoint")
+        self.assertEqual(len(result["coordinates"]), 2)
+
+    def test_two_polygons_become_multipolygon(self):
+        pg1 = self._polygon()
+        pg2 = {"type": "Polygon", "coordinates": [[[5, 5], [6, 5], [6, 6], [5, 5]]]}
+        gc = {"type": "GeometryCollection", "geometries": [pg1, pg2]}
+        result = _unwrap_geometry_collection(gc)
+        self.assertEqual(result["type"], "MultiPolygon")
+        self.assertEqual(len(result["coordinates"]), 2)
+
+    def test_mixed_types_stay_as_collection(self):
+        gc = {"type": "GeometryCollection", "geometries": [self._point(), self._polygon()]}
+        result = _unwrap_geometry_collection(gc)
+        self.assertEqual(result["type"], "GeometryCollection")
+
+
+# ---------------------------------------------------------------------------
+# GeoJSON download geometry-type assertions
+# ---------------------------------------------------------------------------
+
+class CollectionDownloadGeometryTests(_CollectionFixtureMixin, TestCase):
+    """Verify that collection GeoJSON download contains primitive geometry types,
+    not bare GeometryCollection wrappers (QGIS rendering regression)."""
+
+    def _geojson(self, slug='test-col'):
+        return json.loads(
+            self.client.get(
+                reverse('optimap:download-collection-geojson', args=[slug]) + '?now'
+            ).content
+        )
+
+    def test_point_geometry_is_unwrapped(self):
+        data = self._geojson()
+        geo_types = {
+            f['geometry']['type']
+            for f in data['features']
+            if f.get('geometry') is not None
+        }
+        self.assertNotIn('GeometryCollection', geo_types,
+                         "GeoJSON export must not contain raw GeometryCollection wrappers")
+
+    def test_point_feature_has_point_type(self):
+        data = self._geojson()
+        # pub_geo is a single-point GeometryCollection — must unwrap to Point.
+        # Django's GeoJSON serializer puts fields directly under `properties`.
+        matching = [
+            f for f in data['features']
+            if f.get('properties', {}).get('doi') == '10.1234/pub'
+        ]
+        self.assertEqual(len(matching), 1)
+        self.assertEqual(matching[0]['geometry']['type'], 'Point')
+
+
+# ---------------------------------------------------------------------------
+# GDAL format validation — collection and global downloads
+# ---------------------------------------------------------------------------
+
+def _open_bytes_as_ogr(data, suffix):
+    """Write *data* to a named temp file, open it with OGR, return (datasource, path).
+    Caller is responsible for closing the datasource and deleting the file."""
+    tmp = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
+    tmp.write(data)
+    tmp.flush()
+    tmp.close()
+    ds = ogr.Open(tmp.name)
+    return ds, tmp.name
+
+
+class CollectionGdalValidationTests(_CollectionFixtureMixin, TestCase):
+    """GDAL-backed format validation for collection download endpoints."""
+
+    def _get_bytes(self, fmt, slug='test-col'):
+        url = reverse(f'optimap:download-collection-{fmt}', args=[slug]) + '?now'
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200)
+        return resp.content
+
+    # --- GeoJSON ---
+
+    def test_collection_geojson_opens_with_gdal(self):
+        ds, path = _open_bytes_as_ogr(self._get_bytes('geojson'), '.geojson')
+        try:
+            self.assertIsNotNone(ds, "GDAL could not open GeoJSON output")
+            self.assertGreater(ds.GetLayerCount(), 0)
+        finally:
+            ds = None
+            import os; os.unlink(path)
+
+    def test_collection_geojson_no_geometry_collection_type(self):
+        data = json.loads(self._get_bytes('geojson'))
+        geo_types = {
+            f['geometry']['type']
+            for f in data['features']
+            if f.get('geometry') is not None
+        }
+        self.assertNotIn('GeometryCollection', geo_types)
+
+    def test_collection_geojson_feature_count_matches_published(self):
+        ds, path = _open_bytes_as_ogr(self._get_bytes('geojson'), '.geojson')
+        try:
+            layer = ds.GetLayer(0)
+            self.assertEqual(layer.GetFeatureCount(), 2)  # pub_geo + pub_no_geo
+        finally:
+            ds = None
+            import os; os.unlink(path)
+
+    # --- GeoPackage ---
+
+    def test_collection_gpkg_opens_with_gdal(self):
+        ds, path = _open_bytes_as_ogr(self._get_bytes('gpkg'), '.gpkg')
+        try:
+            self.assertIsNotNone(ds, "GDAL could not open GeoPackage output")
+            self.assertGreater(ds.GetLayerCount(), 0)
+        finally:
+            ds = None
+            import os; os.unlink(path)
+
+    def test_collection_gpkg_no_geometry_collection_layer_type(self):
+        import os
+        data = self._get_bytes('gpkg')
+        ds, path = _open_bytes_as_ogr(data, '.gpkg')
+        try:
+            layer = ds.GetLayer(0)
+            geom_type = layer.GetGeomType()
+            self.assertNotEqual(
+                geom_type, ogr.wkbGeometryCollection,
+                "GeoPackage layer must not be declared as GEOMETRYCOLLECTION",
+            )
+        finally:
+            ds = None
+            os.unlink(path)
+
+    def test_collection_gpkg_feature_count_matches_published(self):
+        import os
+        ds, path = _open_bytes_as_ogr(self._get_bytes('gpkg'), '.gpkg')
+        try:
+            layer = ds.GetLayer(0)
+            self.assertEqual(layer.GetFeatureCount(), 2)
+        finally:
+            ds = None
+            os.unlink(path)
+
+    def test_collection_gpkg_point_features_have_point_geometry(self):
+        import os
+        ds, path = _open_bytes_as_ogr(self._get_bytes('gpkg'), '.gpkg')
+        try:
+            layer = ds.GetLayer(0)
+            point_types = {ogr.wkbPoint, ogr.wkbPoint25D, ogr.wkbPointM, ogr.wkbPointZM}
+            for feat in layer:
+                geom = feat.GetGeometryRef()
+                if geom is not None:
+                    doi = feat.GetField('doi') if feat.GetFieldIndex('doi') >= 0 else None
+                    if doi == '10.1234/pub':
+                        self.assertIn(geom.GetGeometryType(), point_types,
+                                      f"Expected Point type, got {geom.GetGeometryName()}")
+        finally:
+            ds = None
+            os.unlink(path)
+
+
+class GlobalDownloadGdalValidationTests(TestCase):
+    """GDAL validation for the global /download/geopackage/ endpoint."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.work_pt = Work.objects.create(
+            title='Global point work',
+            doi='10.1234/global-pt',
+            url='https://example.com/gpt',
+            status='p',
+            geometry=GeometryCollection(Point(13.4, 52.5)),
+        )
+        cls.work_pg = Work.objects.create(
+            title='Global polygon work',
+            doi='10.1234/global-pg',
+            url='https://example.com/gpg',
+            status='p',
+            geometry=GeometryCollection(Polygon([(0, 0), (1, 0), (1, 1), (0, 0)])),
+        )
+
+    def _get_gpkg_bytes(self):
+        resp = self.client.get('/download/geopackage/')
+        self.assertEqual(resp.status_code, 200)
+        # FileResponse is streaming; regular HttpResponse has .content.
+        if hasattr(resp, 'streaming_content'):
+            return b''.join(resp.streaming_content)
+        return resp.content
+
+    def test_global_gpkg_opens_with_gdal(self):
+        import os
+        ds, path = _open_bytes_as_ogr(self._get_gpkg_bytes(), '.gpkg')
+        try:
+            self.assertIsNotNone(ds, "GDAL could not open global GeoPackage output")
+            self.assertGreater(ds.GetLayerCount(), 0)
+        finally:
+            ds = None
+            os.unlink(path)
+
+    def test_global_gpkg_no_geometry_collection_layer_type(self):
+        import os
+        ds, path = _open_bytes_as_ogr(self._get_gpkg_bytes(), '.gpkg')
+        try:
+            layer = ds.GetLayer(0)
+            geom_type = layer.GetGeomType()
+            self.assertNotEqual(
+                geom_type, ogr.wkbGeometryCollection,
+                "Global GeoPackage layer must not be declared as GEOMETRYCOLLECTION",
+            )
+        finally:
+            ds = None
+            os.unlink(path)
+
+    def test_global_gpkg_has_point_and_polygon_features(self):
+        import os
+        ds, path = _open_bytes_as_ogr(self._get_gpkg_bytes(), '.gpkg')
+        try:
+            layer = ds.GetLayer(0)
+            point_types = {ogr.wkbPoint, ogr.wkbPoint25D}
+            polygon_types = {ogr.wkbPolygon, ogr.wkbPolygon25D, ogr.wkbMultiPolygon}
+            found_point = False
+            found_polygon = False
+            for feat in layer:
+                geom = feat.GetGeometryRef()
+                if geom is None:
+                    continue
+                if geom.GetGeometryType() in point_types:
+                    found_point = True
+                elif geom.GetGeometryType() in polygon_types:
+                    found_polygon = True
+            self.assertTrue(found_point, "No Point features found in global GeoPackage")
+            self.assertTrue(found_polygon, "No Polygon features found in global GeoPackage")
+        finally:
+            ds = None
+            os.unlink(path)
