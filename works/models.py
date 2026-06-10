@@ -421,6 +421,10 @@ class UserProfile(models.Model):
         max_length=64, unique=True, null=True, blank=True,
         help_text="Display name for the public contributor recognition board. Only shown when opt-in is enabled.",
     )
+    consented_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="Timestamp of the user's initial privacy-policy consent (set when they click 'I consent' on first login). Null for accounts created before this field was introduced.",
+    )
 
     def __str__(self):
         return f"{self.user.username} - Notifications: {self.notify_new_manuscripts}"

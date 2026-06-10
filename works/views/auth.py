@@ -35,6 +35,7 @@ import time
 from math import floor
 from django.conf import settings
 from django.db.models import Count, Q
+from django.utils import timezone
 from works.models import BlockedEmail, BlockedDomain, Contribution, Subscription, UserProfile, GlobalRegion
 from works.recognition import (
     RECOGNITION_TIERS,
@@ -172,6 +173,7 @@ def authenticate_via_magic_link(request, token):
         if is_new:
             from works.notifications import notify_admins_new_user_registered
             notify_admins_new_user_registered(user)
+            UserProfile.objects.filter(user=user).update(consented_at=timezone.now())
         login_user(request, user)
         # Redirect to next URL after successful login
         logger.info('User %s logged in successfully, redirecting to %s', email, next_url)

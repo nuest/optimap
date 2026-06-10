@@ -181,6 +181,49 @@ class NewUserAdminNotificationTests(TestCase):
         # No new-user notification for a returning user.
         self.assertEqual(len(mail.outbox), 0)
 
+    def test_consented_at_set_on_first_confirmed_login(self):
+        """consented_at is stamped on the UserProfile when a new user clicks 'I consent'."""
+        token = self._prime_magic_link("newcomer@example.org")
+
+        with patch("django_q.tasks.async_task", side_effect=_run_async_synchronously):
+            response = self.client.get(
+                reverse("optimap:magic_link", args=[token]) + "?confirmed=true"
+            )
+
+        self.assertEqual(response.status_code, 302)
+        user = User.objects.get(email="newcomer@example.org")
+        self.assertIsNotNone(user.userprofile.consented_at)
+
+    def test_consented_at_not_overwritten_on_returning_login(self):
+        """Returning users skip the elif branch; consented_at remains unchanged."""
+        from works.models import UserProfile
+        existing = User.objects.create_user(
+            username="veteran@example.org", email="veteran@example.org",
+        )
+        token = self._prime_magic_link(existing.email, token="tok-veteran")
+
+        with patch("django_q.tasks.async_task", side_effect=_run_async_synchronously):
+            self.client.get(reverse("optimap:magic_link", args=[token]))
+
+        profile = UserProfile.objects.get(user=existing)
+        self.assertIsNone(profile.consented_at)
+
+    def test_profile_created_for_user_without_one(self):
+        """Signal get_or_create guard: updating a legacy user without a UserProfile
+        must not raise RelatedObjectDoesNotExist."""
+        from works.models import UserProfile
+        existing = User.objects.create_user(
+            username="legacy@example.org", email="legacy@example.org",
+        )
+        # Simulate a legacy account by deleting its auto-created profile.
+        UserProfile.objects.filter(user=existing).delete()
+        self.assertFalse(UserProfile.objects.filter(user=existing).exists())
+
+        # Saving the user (as login_user does) must not raise.
+        existing.save()
+
+        self.assertTrue(UserProfile.objects.filter(user=existing).exists())
+
     def test_confirmed_true_for_existing_user_does_not_crash(self):
         """If ?confirmed=true reaches the view for an already-existing account
         (e.g. direct URL manipulation or a stale link), the view must log the
