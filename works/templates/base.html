@@ -166,36 +166,65 @@
       //     same auto-close behaviour. Use this in place of native browser
       //     `alert(...)` so errors / info pop up consistently with framework
       //     messages.
-      $(function () {
-        document.querySelectorAll('.alert-autoclose').forEach(function (el) {
-          const ttl = parseInt(el.dataset.ttl, 10) || 5000;
-          setTimeout(function () {
-            try { $(el).alert('close'); } catch (_) { el.remove(); }
-          }, ttl);
-        });
 
-        // Remove the flash-messages container once its last alert is gone so
-        // it doesn't leave an empty box (padding-top) above the page content.
-        // Bootstrap 4 fires closed.bs.alert *after* detach(), so that event
-        // never bubbles. A MutationObserver on the container is the reliable
-        // cross-version alternative — it fires when Bootstrap detaches the
-        // child, at which point we check whether any alerts remain.
-        function watchFlashHost(host) {
-          if (!host || host._flashWatcher) return;
-          host._flashWatcher = true;
-          new MutationObserver(function (mutations, obs) {
-            if (!host.querySelector('.alert')) { host.remove(); obs.disconnect(); }
-          }).observe(host, { childList: true });
-        }
+      // Remove the flash-messages container once its last alert is gone so it
+      // doesn't leave an empty box (padding-top) above the page content.
+      // Bootstrap 4 fires closed.bs.alert *after* detach(), so that event
+      // never bubbles. A MutationObserver on the container is the reliable
+      // cross-version alternative.
+      function watchFlashHost(host) {
+        if (!host || host._flashWatcher) return;
+        host._flashWatcher = true;
+        new MutationObserver(function (mutations, obs) {
+          if (!host.querySelector('.alert')) { host.remove(); obs.disconnect(); }
+        }).observe(host, { childList: true });
+      }
+
+      // Attach animated countdown to an auto-closing alert and wire up the
+      // click-to-keep interaction. Reads the timeout from data-ttl (ms).
+      function startAutoclose(el) {
+        const ttl = parseInt(el.dataset.ttl, 10) || 5000;
+        let remaining = Math.round(ttl / 1000);
+
+        const countdown = document.createElement('small');
+        countdown.className = 'alert-autoclose-countdown';
+        const secsSpan = document.createElement('span');
+        secsSpan.textContent = remaining;
+        countdown.appendChild(document.createTextNode('Closes in '));
+        countdown.appendChild(secsSpan);
+        countdown.appendChild(document.createTextNode(' s — click anywhere on the message to keep it open'));
+        el.insertBefore(countdown, el.querySelector('button.close'));
+
+        const interval = setInterval(function () {
+          remaining -= 1;
+          secsSpan.textContent = remaining;
+        }, 1000);
+
+        const timer = setTimeout(function () {
+          clearInterval(interval);
+          try { $(el).alert('close'); } catch (_) { el.remove(); }
+        }, ttl);
+
+        el.addEventListener('click', function () {
+          clearTimeout(timer);
+          clearInterval(interval);
+          countdown.remove();
+        }, { once: true });
+      }
+
+      $(function () {
+        document.querySelectorAll('.alert-autoclose').forEach(startAutoclose);
         watchFlashHost(document.getElementById('flash-messages'));
       });
 
       window.OPTIMAP_FLASH = function (level, message) {
         const cls = ({error: 'alert-danger', warning: 'alert-warning',
                       success: 'alert-success', info: 'alert-info'})[level] || 'alert-info';
+        const ttl = (level === 'error' || level === 'warning') ? 8000 : 5000;
         const div = document.createElement('div');
         div.className = 'alert ' + cls + ' alert-dismissible alert-autoclose fade show m-3';
         div.setAttribute('role', 'alert');
+        div.dataset.ttl = ttl;
         const text = document.createElement('span');
         text.textContent = message;
         div.appendChild(text);
@@ -216,11 +245,7 @@
         }
         watchFlashHost(host);
         host.appendChild(div);
-        // Errors and warnings get a longer dwell; matches the server-rendered defaults.
-        const ttl = (level === 'error' || level === 'warning') ? 8000 : 5000;
-        setTimeout(function () {
-          try { $(div).alert('close'); } catch (_) { div.remove(); }
-        }, ttl);
+        startAutoclose(div);
       };
     </script>
   </body>

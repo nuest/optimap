@@ -486,3 +486,11 @@ body.high-contrast .leaflet-control-zoom-to-all-button:focus {
   word-wrap: break-word;
   white-space: normal;
 }
+
+/* Countdown line shown inside auto-closing alerts */
+.alert-autoclose-countdown {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.8em;
+  opacity: 0.7;
+}

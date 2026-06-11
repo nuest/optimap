@@ -175,7 +175,7 @@ def authenticate_via_magic_link(request, token):
             notify_admins_new_user_registered(user)
             UserProfile.objects.filter(user=user).update(consented_at=timezone.now())
         login_user(request, user)
-        # Redirect to next URL after successful login
+        messages.success(request, "Welcome to OPTIMAP!")
         logger.info('User %s logged in successfully, redirecting to %s', email, next_url)
         return HttpResponseRedirect(next_url)
     else:
@@ -186,6 +186,7 @@ def authenticate_via_magic_link(request, token):
 
     # If user is already authenticated and doesn't need confirmation, redirect
     if not needs_confirmation and user:
+        messages.success(request, "Welcome back to OPTIMAP!")
         logger.info('User %s authenticated, redirecting to %s', email, next_url)
         return HttpResponseRedirect(next_url)
 
