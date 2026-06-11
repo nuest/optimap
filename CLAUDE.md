@@ -536,6 +536,14 @@ All geoextent endpoints return valid GeoJSON FeatureCollections by default, matc
   - Uses geoextent's `from_directory` for native extent combination
   - Returns: GeoJSON FeatureCollection with combined extent and individual features
 
+- `/api/v1/geoextent/extract-text/` - NER-based location extraction from free text (issue #199)
+  - Method: POST with JSON body
+  - Parameters: `text` (required), `gazetteer` (default from `OPTIMAP_GEOEXTENT_NER_GAZETTEER`), `ner_ambiguity` (`'drop'`/`'top'`), `tbox`, `convex_hull`
+  - Calls `geoextent.from_text()` with spaCy NER + gazetteer lookup
+  - Returns: GeoJSON FeatureCollection with `geoextent_extraction.place_names` (each entry has `char_start`/`char_end` offsets, `matched`, `candidate_count`, coordinates, `gazetteer_url`)
+  - spaCy model auto-downloads on first call (`ner_auto_download=True`)
+  - See [docs/ner_location_suggestions.md](docs/ner_location_suggestions.md) for user documentation
+
 **Response Formats** (`response_format` parameter):
 
 - `geojson` (default) - Valid GeoJSON FeatureCollection matching CLI output

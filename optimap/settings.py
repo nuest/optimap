@@ -415,6 +415,15 @@ GEOEXTENT_GAZETTEER_TIMEOUT_SECONDS = int(os.getenv("OPTIMAP_GEOEXTENT_GAZETTEER
 # GeoNames API configuration (if using geonames gazetteer)
 GEOEXTENT_GEONAMES_USERNAME = os.getenv("OPTIMAP_GEOEXTENT_GEONAMES_USERNAME", "")
 
+# NER (Named Entity Recognition) text extraction settings.
+# GEOEXTENT_NER_MODEL: spaCy model name. None = geoextent auto-selects and
+#   downloads the default model on first use (~12 MB, one-off).
+# GEOEXTENT_NER_GAZETTEER: default gazetteer for text-based NER extraction.
+#   Separate from GEOEXTENT_DEFAULT_GAZETTEER so NER can use a different
+#   service than the file-upload gazetteer.
+GEOEXTENT_NER_MODEL = os.getenv("OPTIMAP_GEOEXTENT_NER_MODEL", None)
+GEOEXTENT_NER_GAZETTEER = os.getenv("OPTIMAP_GEOEXTENT_NER_GAZETTEER", "nominatim")
+
 # How long copied geometries from the geoextent tool ("Copy extents")
 # remain available for paste into a work's contribution form. Stored
 # client-side in localStorage; the work landing page silently discards

@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **NER-based location suggestions on the work contribution form** (closes #199). A collapsible "Suggest locations from text" panel on the work landing page runs spaCy Named Entity Recognition on the work's title and abstract (two parallel API calls), looks up found place names via a configurable gazetteer (Nominatim by default), and presents the results as a selectable list. Matched spans are highlighted in the text preview using character offsets. Each place can be added to the Leaflet map individually or via "Add all to map". New REST endpoint: `POST /api/v1/geoextent/extract-text/` (see `docs/ner_location_suggestions.md`). Provenance events record `geometry_source` when NER-derived geometry is contributed. spaCy model auto-downloads on first use (~12 MB). Requires `geoextent>=0.13.0`.
+
 - **REST API for collections at `/api/v1/collections/`**. `GET /api/v1/collections/` lists all published collections (paginated); `GET /api/v1/collections/<identifier>/` retrieves a single collection by its slug. Each response includes `works_count` (published works only), `collection_url`, and embedded `feeds` and `downloads` link objects. Staff can additionally retrieve unpublished collections. Documented in the OpenAPI schema under the *Collections* tag.
 
 ### Fixed

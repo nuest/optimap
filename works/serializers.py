@@ -188,8 +188,22 @@ RESPONSE_FORMAT_CHOICES = ['geojson', 'wkt', 'wkb']
 RESPONSE_FORMAT_DEFAULT = 'geojson'
 RESPONSE_FORMAT_HELP = "Response format: 'geojson' (default - GeoJSON FeatureCollection), 'wkt' (WKT string with metadata), 'wkb' (WKB hex string with metadata)"
 
+# All gazetteers the library supports.
 GAZETTEER_CHOICES = ['nominatim', 'geonames', 'photon']
 GAZETTEER_DEFAULT = 'nominatim'
+
+
+def get_available_gazetteers():
+    """Return gazetteers that are usable with the current configuration.
+
+    GeoNames requires OPTIMAP_GEOEXTENT_GEONAMES_USERNAME to be set; if it is
+    absent or empty the library raises ValueError at call time, so we exclude
+    it here to give users a clean 400 / empty dropdown instead of a 500.
+    """
+    available = ['nominatim', 'photon']
+    if getattr(settings, 'GEOEXTENT_GEONAMES_USERNAME', ''):
+        available.append('geonames')
+    return available
 
 
 class GeoextentBaseSerializer(serializers.Serializer):
@@ -218,9 +232,14 @@ class GeoextentBaseSerializer(serializers.Serializer):
     )
 
     def validate_gazetteer(self, value):
-        """Only validate gazetteer if placename is requested."""
-        if self.initial_data.get('placename', False) and not value:
-            raise serializers.ValidationError("Gazetteer must be specified when placename=true")
+        """Reject unconfigured gazetteers before they reach the library."""
+        available = get_available_gazetteers()
+        if value not in available:
+            raise serializers.ValidationError(
+                f"Gazetteer '{value}' is not available. "
+                f"Available options: {', '.join(available)}. "
+                f"GeoNames requires OPTIMAP_GEOEXTENT_GEONAMES_USERNAME to be configured."
+            )
         return value
 
 
@@ -288,6 +307,54 @@ class GeoextentBatchSerializer(GeoextentBaseSerializer):
             raise serializers.ValidationError(
                 f"Requested batch size ({value}MB) exceeds server maximum ({max_allowed}MB)"
             )
+        return value
+
+
+class GeoextentExtractTextSerializer(serializers.Serializer):
+    """Serializer for NER-based location extraction from free text."""
+    text = serializers.CharField(
+        required=True,
+        max_length=20000,
+        help_text="Free text (title, abstract, etc.) to extract place names from.",
+    )
+    gazetteer = serializers.ChoiceField(
+        choices=GAZETTEER_CHOICES,
+        default=None,
+        allow_null=True,
+        help_text="Gazetteer service for geocoding found place names. Defaults to OPTIMAP_GEOEXTENT_NER_GAZETTEER.",
+    )
+    ner_ambiguity = serializers.ChoiceField(
+        choices=['drop', 'top'],
+        default='drop',
+        help_text=(
+            "'drop' (default): skip place names that match multiple gazetteer candidates. "
+            "'top': keep the highest-ranked candidate when multiple are returned."
+        ),
+    )
+    tbox = serializers.BooleanField(
+        default=True,
+        help_text="Also extract temporal extent from date mentions in the text (enabled by default).",
+    )
+    convex_hull = serializers.BooleanField(
+        default=False,
+        help_text="Return convex hull of all matched places instead of bounding box.",
+    )
+
+    def validate_gazetteer(self, value):
+        if value is None:
+            value = getattr(settings, 'GEOEXTENT_NER_GAZETTEER', 'nominatim')
+        available = get_available_gazetteers()
+        if value not in available:
+            raise serializers.ValidationError(
+                f"Gazetteer '{value}' is not available. "
+                f"Available options: {', '.join(available)}. "
+                f"GeoNames requires OPTIMAP_GEOEXTENT_GEONAMES_USERNAME to be configured."
+            )
+        return value
+
+    def validate_text(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError("Text must not be empty.")
         return value
 
 

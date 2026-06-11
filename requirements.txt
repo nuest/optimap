@@ -56,7 +56,9 @@ cairosvg>=2.7
 
 
 # Geoextent library for spatial/temporal extent extraction
-git+https://github.com/nuest/geoextent.git@main#egg=geoextent
+geoextent>=0.13.0
+# NLP/NER for text-based location extraction (geoextent.from_text / extract-text endpoint), this is not a default dpeendency for geoextent and requires explicit installation here
+spacy>=3.8
 
 # PDF text extraction for BoK concept harvesting from AGILE GISS PDFs (issue #250)
 pdf-oxide>=0.1

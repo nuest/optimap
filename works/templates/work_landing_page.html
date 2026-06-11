@@ -333,6 +333,94 @@
         </div>
       </div>
 
+      {# NER suggestions — between spatial and temporal because results feed both #}
+      <div id="ner-suggest-panel" class="mb-4">
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="ner-suggest-toggle"
+                data-toggle="collapse" data-target="#ner-suggest-body" aria-expanded="false"
+                aria-controls="ner-suggest-body">
+          <i class="fas fa-magic"></i> Suggest locations and dates from text
+        </button>
+        <div id="ner-suggest-body" class="collapse mt-2 border rounded p-3 bg-light">
+          <p class="small text-muted mb-2">
+            Uses Named Entity Recognition (NER) to find place names and date mentions in the
+            title and abstract. Place results can be added to the map; date results can fill
+            the temporal extent fields below.
+          </p>
+
+          <div class="mb-2">
+            <label for="ner-title-input" class="small font-weight-bold">Title</label>
+            <textarea class="form-control form-control-sm" id="ner-title-input" rows="2">{{ work.title }}</textarea>
+            <div id="ner-title-preview" class="small mt-1 p-2 border rounded bg-white" style="display:none; white-space:pre-wrap; font-family:inherit;"></div>
+          </div>
+          <div class="mb-2">
+            <label for="ner-abstract-input" class="small font-weight-bold">Abstract</label>
+            <textarea class="form-control form-control-sm" id="ner-abstract-input" rows="4">{% if work.abstract %}{{ work.abstract }}{% endif %}</textarea>
+            <div id="ner-abstract-preview" class="small mt-1 p-2 border rounded bg-white" style="display:none; white-space:pre-wrap; font-family:inherit;"></div>
+          </div>
+
+          <div class="form-row mb-2 align-items-end">
+            <div class="col-auto">
+              <label for="ner-ambiguity" class="small">Ambiguity</label>
+              <select class="form-control form-control-sm" id="ner-ambiguity">
+                <option value="drop" selected>Drop ambiguous (strict)</option>
+                <option value="top">Keep best match (lenient)</option>
+              </select>
+            </div>
+            <div class="col-auto">
+              <label for="ner-gazetteer" class="small">Gazetteer</label>
+              <select class="form-control form-control-sm" id="ner-gazetteer">
+                {% for gaz in ner_available_gazetteers %}
+                  <option value="{{ gaz }}"{% if gaz == "nominatim" %} selected{% endif %}>{{ gaz|capfirst }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-auto align-self-end">
+              <div class="form-check form-check-inline mb-0">
+                <input class="form-check-input" type="checkbox" id="ner-tbox" value="1" checked>
+                <label class="form-check-label small" for="ner-tbox">Extract dates</label>
+              </div>
+            </div>
+            <div class="col-auto align-self-end">
+              <button type="button" class="btn btn-sm btn-primary" id="ner-suggest-btn">
+                <i class="fas fa-magic"></i> Suggest locations and dates
+              </button>
+              <span id="ner-spinner" class="ml-1" style="display:none;">
+                <i class="fas fa-spinner fa-spin"></i>
+              </span>
+            </div>
+          </div>
+
+          <div id="ner-results" style="display:none;">
+            <hr class="my-2">
+
+            {# Date results #}
+            <div id="ner-dates-section" style="display:none;">
+              <strong class="small"><i class="fas fa-calendar-alt"></i> Suggested dates</strong>
+              <div id="ner-dates-content" class="mt-1 mb-2 small"></div>
+            </div>
+
+            {# Place results #}
+            <div id="ner-results-header" class="d-flex justify-content-between align-items-center mb-1">
+              <strong class="small"><i class="fas fa-map-pin"></i> Suggested locations</strong>
+              <button type="button" class="btn btn-xs btn-outline-success" id="ner-add-all-btn" style="display:none;">
+                Add all to map
+              </button>
+            </div>
+            <ul id="ner-results-list" class="list-group list-group-flush small"></ul>
+            <div id="ner-lenient-hint" class="alert alert-warning alert-sm py-1 px-2 small mt-2" style="display:none;">
+              <i class="fas fa-exclamation-triangle"></i>
+              <span id="ner-lenient-hint-text"></span>
+              <button type="button" class="btn btn-xs btn-warning ml-2" id="ner-try-lenient-btn">Try lenient mode</button>
+            </div>
+            <div id="ner-empty-msg" class="text-muted small mt-1" style="display:none;">
+              No locations or dates found — try lenient mode or a different gazetteer.
+            </div>
+          </div>
+          <div id="ner-error-msg" class="alert alert-danger small mt-2" style="display:none;"></div>
+        </div>
+      </div>
+      {# end NER suggestions #}
+
       <div class="mb-4" id="contribute-temporal">
         <h6 class="font-weight-bold"><i class="fas fa-calendar"></i> Temporal extent (time period)</h6>
         {% if has_temporal %}
@@ -429,6 +517,12 @@
   </div>
 </div>
 <link rel="stylesheet" href="{% static 'css/bok.css' %}">
+<style>
+  /* NER location suggestion highlighting */
+  .ner-matched   { background: #d4f0c0; border-radius: 2px; padding: 0 1px; }
+  .ner-ambiguous { background: #fff3cd; border-radius: 2px; padding: 0 1px; }
+  .btn-xs { padding: 0.15rem 0.4rem; font-size: 0.75rem; line-height: 1.2; border-radius: 0.2rem; }
+</style>
 <script>
   window.OPTIMAP_BOK = {
     workId: {{ work.id }},
@@ -982,6 +1076,377 @@
       });
     });
   </script>
+
+{% if can_contribute %}
+<script>
+(function () {
+  'use strict';
+
+  // ---- helpers ----
+
+  function getCsrf() {
+    const el = document.querySelector('[name=csrfmiddlewaretoken]');
+    return el ? el.value : '';
+  }
+
+  // Build an HTML string with matched/ambiguous spans highlighted using char offsets.
+  function highlightText(text, placeNames) {
+    // Sort entries by char_start so we walk the string once.
+    const entries = (placeNames || []).slice().sort((a, b) => (a.char_start || 0) - (b.char_start || 0));
+    let html = '';
+    let cursor = 0;
+    for (const entry of entries) {
+      const start = entry.char_start;
+      const end = entry.char_end;
+      if (typeof start !== 'number' || typeof end !== 'number') continue;
+      if (start < cursor || end <= start) continue;
+      // Text before this span
+      html += escapeHtml(text.slice(cursor, start));
+      const cls = entry.matched ? 'ner-matched' : (entry.candidate_count > 0 ? 'ner-ambiguous' : '');
+      const title = entry.matched
+        ? `Matched: ${entry.match_name || entry.name}`
+        : (entry.candidate_count > 0 ? `Ambiguous (${entry.candidate_count} candidates)` : 'Not found');
+      if (cls) {
+        html += `<mark class="${cls}" title="${escapeAttr(title)}">${escapeHtml(text.slice(start, end))}</mark>`;
+      } else {
+        html += escapeHtml(text.slice(start, end));
+      }
+      cursor = end;
+    }
+    html += escapeHtml(text.slice(cursor));
+    return html;
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function escapeAttr(s) {
+    return s.replace(/"/g,'&quot;');
+  }
+
+  // Call /api/v1/geoextent/extract-text/ with the given text and params.
+  function fetchNER(text, gazetteer, ambiguity, tbox) {
+    return fetch('/api/v1/geoextent/extract-text/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCsrf(),
+      },
+      body: JSON.stringify({ text, gazetteer, ner_ambiguity: ambiguity, tbox }),
+    }).then(r => r.json());
+  }
+
+  // Build a Leaflet-addable layer from a place_names entry.
+  function placeToLayer(entry) {
+    let geojsonGeom;
+    if (entry.boundary && entry.boundary.type) {
+      geojsonGeom = entry.boundary;
+    } else if (typeof entry.lon === 'number' && typeof entry.lat === 'number') {
+      geojsonGeom = { type: 'Point', coordinates: [entry.lon, entry.lat] };
+    } else {
+      return null;
+    }
+    return L.geoJSON({ type: 'Feature', geometry: geojsonGeom, properties: {
+      _optimap_ner_source: 'ner',
+      name: entry.match_name || entry.name,
+    }});
+  }
+
+  function addPlaceToMap(entry) {
+    const layer = placeToLayer(entry);
+    if (!layer || typeof drawnItems === 'undefined' || !drawnItems) return false;
+    layer.eachLayer(l => drawnItems.addLayer(l));
+    try {
+      const bounds = drawnItems.getBounds();
+      if (bounds.isValid()) map.fitBounds(bounds, { padding: [30, 30] });
+    } catch (_) {}
+    return true;
+  }
+
+  // Track which NER place_names contributed to the map (for provenance_hint).
+  const _nerUsedPlaces = [];
+
+  // Patch the existing contribution form submission to include provenance_hint.
+  const _origSubmit = window._nerOrigFormSubmit;
+  document.addEventListener('DOMContentLoaded', function () {
+    const form = document.getElementById('contribution-form');
+    if (!form) return;
+    // Monkey-patch: we wrap the existing submit to inject provenance_hint
+    // by overriding the fetch call's body serialisation.
+    // We store the list on the window so the existing handler can read it.
+    window._nerUsedPlaces = _nerUsedPlaces;
+  });
+
+  // ---- results rendering ----
+
+  function renderResults(titleResult, abstractResult) {
+    const resultDiv = document.getElementById('ner-results');
+    const list = document.getElementById('ner-results-list');
+    const emptyMsg = document.getElementById('ner-empty-msg');
+    const addAllBtn = document.getElementById('ner-add-all-btn');
+    const errMsg = document.getElementById('ner-error-msg');
+    const datesSection = document.getElementById('ner-dates-section');
+    const datesContent = document.getElementById('ner-dates-content');
+    const lenientHint = document.getElementById('ner-lenient-hint');
+    const lenientHintText = document.getElementById('ner-lenient-hint-text');
+    errMsg.style.display = 'none';
+    resultDiv.style.display = '';
+    list.innerHTML = '';
+    lenientHint.style.display = 'none';
+    datesSection.style.display = 'none';
+
+    // ---- Temporal: merge tbox from both responses, prefer abstract over title ----
+    function extractTbox(result) {
+      if (!result) return null;
+      const ge = result.geoextent_extraction || {};
+      // Present in geoextent_extraction (our explicit passthrough)
+      if (ge.tbox && ge.tbox.length >= 1) return ge.tbox;
+      // Present directly on the FeatureCollection (geoextent standard format)
+      const feat = (result.features || [])[0];
+      if (feat && feat.properties && feat.properties.tbox) return feat.properties.tbox;
+      return null;
+    }
+    const titleTbox = extractTbox(titleResult);
+    const abstractTbox = extractTbox(abstractResult);
+    // Use whichever is available; prefer abstract (typically richer)
+    const tbox = abstractTbox || titleTbox;
+
+    if (tbox && tbox.length >= 1) {
+      const start = tbox[0] || '';
+      const end = tbox[1] || tbox[0] || '';
+      datesSection.style.display = '';
+      datesContent.innerHTML =
+        `<span class="text-success"><i class="fas fa-calendar-check"></i></span> `
+        + `${escapeHtml(start)}${end && end !== start ? ' — ' + escapeHtml(end) : ''} `
+        + `<button type="button" class="btn btn-xs btn-outline-primary ml-2" id="ner-use-dates-btn">`
+        + `Use these dates</button>`;
+      document.getElementById('ner-use-dates-btn').addEventListener('click', function () {
+        const startEl = document.getElementById('start-date');
+        const endEl = document.getElementById('end-date');
+        if (startEl && start) startEl.value = start;
+        if (endEl && end) endEl.value = end;
+        this.textContent = 'Applied';
+        this.disabled = true;
+      });
+    }
+
+    // ---- Spatial: merge place_names from both results, dedup by gazetteer_id or lat/lon ----
+    const seen = new Map();
+    function addEntries(entries, source) {
+      for (const e of (entries || [])) {
+        const key = e.gazetteer_id
+          ? String(e.gazetteer_id)
+          : (e.matched ? `${Math.round((e.lat||0)*1e4)},${Math.round((e.lon||0)*1e4)}` : `unmatched:${(e.name||'').toLowerCase()}`);
+        if (seen.has(key)) {
+          const existing = seen.get(key);
+          if (existing.source !== source) existing.source = 'both';
+        } else {
+          seen.set(key, { ...e, source });
+        }
+      }
+    }
+    const titlePN = titleResult && titleResult.geoextent_extraction ? titleResult.geoextent_extraction.place_names || [] : [];
+    const abstractPN = abstractResult && abstractResult.geoextent_extraction ? abstractResult.geoextent_extraction.place_names || [] : [];
+    addEntries(titlePN, 'title');
+    addEntries(abstractPN, 'abstract');
+
+    const allEntries = Array.from(seen.values());
+    const matchedEntries = allEntries.filter(e => e.matched);
+
+    if (allEntries.length === 0 && !tbox) {
+      emptyMsg.style.display = '';
+      addAllBtn.style.display = 'none';
+      return;
+    }
+    emptyMsg.style.display = 'none';
+    addAllBtn.style.display = matchedEntries.length > 0 ? '' : 'none';
+
+    addAllBtn.onclick = function () {
+      matchedEntries.forEach(e => {
+        addPlaceToMap(e);
+        if (!_nerUsedPlaces.find(p => p.name === e.name)) _nerUsedPlaces.push({ name: e.match_name || e.name });
+      });
+    };
+
+    for (const entry of allEntries) {
+      const li = document.createElement('li');
+      li.className = 'list-group-item py-1 px-2';
+
+      const sourceBadge = `<span class="badge badge-light ml-1">${entry.source}</span>`;
+
+      if (entry.matched) {
+        li.innerHTML = `<span class="text-success"><i class="fas fa-map-pin"></i></span> `
+          + `<strong>${escapeHtml(entry.name)}</strong> `
+          + `<span class="text-muted">${escapeHtml(entry.match_name || '')}</span>`
+          + sourceBadge
+          + ` <button type="button" class="btn btn-xs btn-outline-success float-right ner-add-one-btn">Add to map</button>`;
+        li.querySelector('.ner-add-one-btn').addEventListener('click', function () {
+          addPlaceToMap(entry);
+          if (!_nerUsedPlaces.find(p => p.name === entry.name)) _nerUsedPlaces.push({ name: entry.match_name || entry.name });
+          this.textContent = 'Added';
+          this.disabled = true;
+        });
+      } else if (entry.candidate_count > 0) {
+        li.innerHTML = `<span class="text-warning"><i class="fas fa-exclamation-triangle"></i></span> `
+          + `<span class="text-muted">${escapeHtml(entry.name)}</span> `
+          + `<small class="text-muted">ambiguous (${entry.candidate_count} candidates)</small>`
+          + sourceBadge;
+      } else {
+        li.innerHTML = `<span class="text-danger"><i class="fas fa-times"></i></span> `
+          + `<span class="text-muted">${escapeHtml(entry.name)}</span> `
+          + `<small class="text-muted">not found</small>`
+          + sourceBadge;
+      }
+      list.appendChild(li);
+    }
+
+    // If strict mode dropped ambiguous names, nudge the user towards lenient mode.
+    const currentAmbiguity = document.getElementById('ner-ambiguity').value;
+    const droppedAmbiguous = allEntries.filter(e => !e.matched && e.candidate_count > 0);
+    if (currentAmbiguity === 'drop' && droppedAmbiguous.length > 0) {
+      const names = droppedAmbiguous.map(e => escapeHtml(e.name)).join(', ');
+      const n = droppedAmbiguous.length;
+      lenientHintText.innerHTML =
+        `<strong>${n} ambiguous name${n > 1 ? 's' : ''} dropped</strong> (${names}) — `
+        + `lenient mode keeps the best-ranked match for each.`;
+      lenientHint.style.display = '';
+      document.getElementById('ner-try-lenient-btn').onclick = function () {
+        document.getElementById('ner-ambiguity').value = 'top';
+        document.getElementById('ner-suggest-btn').click();
+      };
+    }
+  }
+
+  // ---- main button handler ----
+
+  document.addEventListener('DOMContentLoaded', function () {
+    const btn = document.getElementById('ner-suggest-btn');
+    if (!btn) return;
+
+    btn.addEventListener('click', function () {
+      const titleText = (document.getElementById('ner-title-input').value || '').trim();
+      const abstractText = (document.getElementById('ner-abstract-input').value || '').trim();
+      const gazetteer = document.getElementById('ner-gazetteer').value;
+      const ambiguity = document.getElementById('ner-ambiguity').value;
+      const tbox = document.getElementById('ner-tbox').checked;
+
+      const spinner = document.getElementById('ner-spinner');
+      const errMsg = document.getElementById('ner-error-msg');
+      const resultDiv = document.getElementById('ner-results');
+      const titlePreview = document.getElementById('ner-title-preview');
+      const abstractPreview = document.getElementById('ner-abstract-preview');
+
+      errMsg.style.display = 'none';
+      resultDiv.style.display = 'none';
+      spinner.style.display = '';
+      btn.disabled = true;
+
+      // Hide previews while loading
+      titlePreview.style.display = 'none';
+      abstractPreview.style.display = 'none';
+
+      const calls = [];
+      if (titleText)    calls.push(fetchNER(titleText, gazetteer, ambiguity, tbox));
+      else              calls.push(Promise.resolve(null));
+      if (abstractText) calls.push(fetchNER(abstractText, gazetteer, ambiguity, tbox));
+      else              calls.push(Promise.resolve(null));
+
+      Promise.all(calls).then(function ([titleResult, abstractResult]) {
+        spinner.style.display = 'none';
+        btn.disabled = false;
+
+        if (titleResult && titleResult.error) {
+          errMsg.textContent = 'Error (title): ' + (titleResult.error || 'Unknown error');
+          errMsg.style.display = '';
+          return;
+        }
+        if (abstractResult && abstractResult.error) {
+          errMsg.textContent = 'Error (abstract): ' + (abstractResult.error || 'Unknown error');
+          errMsg.style.display = '';
+          return;
+        }
+
+        // Render highlighted previews
+        const titlePN = titleResult && titleResult.geoextent_extraction ? titleResult.geoextent_extraction.place_names || [] : [];
+        const abstractPN = abstractResult && abstractResult.geoextent_extraction ? abstractResult.geoextent_extraction.place_names || [] : [];
+
+        if (titleText && titlePN.length > 0) {
+          titlePreview.innerHTML = highlightText(titleText, titlePN);
+          titlePreview.style.display = '';
+          document.getElementById('ner-title-input').style.display = 'none';
+        }
+        if (abstractText && abstractPN.length > 0) {
+          abstractPreview.innerHTML = highlightText(abstractText, abstractPN);
+          abstractPreview.style.display = '';
+          document.getElementById('ner-abstract-input').style.display = 'none';
+        }
+
+        renderResults(titleResult, abstractResult);
+
+        // Store NER metadata on window for provenance_hint injection
+        window._nerLastResult = {
+          ner_model: (titleResult || abstractResult || {}).geoextent_extraction
+            ? ((titleResult || abstractResult).geoextent_extraction.ner_model || null)
+            : null,
+          ner_gazetteer: gazetteer,
+        };
+      }).catch(function (err) {
+        spinner.style.display = 'none';
+        btn.disabled = false;
+        errMsg.textContent = 'Request failed: ' + err.message;
+        errMsg.style.display = '';
+      });
+    });
+
+    // "← Edit" buttons to restore textareas from preview
+    ['title', 'abstract'].forEach(function (section) {
+      const preview = document.getElementById('ner-' + section + '-preview');
+      const textarea = document.getElementById('ner-' + section + '-input');
+      if (!preview || !textarea) return;
+      preview.addEventListener('click', function () {
+        preview.style.display = 'none';
+        textarea.style.display = '';
+      });
+      preview.title = 'Click to edit text';
+      preview.style.cursor = 'pointer';
+    });
+  });
+
+  // ---- inject provenance_hint into contribution form POST ----
+  // Wrap the existing fetch call by patching submissionData before it's sent.
+  // We do this by observing the form submit and setting a flag that the
+  // existing handler will pick up from window._nerUsedPlaces.
+  document.addEventListener('DOMContentLoaded', function () {
+    const form = document.getElementById('contribution-form');
+    if (!form) return;
+    // The existing submit handler reads submissionData from local scope.
+    // We can't patch it directly, but we CAN listen to the same event
+    // on the form *before* the existing one fires by using capture=true
+    // to store the hint, which the existing handler will pick up because
+    // we've set it on the shared window object.
+    // Simpler: we monkeypatch the global fetch for /contribute-geometry/.
+    const _origFetch = window.fetch;
+    window.fetch = function (url, options) {
+      if (typeof url === 'string' && url.includes('/contribute-geometry/') && options && options.method === 'POST') {
+        try {
+          const body = JSON.parse(options.body || '{}');
+          if ((window._nerUsedPlaces || []).length > 0) {
+            body.provenance_hint = {
+              source: 'ner',
+              ner_model: (window._nerLastResult || {}).ner_model || null,
+              ner_gazetteer: (window._nerLastResult || {}).ner_gazetteer || null,
+              place_names: (window._nerUsedPlaces || []).map(p => p.name),
+            };
+            options = { ...options, body: JSON.stringify(body) };
+          }
+        } catch (_) {}
+      }
+      return _origFetch.call(this, url, options);
+    };
+  });
+}());
+</script>
+{% endif %}
 
 <p class="text-muted mt-4">
   <a href="/api/v1/works/{{ work.id }}/" target="_blank" rel="noopener">View raw JSON from API</a>

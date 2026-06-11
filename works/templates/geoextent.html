@@ -273,9 +273,9 @@
                                    title="Choose which geocoding service to use for place name lookups (when placename option is enabled)"></i>
                             </label>
                             <select class="form-control" id="gazetteer" name="gazetteer">
-                                <option value="nominatim" selected>Nominatim (default)</option>
-                                <option value="geonames">GeoNames</option>
-                                <option value="photon">Photon</option>
+                                {% for gaz in available_gazetteers %}
+                                  <option value="{{ gaz }}"{% if gaz == "nominatim" %} selected{% endif %}>{{ gaz|capfirst }}{% if gaz == "nominatim" %} (default){% endif %}</option>
+                                {% endfor %}
                             </select>
                         </div>
                     </div>

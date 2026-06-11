@@ -36,6 +36,7 @@ from works.services.preview_image import (
 )
 from works.utils.identifiers import resolve_work_identifier
 from works.utils.statistics import get_cached_statistics
+from works.serializers import get_available_gazetteers as _ner_available_gazetteers
 
 
 def contribute(request):
@@ -462,6 +463,7 @@ def work_landing(request, identifier):
         "missing_for_logged_in": missing_for_logged_in,
         "missing_for_anonymous": missing_for_anonymous,
         "geoextent_copy_ttl_seconds": getattr(settings, 'GEOEXTENT_COPY_TTL_SECONDS', 300),
+        "ner_available_gazetteers": _ner_available_gazetteers(),
         "show_provenance": is_admin,
         "latest_wikidata_export": latest_wikidata_export,
         "all_wikidata_exports": all_wikidata_exports,

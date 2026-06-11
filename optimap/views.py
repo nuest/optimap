@@ -34,6 +34,7 @@ from works import views_feeds
 from works.feeds import normalize_region_slug
 from django.urls import reverse
 import geoextent.lib.features
+from works.serializers import get_available_gazetteers as _available_gazetteers
 
 
 def main(request):
@@ -154,6 +155,7 @@ def geoextent(request):
         'max_download_size_mb': getattr(settings, 'GEOEXTENT_MAX_DOWNLOAD_SIZE_MB', 1000),
         'copy_ttl_seconds': getattr(settings, 'GEOEXTENT_COPY_TTL_SECONDS', 300),
         'copy_ttl_minutes': max(1, getattr(settings, 'GEOEXTENT_COPY_TTL_SECONDS', 300) // 60),
+        'available_gazetteers': _available_gazetteers(),
     }
 
     return render(request, 'geoextent.html', context)

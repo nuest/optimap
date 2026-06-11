@@ -38,6 +38,7 @@ from .serializers import (
     GlobalRegionSerializer,
     CollectionSerializer,
     GeoextentExtractSerializer,
+    GeoextentExtractTextSerializer,
     GeoextentRemoteSerializer,
     GeoextentRemoteGetSerializer,
     GeoextentBatchSerializer,
@@ -672,6 +673,11 @@ class GeoextentViewSet(viewsets.ViewSet):
         else:
             metadata['extent_type'] = 'bounding_box'
 
+        # NER provenance: pass place_names and related fields through unchanged
+        for key in ('place_names', 'ner_model', 'ner_gazetteer', 'extraction_method'):
+            if geoextent_result.get(key) is not None:
+                metadata[key] = geoextent_result[key]
+
         return metadata
 
     def _format_response(self, geoextent_result, structured_result, response_format, identifiers=None):
@@ -1224,3 +1230,114 @@ class GeoextentViewSet(viewsets.ViewSet):
                     logger.info(f"Cleaned up temp directory: {temp_dir}")
                 except Exception as e:
                     logger.error(f"Error cleaning up temp directory {temp_dir}: {e}")
+
+    @extend_schema(
+        summary="Extract place names and spatial extent from free text via NER",
+        description=(
+            "Runs spaCy Named Entity Recognition on the provided text string, then "
+            "forward-geocodes the detected place names via the configured gazetteer "
+            "(Nominatim by default) to produce a bounding box and a `place_names` "
+            "provenance list. Each entry in `place_names` carries the original text "
+            "span, character offsets (`char_start`/`char_end`) for client-side "
+            "highlighting, matched coordinates, and the gazetteer result URL.\n\n"
+            "The spaCy model is downloaded automatically on first use (~12 MB). "
+            "Subsequent calls reuse the cached model without network access."
+        ),
+        tags=["Geoextent"],
+        request=GeoextentExtractTextSerializer,
+        responses={
+            200: OpenApiResponse(OpenApiTypes.OBJECT, description=(
+                "GeoJSON FeatureCollection for the combined spatial extent, with "
+                "`geoextent_extraction.place_names` listing all detected entities "
+                "(matched, ambiguous, and unresolved)."
+            )),
+            400: OpenApiResponse(_ERROR_RESPONSE, description="Empty text or invalid parameters."),
+            500: OpenApiResponse(_ERROR_RESPONSE, description="NER or gazetteer error."),
+        },
+    )
+    @action(detail=False, methods=['post'], url_path='extract-text')
+    def extract_text(self, request):
+        """Extract place names and spatial extent from a free text string via NER."""
+        serializer = GeoextentExtractTextSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        text = serializer.validated_data['text']
+        gazetteer = serializer.validated_data['gazetteer']
+        ner_ambiguity = serializer.validated_data['ner_ambiguity']
+        tbox = serializer.validated_data['tbox']
+        convex_hull = serializer.validated_data['convex_hull']
+
+        ner_model = getattr(settings, 'GEOEXTENT_NER_MODEL', None) or None
+
+        try:
+            geoextent_result = geoextent.from_text(
+                text,
+                bbox=True,
+                tbox=tbox,
+                convex_hull=convex_hull,
+                ner_gazetteer=gazetteer,
+                ner_ambiguity=ner_ambiguity,
+                ner_auto_download=True,
+                include_source_text=False,
+                ner_model=ner_model,
+            )
+
+            if geoextent_result is None:
+                # No entities found — return empty FeatureCollection with metadata
+                import geoextent as _ge
+                return Response({
+                    'type': 'FeatureCollection',
+                    'features': [],
+                    'geoextent_extraction': {
+                        'version': _ge.__version__,
+                        'format': 'text',
+                        'ner_gazetteer': gazetteer,
+                        'place_names': [],
+                    },
+                }, status=status.HTTP_200_OK)
+
+            structured_result = self._process_geoextent_result(geoextent_result)
+
+            # Build the base metadata — always include NER provenance and tbox.
+            import geoextent as _ge
+            extraction_meta = {
+                'version': _ge.__version__,
+                'format': geoextent_result.get('format', 'text'),
+                'ner_model': geoextent_result.get('ner_model'),
+                'ner_gazetteer': geoextent_result.get('ner_gazetteer', gazetteer),
+                'place_names': geoextent_result.get('place_names', []),
+            }
+            if geoextent_result.get('tbox'):
+                extraction_meta['tbox'] = geoextent_result['tbox']
+
+            if structured_result is None or not structured_result.get('spatial_extent'):
+                # NER ran but no places were resolved to coordinates.
+                return Response({
+                    'type': 'FeatureCollection',
+                    'features': [],
+                    'geoextent_extraction': extraction_meta,
+                }, status=status.HTTP_200_OK)
+
+            formatted = self._format_response(
+                geoextent_result,
+                structured_result,
+                'geojson',
+                identifiers=['text'],
+            )
+            # Ensure place_names and tbox are always present in geoextent_extraction
+            # even when _format_response uses geoextent's own formatter.
+            if 'geoextent_extraction' in formatted:
+                ge_meta = formatted['geoextent_extraction']
+                if 'place_names' not in ge_meta:
+                    ge_meta['place_names'] = geoextent_result.get('place_names', [])
+                if 'tbox' not in ge_meta and geoextent_result.get('tbox'):
+                    ge_meta['tbox'] = geoextent_result['tbox']
+            return Response(formatted, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Error in NER text extraction: {e}", exc_info=True)
+            return Response(
+                {'error': 'NER extraction error', 'details': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
