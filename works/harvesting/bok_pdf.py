@@ -41,15 +41,27 @@ _AGILE_DOI_RE = re.compile(
     r"^10\.5194/agile-giss-(\d+)-(\d+)-(\d{4})$", re.IGNORECASE
 )
 
-# "BoK Concepts." (with or without trailing space) up to the next blank line or
-# capitalised section header. Handles multi-line wraps within the section.
+# "BoK Concepts." or "BoK Concepts:" up to the next blank line or a capitalised
+# section label (a word ending in a period, e.g. "Keywords." or "Abstract.").
+# The header match uses an inline (?i:...) flag so only that part is
+# case-insensitive; the stop condition must stay case-sensitive — applying
+# re.IGNORECASE to the whole pattern would make [A-Z] match lowercase letters
+# and cause word-wrapped lines like "\ndata models" or "\nGeostatistics,"
+# to falsely trigger the stop condition.
 _BOK_SECTION_RE = re.compile(
-    r"BoK Concepts\.\s*(.+?)(?=\n\s*\n|\n[A-Z][a-zA-Z]|\Z)",
-    re.IGNORECASE | re.DOTALL,
+    r"(?i:BoK Concepts[.:])\s*(.+?)(?=\n\s*\n|\n[A-Z][a-zA-Z]+\.|\Z)",
+    re.DOTALL,
 )
 
 # Bracketed BoK codes: [TA12-6], [GS4-3b], [AM10], …
 _BRACKET_CODE_RE = re.compile(r"\[([A-Za-z0-9_-]{1,32})\]")
+
+# Parenthesised codes: (TA12-2), (GS3-4) — also covers "AM(AM8)" parent-prefix
+# format (the inner part is extracted). Code must begin with a letter.
+_PAREN_CODE_RE = re.compile(r"\(([A-Za-z][A-Za-z0-9_-]{0,31})\)")
+
+# Codes split across a line break by hyphenation: "TA12-\n2" → "TA12-2"
+_LINE_BREAK_IN_CODE_RE = re.compile(r"([A-Za-z0-9])-\n([A-Za-z0-9])")
 
 _PDF_HTTP_TIMEOUT = 60
 _PDF_RETRY_TOTAL = 3
@@ -98,29 +110,50 @@ def _find_bok_section(text: str) -> str | None:
 def _parse_bok_section(section: str) -> list[str]:
     """Extract validated BoK concept codes from the section text.
 
-    Priority:
-        1. Bracketed codes [XX-Y] — taken as literal codes.
-        2. Arrow-separated names (→ or ->) — each segment looked up by name.
-        3. Comma/semicolon-separated names — looked up by name.
+    Handles all observed real-world formats:
+      - Bracketed:             [TA12-6] Name; [GS4-3b] Name
+      - Parenthesised:         Name (TA12-2), Name (GS3-4)
+      - Parent-prefixed paren: AM(AM8), GD(GD4)
+      - Bare codes:            IP, DM.
+      - Code split by newline: Name (TA12-\\n2)  →  normalised to (TA12-2)
+      - Arrow names:           image processing -> image understanding
+      - Comma/semicolon names: Geocomputation, Geospatial Data.
+
+    Strategy:
+        1. Pre-process: join codes split across line breaks.
+        2. Collect all literal codes from brackets [CODE] and parentheses (CODE).
+        3. Scan comma/semicolon tokens for bare codes directly known to the BoK.
+        4. If nothing found, fall back to name-based lookup (arrow or comma list).
     """
-    # 1. Bracketed codes
-    bracketed = _BRACKET_CODE_RE.findall(section)
-    if bracketed:
-        seen: set[str] = set()
-        out: list[str] = []
-        for code in bracketed:
-            if code not in seen and is_known(code):
-                seen.add(code)
-                out.append(code)
+    # 1. Join codes hyphenated across a line break ("TA12-\n2" → "TA12-2")
+    section = _LINE_BREAK_IN_CODE_RE.sub(r"\1-\2", section)
+
+    seen: set[str] = set()
+    out: list[str] = []
+
+    def _accept(code: str) -> None:
+        if code and code not in seen and is_known(code):
+            seen.add(code)
+            out.append(code)
+
+    # 2. Bracketed [CODE] and parenthesised (CODE)
+    for code in _BRACKET_CODE_RE.findall(section):
+        _accept(code)
+    for code in _PAREN_CODE_RE.findall(section):
+        _accept(code)
+
+    # 3. Bare codes from comma/semicolon tokens (e.g. "IP, DM.")
+    for part in re.split(r"[,;]", section):
+        _accept(part.strip().rstrip(".").strip())
+
+    if out:
         return out
 
-    # 2. Arrow notation (both → and ->)
+    # 4. Name-matching fallback
     if "→" in section or "->" in section:
         parts = re.split(r"→|->", section)
-        return match_text_to_codes([p.strip().rstrip(".") for p in parts])
-
-    # 3. Comma / semicolon list
-    parts = re.split(r"[,;]", section)
+    else:
+        parts = re.split(r"[,;]", section)
     return match_text_to_codes([p.strip().rstrip(".") for p in parts])
 
 

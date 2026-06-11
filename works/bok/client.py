@@ -39,7 +39,7 @@ BOK_CACHE_TIMEOUT = None
 
 
 def _version() -> str:
-    return getattr(settings, "BOK_VERSION", "current")
+    return getattr(settings, "BOK_VERSION", "v9")
 
 
 def _api_base() -> str:
@@ -80,11 +80,12 @@ def _trim_concept(code: str, raw: dict[str, Any]) -> dict[str, Any]:
     description = raw.get("description") or ""
     if isinstance(description, str) and len(description) > 600:
         description = description[:600].rstrip() + "…"
+    concept_base = getattr(settings, "BOK_CONCEPT_BASE_URL", "https://geospacebok.eu").rstrip("/")
     return {
         "code": code,
         "id": raw.get("id") or code,
         "name": raw.get("name") or code,
-        "uri": raw.get("uri") or "",
+        "uri": f"{concept_base}/{code}",
         "description": description,
     }
 

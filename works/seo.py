@@ -527,8 +527,8 @@ def _bok_defined_terms(work) -> list[dict]:
 
     term_set = {
         "@type": "DefinedTermSet",
-        "name": "EO4GEO Body of Knowledge",
-        "url": "https://eo4geo.eu/bok/",
+        "name": "EO4GEO Body of Knowledge (GeoSpaceBoK)",
+        "url": "https://geospacebok.eu",
     }
     out: list[dict] = []
     for c in resolved:

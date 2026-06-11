@@ -18,17 +18,30 @@ from works.harvesting.bok_pdf import (
     _parse_bok_section,
     agile_giss_doi_to_pdf_url,
     extract_bok_from_agile_pdf,
+    _LINE_BREAK_IN_CODE_RE,
 )
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
 # Minimal BoK snapshot used in mocked tests
+def _entry(code, name):
+    return {"code": code, "id": code, "name": name, "uri": "", "description": "", "parent_code": "", "breadcrumb": []}
+
 _MOCK_SNAPSHOT = {
-    "TA12-6": {"code": "TA12-6", "id": "TA12-6", "name": "EO for infrastructure & transport", "uri": "", "description": "", "parent_code": "", "breadcrumb": []},
-    "GS4-3b": {"code": "GS4-3b", "id": "GS4-3b", "name": "Citizens and volunteered geographic information", "uri": "", "description": "", "parent_code": "", "breadcrumb": []},
-    "IP3":    {"code": "IP3",    "id": "IP3",    "name": "image understanding",          "uri": "", "description": "", "parent_code": "", "breadcrumb": []},
-    "GC1":    {"code": "GC1",    "id": "GC1",    "name": "Geocomputation",                "uri": "", "description": "", "parent_code": "", "breadcrumb": []},
-    "GD1":    {"code": "GD1",    "id": "GD1",    "name": "Geospatial Data",               "uri": "", "description": "", "parent_code": "", "breadcrumb": []},
+    "TA12-6": _entry("TA12-6", "EO for infrastructure & transport"),
+    "GS4-3b": _entry("GS4-3b", "Citizens and volunteered geographic information"),
+    "IP3":    _entry("IP3",    "image understanding"),
+    "GC1":    _entry("GC1",    "Geocomputation"),
+    "GD1":    _entry("GD1",    "Geospatial Data"),
+    # codes for new-format tests
+    "TA12-2": _entry("TA12-2", "EO for biodiversity & ecosystems"),
+    "GS3-4":  _entry("GS3-4",  "Use of geospatial information in environmental issues"),
+    "AM8":    _entry("AM8",    "Geostatistics"),
+    "GD4":    _entry("GD4",    "Data Quality, Metadata and Data Infrastructure"),
+    "IP":     _entry("IP",     "Image processing and analysis"),
+    "DM":     _entry("DM",     "Data modelling and management"),
+    "AM":     _entry("AM",     "Analytical Methods"),
+    "CF":     _entry("CF",     "Conceptual Foundations"),
 }
 
 
@@ -68,9 +81,54 @@ class TestFindBokSection(TestCase):
         text = "bok concepts. Geocomputation\n\nKeywords."
         self.assertIsNotNone(_find_bok_section(text))
 
+    def test_multiline_lowercase_continuation(self):
+        # regression: re.IGNORECASE made [A-Z] match lowercase, truncating sections
+        # where a word-wrapped line started with a lowercase letter (e.g. "data models")
+        text = (
+            "BoK Concepts. [IP5-1] Data cubes; [DM3-7] Hierarchical\n"
+            "data models; [DA3-6] Cloud and Grid computing\n\n"
+            "Keywords."
+        )
+        section = _find_bok_section(text)
+        self.assertIsNotNone(section)
+        self.assertIn("DA3-6", section)
+
+    def test_multiline_uppercase_continuation(self):
+        # regression: \n[A-Z][a-zA-Z] stop condition fired on word-wrapped lines
+        # starting with an uppercase letter (e.g. "Geostatistics,") that are NOT
+        # section headers — only lines ending with "." should terminate the section
+        text = (
+            "BoK Concepts. [AM8]\n"
+            "Geostatistics, [DM1-4] Data Structures and Indices for\n"
+            "Databases, [DM1-5] Data compression techniques\n\n"
+            "Keywords."
+        )
+        section = _find_bok_section(text)
+        self.assertIsNotNone(section)
+        self.assertIn("DM1-4", section)
+        self.assertIn("DM1-5", section)
+
+    def test_colon_delimiter(self):
+        # Some papers use "BoK Concepts:" (colon) instead of "BoK Concepts." (period)
+        text = "BoK Concepts: [AM] Analytical Methods, [CF] Conceptual Foundations\n\nKeywords."
+        section = _find_bok_section(text)
+        self.assertIsNotNone(section)
+        self.assertIn("AM", section)
+        self.assertIn("CF", section)
+
     def test_missing_section(self):
         text = "Abstract\n\nNo BoK here.\n\nKeywords. city"
         self.assertIsNone(_find_bok_section(text))
+
+
+class TestLineBreakNorm(TestCase):
+    def test_normalises_hyphen_split(self):
+        self.assertEqual(_LINE_BREAK_IN_CODE_RE.sub(r"\1-\2", "TA12-\n2"), "TA12-2")
+
+    def test_leaves_word_wrap_untouched(self):
+        # A newline NOT preceded by a hyphen should not be altered
+        result = _LINE_BREAK_IN_CODE_RE.sub(r"\1-\2", "analysis\nof data")
+        self.assertEqual(result, "analysis\nof data")
 
 
 class TestParseBokSection(TestCase):
@@ -114,6 +172,45 @@ class TestParseBokSection(TestCase):
         with self._with_snapshot():
             codes = _parse_bok_section("[TA12-6] name; [TA12-6] duplicate")
         self.assertEqual(codes.count("TA12-6"), 1)
+
+    def test_paren_codes(self):
+        # Format: "Name (CODE), Name (CODE)"
+        with self._with_snapshot():
+            codes = _parse_bok_section("EO for biodiversity (TA12-2), geospatial use (GS3-4)")
+        self.assertIn("TA12-2", codes)
+        self.assertIn("GS3-4", codes)
+
+    def test_line_break_within_code(self):
+        # Format: code hyphenated across a line break "TA12-\n2" → "TA12-2"
+        with self._with_snapshot():
+            codes = _parse_bok_section(
+                "EO for biodiversity & ecosystems (TA12-\n2), geospatial use\n(GS3-4)"
+            )
+        self.assertIn("TA12-2", codes)
+        self.assertIn("GS3-4", codes)
+
+    def test_parent_prefixed_paren(self):
+        # Format: "AM(AM8), GD(GD4)" — parent code prefix, child code in parens
+        with self._with_snapshot():
+            codes = _parse_bok_section("AM(AM8), GD(GD4)")
+        self.assertIn("AM8", codes)
+        self.assertIn("GD4", codes)
+
+    def test_bare_codes_mixed_with_paren(self):
+        # Format: "AM(AM8), GD(GD4), IP, DM." — parent-paren codes plus bare codes
+        with self._with_snapshot():
+            codes = _parse_bok_section("AM(AM8), GD(GD4), IP, DM.")
+        self.assertIn("AM8", codes)
+        self.assertIn("GD4", codes)
+        self.assertIn("IP", codes)
+        self.assertIn("DM", codes)
+
+    def test_top_level_bracketed_codes(self):
+        # Format: "[AM] Name, [CF] Name" — top-level (non-leaf) codes in brackets
+        with self._with_snapshot():
+            codes = _parse_bok_section("[AM] Analytical Methods, [CF] Conceptual Foundations")
+        self.assertIn("AM", codes)
+        self.assertIn("CF", codes)
 
 
 class TestExtractFromFixturePdfs(TestCase):

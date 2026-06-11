@@ -245,7 +245,7 @@
   <p class="meta muted mb-1">
     <i class="fas fa-book"></i>
     <strong>Topics:</strong>
-    <small class="text-muted">EO4GEO Body of Knowledge</small>
+    <small class="text-muted">EO4GEO Body of Knowledge (GeoSpaceBoK)</small>
   </p>
   <ul class="bok-chip-list" aria-label="EO4GEO BoK concept tags">
     {% for c in bok_concepts_resolved %}
@@ -256,7 +256,7 @@
           </small>
         {% endif %}
         {% if c.orphan %}
-          <span class="bok-chip bok-chip-orphan" title="No longer in current EO4GEO BoK">
+          <span class="bok-chip bok-chip-orphan" title="No longer in current GeoSpaceBoK">
             {{ c.code }}
           </span>
         {% else %}
@@ -472,7 +472,7 @@
     {% endif %}
     <p class="text-muted small">
       Tag this work with concepts from the
-      <a href="https://eo4geo.eu/bok/" target="_blank" rel="noopener">EO4GEO Body of Knowledge</a>.
+      <a href="https://geospacebok.eu" target="_blank" rel="noopener">EO4GEO Body of Knowledge (GeoSpaceBoK)</a>.
       Start typing (3+ characters) to search; click or press Enter to add.
     </p>
 
@@ -491,7 +491,7 @@
       {% for c in bok_concepts_resolved %}
         <li data-code="{{ c.code }}">
           {% if c.orphan %}
-            <span class="bok-chip bok-chip-orphan" title="No longer in current EO4GEO BoK">{{ c.code }}</span>
+            <span class="bok-chip bok-chip-orphan" title="No longer in current GeoSpaceBoK">{{ c.code }}</span>
           {% else %}
             <a class="bok-chip" href="{{ c.uri }}" target="_blank" rel="noopener">
               {{ c.name }} <small class="bok-chip-code">{{ c.code }}</small>

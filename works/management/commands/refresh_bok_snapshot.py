@@ -4,9 +4,9 @@
 """Fetch the EO4GEO Body of Knowledge snapshot and prime the cache.
 
 Usage:
-    python manage.py refresh_bok_snapshot                      # use settings.BOK_VERSION
-    python manage.py refresh_bok_snapshot --version v3         # override version
-    python manage.py refresh_bok_snapshot --dry-run            # don't write cache
+    python manage.py refresh_bok_snapshot                          # use settings.BOK_VERSION
+    python manage.py refresh_bok_snapshot --bok-version v9          # override version
+    python manage.py refresh_bok_snapshot --dry-run                # don't write cache
 
 The cache is otherwise filled lazily on first request; this command is
 the explicit ops hook for warming the cache after a deploy or for cron.
@@ -24,9 +24,10 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--version",
+            "--bok-version",
+            dest="bok_version",
             default=None,
-            help="BoK version to fetch (e.g. 'current', 'v3'). Defaults to OPTIMAP_BOK_VERSION.",
+            help="BoK version to fetch (e.g. 'v9', 'v3'). Defaults to OPTIMAP_BOK_VERSION.",
         )
         parser.add_argument(
             "--dry-run",
@@ -35,7 +36,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **opts):
-        version = opts.get("version") or settings.BOK_VERSION
+        version = opts.get("bok_version") or settings.BOK_VERSION
         dry_run = opts["dry_run"]
 
         self.stdout.write(f"Fetching EO4GEO BoK snapshot (version={version})…")
