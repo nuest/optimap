@@ -5,7 +5,10 @@
 
 import json
 import os
+import unittest
 from unittest.mock import patch
+
+import requests as _requests
 
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase, tag, override_settings
@@ -280,10 +283,30 @@ class ProvenanceHintTests(TestCase):
 class ExtractTextOnlineTests(TestCase):
     """Live tests: require spaCy model download and Nominatim access."""
 
+    @classmethod
+    def _skip_if_nominatim_unreachable(cls):
+        url = "https://nominatim.openstreetmap.org/search"
+        try:
+            r = _requests.get(
+                url,
+                params={"q": "Hannover", "format": "json", "limit": "1"},
+                timeout=10,
+                headers={"User-Agent": "OPTIMAP/test"},
+            )
+            r.raise_for_status()
+            if not r.json():
+                raise unittest.SkipTest(
+                    "Nominatim returned empty results for Hannover — "
+                    "service may be rate-limiting; skipping live NER test"
+                )
+        except _requests.RequestException as e:
+            raise unittest.SkipTest(f"Nominatim unreachable: {e}")
+
     def setUp(self):
         self.client = Client()
 
     def test_real_ner_extraction_with_known_place(self):
+        self._skip_if_nominatim_unreachable()
         resp = self.client.post(
             "/api/v1/geoextent/extract-text/",
             data=json.dumps({
