@@ -26,7 +26,7 @@ class EmailChangeUITest(StaticLiveServerTestCase):
         self.user = User.objects.create_user(username=self.old_email, email=self.old_email, password="password")
         self.user.save()
 
-        cache.set(self.token, self.old_email, timeout=300)  
+        cache.set(self.token, {'email': self.old_email, 'next': '/'}, timeout=300)
         cache.set(f"email_confirmation_{self.new_email}", 
             {"token": self.change_token, "old_email": self.old_email}, 
             timeout=600

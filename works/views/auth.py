@@ -166,6 +166,9 @@ def authenticate_via_magic_link(request, token):
             username=email,
             defaults={'username': email, 'email': email},
         )
+        if not is_new and not user.email:
+            user.email = email
+            user.save()
         needs_confirmation = False
         # First-time confirmed registration: tell the admins. Imported
         # locally to keep this view import-graph free of django_q at import
