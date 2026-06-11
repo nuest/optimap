@@ -204,12 +204,26 @@
         </a>
       </p>
 
-      {% if works %}
-        <div id="collection-map" style="height: 540px; width: 100%; margin-bottom: 2rem; border-radius: 8px;"></div>
+      {% if page_obj.paginator.count %}
+        <div id="collection-map" style="height: 540px; width: 100%; margin-bottom: 0.5rem; border-radius: 8px;"></div>
+        {% if page_obj.paginator.num_pages > 1 %}
+        <div class="d-flex justify-content-end mb-3">
+          <div class="btn-group btn-group-sm" id="map-scope-toggle" role="group" aria-label="Map scope">
+            <button type="button" class="btn btn-outline-secondary active" id="map-scope-page"
+              title="Show only the {{ page_obj.object_list|length }} work{{ page_obj.object_list|length|pluralize }} on the current page.">Show only page on map</button>
+            <button type="button" class="btn btn-outline-secondary" id="map-scope-all"
+              title="Load and show all {{ page_obj.paginator.count }} work{{ page_obj.paginator.count|pluralize }} in this collection. Current-page works are highlighted in orange. Loaded data is cached in the browser — switching pages is instant after the first load.">Show all on map</button>
+          </div>
+        </div>
+        {% endif %}
 
-        <h2 class="h4 mb-3">{{ works|length }} work{{ works|length|pluralize }}</h2>
+        <h2 class="h4 mb-3">{{ page_obj.paginator.count }} work{{ page_obj.paginator.count|pluralize }}</h2>
+
+        <!-- Pagination controls (top) -->
+        {% include "_pagination.html" with show_meta=True pagination_label="Collection pagination" %}
+
         <div class="publication-grid">
-          {% for work in works %}
+          {% for work in page_obj.object_list %}
             <div class="card locate-card">
               {% if work.coins_ctx %}<span class="Z3988" title="{{ work.coins_ctx }}"></span>{% endif %}
               <div class="card-body">
@@ -285,12 +299,8 @@
             </div>
           {% endfor %}
         </div>
-        {% if work_count_total > works|length %}
-          <div class="alert alert-secondary mt-4">
-            <i class="fas fa-info-circle"></i>
-            Showing first {{ works|length }} of {{ work_count_total }} works.
-          </div>
-        {% endif %}
+        <!-- Pagination controls (bottom) -->
+        {% include "_pagination.html" with pagination_label="Collection pagination" %}
       {% else %}
         <div class="alert alert-warning">
           <i class="fas fa-exclamation-triangle"></i>
@@ -360,20 +370,107 @@
       attribution: 'Map data: © <a href="https://openstreetmap.org">OpenStreetMap</a> contributors',
       maxZoom: 18,
     }).addTo(map);
-    const publicationsData = {{ publications_geojson|safe }};
+
+    const pageData = {{ publications_geojson|safe }};
+    const collectionGeoJsonUrl = '{{ collection_geojson_url }}';
+    const cacheKey = 'collection_geojson_{{ collection.identifier }}';
+    const scopeKey = 'collection_map_scope_{{ collection.identifier }}';
+
+    const pageWorkIds = new Set([{% for work in page_obj.object_list %}{{ work.id }},{% endfor %}]);
+
     const layerControl = L.control.layers({ 'OpenStreetMap': osmLayer }, {}).addTo(map);
     window.mapLayerControl = layerControl;
-    const statusLayers = new MapStatusLayersManager(map, layerControl, publicationsData);
-    const publicationsLayer = statusLayers.getCombinedLayer();
-    const publicationsGroup = statusLayers.getPublicationsGroup();
-    if (publicationsGroup.getBounds().isValid()) {
-      map.fitBounds(publicationsGroup.getBounds(), { padding: [20, 20] });
-    } else {
-      map.setView([0, 0], 2);
+
+    let currentStatusLayers = null;
+    let currentZoomCtrl = null;
+
+    function makeStyleFn(highlightIds) {
+      return function (feature) {
+        var fid = feature && (feature.id || (feature.properties && feature.properties.id));
+        if (highlightIds && highlightIds.has(fid)) {
+          return { color: '#FF6B00', weight: 3, fillOpacity: 0.55 };
+        }
+        return { color: '#158F9B', weight: 2, fillOpacity: 0.3 };
+      };
     }
-    if (typeof MapInteractionManager !== 'undefined') { new MapInteractionManager(map, publicationsLayer); }
-    if (typeof MapZoomToAllControl !== 'undefined') { new MapZoomToAllControl(map, publicationsGroup); }
+
+    function buildMap(data, highlightIds) {
+      if (currentZoomCtrl) { currentZoomCtrl.destroy(); currentZoomCtrl = null; }
+      if (currentStatusLayers) {
+        layerControl.removeLayer(currentStatusLayers.publishedGroup);
+        layerControl.removeLayer(currentStatusLayers.unpublishedGroup);
+        map.removeLayer(currentStatusLayers.getPublicationsGroup());
+      }
+      currentStatusLayers = new MapStatusLayersManager(map, layerControl, data, {
+        styleFn: makeStyleFn(highlightIds || null),
+      });
+      var pubLayer = currentStatusLayers.getCombinedLayer();
+      var pubGroup = currentStatusLayers.getPublicationsGroup();
+      if (pubGroup.getBounds().isValid()) {
+        map.fitBounds(pubGroup.getBounds(), { padding: [20, 20] });
+      } else {
+        map.setView([0, 0], 2);
+      }
+      if (typeof MapInteractionManager !== 'undefined') { new MapInteractionManager(map, pubLayer); }
+      if (typeof MapZoomToAllControl !== 'undefined') { currentZoomCtrl = new MapZoomToAllControl(map, pubGroup); }
+    }
+
+    buildMap(pageData);
     if (typeof MapGazetteerManager !== 'undefined') { new MapGazetteerManager(map, {provider: 'nominatim'}); }
+
+    var btnPage = document.getElementById('map-scope-page');
+    var btnAll  = document.getElementById('map-scope-all');
+    if (!btnPage || !btnAll) { return; }
+
+    function setScope(scope) {
+      sessionStorage.setItem(scopeKey, scope);
+      if (scope === 'all') {
+        btnAll.classList.add('active');
+        btnPage.classList.remove('active');
+      } else {
+        btnPage.classList.add('active');
+        btnAll.classList.remove('active');
+      }
+    }
+
+    function loadAll() {
+      var cached = sessionStorage.getItem(cacheKey);
+      if (cached) {
+        try { buildMap(JSON.parse(cached), pageWorkIds); return; } catch (e) { sessionStorage.removeItem(cacheKey); }
+      }
+      btnAll.disabled = true;
+      btnAll.textContent = 'Loading…';
+      fetch(collectionGeoJsonUrl)
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          try { sessionStorage.setItem(cacheKey, JSON.stringify(data)); } catch (e) {}
+          buildMap(data, pageWorkIds);
+          btnAll.disabled = false;
+          btnAll.textContent = 'Show all on map';
+        })
+        .catch(function () {
+          btnAll.disabled = false;
+          btnAll.textContent = 'Show all on map';
+        });
+    }
+
+    btnAll.addEventListener('click', function () {
+      setScope('all');
+      loadAll();
+    });
+
+    btnPage.addEventListener('click', function () {
+      setScope('page');
+      buildMap(pageData);
+    });
+
+    var savedScope = sessionStorage.getItem(scopeKey);
+    if (savedScope === 'all') {
+      var cached = sessionStorage.getItem(cacheKey);
+      if (cached) {
+        try { buildMap(JSON.parse(cached), pageWorkIds); setScope('all'); } catch (e) { sessionStorage.removeItem(cacheKey); }
+      }
+    }
   });
 </script>
 {% if is_admin %}

@@ -16,8 +16,9 @@ import logging
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Count
-from django.http import Http404, JsonResponse, HttpResponseRedirect
+from django.http import Http404, HttpResponse, JsonResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.cache import add_never_cache_headers
@@ -112,8 +113,24 @@ def collection_page(request, collection_slug):
     works_qs = Work.objects.filter(collections=collection).select_related('source')
     if not can_curate:
         works_qs = works_qs.filter(status='p')
-    works = list(works_qs.order_by('-creationDate', '-id')[: settings.FEED_MAX_ITEMS])
-    for w in works:
+    works_qs = works_qs.order_by('-creationDate', '-id')
+
+    page_size = request.GET.get('size', settings.PAGE_MAX_ITEMS)
+    try:
+        page_size = int(page_size)
+        page_size = max(settings.WORKS_PAGE_SIZE_MIN, min(page_size, settings.WORKS_PAGE_SIZE_MAX))
+    except (ValueError, TypeError):
+        page_size = settings.PAGE_MAX_ITEMS
+
+    paginator = Paginator(works_qs, page_size)
+    try:
+        page_obj = paginator.page(request.GET.get('page', 1))
+    except PageNotAnInteger:
+        page_obj = paginator.page(1)
+    except EmptyPage:
+        page_obj = paginator.page(paginator.num_pages)
+
+    for w in page_obj.object_list:
         w.coins_ctx = coins_title(w)
         w.has_geo = bool(w.geometry and not w.geometry.empty)
         w.has_temporal = (
@@ -143,9 +160,11 @@ def collection_page(request, collection_slug):
 
     context = {
         'collection': collection,
-        'works': works,
-        'work_count_total': Work.objects.filter(collections=collection).count(),
-        'publications_geojson': _publications_to_geojson(works),
+        'page_obj': page_obj,
+        'page_size': page_size,
+        'page_size_options': settings.WORKS_PAGE_SIZE_OPTIONS,
+        'publications_geojson': _publications_to_geojson(list(page_obj.object_list)),
+        'collection_geojson_url': reverse('optimap:collection-geojson', args=[collection.identifier]),
         'is_admin': is_admin,
         'is_curator': is_curator,
         'can_curate': can_curate,
@@ -161,6 +180,13 @@ def collection_page(request, collection_slug):
         # whose state must stay live; bypass the site-wide cache middleware.
         add_never_cache_headers(response)
     return response
+
+
+def collection_geojson(request, collection_slug):
+    """GeoJSON of all published works in a collection — used by the map 'show all' toggle."""
+    collection = _collection_for_request(request, collection_slug)
+    works_qs = Work.objects.filter(collections=collection, status='p').select_related('source')
+    return HttpResponse(_publications_to_geojson(list(works_qs)), content_type='application/geo+json')
 
 
 def collection_short_redirect(request, short_slug):

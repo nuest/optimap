@@ -78,6 +78,7 @@ urlpatterns = [
     path('collections/<int:collection_id>/curators/add/', views_collections.add_curator, name='collection-add-curator'),
     path('collections/<int:collection_id>/curators/<int:user_id>/remove/', views_collections.remove_curator, name='collection-remove-curator'),
     path('collections/<int:collection_id>/', views_collections.collection_by_id_redirect, name='collection-by-id'),
+    path('collections/<slug:collection_slug>/geojson/', views_collections.collection_geojson, name='collection-geojson'),
     path('collections/<slug:collection_slug>/', views_collections.collection_page, name='collection-page'),
     path('work/<int:work_id>/collection/<int:collection_id>/add/', views_collections.add_work_to_collection, name='add-work-to-collection'),
     path('work/<int:work_id>/collection/<int:collection_id>/remove/', views_collections.remove_work_from_collection, name='remove-work-from-collection'),

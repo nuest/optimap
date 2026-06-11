@@ -608,18 +608,18 @@ GAZETTEER_PLACEHOLDER = env('OPTIMAP_GAZETTEER_PLACEHOLDER', default='Search for
 # Optional API key for commercial providers (not required for Nominatim)
 GAZETTEER_API_KEY = env('OPTIMAP_GAZETTEER_API_KEY', default='')
 
-# Works List Pagination Settings
-# Default number of works to display per page
-WORKS_PAGE_SIZE_DEFAULT = int(env('OPTIMAP_WORKS_PAGE_SIZE_DEFAULT', default=50))
-# Minimum page size users can select
+# Default page size for paginated list views (works list, collection pages, etc.)
+# OPTIMAP_WORKS_PAGE_SIZE_DEFAULT is kept as a fallback for backward compatibility.
+PAGE_MAX_ITEMS = int(env('OPTIMAP_PAGE_MAX_ITEMS',
+                         default=env('OPTIMAP_WORKS_PAGE_SIZE_DEFAULT', default=50)))
+# Works list pagination bounds (selectable range shown to users)
+WORKS_PAGE_SIZE_DEFAULT = PAGE_MAX_ITEMS
 WORKS_PAGE_SIZE_MIN = int(env('OPTIMAP_WORKS_PAGE_SIZE_MIN', default=10))
-# Maximum page size users can select
 WORKS_PAGE_SIZE_MAX = int(env('OPTIMAP_WORKS_PAGE_SIZE_MAX', default=200))
 
-# Calculate available page size options by doubling from MIN to MAX
-# Always includes MIN and MAX values
-def _calculate_page_size_options(min_size, max_size):
-    """Calculate page size options by doubling from min to max"""
+# Calculate available page size options by doubling from MIN to MAX.
+# Always includes MIN, MAX, and the given default value.
+def _calculate_page_size_options(min_size, max_size, default=None):
     options = [min_size]
     current = min_size
     while current * 2 < max_size:
@@ -627,9 +627,11 @@ def _calculate_page_size_options(min_size, max_size):
         options.append(current)
     if options[-1] != max_size:
         options.append(max_size)
-    return options
+    if default is not None and default not in options:
+        options.append(default)
+    return sorted(options)
 
-WORKS_PAGE_SIZE_OPTIONS = _calculate_page_size_options(WORKS_PAGE_SIZE_MIN, WORKS_PAGE_SIZE_MAX)
+WORKS_PAGE_SIZE_OPTIONS = _calculate_page_size_options(WORKS_PAGE_SIZE_MIN, WORKS_PAGE_SIZE_MAX, default=PAGE_MAX_ITEMS)
 
 # OGC API - Features via pygeoapi (issue #19)
 # Served at /ogcapi/ when etc/pygeoapi-config.yml is present and the

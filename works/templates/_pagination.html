@@ -1,0 +1,41 @@
+{# SPDX-FileCopyrightText: 2026 OPTIMETA and KOMET projects <https://projects.tib.eu/komet> #}
+{# SPDX-License-Identifier: GPL-3.0-or-later #}
+{#                                                                              #}
+{# Full pagination controls.  Two modes:                                       #}
+{#   Top position  — pass show_meta=True: shows count, dropdown, and nav.      #}
+{#   Bottom position — omit show_meta:    shows nav only (when num_pages > 1). #}
+{#                                                                              #}
+{# Required context: page_obj, page_size, page_size_options                    #}
+{# Optional: pagination_label (aria-label), filter_collection (contribute pg)  #}
+{% if show_meta %}
+{% if page_obj %}
+<div class="pagination-controls mb-4">
+  <div class="row align-items-center">
+    <div class="col-md-6">
+      <p class="mb-2">
+        Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} works
+      </p>
+    </div>
+    <div class="col-md-6 text-md-right">
+      <form method="get" class="form-inline justify-content-md-end">
+        {% if filter_collection %}
+          <input type="hidden" name="collection" value="{{ filter_collection.identifier }}">
+        {% endif %}
+        <label for="page-size" class="mr-2">Works per page:</label>
+        <select name="size" id="page-size" class="form-control form-control-sm mr-2" onchange="this.form.submit()">
+          {% for option in page_size_options %}
+            <option value="{{ option }}" {% if option == page_size %}selected{% endif %}>{{ option }}</option>
+          {% endfor %}
+        </select>
+        <input type="hidden" name="page" value="1">
+      </form>
+    </div>
+  </div>
+  {% include "_pagination_nav.html" with pagination_label=pagination_label %}
+</div>
+{% endif %}
+{% elif page_obj and page_obj.paginator.num_pages > 1 %}
+<div class="pagination-controls mt-4">
+  {% include "_pagination_nav.html" with pagination_label=pagination_label %}
+</div>
+{% endif %}
