@@ -536,6 +536,7 @@
 {% endif %}
 
   <script src="{% static 'js/leaflet.js' %}"></script>
+  <script src="{% static 'js/map-styles.js' %}"></script>
   {% if can_contribute or is_admin %}
   <!-- Leaflet Draw plugin -->
   <script src="{% static 'js/leaflet.draw.js' %}"></script>
@@ -582,7 +583,8 @@
 
     if (publicationFeature) {
       layer = L.geoJSON(publicationFeature, {
-        pointToLayer: (feat, latlng) => L.circleMarker(latlng, { radius: 6 })
+        style: publicationStyle,
+        pointToLayer: (feat, latlng) => L.circleMarker(latlng, Object.assign({ radius: 6 }, publicationStyle(feat)))
       });
       featureGroup.addLayer(layer);
 

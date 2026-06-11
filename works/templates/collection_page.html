@@ -362,6 +362,7 @@
 
 {% block scripts %}
 {{ block.super }}
+<script src="{% static 'js/map-styles.js' %}"></script>
 <script src="{% static 'js/map-popup.js' %}"></script>
 <script src="{% static 'js/map-interaction.js' %}"></script>
 <script src="{% static 'js/map-gazetteer.js' %}"></script>
@@ -395,7 +396,7 @@
         if (highlightIds && highlightIds.has(fid)) {
           return { color: '#FF6B00', weight: 3, fillOpacity: 0.55 };
         }
-        return { color: '#158F9B', weight: 2, fillOpacity: 0.3 };
+        return publicationStyle(feature);
       };
     }
 

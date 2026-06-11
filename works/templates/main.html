@@ -31,9 +31,18 @@
 
   {# {%include timeline_snippet.html %} #}
 
-  <div class="col w-100 p-0" style="width: 100%;">
+  <div class="col w-100 p-0" style="width: 100%; position: relative;">
     <!--Map-->
     <div id="map"></div>
+
+    <!-- Chunked-loading progress indicator -->
+    <div id="map-loading-status"
+         style="position:absolute; bottom:30px; left:50%; transform:translateX(-50%);
+                background:rgba(255,255,255,0.9); padding:4px 14px; border-radius:4px;
+                font-size:13px; z-index:1000; display:none; pointer-events:none;"
+         role="status" aria-live="polite" aria-atomic="true">
+      Loading works&hellip;
+    </div>
 
     <!-- Search results status (for screen readers) -->
     <div id="search-results-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
@@ -43,6 +52,7 @@
 
 
 {% block scripts %}
+<script src="{% static 'js/map-styles.js' %}"></script>
 <script src="{% static 'js/map-popup.js' %}"></script>
 <script src="{% static 'js/map-interaction.js' %}"></script>
 <script src="{% static 'js/map-keyboard-navigation.js' %}"></script>
@@ -57,7 +67,8 @@
     gazetteer: {
       provider: '{{ gazetteer_provider }}',
       placeholder: '{{ gazetteer_placeholder }}'
-    }
+    },
+    mapChunkSize: {{ map_chunk_size|default:1000 }},
   };
 </script>
 <script src="{% static 'js/main.js' %}"></script>

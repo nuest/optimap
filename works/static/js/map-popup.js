@@ -32,120 +32,160 @@ function publicationStatusBadgeHTML(status, statusDisplay) {
   return html;
 }
 
+// ---------------------------------------------------------------------------
+// Shared lazy-load cache and fetcher — used by both the single-feature popup
+// below and the paginated popup in map-interaction.js.
+// ---------------------------------------------------------------------------
+
+/** @type {Object.<string|number, Object>} */
+window.workDetailsCache = {};
+
 /**
- * Generate popup content for a publication feature
- * @param {Object} feature - GeoJSON feature object
- * @param {Object} layer - Leaflet layer object
+ * Fetch full work details from the API and cache them.
+ * Returns the cached value if already fetched.
+ * @param {string|number} featureId
+ * @returns {Promise<Object>} Resolved properties object.
  */
-function publicationPopup(feature, layer) {
-  const p = feature.properties;
-  // GeoJSON convention (and rest_framework_gis ``GeoFeatureModelSerializer``)
-  // puts the primary key at ``feature.id`` rather than in ``feature.properties``,
-  // so we have to merge both before deciding what landing-page URL to build —
-  // otherwise works without a DOI render no "View work details" button at all.
-  const featureId = feature.id || p.id;
-  let html = '<div>';
+window.fetchWorkDetails = async function(featureId) {
+  if (window.workDetailsCache[featureId]) return window.workDetailsCache[featureId];
+  const resp = await fetch(`/api/v1/works/${featureId}/?format=json`);
+  const data = await resp.json();
+  // GeoFeatureModelSerializer places non-geometry fields under `properties`.
+  window.workDetailsCache[featureId] = data.properties ?? data;
+  return window.workDetailsCache[featureId];
+};
 
-  // Status badge — only present in the GeoJSON when the viewer is an admin/curator
-  // (anonymous users only see published works, so the badge would always say
-  // "Published" and adds no value for them).
-  if (p.status) {
-    html += `<div style="margin-bottom:8px;">${publicationStatusBadgeHTML(p.status, p.status_display)}</div>`;
-  }
+/**
+ * Render the rich detail section of a popup (source, abstract, dates, links).
+ * Exported on window so map-interaction.js can reuse it for the paginated popup.
+ * @param {Object} p - Work properties object (from the full serializer).
+ * @param {string|number} featureId
+ * @returns {string} HTML string.
+ */
+window.renderPublicationContent = function(p, featureId) {
+  let html = '';
 
-  if (p.title) {
-    html += `<h3>${p.title}</h3>`;
-  }
-
-  // "View work details" button — render whenever we have an identifier, even
-  // when the title is absent, so the user can still navigate to the landing
-  // page from a single-feature popup.
-  if (p.doi) {
-    html += `<div style="margin-bottom: 10px;"><a href="/work/${encodeURIComponent(p.doi)}/" class="btn btn-sm btn-primary" style="color: white; text-decoration: none; padding: 5px 10px; border-radius: 3px; display: inline-block;">View work details</a></div>`;
-  } else if (featureId) {
-    html += `<div style="margin-bottom: 10px;"><a href="/work/${featureId}/" class="btn btn-sm btn-primary" style="color: white; text-decoration: none; padding: 5px 10px; border-radius: 3px; display: inline-block;">View work details</a></div>`;
-  }
-
-  // Source details from nested object
+  // Source details
   if (p.source_details) {
     const s = p.source_details;
-
-    // Display name
     const name = s.display_name || s.name || 'Unknown';
     html += `<div><strong>Source:</strong> ${name}</div>`;
-
-    // Abbreviated title
     if (s.abbreviated_title) {
       html += `<div><em>${s.abbreviated_title}</em></div>`;
     }
-
-    // Homepage link
     if (s.homepage_url) {
       html += `<div><a href="${s.homepage_url}" target="_blank"><i class="fas fa-external-link-alt"></i> Visit source website</a></div>`;
     }
-
-    // ISSN-L link
     if (s.issn_l) {
-      html +=
-        `<div><strong>ISSN-L:</strong> ` +
-        `<a href="https://openalex.org/sources/issn:${s.issn_l}" target="_blank"><i class="fas fa-external-link-alt"></i> ${s.issn_l}</a></div>`;
+      html += `<div><strong>ISSN-L:</strong> <a href="https://openalex.org/sources/issn:${s.issn_l}" target="_blank"><i class="fas fa-external-link-alt"></i> ${s.issn_l}</a></div>`;
     }
-
-    // Publisher (only if different from display name)
     if (s.publisher_name && s.publisher_name !== name) {
       html += `<div><strong>Publisher:</strong> ${s.publisher_name}</div>`;
     }
-
-    // Open access status
     if ('is_oa' in s) {
-      const status = s.is_oa ? 'Open Access' : 'Closed Access';
-      html += `<div><strong>Access:</strong> ${status}</div>`;
+      html += `<div><strong>Access:</strong> ${s.is_oa ? 'Open Access' : 'Closed Access'}</div>`;
     }
-
-    // Citation count
     if (s.cited_by_count != null) {
       html += `<div>Cited by ${s.cited_by_count} works</div>`;
     }
-
-    // Works count
     if (s.works_count != null) {
       html += `<div>${s.works_count} works hosted</div>`;
     }
   }
 
-  // Time period
   if (p.timeperiod_startdate && p.timeperiod_enddate) {
-    html +=
-      `<div><strong>Timeperiod:</strong> from ${p.timeperiod_startdate} to ${p.timeperiod_enddate}</div>`;
+    html += `<div><strong>Timeperiod:</strong> from ${p.timeperiod_startdate} to ${p.timeperiod_enddate}</div>`;
   }
 
-  // Abstract
-  if (p.abstract) html += `<div><p>${p.abstract}</p></div>`;
+  if (p.abstract) {
+    html += `<div><p>${p.abstract}</p></div>`;
+  }
 
-  // Work source link
   if (p.url) {
     html += `<div><a href="${p.url}" target="_blank"><i class="fas fa-external-link-alt"></i> Visit work</a></div>`;
   }
 
-  // OpenAlex link
   if (p.openalex_id) {
-    html += `<div style="margin-top: 8px;"><a href="${p.openalex_id}" target="_blank" style="color: #2563eb;"><i class="fas fa-external-link-alt"></i> View in OpenAlex</a></div>`;
+    html += `<div style="margin-top:8px;"><a href="${p.openalex_id}" target="_blank" style="color:#2563eb;"><i class="fas fa-external-link-alt"></i> View in OpenAlex</a></div>`;
   }
 
-  html += '</div>';
-  layer.bindPopup(html, { maxWidth: 300, maxHeight: 250 });
+  return html;
+};
+
+// ---------------------------------------------------------------------------
+// Internal renderers
+// ---------------------------------------------------------------------------
+
+function _renderHeader(p, featureId) {
+  let html = '';
+  // Status badge — only present for admin/curator; anonymous users see published only.
+  if (p.status) {
+    html += `<div style="margin-bottom:8px;">${publicationStatusBadgeHTML(p.status, p.status_display)}</div>`;
+  }
+  if (p.title) {
+    html += `<h3>${p.title}</h3>`;
+  }
+  // "View work details" button
+  const doi = p.doi;
+  if (doi) {
+    html += `<div style="margin-bottom:10px;"><a href="/work/${encodeURIComponent(doi)}/" class="btn btn-sm btn-primary" style="color:white;text-decoration:none;padding:5px 10px;border-radius:3px;display:inline-block;">View work details</a></div>`;
+  } else if (featureId) {
+    html += `<div style="margin-bottom:10px;"><a href="/work/${featureId}/" class="btn btn-sm btn-primary" style="color:white;text-decoration:none;padding:5px 10px;border-radius:3px;display:inline-block;">View work details</a></div>`;
+  }
+  return html;
 }
 
+function _renderMinimalPopup(p, featureId) {
+  return '<div>' + _renderHeader(p, featureId) +
+    '<p style="color:#666;font-size:12px;margin-top:6px;">Loading details…</p></div>';
+}
+
+function _renderFullPopup(p, featureId) {
+  return '<div>' + _renderHeader(p, featureId) +
+    (window.renderPublicationContent(p, featureId) || '') + '</div>';
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
 /**
- * Style function for publication features
- * Uses teal color scheme from feed pages
+ * Generate popup content for a publication feature.
+ * With chunked loading the initial feature only has minimal properties
+ * (id, title, doi, status). Full details are fetched lazily on first open.
  * @param {Object} feature - GeoJSON feature object
- * @returns {Object} Style object for Leaflet
+ * @param {Object} layer - Leaflet layer object
  */
-function publicationStyle(feature) {
-  return {
-    color: '#158F9B',
-    weight: 2,
-    fillOpacity: 0.3,
-  };
+function publicationPopup(feature, layer) {
+  const p = feature.properties;
+  // GeoJSON convention puts the primary key at feature.id rather than properties.
+  const featureId = feature.id || p.id;
+  const container = document.createElement('div');
+
+  function paint(props) {
+    container.innerHTML = props
+      ? _renderFullPopup(props, featureId)
+      : _renderMinimalPopup(p, featureId);
+  }
+
+  // If already cached (e.g. popup reopened), render immediately.
+  paint(window.workDetailsCache[featureId] ?? null);
+  layer.bindPopup(container, { maxWidth: 300, maxHeight: 250 });
+
+  layer.on('popupopen', async () => {
+    if (window.workDetailsCache[featureId]) {
+      paint(window.workDetailsCache[featureId]);
+      layer.getPopup().update();
+      return;
+    }
+    try {
+      await window.fetchWorkDetails(featureId);
+    } catch (_) {
+      // Leave "Loading details…" — don't crash.
+    }
+    if (window.workDetailsCache[featureId]) {
+      paint(window.workDetailsCache[featureId]);
+      layer.getPopup().update();
+    }
+  });
 }

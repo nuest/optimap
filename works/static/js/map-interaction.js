@@ -22,27 +22,10 @@ class MapInteractionManager {
     this.paginatedPopup = null;
     this.currentClickLocation = null;
 
-    // Style definitions
-    this.defaultStyle = {
-      color: '#158F9B',
-      weight: 2,
-      fillOpacity: 0.3,
-    };
-
-    this.highlightStyle = {
-      color: '#FF4500',      // Bright red-orange for high contrast
-      weight: 5,             // Thicker border
-      fillOpacity: 0.6,      // More opaque
-      fillColor: '#FF6B35',  // Explicit fill color
-    };
-
-    this.selectedStyle = {
-      color: '#FFD700',      // Gold/yellow for maximum contrast
-      weight: 6,             // Extra thick border
-      fillOpacity: 0.7,      // Higher opacity
-      fillColor: '#FFA500',  // Orange fill
-      dashArray: '10, 5'     // More prominent dashes
-    };
+    // Style definitions — canonical values live in map-styles.js
+    this.defaultStyle   = OPTIMAP_MAP_STYLES.default;
+    this.highlightStyle = OPTIMAP_MAP_STYLES.highlight;
+    this.selectedStyle  = OPTIMAP_MAP_STYLES.selected;
 
     this.initializeInteraction();
   }
@@ -436,74 +419,42 @@ class MapInteractionManager {
 
     html += '</div></div></div>';
 
-    // Publication content (using standard popup format)
-    html += '<div class="publication-content" style="max-height: 350px; overflow-y: auto;">';
+    // Publication content — title + link always present (from minimal serializer);
+    // rich details (source, abstract, …) served from shared cache or fetched lazily.
+    const cachedDetails = window.workDetailsCache?.[featureId];
+    html += `<div id="pub-content-${featureId}" class="publication-content" style="max-height: 350px; overflow-y: auto;">`;
 
     // Title with link to work landing page
     if (properties.title) {
       html += `<h3 style="margin: 0 0 10px 0; font-size: 16px;">${properties.title}</h3>`;
-
-      if (properties.doi) {
-        html += `<div style="margin-bottom: 10px;"><a href="/work/${encodeURIComponent(properties.doi)}/" class="btn btn-sm btn-primary" style="color: white; text-decoration: none; padding: 5px 10px; border-radius: 3px; display: inline-block; background: #158F9B; border: none;">View work details</a></div>`;
-      } else if (featureId) {
-        html += `<div style="margin-bottom: 10px;"><a href="/work/${featureId}/" class="btn btn-sm btn-primary" style="color: white; text-decoration: none; padding: 5px 10px; border-radius: 3px; display: inline-block; background: #158F9B; border: none;">View work details</a></div>`;
-      }
+    }
+    if (properties.doi) {
+      html += `<div style="margin-bottom: 10px;"><a href="/work/${encodeURIComponent(properties.doi)}/" class="btn btn-sm btn-primary" style="color: white; text-decoration: none; padding: 5px 10px; border-radius: 3px; display: inline-block; background: #158F9B; border: none;">View work details</a></div>`;
+    } else if (featureId) {
+      html += `<div style="margin-bottom: 10px;"><a href="/work/${featureId}/" class="btn btn-sm btn-primary" style="color: white; text-decoration: none; padding: 5px 10px; border-radius: 3px; display: inline-block; background: #158F9B; border: none;">View work details</a></div>`;
     }
 
-    // Source details
-    if (properties.source_details) {
-      const s = properties.source_details;
-      const name = s.display_name || s.name || 'Unknown';
-      html += `<div style="margin-bottom: 5px;"><strong>Source:</strong> ${name}</div>`;
-
-      if (s.abbreviated_title) {
-        html += `<div style="margin-bottom: 5px;"><em>${s.abbreviated_title}</em></div>`;
-      }
-
-      if (s.homepage_url) {
-        html += `<div style="margin-bottom: 5px;"><a href="${s.homepage_url}" target="_blank"><i class="fas fa-external-link-alt"></i> Visit source website</a></div>`;
-      }
-
-      if (s.issn_l) {
-        html += `<div style="margin-bottom: 5px;"><strong>ISSN-L:</strong> <a href="https://openalex.org/sources/issn:${s.issn_l}" target="_blank"><i class="fas fa-external-link-alt"></i> ${s.issn_l}</a></div>`;
-      }
-
-      if (s.publisher_name && s.publisher_name !== name) {
-        html += `<div style="margin-bottom: 5px;"><strong>Publisher:</strong> ${s.publisher_name}</div>`;
-      }
-
-      if ('is_oa' in s) {
-        const status = s.is_oa ? 'Open Access' : 'Closed Access';
-        html += `<div style="margin-bottom: 5px;"><strong>Access:</strong> ${status}</div>`;
-      }
-
-      if (s.cited_by_count != null) {
-        html += `<div style="margin-bottom: 5px;">Cited by ${s.cited_by_count} works</div>`;
-      }
-
-      if (s.works_count != null) {
-        html += `<div style="margin-bottom: 5px;">${s.works_count} works hosted</div>`;
-      }
-    }
-
-    // Time period
-    if (properties.timeperiod_startdate && properties.timeperiod_enddate) {
-      html += `<div style="margin-bottom: 5px;"><strong>Timeperiod:</strong> from ${properties.timeperiod_startdate} to ${properties.timeperiod_enddate}</div>`;
-    }
-
-    // Abstract
-    if (properties.abstract) {
-      html += `<div style="margin-top: 10px;"><p style="margin: 0;">${properties.abstract}</p></div>`;
-    }
-
-    // Work source link
-    if (properties.url) {
-      html += `<div style="margin-top: 8px;"><a href="${properties.url}" target="_blank"><i class="fas fa-external-link-alt"></i> Visit work</a></div>`;
-    }
-
-    // OpenAlex link
-    if (properties.openalex_id) {
-      html += `<div style="margin-top: 8px;"><a href="${properties.openalex_id}" target="_blank" style="color: #2563eb;"><i class="fas fa-external-link-alt"></i> View in OpenAlex</a></div>`;
+    if (cachedDetails) {
+      // Render full details synchronously from cache.
+      html += (window.renderPublicationContent?.(cachedDetails, featureId) || '');
+    } else {
+      html += '<p class="popup-loading" style="color:#666;font-size:12px;margin-top:6px;">Loading details…</p>';
+      // Fetch and fill in asynchronously after the popup is in the DOM.
+      const capturedId = featureId;
+      Promise.resolve().then(async () => {
+        try {
+          await window.fetchWorkDetails(capturedId);
+        } catch (_) { return; }
+        const el = document.getElementById('pub-content-' + capturedId);
+        if (el && this.paginatedPopup) {
+          const details = window.workDetailsCache[capturedId];
+          const richHtml = window.renderPublicationContent?.(details, capturedId) || '';
+          // Replace only the loading text, keeping title + link intact.
+          const loadingEl = el.querySelector('.popup-loading');
+          if (loadingEl) loadingEl.outerHTML = richHtml;
+          this.paginatedPopup.update();
+        }
+      });
     }
 
     html += '</div></div>';
