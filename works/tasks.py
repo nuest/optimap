@@ -102,6 +102,10 @@ from works.harvesting.oai import (  # noqa: F401
     harvest_oai_endpoint,
     parse_oai_xml_and_save_works,
 )
+from works.harvesting.geoscienceworld import (  # noqa: F401
+    harvest_geoscienceworld,
+    parse_gsw_response_and_save_works,
+)
 from works.harvesting.openalex import build_openalex_fields  # noqa: F401
 from works.harvesting.openalex_source import (  # noqa: F401
     OPENALEX_API_URL,

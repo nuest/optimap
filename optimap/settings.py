@@ -235,7 +235,7 @@ download URLs directly.
         {'name': 'Gazetteer', 'description': 'Server-side proxy for forward / reverse geocoding via Nominatim or Photon.'},
         {'name': 'Downloads', 'description': 'Flat-file dumps of the full work corpus (GeoJSON, GeoPackage, CSV).'},
         {'name': 'Collections', 'description': 'Curated groups of published works. The list/detail endpoints return collection metadata with a `works_count` and embedded links to feeds and downloads. Per-collection GeoRSS/GeoAtom feeds are served by the Django syndication framework and are documented in the API description above.'},
-        {'name': 'Body of Knowledge', 'description': 'Search the cached [EO4GEO Body of Knowledge](https://eo4geo.eu/bok/) for concept tagging.'},
+        {'name': 'Body of Knowledge', 'description': 'Search the cached [EO4GEO Body of Knowledge](https://geospacebok.eu) for concept tagging.'},
     ],
     'SWAGGER_UI_DIST': 'SIDECAR',  # shorthand to use the sidecar instead
     'SWAGGER_UI_FAVICON_HREF': 'SIDECAR',
@@ -431,15 +431,22 @@ GEOEXTENT_NER_GAZETTEER = os.getenv("OPTIMAP_GEOEXTENT_NER_GAZETTEER", "nominati
 # change in code only (small UX number, no per-deploy reason to tune).
 GEOEXTENT_COPY_TTL_SECONDS = 5 * 60
 
+# Seconds to sleep between geoextent calls in the GeoScienceWorld harvester.
+# Each call fetches a GSW landing page via Cloudflare bypass (curl_cffi); a
+# small delay reduces the risk of rate-limiting. Set to 0 to disable.
+GEOSCIENCEWORLD_THROTTLE_SECONDS = float(os.getenv("OPTIMAP_GSW_THROTTLE", 2.0))
+
 # EO4GEO Body of Knowledge — controlled vocabulary used for concept tagging
 # on the work landing page. The cached snapshot lives in the `default` cache
 # (DB-backed, lazy on miss) and is refreshed by `manage.py refresh_bok_snapshot`.
-# Set to "current", "v1", "v2", "v3", … (see https://eo4geo-uji.web.app/documentation/API.pdf).
-# `v3` is pinned as the default so chip labels stay stable across upstream
-# churn; set to `current` to auto-follow upstream renames/additions.
-BOK_VERSION = os.getenv("OPTIMAP_BOK_VERSION", "v3")
+# Set to "v9", "v3", … (see https://eo4geo-uji.web.app/documentation/API.pdf).
+# v9 is the current live version (1212 concepts, verified 2026-06-11).
+# Firebase also exposes a "current" alias — we pin explicitly to avoid silent
+# drift if the upstream alias moves.  v9 vs v3: expanded GC3 AI/ML hierarchy,
+# new GN (GNSS) top-level category.
+BOK_VERSION = os.getenv("OPTIMAP_BOK_VERSION", "v9")
 BOK_API_BASE = os.getenv("OPTIMAP_BOK_API_BASE", "https://eo4geo-bok.firebaseio.com")
-BOK_CONCEPT_BASE_URL = os.getenv("OPTIMAP_BOK_CONCEPT_BASE_URL", "http://bok.eo4geo.eu")
+BOK_CONCEPT_BASE_URL = os.getenv("OPTIMAP_BOK_CONCEPT_BASE_URL", "https://geospacebok.eu")
 # Gate: comma-separated list of `Collection.identifier` slugs (e.g.
 # "mountain-wetlands,essd"). The BoK editor is restricted to works that
 # belong to at least one of those collections; the `/contribute-bok/`

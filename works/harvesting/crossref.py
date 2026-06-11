@@ -368,7 +368,7 @@ def harvest_crossref_prefix(
 
     resolved_prefix = (
         prefix
-        or getattr(source, "crossref_prefix", None)
+        or (source.doi_prefix if source else None)
         or "10.5194"
     )
 

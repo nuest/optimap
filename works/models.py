@@ -393,6 +393,7 @@ class HarvestingEvent(models.Model):
     log_text = models.TextField(blank=True, default="")
     records_added = models.IntegerField(null=True, blank=True)
     records_updated = models.IntegerField(null=True, blank=True)
+    records_skipped = models.IntegerField(null=True, blank=True)
     records_with_spatial = models.IntegerField(null=True, blank=True)
     records_with_temporal = models.IntegerField(null=True, blank=True)
 
@@ -528,6 +529,7 @@ class Source(models.Model):
         ('crossref-prefix',   'Crossref (DOI prefix)'),
         ('mountain-wetlands', 'Mountain Wetlands Repository'),
         ('openalex',          'OpenAlex source'),
+        ('geoscienceworld',   'GeoScienceWorld'),
     ]
 
     # Map source_type → Django-Q task path. Types not listed here cannot be auto-scheduled.
@@ -539,6 +541,7 @@ class Source(models.Model):
         'crossref-prefix':   'works.tasks.harvest_crossref_prefix',
         'mountain-wetlands': 'works.tasks.harvest_mountain_wetlands',
         'openalex':          'works.tasks.harvest_openalex_source',
+        'geoscienceworld':   'works.tasks.harvest_geoscienceworld',
     }
 
     url_field                = models.URLField(
@@ -547,11 +550,11 @@ class Source(models.Model):
             'Source endpoint URL. What goes here depends on source_type — see '
             'docs/manage.md → "Source field cheatsheet". OAI-PMH: full '
             'ListRecords URL incl. metadataPrefix. RSS: feed URL. '
-            'Crossref-prefix: display-only (the prefix is hard-coded to '
-            '10.5194 today, change requires code edit). Mountain-wetlands: '
-            'API base URL. OpenAlex: any placeholder URL works as long as '
-            'openalex_id is set to the S<id>; otherwise put a URL containing '
-            'the S<id> here.'
+            'Crossref-prefix / GeoScienceWorld: display-only URL (harvester '
+            'reads doi_prefix for the actual Crossref filter). '
+            'Mountain-wetlands: API base URL. OpenAlex: any placeholder URL '
+            'works as long as openalex_id is set to the S<id>; otherwise put '
+            'a URL containing the S<id> here.'
         ),
     )
     source_type              = models.CharField(
@@ -596,6 +599,15 @@ class Source(models.Model):
             'source_type=openalex — the harvester scans this field first, '
             'then url_field, for an S<digits> token. The display URL '
             '(`openalex_url` in the public Source API) is derived from this.'
+        ),
+    )
+    doi_prefix               = models.CharField(
+        max_length=20, blank=True, null=True,
+        help_text=(
+            'DOI prefix used for Crossref-based harvesters (e.g. "10.1190" '
+            'for SEG journals, "10.5194" for Copernicus). Used by '
+            'source_type=crossref-prefix and source_type=geoscienceworld. '
+            'Overrides the hardcoded fallback in harvest_crossref_prefix.'
         ),
     )
     publisher_name           = models.CharField(

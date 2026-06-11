@@ -37,6 +37,7 @@ from works.tasks import (
     harvest_crossref_prefix,
     harvest_mountain_wetlands,
     harvest_openalex_source,
+    harvest_geoscienceworld,
 )
 
 logger = logging.getLogger(__name__)
@@ -158,6 +159,101 @@ SOURCE_CONFIG = {
         'publisher_name': 'Mountain Wetlands Repository (MaRESS)',
         'source_type': 'mountain-wetlands',
         'is_oa': True,
+        'default_work_type': 'article',
+    },
+    # GeoScienceWorld (GSW) — journals from multiple geoscience publishers hosted on
+    # pubs.geoscienceworld.org. Articles include GeoRef coordinates as WKT on landing
+    # pages; geoextent's GSW content provider extracts them via Cloudflare bypass.
+    # Temporal/epoch extraction is deferred — see issue #257 / geoextent#122.
+    # Use --source-prefix gsw to harvest all sources in one run.
+    'gsw-seg': {
+        'name': 'GeoScienceWorld — SEG Journals',
+        'url': 'https://pubs.geoscienceworld.org/seg',
+        'collection_name': 'GeoScienceWorld SEG',
+        'homepage_url': 'https://pubs.geoscienceworld.org/seg',
+        'publisher_name': 'Society of Exploration Geophysicists',
+        'source_type': 'geoscienceworld',
+        'doi_prefix': '10.1190',
+        'default_work_type': 'article',
+    },
+    'gsw-gsl': {
+        'name': 'GeoScienceWorld — Geological Society of London',
+        'url': 'https://pubs.geoscienceworld.org/gsl',
+        'collection_name': 'GeoScienceWorld GSL',
+        'homepage_url': 'https://pubs.geoscienceworld.org/gsl',
+        'publisher_name': 'Geological Society of London',
+        'source_type': 'geoscienceworld',
+        'doi_prefix': '10.1144',
+        'default_work_type': 'article',
+    },
+    'gsw-mineralogical': {
+        'name': 'GeoScienceWorld — Mineralogical Society',
+        'url': 'https://pubs.geoscienceworld.org/minersoc',
+        'collection_name': 'GeoScienceWorld Mineralogical Society',
+        'homepage_url': 'https://pubs.geoscienceworld.org/minersoc',
+        'publisher_name': 'Mineralogical Society of Great Britain and Ireland',
+        'source_type': 'geoscienceworld',
+        'doi_prefix': '10.1180',
+        'default_work_type': 'article',
+    },
+    'gsw-gsa': {
+        'name': 'GeoScienceWorld — Geological Society of America',
+        'url': 'https://pubs.geoscienceworld.org/gsa',
+        'collection_name': 'GeoScienceWorld GSA',
+        'homepage_url': 'https://pubs.geoscienceworld.org/gsa',
+        'publisher_name': 'Geological Society of America',
+        'source_type': 'geoscienceworld',
+        'doi_prefix': '10.1130',
+        'default_work_type': 'article',
+    },
+    'gsw-own': {
+        'name': 'GeoScienceWorld — Aggregated (10.2113)',
+        'url': 'https://pubs.geoscienceworld.org',
+        'collection_name': 'GeoScienceWorld Aggregated',
+        'homepage_url': 'https://pubs.geoscienceworld.org',
+        'publisher_name': 'GeoScienceWorld',
+        'source_type': 'geoscienceworld',
+        'doi_prefix': '10.2113',
+        'default_work_type': 'article',
+    },
+    'gsw-aapg': {
+        'name': 'GeoScienceWorld — AAPG/Datapages',
+        'url': 'https://pubs.geoscienceworld.org/aapg',
+        'collection_name': 'GeoScienceWorld AAPG',
+        'homepage_url': 'https://pubs.geoscienceworld.org/aapg',
+        'publisher_name': 'AAPG/Datapages',
+        'source_type': 'geoscienceworld',
+        'doi_prefix': '10.1306',
+        'default_work_type': 'article',
+    },
+    'gsw-seg-econ': {
+        'name': 'GeoScienceWorld — Society of Economic Geologists',
+        'url': 'https://pubs.geoscienceworld.org/seg-econ',
+        'collection_name': 'GeoScienceWorld SEG-Econ',
+        'homepage_url': 'https://pubs.geoscienceworld.org/seg-econ',
+        'publisher_name': 'Society of Economic Geologists',
+        'source_type': 'geoscienceworld',
+        'doi_prefix': '10.5382',
+        'default_work_type': 'article',
+    },
+    'gsw-clay': {
+        'name': 'GeoScienceWorld — Clay Minerals Society',
+        'url': 'https://pubs.geoscienceworld.org/clay',
+        'collection_name': 'GeoScienceWorld Clay Minerals',
+        'homepage_url': 'https://pubs.geoscienceworld.org/clay',
+        'publisher_name': 'Clay Minerals Society',
+        'source_type': 'geoscienceworld',
+        'doi_prefix': '10.1346',
+        'default_work_type': 'article',
+    },
+    'gsw-cushman': {
+        'name': 'GeoScienceWorld — Cushman Foundation for Foraminiferal Research',
+        'url': 'https://pubs.geoscienceworld.org/cushman',
+        'collection_name': 'GeoScienceWorld Cushman Foundation',
+        'homepage_url': 'https://pubs.geoscienceworld.org/cushman',
+        'publisher_name': 'Cushman Foundation for Foraminiferal Research',
+        'source_type': 'geoscienceworld',
+        'doi_prefix': '10.61551',
         'default_work_type': 'article',
     },
     # Pensoft / ARPHA platform journals — OAI-PMH endpoint pattern:
@@ -674,6 +770,16 @@ class Command(BaseCommand):
                         fetch_abstract_from_publisher=fetch_abstract,
                         update_existing=update_existing,
                     )
+                elif source_type == 'geoscienceworld':
+                    self.stdout.write('Source type: GeoScienceWorld (Crossref + geoextent)')
+                    effective_prefix = config.get('doi_prefix') or (source.doi_prefix if source else None)
+                    self.stdout.write(f'  DOI prefix: {effective_prefix}')
+                    harvest_geoscienceworld(
+                        source.id,
+                        user=user,
+                        max_records=max_records,
+                        update_existing=update_existing,
+                    )
                 elif source_type == 'openalex':
                     self.stdout.write('Source type: OpenAlex source')
                     self.stdout.write(
@@ -700,8 +806,10 @@ class Command(BaseCommand):
                 duration = (timezone.now() - harvest_start).total_seconds()
 
                 if event.status == 'completed':
+                    skipped_count = event.records_skipped or 0
+                    skip_note = f', {skipped_count} skipped' if skipped_count else ''
                     self.stdout.write(self.style.SUCCESS(
-                        f'✓ Successfully harvested {pub_count} publications in {duration:.1f}s'
+                        f'✓ Successfully harvested {pub_count} publications in {duration:.1f}s{skip_note}'
                     ))
                     total_harvested += pub_count
                     results.append({
@@ -888,6 +996,7 @@ class Command(BaseCommand):
             is_preprint=config.get('is_preprint', False),
             default_work_type=config.get('default_work_type', 'article'),
             openalex_id=config.get('openalex_id'),
+            doi_prefix=config.get('doi_prefix'),
             issn_l=config.get('issn_l'),
             harvest_interval_minutes=0,
         )
@@ -921,7 +1030,7 @@ class Command(BaseCommand):
                 source.collection = col
                 update_fields.append('collection')
 
-        for field in ('homepage_url', 'publisher_name', 'default_work_type', 'openalex_id', 'issn_l'):
+        for field in ('homepage_url', 'publisher_name', 'default_work_type', 'openalex_id', 'doi_prefix', 'issn_l'):
             new_value = config.get(field)
             if not new_value or getattr(source, field):
                 continue

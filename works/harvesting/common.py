@@ -36,7 +36,7 @@ class HarvestStats:
 
     __slots__ = (
         "created", "updated", "doi_backfilled",
-        "skipped_same_source", "skipped_cross_source",
+        "skipped_same_source", "skipped_cross_source", "skipped_existing",
     )
 
     def __init__(self):
@@ -45,6 +45,11 @@ class HarvestStats:
         self.doi_backfilled = 0
         self.skipped_same_source = 0
         self.skipped_cross_source = 0
+        self.skipped_existing = 0
+
+    @property
+    def skipped(self):
+        return self.skipped_same_source + self.skipped_cross_source + self.skipped_existing
 
     def record(self, action):
         if action == "created":
@@ -57,6 +62,8 @@ class HarvestStats:
             self.skipped_same_source += 1
         elif action == "skipped_cross_source":
             self.skipped_cross_source += 1
+        elif action == "skipped_existing":
+            self.skipped_existing += 1
 
 
 class HarvestWarningCollector(logging.Handler):
@@ -404,6 +411,7 @@ def complete_harvest(event, stats, warning_collector, spatial_count=None, tempor
     event.completed_at = timezone.now()
     event.records_added = stats.created
     event.records_updated = stats.updated
+    event.records_skipped = stats.skipped
     event.records_with_spatial = spatial_count
     event.records_with_temporal = temporal_count
     event.log_text = warning_collector.get_summary()

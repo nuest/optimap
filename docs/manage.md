@@ -28,6 +28,7 @@ The change form is grouped into five fieldsets, mirrored below. **Only the three
 | | `collection` | Optional | Default `Collection` for harvested works. Blank is fine — works are simply not auto-added; OAI-PMH/OJS/Janeway also auto-create one if blank. |
 | | `default_work_type` | Defaulted to `article` | Default `Work.type` for harvested works (overridden by OpenAlex metadata when present). |
 | **OpenAlex / external IDs** | `openalex_id` | **Yes for `source_type=openalex`**, optional otherwise | OpenAlex Source identifier (`S<digits>`, or the full `https://openalex.org/S<id>` URL). The display URL exposed by the public Source API as `openalex_url` is derived from this field on the fly. |
+| | `doi_prefix` | **Yes for `crossref-prefix` and `geoscienceworld`**, ignored otherwise | DOI prefix used by Crossref-based harvesters, e.g. `10.1190` (SEG) or `10.5194` (Copernicus). Replaces the old hardcoded Copernicus fallback. |
 | | `issn_l`, `abbreviated_title` | Optional | Display only. |
 | **Display metadata** | `publisher_name`, `homepage_url`, `is_oa`, `is_preprint`, `tags` | Optional | Display only — none of these affect harvesting. |
 | **Statistics (auto-populated)** | `works_count`, `cited_by_count`, `last_harvest` | Read-only | Auto-populated. |
@@ -50,9 +51,27 @@ For each type, only mandatory and type-specific fields are listed; defaults / di
 
 ##### Crossref by DOI prefix (`crossref-prefix`)
 
-- **`url_field`** — currently **display only**. The harvester ignores it.
-- ⚠️ **The DOI prefix is hard-coded to `10.5194` (Copernicus).** [`works/harvesting/crossref.py:335-339`](../works/harvesting/crossref.py) falls back to `"10.5194"` because `Source` has no `crossref_prefix` field today. **Adding a non-Copernicus crossref-prefix source through the admin alone will not work** — open an issue / extend the model if you need this.
-- For the Copernicus path, leave `url_field` as something representative (e.g. `https://api.crossref.org/works?filter=prefix:10.5194`); harvest with `python manage.py harvest_sources --source copernicus [--source-title "<title>"]` to filter to a specific Copernicus title.
+- **`url_field`** — display only. Set it to something representative, e.g. `https://api.crossref.org/works?filter=prefix:10.5194`.
+- **`doi_prefix`** — the DOI prefix to filter on (e.g. `10.5194`). Falls back to `10.5194` if blank for backwards compatibility.
+- Harvest with `python manage.py harvest_sources --source copernicus [--source-title "<title>"]` to filter to a specific container title.
+
+##### GeoScienceWorld (`geoscienceworld`)
+
+Enumerates articles from Crossref by DOI prefix, then fetches geographic coordinates from each article's GSW landing page via geoextent's built-in GSW content provider (uses `curl_cffi` for Cloudflare bypass; parses WKT `<coordinates>` elements from GeoRef metadata).
+
+- **`url_field`** — display only. Set it to the GSW journal homepage, e.g. `https://pubs.geoscienceworld.org/seg`.
+- **`doi_prefix`** — **required**. DOI prefix for the journal family, e.g. `10.1190` (SEG), `10.1144` (GSL), `10.1180` (Mineralogical Society).
+- Throttle between geoextent calls is controlled by `OPTIMAP_GSW_THROTTLE` (default 2 s).
+- Temporal/epoch extraction is not yet implemented — tracked in [#257](https://github.com/GeoinformationSystems/optimap/issues/257) pending [nuest/geoextent#122](https://github.com/nuest/geoextent/issues/122).
+
+| Field | Value (SEG example) |
+|-------|---------------------|
+| `name` | `GeoScienceWorld — SEG Journals` |
+| `source_type` | `geoscienceworld` |
+| `url_field` | `https://pubs.geoscienceworld.org/seg` |
+| `doi_prefix` | `10.1190` |
+| `default_work_type` | `article` |
+| `harvest_interval_minutes` | `0` (manual until smoke run passes) |
 
 ##### Mountain Wetlands Repository (`mountain-wetlands`)
 
@@ -275,9 +294,10 @@ The `Source.source_type` choice field selects the harvester pipeline:
 | `ojs` | `harvest_oai_endpoint` | OJS journal (typically with the [geoMetadata OJS plugin](https://github.com/TIBHannover/geoMetadata)) |
 | `janeway` | `harvest_oai_endpoint` | Janeway journal (typically with the [geometadata Janeway plugin](https://github.com/GeoinformationSystems/janeway_geometadata/)) |
 | `rss` | `harvest_rss_endpoint` | RSS / Atom feed |
-| `crossref-prefix` | `harvest_crossref_prefix` | Crossref `works` API filtered by DOI prefix |
+| `crossref-prefix` | `harvest_crossref_prefix` | Crossref `works` API filtered by DOI prefix (`doi_prefix` field) |
 | `mountain-wetlands` | `harvest_mountain_wetlands` | Bespoke harvester for the Mountain Wetlands Repository (MaRESS) |
 | `openalex` | `harvest_openalex_source` | OpenAlex `works` API filtered by `primary_location.source.id` |
+| `geoscienceworld` | `harvest_geoscienceworld` | Crossref enumeration + geoextent coordinate extraction from GSW landing pages |
 
 `oai-pmh`, `ojs`, and `janeway` share the same harvester today; the distinction captures the platform so the metadata extractor's priority order (schema.org JSON-LD → `geo+json` link → `DC.SpatialCoverage` → `DC.box`) and admin UI can branch in future without another migration.
 
@@ -593,24 +613,36 @@ When to clear which:
 
 ### EO4GEO BoK snapshot
 
-OPTIMAP caches the public [EO4GEO Body of Knowledge](https://eo4geo.eu/bok/)
-so the autosuggest combobox on the work landing page (issue #245) and the
-contribution endpoint can validate concept codes without hitting upstream
-on every request. The cache is **lazy on miss** — first request after
-deploy fetches and writes; the management command below makes that
-explicit.
+OPTIMAP caches the public [EO4GEO Body of Knowledge](https://geospacebok.eu)
+(also known as **GeoSpaceBoK**) so the autosuggest combobox on the work
+landing page (issue #245) and the contribution endpoint can validate concept
+codes without hitting upstream on every request. The cache is **lazy on miss**
+— first request after deploy fetches and writes; the management command below
+makes that explicit.
+
+The BoK is served from a Firebase Realtime DB (`eo4geo-bok.firebaseio.com`)
+and versioned. OPTIMAP is pinned to **`v9`** (the live version as of 2026-06,
+1,212 concepts, verified 2026-06-11). Firebase also exposes a `current` alias,
+but we use an explicit version to avoid silent drift when the alias moves.
+`v9` reflects the live portal at [geospacebok.eu](https://geospacebok.eu) and
+contains:
+- An expanded GC3 AI/ML subtree (6 codes in v3 → 52 in v9, e.g.
+  `GC3-11-2` Space-time dynamic reasoning, `GC3-14` Intelligent Software
+  Agent).
+- A new top-level `GN` category (GNSS – Global Navigation Satellite Systems)
+  with ~277 sub-concepts.
 
 **Settings (env vars, see `optimap/.env.example`):**
 
-- `OPTIMAP_BOK_VERSION` — which BoK version to follow. Default `v3`
-  (pinned for label stability). Set to `current` to auto-follow
-  upstream renames/additions; pin to another `vN` if upstream churn
-  breaks chips.
+- `OPTIMAP_BOK_VERSION` — which BoK version to use. Default `v9`. Set to
+  `v3`, `v8`, etc. to roll back to an older snapshot, or `current` to
+  always track the latest live version.
 - `OPTIMAP_BOK_API_BASE` — root of the Firebase API. Default
   `https://eo4geo-bok.firebaseio.com`.
-- `OPTIMAP_BOK_CONCEPT_BASE_URL` — base for the public concept pages.
-  Default `http://bok.eo4geo.eu`. Used as a fallback when a concept's
-  `uri` field is missing.
+- `OPTIMAP_BOK_CONCEPT_BASE_URL` — base URL for concept page links, e.g.
+  `https://geospacebok.eu` (default) renders chips that link to
+  `https://geospacebok.eu/<CODE>`. Change to `http://bok.eo4geo.eu` to
+  use the legacy portal.
 - `OPTIMAP_BOK_ENABLED_COLLECTIONS` — **opt-in allow-list** of
   `Collection.identifier` slugs (comma-separated, no spaces; e.g.
   `mountain-wetlands,essd`). The editor is shown only on works that
@@ -624,9 +656,9 @@ explicit.
 **Refresh:**
 
 ```bash
-python manage.py refresh_bok_snapshot               # use settings.BOK_VERSION
-python manage.py refresh_bok_snapshot --version v3  # pin a version explicitly
-python manage.py refresh_bok_snapshot --dry-run     # fetch + report without writing
+python manage.py refresh_bok_snapshot                        # use settings.BOK_VERSION
+python manage.py refresh_bok_snapshot --bok-version v9       # explicit version override
+python manage.py refresh_bok_snapshot --dry-run              # fetch + report without writing
 ```
 
 The snapshot lives in the `default` (DB) cache under
@@ -641,11 +673,12 @@ python manage.py clear_caches --cache default      # also drops other DB-cache r
 
 - After a known upstream change (new concepts, renames).
 - If the autosuggest input returns "No matches" for terms you expect.
-- On a quarterly cadence (mostly to keep names in sync with upstream).
+- When upgrading `OPTIMAP_BOK_VERSION` (the old cached key stays until
+  the cache is cleared; changing the version setting alone is not enough).
 
 **Orphan codes.** If upstream removes a concept that's already stored on
 a work, the chip on the landing page renders as a greyed plain-text chip
-with a *"No longer in current EO4GEO BoK"* tooltip. The code stays in
+with a *"No longer in current GeoSpaceBoK"* tooltip. The code stays in
 the DB so admins can decide whether to remove it, swap to a successor,
 or wait for upstream to restore it.
 
