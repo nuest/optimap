@@ -601,6 +601,14 @@
       map.setView([0, 0], 2);
     }
 
+    // When ESC exits fullscreen the browser fires fullscreenchange at document,
+    // so leaflet.fullscreen's handler (which checks ev.target === container) never
+    // calls map.invalidateSize(). Without it the SVG overlay stays positioned for
+    // the fullscreen viewport and geometries appear missing.
+    document.addEventListener('fullscreenchange', function() {
+      if (!document.fullscreenElement) map.invalidateSize();
+    });
+
     // Add drawing controls for contributions
     if (canContribute) {
       drawnItems = new L.FeatureGroup();
