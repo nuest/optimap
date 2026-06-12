@@ -57,6 +57,12 @@ class AccountDeletionUITest(StaticLiveServerTestCase):
         user = User.objects.filter(email=self.email).first()
         self.assertIsNone(user, "User was not deleted from the database!")
 
+        # After deletion the browser should be on the start page
+        self.assertIn(self.live_server_url + "/", get_driver().current_url)
+
+        # The user menu should show the login link, not a logged-in state
+        self.assertFalse(Text("Logout").exists(), "User should be logged out after account deletion")
+
     def tearDown(self):
         """Close browser after test"""
         if self.browser:
