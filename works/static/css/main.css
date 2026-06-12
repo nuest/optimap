@@ -487,6 +487,28 @@ body.high-contrast .leaflet-control-zoom-to-all-button:focus {
   white-space: normal;
 }
 
+/* User settings accordion: labels + toggle switches must wrap on narrow screens */
+#user_settings .form-group.d-flex {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+#user_settings .form-group.d-flex label.mr-3 {
+  white-space: normal;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+/* All alert boxes must wrap regardless of the parent white-space: nowrap on main */
+.alert {
+  white-space: normal;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
 /* Countdown line shown inside auto-closing alerts */
 .alert-autoclose-countdown {
   display: block;
