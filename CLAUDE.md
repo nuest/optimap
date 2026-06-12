@@ -654,3 +654,16 @@ Size limits passed from Django settings:
 ## Version Management
 
 Version is maintained in [optimap/\_\_init\_\_.py](optimap/__init__.py). Follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Update [CHANGELOG.md](CHANGELOG.md) following [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
+
+### Release procedure
+
+1. **Bump the version** in `optimap/__init__.py` (minor for new features, patch for bug-fix-only).
+2. **Update CHANGELOG.md**: rename `[Unreleased]` to `[X.Y.Z] - YYYY-MM-DD` and add a fresh empty `[Unreleased]` section above it.
+3. **Commit** both files: `git commit -m "bump version to X.Y.Z"`.
+4. **Tag** the commit: `git tag -a vX.Y.Z -m "Release vX.Y.Z"`.
+5. **Push** commits and tag: `git push && git push origin vX.Y.Z`.
+6. **Create the GitHub release**:
+   ```bash
+   gh release create vX.Y.Z --title "vX.Y.Z" --notes-file <(sed -n '/^\#\# \[X.Y.Z\]/,/^\#\# \[/p' CHANGELOG.md | head -n -1)
+   ```
+   Or via the GitHub UI using the CHANGELOG section as release notes.
