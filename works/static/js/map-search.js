@@ -396,20 +396,15 @@ class MapSearchManager {
     // Import the popup function from the global scope
     const popupFunc = window.publicationPopup || this.publicationsLayer.options.onEachFeature;
 
-    // Use a custom style for search results to distinguish them from all works
-    const searchResultStyle = function(feature) {
-      return {
-        color: '#FF6B35',      // Vibrant orange for filtered results
-        weight: 3,             // Thicker border than default (2)
-        fillColor: '#FF6B35',  // Match border color
-        fillOpacity: 0.5,      // More opaque than default (0.3)
-        dashArray: null        // Solid line (no dashes)
-      };
-    };
+    // Use the same style as the original layer so symbology is unchanged
+    const styleFn = (typeof publicationStyle === 'function') ? publicationStyle : () => ({});
 
-    // Create a new layer with the filtered publications using search result styling
+    // Create a new layer with the filtered publications, preserving the original symbology.
+    // pointToLayer is required so that GeoJSON Point features become CircleMarkers
+    // (matching the original layer) rather than falling back to default blue pin markers.
     this.filteredLayer = L.geoJSON(filteredGeoJSON, {
-      style: searchResultStyle,
+      pointToLayer: (feature, latlng) => L.circleMarker(latlng, Object.assign({ radius: 6 }, styleFn(feature))),
+      style: styleFn,
       onEachFeature: popupFunc
     });
 

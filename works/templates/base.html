@@ -87,7 +87,7 @@
         <!-- Map Search (only shown on main/map page) -->
         <div id="navbar-search-container" class="navbar-search-container" style="display: none;">
           <form class="navbar-search-form" role="search" onsubmit="return false;">
-            <label for="map-search-input" class="sr-only">Search displayed publications on map</label>
+            <label for="map-search-input" class="sr-only">Filter displayed works on map</label>
             <div class="search-input-wrapper">
               <span class="search-icon" aria-hidden="true">
                 <i class="fas fa-search"></i>
@@ -96,12 +96,12 @@
                 type="search"
                 id="map-search-input"
                 class="navbar-search-input"
-                placeholder="Search displayed publications..."
+                placeholder="Filter works on map"
                 autocomplete="off"
                 spellcheck="false"
-                aria-label="Search displayed by title, author, abstract, keywords, or any text. Minimum 3 characters required."
+                aria-label="Filter displayed by title, author, abstract, keywords, or any text. Minimum 3 characters required."
                 aria-describedby="search-help-text"
-                title="Search displayed by title, author, abstract, keywords, or any text. Results update as you type (minimum 3 characters)."
+                title="Filter displayed by title, author, abstract, keywords, or any text. Results update as you type (minimum 3 characters)."
               />
               <button
                 type="submit"
@@ -130,6 +130,13 @@
         </div>
 
         <ul class="nav navbar-nav ml-auto">
+          <li class="nav-item mr-2 d-flex align-items-center">
+            <a class="btn btn-outline-light" href="{% url 'optimap:contribute-next' %}"
+               style="font-size: 1rem; padding: 0.5rem 1rem;"
+               title="Start georeferencing game">
+              <i class="fas fa-gamepad"></i> <span class="d-none d-md-inline"><strong>Play</strong></span>
+            </a>
+          </li>
           {% include "unified_menu_snippet.html" %}
         </ul>
       </div>
