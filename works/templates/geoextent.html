@@ -461,6 +461,7 @@
 
 {% block scripts %}
 <script src="{% static 'js/leaflet.js' %}"></script>
+<script src="{% static 'js/map-base.js' %}"></script>
 <script>
 $(document).ready(function() {
     let map = null;
@@ -491,10 +492,8 @@ $(document).ready(function() {
     // Initialize map
     function initMap() {
         if (!map) {
-            map = L.map('geoextent-map').setView([20, 0], 2);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors'
-            }).addTo(map);
+            ({ map } = createBaseMap('geoextent-map'));
+            map.setView([20, 0], 2);
 
             // Fix map rendering after initialization
             setTimeout(function() {

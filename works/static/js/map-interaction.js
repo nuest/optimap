@@ -78,7 +78,8 @@ class MapInteractionManager {
 
       layer.on('mouseout', function(e) {
         if (!self.isLayerHighlighted(layer)) {
-          layer.setStyle(self.defaultStyle);
+          const styleFn = self.publicationsLayer.options && self.publicationsLayer.options.style;
+          layer.setStyle(styleFn && layer.feature ? styleFn(layer.feature) : self.defaultStyle);
         }
       });
     });

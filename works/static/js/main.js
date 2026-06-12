@@ -23,18 +23,10 @@ async function initMap() {
   if (!mapEl) {
     return;
   }
-  const map = L.map(mapEl);
-
-  // Base layer: OpenStreetMap
-  const osmLayer = L.tileLayer(
-    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    {
-      attribution:
-        'Map data: © <a href="https://openstreetmap.org">OpenStreetMap</a> contributors' +
-        dataCopyright,
-      maxZoom: 18,
-    }
-  ).addTo(map);
+  const { map, tileLayer: osmLayer } = createBaseMap(mapEl, {}, {
+    attribution: OPTIMAP_OSM_ATTR + dataCopyright,
+  });
+  window._optimapMap = map;
 
   // Controls: scale and layer switcher. The work overlays are added by
   // MapStatusLayersManager once the data has loaded so that the layer-control

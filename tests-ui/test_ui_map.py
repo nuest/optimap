@@ -97,6 +97,23 @@ class NoDoiPopupTest(StaticLiveServerTestCase):
             geometry=GeometryCollection(polygon),  # Dresden bbox
         )
 
+    def test_map_does_not_scroll_beyond_world_bounds(self):
+        """Map must not show duplicate Earths when panning far east (issue #129)."""
+        start_chrome(f'{self.live_server_url}/', headless=True)
+        try:
+            self.assertTrue(S('#map').exists())
+            wait_until(lambda: get_driver().execute_script(
+                "return typeof window._optimapMap !== 'undefined'"
+            ), timeout_secs=10)
+            get_driver().execute_script("window._optimapMap.panTo([0, 400]);")
+            center_lng = get_driver().execute_script(
+                "return window._optimapMap.getCenter().lng;"
+            )
+            self.assertLessEqual(center_lng,  180.0, "Map center exceeded 180° east")
+            self.assertGreaterEqual(center_lng, -180.0, "Map center went below -180° west")
+        finally:
+            kill_browser()
+
     def test_view_details_button_links_to_id_url(self):
         start_chrome(f'{self.live_server_url}/', headless=True)
         try:

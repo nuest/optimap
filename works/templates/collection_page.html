@@ -378,14 +378,11 @@
 <script src="{% static 'js/map-gazetteer.js' %}"></script>
 <script src="{% static 'js/map-zoom-to-all.js' %}"></script>
 <script src="{% static 'js/map-status-layers.js' %}"></script>
+<script src="{% static 'js/map-base.js' %}"></script>
 <script type="text/javascript">
   $(document).ready(function () {
     if (!document.getElementById('collection-map')) { return; }
-    const map = L.map('collection-map');
-    const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: 'Map data: © <a href="https://openstreetmap.org">OpenStreetMap</a> contributors',
-      maxZoom: 18,
-    }).addTo(map);
+    const { map, tileLayer: osmLayer } = createBaseMap('collection-map');
 
     const pageData = {{ publications_geojson|safe }};
     const collectionGeoJsonUrl = '{{ collection_geojson_url }}';
@@ -429,6 +426,12 @@
       }
       if (typeof MapInteractionManager !== 'undefined') { new MapInteractionManager(map, pubLayer); }
       if (typeof MapZoomToAllControl !== 'undefined') { currentZoomCtrl = new MapZoomToAllControl(map, pubGroup); }
+      if (highlightIds) {
+        pubLayer.eachLayer(function (layer) {
+          var fid = layer.feature && (layer.feature.id || (layer.feature.properties && layer.feature.properties.id));
+          if (fid && highlightIds.has(fid)) { layer.bringToFront(); }
+        });
+      }
     }
 
     buildMap(pageData);
