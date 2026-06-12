@@ -662,7 +662,14 @@ Version is maintained in [optimap/\_\_init\_\_.py](optimap/__init__.py). Follow 
 3. **Commit** both files: `git commit -m "bump version to X.Y.Z"`.
 4. **Tag** the commit: `git tag -a vX.Y.Z -m "Release vX.Y.Z"`.
 5. **Push** commits and tag: `git push && git push origin vX.Y.Z`.
-6. **Create the GitHub release**:
+6. **Verify** that both the commit and tag are visible on the upstream repository before proceeding:
+   ```bash
+   gh api repos/GeoinformationSystems/optimap/git/refs/tags/vX.Y.Z --jq '.object.sha'
+   # must match: git rev-parse vX.Y.Z^{}
+   git log --oneline origin/main..main
+   # must print nothing (no local-only commits)
+   ```
+7. **Create the GitHub release**:
    ```bash
    gh release create vX.Y.Z --title "vX.Y.Z" --notes-file <(sed -n '/^\#\# \[X.Y.Z\]/,/^\#\# \[/p' CHANGELOG.md | head -n -1)
    ```
