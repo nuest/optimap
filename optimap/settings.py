@@ -432,6 +432,12 @@ GEOEXTENT_NER_GAZETTEER = os.getenv("OPTIMAP_GEOEXTENT_NER_GAZETTEER", "nominati
 # change in code only (small UX number, no per-deploy reason to tune).
 GEOEXTENT_COPY_TTL_SECONDS = 5 * 60
 
+# Geometry upload limits — enforced client-side before the POST is sent.
+# GEOMETRY_WARN_SIZE_KB:  soft warning shown when a single polygon exceeds this.
+# GEOMETRY_MAX_UPLOAD_KB: hard block shown at submit time if total payload exceeds this.
+GEOMETRY_WARN_SIZE_KB  = int(os.getenv("OPTIMAP_GEOMETRY_WARN_SIZE_KB",  50))
+GEOMETRY_MAX_UPLOAD_KB = int(os.getenv("OPTIMAP_GEOMETRY_MAX_UPLOAD_KB", 2048))
+
 # Seconds to sleep between geoextent calls in the GeoScienceWorld harvester.
 # Each call fetches a GSW landing page via Cloudflare bypass (curl_cffi); a
 # small delay reduces the risk of rate-limiting. Set to 0 to disable.

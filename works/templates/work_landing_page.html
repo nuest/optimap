@@ -313,6 +313,32 @@
 
 {% if has_geometry or can_contribute %}
 <div id="mini-map"></div>
+{% if can_contribute %}
+<div id="geometry-simplify-panel" class="alert alert-warning mt-2 mb-0" style="display:none;" role="alert">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <strong><i class="fas fa-draw-polygon"></i> <span id="simplify-panel-title">Geometry is large — simplify before adding</span></strong>
+    <button type="button" class="close ml-2" id="simplify-close-btn" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+  </div>
+  <p class="mb-2 small" id="simplify-size-info">Size: — | Points: —</p>
+  <div class="form-group mb-2">
+    <label class="mb-1 small">Simplification tolerance: <strong id="simplify-tolerance-label">—</strong></label>
+    <div class="d-flex align-items-center">
+      <span class="text-muted small mr-2" style="white-space:nowrap">More detail</span>
+      <input type="range" class="custom-range flex-grow-1 mx-1" id="simplify-slider" min="0" max="100" value="0">
+      <span class="text-muted small ml-2" style="white-space:nowrap">Simpler</span>
+    </div>
+  </div>
+  <div class="btn-group btn-group-sm mb-3" role="group" aria-label="Simplification presets">
+    <button type="button" class="btn btn-outline-secondary" data-simplify-tolerance="0.01">Light (~1 km)</button>
+    <button type="button" class="btn btn-outline-secondary" data-simplify-tolerance="0.1">Medium (~11 km)</button>
+    <button type="button" class="btn btn-outline-secondary" data-simplify-tolerance="0.5">Aggressive (~55 km)</button>
+  </div>
+  <div class="d-flex align-items-center">
+    <button type="button" class="btn btn-sm btn-warning mr-3" id="simplify-apply-btn">Apply and add to map</button>
+    <a href="#" class="small text-muted" id="simplify-keep-btn">Keep original</a>
+  </div>
+</div>
+{% endif %}
 {% else %}
 <div class="alert alert-secondary" role="alert">
   <strong><i class="fas fa-info-circle"></i> Missing information:</strong>
@@ -567,6 +593,8 @@
     const canContribute = {{ can_contribute|yesno:"true,false" }};
     // TTL for geoextent "Copy extents" clipboard (settings.GEOEXTENT_COPY_TTL_SECONDS).
     const COPIED_GEOEXTENTS_TTL_MS = {{ geoextent_copy_ttl_seconds|default:300 }} * 1000;
+    const GEOMETRY_WARN_SIZE_KB  = {{ geometry_warn_size_kb|default:50 }};
+    const GEOMETRY_MAX_UPLOAD_KB = {{ geometry_max_upload_kb|default:2048 }};
     const canPublish = {{ can_publish|yesno:"true,false" }};
     const canUnpublish = {{ can_unpublish|yesno:"true,false" }};
     const hasGeometry = {{ has_geometry|yesno:"true,false" }};
@@ -757,6 +785,7 @@
     // Unified contribution form handler
     const contributionForm = document.getElementById('contribution-form');
     if (contributionForm) {
+      let _forceSubmit = false; // set true after user applies simplification at submit time
       contributionForm.addEventListener('submit', function(e) {
         e.preventDefault();
 
@@ -779,6 +808,37 @@
             };
           }
         }
+
+        // Geometry size check (skip after user has already applied simplification)
+        if (geometryCollection && !_forceSubmit) {
+          const geomSizeKB = Math.round(JSON.stringify(geometryCollection).length / 1024);
+          if (geomSizeKB > GEOMETRY_MAX_UPLOAD_KB) {
+            OPTIMAP_FLASH('error',
+              `The geometry is too large to submit (${geomSizeKB} KB, limit ${GEOMETRY_MAX_UPLOAD_KB} KB). ` +
+              `Use the simplification controls below to reduce detail.`
+            );
+            showSimplifyPanel(
+              drawnItems.toGeoJSON(),
+              'Simplify geometry before submitting',
+              'Apply simplification',
+              function (simplified) {
+                drawnItems.clearLayers();
+                L.geoJSON(simplified).eachLayer(l => drawnItems.addLayer(l));
+                _forceSubmit = true;
+                contributionForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+              },
+              null
+            );
+            return;
+          }
+          if (geomSizeKB > GEOMETRY_WARN_SIZE_KB) {
+            OPTIMAP_FLASH('warning',
+              `The geometry is ${geomSizeKB} KB. Large polygons may be slow to process — ` +
+              `consider using the simplification controls below, or submit as-is.`
+            );
+          }
+        }
+        _forceSubmit = false;
 
         // Validate that at least something is being contributed
         if (!geometryCollection && !startDate && !endDate) {
@@ -1186,6 +1246,140 @@
     }).then(r => r.json());
   }
 
+  // ---- Geometry size and simplification helpers ----
+
+  function geometryByteSize(geojson) {
+    return JSON.stringify(geojson).length;
+  }
+
+  function _simplifyRing(coords, tolerance) {
+    const pts = coords.map(([x, y]) => ({ x, y }));
+    return L.LineUtil.simplify(pts, tolerance).map(p => [p.x, p.y]);
+  }
+
+  function simplifyGeometry(g, tolerance) {
+    if (!g) return g;
+    if (g.type === 'Polygon') {
+      return { ...g, coordinates: g.coordinates.map(ring => _simplifyRing(ring, tolerance)) };
+    } else if (g.type === 'MultiPolygon') {
+      return { ...g, coordinates: g.coordinates.map(poly => poly.map(ring => _simplifyRing(ring, tolerance))) };
+    } else if (g.type === 'GeometryCollection') {
+      return { ...g, geometries: g.geometries.map(sub => simplifyGeometry(sub, tolerance)) };
+    } else if (g.type === 'FeatureCollection') {
+      return { ...g, features: g.features.map(f => ({ ...f, geometry: simplifyGeometry(f.geometry, tolerance) })) };
+    } else if (g.type === 'Feature') {
+      return { ...g, geometry: simplifyGeometry(g.geometry, tolerance) };
+    }
+    return g;
+  }
+
+  function countGeometryPoints(g) {
+    if (!g) return 0;
+    if (g.type === 'Point') return 1;
+    if (g.type === 'LineString') return g.coordinates.length;
+    if (g.type === 'Polygon') return g.coordinates.reduce((s, r) => s + r.length, 0);
+    if (g.type === 'MultiPolygon') return g.coordinates.reduce((s, p) => s + p.reduce((s2, r) => s2 + r.length, 0), 0);
+    if (g.type === 'GeometryCollection') return g.geometries.reduce((s, sub) => s + countGeometryPoints(sub), 0);
+    if (g.type === 'FeatureCollection') return g.features.reduce((s, f) => s + countGeometryPoints(f.geometry), 0);
+    if (g.type === 'Feature') return countGeometryPoints(g.geometry);
+    return 0;
+  }
+
+  // Logarithmic slider: 0 → 0.01°, 100 → 1° (degree-space RDP tolerance)
+  function sliderToTolerance(v) { return Math.pow(10, v * 0.02 - 2); }
+  function toleranceToSlider(t) { return Math.round((Math.log10(t) + 2) / 0.02); }
+
+  // ---- Simplification panel state ----
+  let _simplifyOriginal   = null;
+  let _simplifyOrigPts    = 0;
+  let _simplifyOrigSizeKB = 0;
+  let _simplifyPreviewLyr = null;
+  let _simplifyOnApply    = null;
+  let _simplifyOnKeep     = null;
+
+  function _updateSimplifyPreview() {
+    if (!_simplifyOriginal) return;
+    const tolerance  = sliderToTolerance(parseFloat(document.getElementById('simplify-slider').value));
+    const simplified = simplifyGeometry(_simplifyOriginal, tolerance);
+    const pts  = countGeometryPoints(simplified);
+    const sKB  = Math.round(geometryByteSize(simplified) / 1024);
+    document.getElementById('simplify-tolerance-label').textContent = tolerance.toFixed(4) + '°';
+    document.getElementById('simplify-size-info').textContent =
+      `Points: ${_simplifyOrigPts.toLocaleString()} → ${pts.toLocaleString()} | ` +
+      `Size: ${_simplifyOrigSizeKB} KB → ${sKB} KB`;
+    if (_simplifyPreviewLyr && map) {
+      map.removeLayer(_simplifyPreviewLyr);
+      _simplifyPreviewLyr = L.geoJSON(simplified, { style: { color: '#e67e00', weight: 2, fillOpacity: 0.15 } });
+      _simplifyPreviewLyr.addTo(map);
+    }
+  }
+
+  function showSimplifyPanel(originalGeoJSON, title, applyLabel, onApply, onKeep) {
+    _simplifyOriginal   = originalGeoJSON;
+    _simplifyOrigPts    = countGeometryPoints(originalGeoJSON);
+    _simplifyOrigSizeKB = Math.round(geometryByteSize(originalGeoJSON) / 1024);
+    _simplifyOnApply    = onApply;
+    _simplifyOnKeep     = onKeep;
+
+    document.getElementById('simplify-panel-title').textContent = title;
+    document.getElementById('simplify-apply-btn').textContent   = applyLabel;
+
+    if (_simplifyPreviewLyr && map) map.removeLayer(_simplifyPreviewLyr);
+    _simplifyPreviewLyr = L.geoJSON(originalGeoJSON, { style: { color: '#e67e00', weight: 2, fillOpacity: 0.15 } });
+    if (map) _simplifyPreviewLyr.addTo(map);
+
+    document.getElementById('simplify-slider').value = toleranceToSlider(0.01);
+    _updateSimplifyPreview();
+
+    const panel = document.getElementById('geometry-simplify-panel');
+    panel.style.display = '';
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function hideSimplifyPanel() {
+    if (_simplifyPreviewLyr && map) { map.removeLayer(_simplifyPreviewLyr); _simplifyPreviewLyr = null; }
+    const panel = document.getElementById('geometry-simplify-panel');
+    if (panel) panel.style.display = 'none';
+    _simplifyOriginal = null; _simplifyOnApply = null; _simplifyOnKeep = null;
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    const slider = document.getElementById('simplify-slider');
+    if (slider) slider.addEventListener('input', _updateSimplifyPreview);
+
+    const applyBtn = document.getElementById('simplify-apply-btn');
+    if (applyBtn) applyBtn.addEventListener('click', function () {
+      if (!_simplifyOriginal || !_simplifyOnApply) return;
+      const tolerance  = sliderToTolerance(parseFloat(document.getElementById('simplify-slider').value));
+      const simplified = simplifyGeometry(_simplifyOriginal, tolerance);
+      const cb = _simplifyOnApply;
+      hideSimplifyPanel();
+      cb(simplified);
+    });
+
+    const keepBtn = document.getElementById('simplify-keep-btn');
+    if (keepBtn) keepBtn.addEventListener('click', function (e) {
+      e.preventDefault();
+      const cb = _simplifyOnKeep;
+      hideSimplifyPanel();
+      if (cb) cb();
+    });
+
+    const closeBtn = document.getElementById('simplify-close-btn');
+    if (closeBtn) closeBtn.addEventListener('click', function () {
+      const cb = _simplifyOnKeep;
+      hideSimplifyPanel();
+      if (cb) cb();
+    });
+
+    document.querySelectorAll('[data-simplify-tolerance]').forEach(btn => {
+      btn.addEventListener('click', function () {
+        document.getElementById('simplify-slider').value = toleranceToSlider(parseFloat(this.dataset.simplifyTolerance));
+        _updateSimplifyPreview();
+      });
+    });
+  });
+
   // Build a Leaflet-addable layer from a place_names entry.
   function placeToLayer(entry) {
     let geojsonGeom;
@@ -1205,11 +1399,37 @@
   function addPlaceToMap(entry) {
     const layer = placeToLayer(entry);
     if (!layer || typeof drawnItems === 'undefined' || !drawnItems) return false;
-    layer.eachLayer(l => drawnItems.addLayer(l));
-    try {
-      const bounds = drawnItems.getBounds();
-      if (bounds.isValid()) map.fitBounds(bounds, { padding: [30, 30] });
-    } catch (_) {}
+
+    function _doAdd(geoJSON) {
+      L.geoJSON(geoJSON).eachLayer(l => drawnItems.addLayer(l));
+      try {
+        const bounds = drawnItems.getBounds();
+        if (bounds.isValid()) map.fitBounds(bounds, { padding: [30, 30] });
+      } catch (_) {}
+    }
+
+    const layerGeoJSON = layer.toGeoJSON();
+    const sizeKB = Math.round(geometryByteSize(layerGeoJSON) / 1024);
+
+    if (sizeKB > GEOMETRY_WARN_SIZE_KB) {
+      OPTIMAP_FLASH('warning',
+        `The suggested polygon is ${sizeKB} KB — too detailed for most use cases. ` +
+        `Use the simplification controls below to reduce detail before adding.`
+      );
+      if (map) {
+        try { map.fitBounds(layer.getBounds(), { padding: [30, 30] }); } catch (_) {}
+      }
+      showSimplifyPanel(
+        layerGeoJSON,
+        'Simplify polygon before adding to map',
+        'Apply and add to map',
+        (simplified) => _doAdd(simplified),
+        () => _doAdd(layerGeoJSON)
+      );
+      return true;
+    }
+
+    _doAdd(layerGeoJSON);
     return true;
   }
 

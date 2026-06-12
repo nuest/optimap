@@ -546,6 +546,8 @@ def work_landing(request, identifier):
         "missing_for_logged_in": missing_for_logged_in,
         "missing_for_anonymous": missing_for_anonymous,
         "geoextent_copy_ttl_seconds": getattr(settings, 'GEOEXTENT_COPY_TTL_SECONDS', 300),
+        "geometry_warn_size_kb": getattr(settings, 'GEOMETRY_WARN_SIZE_KB', 50),
+        "geometry_max_upload_kb": getattr(settings, 'GEOMETRY_MAX_UPLOAD_KB', 2048),
         "ner_available_gazetteers": _ner_available_gazetteers(),
         "show_provenance": is_admin,
         "latest_wikidata_export": latest_wikidata_export,
