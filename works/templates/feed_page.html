@@ -23,21 +23,36 @@
     <div class="col-md-10 col-lg-8 py-5">
       <h1 class="py-2">{{ region.name }} - Latest works</h1>
 
-      <p class="lead">{{ works|length }} research work{{ works|length|pluralize }} with geographic metadata for {{ region.name }} ({{ region_type }}).</p>
+      <p class="lead">{{ page_obj.paginator.count }} research work{{ page_obj.paginator.count|pluralize }} with geographic metadata for {{ region.name }} ({{ region_type }}).</p>
 
       <div class="alert alert-info" role="alert">
         <i class="fas fa-rss"></i>
-        <strong>Subscribe to this feed:</strong>
+        <strong>Subscribe to this region:</strong>
         <a href="{{ feed_urls.georss }}" class="alert-link">RSS</a> |
         <a href="{{ feed_urls.atom }}" class="alert-link">Atom</a>
       </div>
 
       {% if works %}
-        <!-- Map showing all works -->
-        <div id="feed-map" style="height: 540px; width: 100%; margin-bottom: 2rem; border-radius: 8px;"></div>
+        <!-- Map showing publications -->
+        <div id="feed-map" style="height: 540px; width: 100%; margin-bottom: 0.5rem; border-radius: 8px;"></div>
+        {% if page_obj.paginator.num_pages > 1 %}
+        <div class="d-flex justify-content-end mb-3">
+          <div class="btn-group btn-group-sm" id="map-scope-toggle" role="group" aria-label="Map scope">
+            <button type="button" class="btn btn-outline-secondary active" id="map-scope-page"
+              title="Show only the {{ page_obj.object_list|length }} work{{ page_obj.object_list|length|pluralize }} on the current page.">Show only page on map</button>
+            <button type="button" class="btn btn-outline-secondary" id="map-scope-all"
+              title="Show all {{ page_obj.paginator.count }} work{{ page_obj.paginator.count|pluralize }} in this region. Current-page works are highlighted in orange.">Show all on map</button>
+          </div>
+        </div>
+        {% endif %}
+
+        <h2 class="h4 mb-3">{{ page_obj.paginator.count }} work{{ page_obj.paginator.count|pluralize }}</h2>
+
+        <!-- Pagination controls (top) -->
+        {% include "_pagination.html" with show_meta=True pagination_label="Region pagination" %}
 
         <div class="publication-grid">
-          {% for work in works %}
+          {% for work in page_obj.object_list %}
             <div class="card locate-card">
               <div class="card-body">
                 <h5 class="card-title">
@@ -96,12 +111,8 @@
           {% endfor %}
         </div>
 
-        {% if works|length >= 100 %}
-          <div class="alert alert-secondary mt-4" role="alert">
-            <i class="fas fa-info-circle"></i>
-            Showing first 100 of {{ works|length }} works only. Subscribe to the feed to get updates on new publications.
-          </div>
-        {% endif %}
+        <!-- Pagination controls (bottom) -->
+        {% include "_pagination.html" with pagination_label="Region pagination" %}
 
       {% else %}
         <div class="alert alert-warning" role="alert">
@@ -111,14 +122,14 @@
       {% endif %}
 
       <div class="mt-5">
-        <h3>About this feed</h3>
+        <h3>About this region</h3>
         <p>
           This page shows the latest research publications with geographic metadata from {{ region.name }}.
           The data is cached and updated periodically. To force a refresh, add <code>?now</code> to the URL.
         </p>
         <p>
-          <a href="/feeds" class="btn btn-outline-secondary">
-            <i class="fas fa-rss"></i> View All Feeds
+          <a href="{% url 'optimap:feeds' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-globe"></i> View all regions
           </a>
           <a href="/" class="btn btn-outline-secondary">
             <i class="fas fa-map"></i> Back to Map
@@ -139,74 +150,100 @@
 <script src="{% static 'js/map-gazetteer.js' %}"></script>
 <script src="{% static 'js/map-zoom-to-all.js' %}"></script>
 <script type="text/javascript">
-  // Initialize map with publications
   $(document).ready(function() {
+    if (!document.getElementById('feed-map')) { return; }
     const map = L.map('feed-map');
 
-    // Base layer: OpenStreetMap
-    const osmLayer = L.tileLayer(
-      'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-      {
-        attribution: 'Map data: © <a href="https://openstreetmap.org">OpenStreetMap</a> contributors',
-        maxZoom: 18,
-      }
-    ).addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: 'Map data: © <a href="https://openstreetmap.org">OpenStreetMap</a> contributors',
+      maxZoom: 18,
+    }).addTo(map);
 
-    // Publication data as GeoJSON
-    const publicationsData = {{ publications_geojson|safe }};
+    const pageData = {{ page_publications_geojson|safe }};
+    const allData  = {{ publications_geojson|safe }};
+    const pageWorkIds = new Set([{% for work in page_obj.object_list %}{{ work.id }},{% endfor %}]);
+    const scopeKey = 'feed_page_scope:{{ region_type }}:{{ region.get_slug }}';
 
-    // Region geometry as GeoJSON
-    const regionGeometry = {{ region_geojson|safe }};
-
-    // Add region outline layer (enabled by default, shown below publications)
-    const regionLayer = L.geoJSON(regionGeometry, {
+    const regionLayer = L.geoJSON({{ region_geojson|safe }}, {
       style: {
-        color: '{{ region_type }}' === 'Continent' ? '#8B4513' : '#1E90FF', // Brown for continents, blue for oceans
+        color: '{{ region_type }}' === 'Continent' ? '#8B4513' : '#1E90FF',
         weight: 3,
         opacity: 0.8,
         fillOpacity: 0,
-        dashArray: '5, 10', // Dashed line pattern: 5px dash, 10px gap
+        dashArray: '5, 10',
         interactive: false,
-        bubblingMouseEvents: false
+        bubblingMouseEvents: false,
       }
     }).addTo(map);
 
-    // Add publications to map using shared popup function (displayed above region layer)
-    const publicationsLayer = L.geoJSON(publicationsData, {
-      style: publicationStyle,
-      pointToLayer: publicationPointToLayer,
-      onEachFeature: publicationPopup
-    }).addTo(map);
+    let pubLayer = null;
+    let zoomCtrl = null;
 
-    // Initialize enhanced interaction manager for handling overlapping polygons
-    if (typeof MapInteractionManager !== 'undefined') {
-      const interactionManager = new MapInteractionManager(map, publicationsLayer);
-      console.log('Enhanced map interaction enabled on feed page');
+    function buildMap(data, highlightIds) {
+      if (pubLayer) { map.removeLayer(pubLayer); }
+      if (zoomCtrl) { zoomCtrl.destroy(); zoomCtrl = null; }
+
+      var styleFn = highlightIds ? function(feature) {
+        var fid = feature && (feature.id || (feature.properties && feature.properties.id));
+        return highlightIds.has(fid)
+          ? { color: '#FF6B00', weight: 3, fillOpacity: 0.55 }
+          : publicationStyle(feature);
+      } : publicationStyle;
+
+      pubLayer = L.geoJSON(data, {
+        style: styleFn,
+        pointToLayer: publicationPointToLayer,
+        onEachFeature: publicationPopup,
+      }).addTo(map);
+
+      if (typeof MapInteractionManager !== 'undefined') { new MapInteractionManager(map, pubLayer); }
+      if (typeof MapZoomToAllControl !== 'undefined') { zoomCtrl = new MapZoomToAllControl(map, pubLayer); }
+
+      if (pubLayer.getBounds().isValid()) {
+        map.fitBounds(pubLayer.getBounds(), { padding: [20, 20] });
+      } else if (regionLayer.getBounds().isValid()) {
+        map.fitBounds(regionLayer.getBounds(), { padding: [20, 20] });
+      } else {
+        map.setView([0, 0], 2);
+      }
     }
 
-    // Fit map to show all publications (or region if no publications)
-    if (publicationsLayer.getBounds().isValid()) {
-      map.fitBounds(publicationsLayer.getBounds(), { padding: [20, 20] });
-    } else if (regionLayer.getBounds().isValid()) {
-      map.fitBounds(regionLayer.getBounds(), { padding: [20, 20] });
+    var btnPage = document.getElementById('map-scope-page');
+    var btnAll  = document.getElementById('map-scope-all');
+
+    function setScope(scope) {
+      sessionStorage.setItem(scopeKey, scope);
+      if (btnPage && btnAll) {
+        if (scope === 'all') {
+          btnAll.classList.add('active');
+          btnPage.classList.remove('active');
+        } else {
+          btnPage.classList.add('active');
+          btnAll.classList.remove('active');
+        }
+      }
+    }
+
+    var savedScope = sessionStorage.getItem(scopeKey);
+    if (savedScope === 'all' && btnAll) {
+      buildMap(allData, pageWorkIds);
+      setScope('all');
     } else {
-      // Default view if no geometries
-      map.setView([0, 0], 2);
+      buildMap(pageData);
     }
 
-    // Add zoom to all features control
-    if (typeof MapZoomToAllControl !== 'undefined') {
-      const zoomToAllControl = new MapZoomToAllControl(map, publicationsLayer);
-      console.log('Zoom to all features control enabled on feed page');
+    if (btnAll) {
+      btnAll.addEventListener('click', function() { setScope('all'); buildMap(allData, pageWorkIds); });
+    }
+    if (btnPage) {
+      btnPage.addEventListener('click', function() { setScope('page'); buildMap(pageData); });
     }
 
-    // Add gazetteer (location search) control
     if (typeof MapGazetteerManager !== 'undefined') {
-      const gazetteerManager = new MapGazetteerManager(map, {
+      new MapGazetteerManager(map, {
         provider: '{{ gazetteer_provider|default:"nominatim" }}',
-        placeholder: 'Search for a location...'
+        placeholder: 'Search for a location...',
       });
-      console.log('Gazetteer search enabled on feed page');
     }
   });
 </script>

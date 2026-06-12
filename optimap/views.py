@@ -30,7 +30,7 @@ from django.utils.timezone import get_default_timezone
 import humanize
 from works.models import Collection, GlobalRegion
 from works.seo import build_homepage_meta
-from works import views_feeds
+from works import views_regions
 from works.feeds import normalize_region_slug
 from django.urls import reverse
 import geoextent.lib.features
@@ -189,7 +189,7 @@ class RobotsView(View):
         for region in regions:
             if region.region_type == GlobalRegion.CONTINENT:
                 slug = normalize_region_slug(region.name)
-                lines.append(f"Allow: /feeds/continent/{slug}/")
+                lines.append(f"Allow: /regions/continent/{slug}/")
                 lines.append(f"Allow: /api/v1/feeds/continent/{slug}.rss")
                 lines.append(f"Allow: /api/v1/feeds/continent/{slug}.atom")
 
@@ -198,7 +198,7 @@ class RobotsView(View):
         for region in regions:
             if region.region_type == GlobalRegion.OCEAN:
                 slug = normalize_region_slug(region.name)
-                lines.append(f"Allow: /feeds/ocean/{slug}/")
+                lines.append(f"Allow: /regions/ocean/{slug}/")
                 lines.append(f"Allow: /api/v1/feeds/ocean/{slug}.rss")
                 lines.append(f"Allow: /api/v1/feeds/ocean/{slug}.atom")
 

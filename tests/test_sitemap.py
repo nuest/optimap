@@ -59,11 +59,11 @@ class SitemapTest(TestCase):
         self.assertIn('<?xml version="1.0" encoding="UTF-8"?>', content)
         self.assertIn('<urlset', content)
 
-        # Verify continent feed URL is included
-        self.assertIn('/feeds/continent/test-continent/', content)
+        # Verify continent region URL is included
+        self.assertIn('/regions/continent/test-continent/', content)
 
-        # Verify ocean feed URL is included
-        self.assertIn('/feeds/ocean/test-ocean/', content)
+        # Verify ocean region URL is included
+        self.assertIn('/regions/ocean/test-ocean/', content)
 
         # Verify priority and changefreq
         self.assertIn('<priority>0.6</priority>', content)

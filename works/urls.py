@@ -8,7 +8,7 @@ from django.urls import path, include
 from django.shortcuts import redirect
 from works import views as work_views
 from works import views_geometry
-from works import views_feeds
+from works import views_regions
 from works import views_collections
 from works import views_gazetteer
 from works.bok import views as bok_views
@@ -29,7 +29,8 @@ urlpatterns = [
     path("privacy/", general_views.privacy, name="privacy"),
     path("data/", general_views.data, name="data"),
     path("pages/", general_views.sitemap_page, name="sitemap-page"),
-    path("feeds/", general_views.feeds, name="feeds"),
+    path("regions/", general_views.feeds, name="feeds"),
+    path("feeds/", RedirectView.as_view(pattern_name='optimap:feeds', permanent=True)),
     path("geoextent/", general_views.geoextent, name="geoextent"),
     path("statistics/", work_views.statistics_page, name="statistics"),
 
@@ -63,9 +64,11 @@ urlpatterns = [
     path('api/v1/feeds/collection-<slug:collection_slug>.rss', CollectionGeoFeed(feed_type_variant="georss"), name='api-collection-georss'),
     path('api/v1/feeds/collection-<slug:collection_slug>.atom', CollectionGeoFeed(feed_type_variant="atom"), name='api-collection-atom'),
 
-    # Feed HTML pages (human-readable)
-    path('feeds/continent/<slug:continent_slug>/', views_feeds.continent_feed_page, name='feed-continent-page'),
-    path('feeds/ocean/<slug:ocean_slug>/', views_feeds.ocean_feed_page, name='feed-ocean-page'),
+    # Region HTML pages (human-readable)
+    path('regions/continent/<slug:continent_slug>/', views_regions.continent_feed_page, name='feed-continent-page'),
+    path('regions/ocean/<slug:ocean_slug>/', views_regions.ocean_feed_page, name='feed-ocean-page'),
+    path('feeds/continent/<slug:continent_slug>/', RedirectView.as_view(pattern_name='optimap:feed-continent-page', permanent=True)),
+    path('feeds/ocean/<slug:ocean_slug>/', RedirectView.as_view(pattern_name='optimap:feed-ocean-page', permanent=True)),
 
     # Collections
     path('collections/', views_collections.collections_index, name='collections'),

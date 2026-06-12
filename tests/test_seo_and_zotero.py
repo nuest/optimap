@@ -490,7 +490,7 @@ class FeedPageSEOTests(TestCase):
     def test_continent_feed_page_emits_collectionpage(self):
         from django.core.cache import cache
         cache.clear()  # the feed page caches by slug; flush so we don't read stale
-        resp = self.client.get("/feeds/continent/africa/")
+        resp = self.client.get("/regions/continent/africa/")
         self.assertEqual(resp.status_code, 200)
         soup = BeautifulSoup(resp.content, "html.parser")
         blobs = _find_jsonld(soup)

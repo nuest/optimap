@@ -95,10 +95,10 @@ class SubscriptionEmailTests(TestCase):
     def test_globalregion_get_absolute_url(self):
         """Test that GlobalRegion generates correct URLs"""
         africa_url = self.africa.get_absolute_url()
-        self.assertIn('/feeds/continent/africa/', africa_url)
+        self.assertIn('/regions/continent/africa/', africa_url)
 
         pacific_url = self.pacific.get_absolute_url()
-        self.assertIn('/feeds/ocean/pacific-ocean/', pacific_url)
+        self.assertIn('/regions/ocean/pacific-ocean/', pacific_url)
 
     def test_globalregion_str_representation(self):
         """Test the __str__ method of GlobalRegion"""
@@ -177,7 +177,7 @@ class SubscriptionEmailTests(TestCase):
 
         # Check for region landing page link
         self.assertIn("View all publications in this region", content)
-        self.assertIn("/feeds/continent/africa/", content)
+        self.assertIn("/regions/continent/africa/", content)
 
     @patch('works.tasks.EmailMessage')
     def test_no_email_sent_when_no_publications(self, mock_email):

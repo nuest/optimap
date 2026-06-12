@@ -123,7 +123,7 @@ class RegionalFeedPagesTests(TestCase):
         if not GlobalRegion.objects.exists():
             self.skipTest('Global regions not loaded - run load_global_regions management command')
 
-        response = self.client.get('/feeds/continent/europe/')
+        response = self.client.get('/regions/continent/europe/')
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Europe")
         # Should not contain admin links
@@ -136,7 +136,7 @@ class RegionalFeedPagesTests(TestCase):
         if not GlobalRegion.objects.exists():
             self.skipTest('Global regions not loaded - run load_global_regions management command')
 
-        response = self.client.get('/feeds/ocean/north-atlantic-ocean/')
+        response = self.client.get('/regions/ocean/north-atlantic-ocean/')
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "North Atlantic Ocean")
         # Should not contain admin links

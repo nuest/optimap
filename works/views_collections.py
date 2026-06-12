@@ -4,7 +4,7 @@
 """
 Views for the curated /collections/ pages.
 
-The detail page mirrors :func:`works.views_feeds.continent_feed_page` so the
+The detail page mirrors :func:`works.views_regions.continent_feed_page` so the
 two surfaces feel consistent (map + work cards). Inline admin/curator
 controls render on the index and detail pages for staff users; they POST to
 the small mutation endpoints below (publish/unpublish, add/remove a work).
@@ -31,7 +31,7 @@ from .models import Collection, STATUS_CHOICES, Work
 
 User = get_user_model()
 from .seo import coins_title
-from .views_feeds import _publications_to_geojson
+from .utils.geojson import publications_to_geojson
 
 logger = logging.getLogger(__name__)
 
@@ -163,7 +163,7 @@ def collection_page(request, collection_slug):
         'page_obj': page_obj,
         'page_size': page_size,
         'page_size_options': settings.WORKS_PAGE_SIZE_OPTIONS,
-        'publications_geojson': _publications_to_geojson(list(page_obj.object_list)),
+        'publications_geojson': publications_to_geojson(list(page_obj.object_list)),
         'collection_geojson_url': reverse('optimap:collection-geojson', args=[collection.identifier]),
         'is_admin': is_admin,
         'is_curator': is_curator,
@@ -186,7 +186,7 @@ def collection_geojson(request, collection_slug):
     """GeoJSON of all published works in a collection — used by the map 'show all' toggle."""
     collection = _collection_for_request(request, collection_slug)
     works_qs = Work.objects.filter(collections=collection, status='p').select_related('source')
-    return HttpResponse(_publications_to_geojson(list(works_qs)), content_type='application/geo+json')
+    return HttpResponse(publications_to_geojson(list(works_qs)), content_type='application/geo+json')
 
 
 def collection_short_redirect(request, short_slug):

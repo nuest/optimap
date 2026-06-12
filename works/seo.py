@@ -469,12 +469,12 @@ def build_feed_page_meta(request, *, region_name: str | None,
     title = (
         f"{region_name} — OPTIMAP regional feed"
         if region_name
-        else "OPTIMAP feeds"
+        else "OPTIMAP regions"
     )
     description = (
         f"Recent research articles with geographic coverage in {region_name}."
         if region_name
-        else "OPTIMAP regional and global feeds."
+        else "OPTIMAP regional pages and feeds."
     )
     meta = Meta(
         request=request,
