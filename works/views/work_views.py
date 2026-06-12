@@ -443,7 +443,7 @@ def work_landing(request, identifier):
     # what, and the Recognition Board dedupes per (user, work, kind).
     can_contribute = (
         request.user.is_authenticated
-        and work.status in ('h', 'c')
+        and (work.status in ('h', 'c') or (is_admin and work.status == 'd'))
     )
     # Anonymous visitors who land on a contributable work via the /contribute/
     # listing get a "log in to contribute" call-to-action instead of a silent
@@ -466,7 +466,7 @@ def work_landing(request, identifier):
     bok_eligible = bok_eligibility.is_work_eligible(work)
     can_tag_bok = (
         request.user.is_authenticated
-        and work.status in ('h', 'c')
+        and (work.status in ('h', 'c') or (is_admin and work.status == 'd'))
         and bok_eligible
     )
     prompt_login_to_tag_bok = (

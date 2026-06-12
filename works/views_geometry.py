@@ -47,7 +47,8 @@ def contribute_geometry_by_id(request, work_id):
     except Work.DoesNotExist:
         return JsonResponse({'error': 'Work not found'}, status=404)
 
-    if work.status not in ('h', 'c'):
+    is_admin = request.user.is_staff
+    if work.status not in ('h', 'c') and not (is_admin and work.status == 'd'):
         return JsonResponse({
             'error': 'Can only contribute to harvested or contributed publications'
         }, status=400)
@@ -106,8 +107,8 @@ def contribute_geometry_by_id(request, work_id):
 
         status_from = work.status
         # Harvested works flip to Contributed on the first contribution;
-        # already-Contributed works stay there.
-        status_to = 'c'
+        # already-Contributed and Draft works stay where they are.
+        status_to = work.status if work.status in ('c', 'd') else 'c'
 
         append_event(
             work,
