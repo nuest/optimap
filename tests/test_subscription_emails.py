@@ -6,9 +6,12 @@ import django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "optimap.settings")
 django.setup()
 
+from datetime import timedelta
+
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.contrib.gis.geos import MultiPolygon, Polygon, Point, GeometryCollection
+from django.utils import timezone
 from works.models import Subscription, GlobalRegion, Work, Source, EmailLog
 from works.tasks import send_subscription_based_email
 from unittest.mock import patch
@@ -342,3 +345,163 @@ class SubscriptionEmailTests(TestCase):
             log_entry = EmailLog.objects.filter(recipient_email=self.user.email).first()
             self.assertIsNotNone(log_entry)
             self.assertEqual(log_entry.status, "success")
+
+    # ------------------------------------------------------------------
+    # Interval filtering and last_notified tracking (issue #85)
+    # ------------------------------------------------------------------
+
+    @patch('works.tasks.EmailMessage')
+    def test_weekly_interval_only_includes_recent_works(self, mock_email):
+        """Weekly subscriptions only see works published in the last 7 days."""
+        subscription = Subscription.objects.create(
+            user=self.user,
+            name="test_subscription",
+            subscribed=True,
+            notification_interval='weekly',
+        )
+        subscription.regions.add(self.africa)
+
+        # Move pub_africa back to 10 days ago (outside weekly window)
+        Work.objects.filter(pk=self.pub_africa.pk).update(
+            creationDate=timezone.now() - timedelta(days=10)
+        )
+        # Create a recent work (3 days ago, inside weekly window)
+        recent = Work.objects.create(
+            title="Very Recent African Study",
+            doi="10.1234/africa_recent.2024",
+            status="p",
+            source=self.source,
+            geometry=GeometryCollection(Point(5, 5)),
+        )
+        Work.objects.filter(pk=recent.pk).update(
+            creationDate=timezone.now() - timedelta(days=3)
+        )
+
+        send_subscription_based_email(trigger_source='test', interval='weekly')
+
+        self.assertTrue(mock_email.called)
+        content = mock_email.call_args[0][1]
+        self.assertIn("Very Recent African Study", content)
+        self.assertNotIn("African Study on Climate Change", content)
+
+    @patch('works.tasks.EmailMessage')
+    def test_monthly_interval_only_includes_recent_works(self, mock_email):
+        """Monthly subscriptions only see works published in the last 31 days."""
+        subscription = Subscription.objects.create(
+            user=self.user,
+            name="test_subscription",
+            subscribed=True,
+            notification_interval='monthly',
+        )
+        subscription.regions.add(self.africa)
+
+        # Move pub_africa back to 40 days ago (outside monthly window)
+        Work.objects.filter(pk=self.pub_africa.pk).update(
+            creationDate=timezone.now() - timedelta(days=40)
+        )
+        # Create a work 10 days ago (inside monthly window)
+        mid = Work.objects.create(
+            title="Mid-Month African Study",
+            doi="10.1234/africa_mid.2024",
+            status="p",
+            source=self.source,
+            geometry=GeometryCollection(Point(5, 5)),
+        )
+        Work.objects.filter(pk=mid.pk).update(
+            creationDate=timezone.now() - timedelta(days=10)
+        )
+
+        send_subscription_based_email(trigger_source='test', interval='monthly')
+
+        self.assertTrue(mock_email.called)
+        content = mock_email.call_args[0][1]
+        self.assertIn("Mid-Month African Study", content)
+        self.assertNotIn("African Study on Climate Change", content)
+
+    @patch('works.tasks.EmailMessage')
+    def test_interval_filter_skips_wrong_interval(self, mock_email):
+        """Calling with interval='weekly' skips monthly subscribers and vice versa."""
+        subscription = Subscription.objects.create(
+            user=self.user,
+            name="test_subscription",
+            subscribed=True,
+            notification_interval='monthly',
+        )
+        subscription.regions.add(self.africa)
+
+        send_subscription_based_email(trigger_source='test', interval='weekly')
+
+        self.assertFalse(mock_email.called)
+
+    @patch('works.tasks.EmailMessage')
+    def test_last_notified_updated_after_send(self, mock_email):
+        """last_notified is set on the subscription after a successful send."""
+        subscription = Subscription.objects.create(
+            user=self.user,
+            name="test_subscription",
+            subscribed=True,
+        )
+        subscription.regions.add(self.africa)
+        self.assertIsNone(subscription.last_notified)
+
+        before = timezone.now()
+        send_subscription_based_email(trigger_source='test')
+        after = timezone.now()
+
+        subscription.refresh_from_db()
+        self.assertIsNotNone(subscription.last_notified)
+        self.assertGreaterEqual(subscription.last_notified, before)
+        self.assertLessEqual(subscription.last_notified, after)
+
+    @patch('works.tasks.EmailMessage')
+    def test_last_notified_not_updated_when_no_new_pubs(self, mock_email):
+        """last_notified is NOT updated when there are no new publications."""
+        subscription = Subscription.objects.create(
+            user=self.user,
+            name="test_subscription",
+            subscribed=True,
+        )
+        subscription.regions.add(self.africa)
+
+        # Push pub_africa far into the past so it falls outside the 31-day window
+        Work.objects.filter(pk=self.pub_africa.pk).update(
+            creationDate=timezone.now() - timedelta(days=60)
+        )
+
+        send_subscription_based_email(trigger_source='test')
+
+        self.assertFalse(mock_email.called)
+        subscription.refresh_from_db()
+        self.assertIsNone(subscription.last_notified)
+
+    @patch('works.tasks.EmailMessage')
+    def test_last_notified_used_as_cutoff(self, mock_email):
+        """When last_notified is set, only works created after it are included."""
+        five_days_ago = timezone.now() - timedelta(days=5)
+        subscription = Subscription.objects.create(
+            user=self.user,
+            name="test_subscription",
+            subscribed=True,
+            last_notified=five_days_ago,
+        )
+        subscription.regions.add(self.africa)
+
+        # pub_africa is recent (just created) — within 5-day window ✓
+        # Create an old work (8 days ago) — before last_notified ✗
+        old = Work.objects.create(
+            title="Old African Study",
+            doi="10.1234/africa_old.2024",
+            status="p",
+            source=self.source,
+            geometry=GeometryCollection(Point(5, 5)),
+        )
+        Work.objects.filter(pk=old.pk).update(
+            creationDate=timezone.now() - timedelta(days=8)
+        )
+
+        send_subscription_based_email(trigger_source='test')
+
+        self.assertTrue(mock_email.called)
+        content = mock_email.call_args[0][1]
+        self.assertIn("African Study on Climate Change", content)
+        self.assertNotIn("Old African Study", content)

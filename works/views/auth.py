@@ -54,7 +54,7 @@ LOGIN_TOKEN_TIMEOUT_SECONDS = 10 * 60
 EMAIL_CONFIRMATION_TIMEOUT_SECONDS = 10 * 60
 ACCOUNT_DELETE_TOKEN_TIMEOUT_SECONDS = 10 * 60
 USER_DELETE_TOKEN_PREFIX = "user_delete_token"
-EMAIL_CONFIRMATION_TOKEN_PREFIX = "email_confirmation_"
+EMAIL_CONFIRMATION_TOKEN_PREFIX = "email_confirmation"
 
 
 def loginres(request):
@@ -333,6 +333,7 @@ def user_subscriptions(request):
         'continents': continents,
         'oceans': oceans,
         'selected_region_ids': selected_region_ids,
+        'notification_interval': subscription.notification_interval,
     }
 
     return render(request, 'subscriptions.html', context)
@@ -358,6 +359,10 @@ def add_subscriptions(request):
         if selected_region_ids:
             regions = GlobalRegion.objects.filter(id__in=selected_region_ids)
             subscription.regions.set(regions)
+
+        raw_interval = request.POST.get('notification_interval', 'monthly')
+        subscription.notification_interval = raw_interval if raw_interval in ('weekly', 'monthly') else 'monthly'
+        subscription.save(update_fields=['notification_interval'])
 
         logger.info('Updated subscription for user %s with %d regions', user.username, len(selected_region_ids))
         messages.success(request, f'Subscription updated! Monitoring {len(selected_region_ids)} regions.')
@@ -475,7 +480,7 @@ def confirm_email_change(request, token, email_new):
         from_email=settings.EMAIL_HOST_USER,
         recipient_list=[old_email]
     )
-    cache.delete(f"email_confirmation_{email_new}")
+    cache.delete(f"{EMAIL_CONFIRMATION_TOKEN_PREFIX}_{email_new}")
     login_user(request, user)
     messages.success(request, "Your email has been successfully updated!")
     return redirect("/usersettings/")

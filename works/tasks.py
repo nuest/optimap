@@ -258,16 +258,30 @@ def send_monthly_email(trigger_source="manual", sent_by=None):
             )
 
 
-def send_subscription_based_email(trigger_source='manual', sent_by=None, user_ids=None):
+def send_subscription_based_email(trigger_source='manual', sent_by=None, user_ids=None, interval=None):
     """
     Send subscription-based notifications grouped by region.
 
     Publications are grouped by the regions the user has subscribed to.
     Each region group includes a link to the region's landing page.
+
+    ``interval`` — when given ('weekly' or 'monthly'), only processes subscriptions
+    whose ``notification_interval`` matches. Pass ``None`` (the default, used for
+    manual/admin runs) to process all active subscriptions regardless of their
+    interval setting.
+
+    Only publications added since ``subscription.last_notified`` are included.
+    If ``last_notified`` is unset, a sensible fallback window is used (7 days for
+    weekly, 31 days for monthly, 31 days when interval is None).
+    ``last_notified`` is updated only after a successful send.
     """
     query = Subscription.objects.filter(subscribed=True, user__isnull=False).prefetch_related('regions')
     if user_ids:
         query = query.filter(user__id__in=user_ids)
+    if interval is not None:
+        query = query.filter(notification_interval=interval)
+
+    fallback_days = 7 if interval == 'weekly' else 31
 
     for subscription in query:
         user_email = subscription.user.email
@@ -276,6 +290,10 @@ def send_subscription_based_email(trigger_source='manual', sent_by=None, user_id
         if not subscribed_regions:
             logger.info(f"Skipping subscription for {user_email} - no regions selected")
             continue
+
+        cutoff = subscription.last_notified if subscription.last_notified else (
+            timezone.now() - timedelta(days=fallback_days)
+        )
 
         region_publications = defaultdict(list)
         total_publications = 0
@@ -287,6 +305,7 @@ def send_subscription_based_email(trigger_source='manual', sent_by=None, user_id
                 status="p",
                 geometry__isnull=False,
                 geometry__bboverlaps=region.geom,
+                creationDate__gte=cutoff,
             ).order_by('-creationDate')[:50]
 
             matching_pubs = [
@@ -299,7 +318,7 @@ def send_subscription_based_email(trigger_source='manual', sent_by=None, user_id
                 total_publications += len(matching_pubs)
 
         if total_publications == 0:
-            logger.info(f"Skipping subscription for {user_email} - no new publications")
+            logger.info(f"Skipping subscription for {user_email} - no new publications since {cutoff}")
             continue
 
         unsubscribe_all = f"{BASE_URL}{reverse('optimap:unsubscribe')}?all=true"
@@ -339,6 +358,8 @@ def send_subscription_based_email(trigger_source='manual', sent_by=None, user_id
             email.send()
             EmailLog.log_email(user_email, subject, content, sent_by=sent_by, trigger_source=trigger_source, status="success")
             logger.info(f"Sent regional subscription email to {user_email} with {total_publications} publications across {len(region_publications)} regions")
+            subscription.last_notified = timezone.now()
+            subscription.save(update_fields=['last_notified'])
             time.sleep(settings.EMAIL_SEND_DELAY)
         except Exception as e:
             error_message = str(e)
@@ -362,7 +383,8 @@ def schedule_monthly_email_task(sent_by=None):
 
 
 def schedule_subscription_email_task(sent_by=None):
-    if not Schedule.objects.filter(func='publications.tasks.send_subscription_based_email').exists():
+    monthly_kwargs = {'trigger_source': 'scheduled', 'interval': 'monthly', 'sent_by': sent_by.id if sent_by else None}
+    if not Schedule.objects.filter(func='publications.tasks.send_subscription_based_email', kwargs__contains='"interval": "monthly"').exists():
         now = datetime.now()
         last_day_of_month = calendar.monthrange(now.year, now.month)[1]
         next_run_date = now.replace(day=last_day_of_month, hour=23, minute=59)
@@ -371,9 +393,22 @@ def schedule_subscription_email_task(sent_by=None):
             schedule_type='M',
             repeats=-1,
             next_run=next_run_date,
-            kwargs={'trigger_source': 'scheduled', 'sent_by': sent_by.id if sent_by else None}
+            kwargs=monthly_kwargs,
         )
-        logger.info(f"Scheduled 'send_subscription_based_email' for {next_run_date}")
+        logger.info(f"Scheduled monthly 'send_subscription_based_email' for {next_run_date}")
+
+
+def schedule_weekly_subscription_email_task(sent_by=None):
+    weekly_kwargs = {'trigger_source': 'scheduled', 'interval': 'weekly', 'sent_by': sent_by.id if sent_by else None}
+    if not Schedule.objects.filter(func='publications.tasks.send_subscription_based_email', kwargs__contains='"interval": "weekly"').exists():
+        schedule(
+            'publications.tasks.send_subscription_based_email',
+            schedule_type='C',
+            cron='0 2 * * 1',
+            repeats=-1,
+            kwargs=weekly_kwargs,
+        )
+        logger.info("Scheduled weekly 'send_subscription_based_email' (Monday 02:00 UTC)")
 
 
 # -----------------------------------------------------------------------------

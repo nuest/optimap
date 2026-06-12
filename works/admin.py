@@ -13,7 +13,7 @@ from leaflet.admin import LeafletGeoAdmin
 from works.models import Work, Source, HarvestingEvent, BlockedEmail, BlockedDomain, GlobalRegion, Collection
 from import_export.admin import ImportExportModelAdmin
 from works.models import Contribution, EmailLog, Subscription, UserProfile, WikidataExportLog
-from works.tasks import schedule_subscription_email_task, send_monthly_email, schedule_monthly_email_task, send_subscription_based_email
+from works.tasks import schedule_subscription_email_task, schedule_weekly_subscription_email_task, send_monthly_email, schedule_monthly_email_task, send_subscription_based_email
 from django_q.models import Schedule
 from django_q.tasks import async_task
 from django.utils.timezone import now
@@ -171,14 +171,26 @@ def send_subscription_emails(modeladmin, request, queryset):
     send_subscription_based_email(sent_by=request.user, user_ids=list(selected_users))
     messages.success(request, "Subscription-based emails have been sent.")
 
-@admin.action(description="Schedule subscription-based Email Task")
+@admin.action(description="Schedule monthly subscription email task")
 def send_subscription_emails_scheduler(modeladmin, request, queryset):
     """
-    Admin action to manually schedule the email task.
+    Admin action to manually schedule the monthly email task.
     """
-    try:        
-        schedule_subscription_email_task(sent_by=request.user)  
-        messages.success(request, "Monthly email task has been scheduled successfully.")
+    try:
+        schedule_subscription_email_task(sent_by=request.user)
+        messages.success(request, "Monthly subscription email task has been scheduled successfully.")
+    except Exception as e:
+        messages.error(request, f"Failed to schedule task: {e}")
+
+
+@admin.action(description="Schedule weekly subscription email task")
+def send_weekly_subscription_emails_scheduler(modeladmin, request, queryset):
+    """
+    Admin action to schedule the weekly subscription email task (Monday 02:00 UTC).
+    """
+    try:
+        schedule_weekly_subscription_email_task(sent_by=request.user)
+        messages.success(request, "Weekly subscription email task has been scheduled successfully.")
     except Exception as e:
         messages.error(request, f"Failed to schedule task: {e}")
 
@@ -590,8 +602,10 @@ class WikidataExportLogAdmin(admin.ModelAdmin):
 
 @admin.register(Subscription)
 class SubscriptionAdmin(admin.ModelAdmin):
-    list_display = ("user", "region", "subscribed")
-    actions = [send_subscription_emails, send_subscription_emails_scheduler]
+    list_display = ("user", "subscribed", "notification_interval", "last_notified")
+    list_filter = ("subscribed", "notification_interval")
+    readonly_fields = ("last_notified",)
+    actions = [send_subscription_emails, send_subscription_emails_scheduler, send_weekly_subscription_emails_scheduler]
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):

@@ -326,6 +326,11 @@ class Work(models.Model):
             return None
 
 class Subscription(models.Model):
+    NOTIFICATION_INTERVAL_CHOICES = [
+        ('weekly', 'Weekly'),
+        ('monthly', 'Monthly'),
+    ]
+
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="subscriptions", null=True, blank=True)
     name = models.CharField(max_length=4096, default="default_subscription")
     search_term = models.CharField(max_length=4096, null=True, blank=True)
@@ -334,6 +339,12 @@ class Subscription(models.Model):
     region = models.GeometryCollectionField(null=True, blank=True)  # Deprecated, kept for backward compatibility
     regions = models.ManyToManyField('GlobalRegion', related_name='subscriptions', blank=True, help_text="Predefined geographic regions (continents and oceans)")
     subscribed = models.BooleanField(default=True)
+    notification_interval = models.CharField(
+        max_length=10,
+        choices=NOTIFICATION_INTERVAL_CHOICES,
+        default='monthly',
+    )
+    last_notified = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['name']

@@ -335,6 +335,59 @@ class SubscriptionTests(TestCase):
         self.assertIn('2 regions', str(messages[0]))
         self.assertIn('updated', str(messages[0]).lower())
 
+    # ------------------------------------------------------------------
+    # Notification interval (issue #85)
+    # ------------------------------------------------------------------
+
+    def test_interval_saved_on_subscription_update(self):
+        """POST with notification_interval=weekly saves the choice."""
+        self.client.login(username='testuser', password='testpass123')
+        self.client.post(
+            reverse('optimap:addsubscriptions'),
+            {'regions': [self.africa.id], 'notification_interval': 'weekly'},
+        )
+        subscription = Subscription.objects.get(user=self.user)
+        self.assertEqual(subscription.notification_interval, 'weekly')
+
+    def test_interval_defaults_to_monthly_when_missing(self):
+        """POST without notification_interval defaults to monthly."""
+        self.client.login(username='testuser', password='testpass123')
+        self.client.post(
+            reverse('optimap:addsubscriptions'),
+            {'regions': [self.africa.id]},
+        )
+        subscription = Subscription.objects.get(user=self.user)
+        self.assertEqual(subscription.notification_interval, 'monthly')
+
+    def test_invalid_interval_value_defaults_to_monthly(self):
+        """An unrecognised interval value is silently coerced to monthly."""
+        self.client.login(username='testuser', password='testpass123')
+        self.client.post(
+            reverse('optimap:addsubscriptions'),
+            {'regions': [self.africa.id], 'notification_interval': 'daily'},
+        )
+        subscription = Subscription.objects.get(user=self.user)
+        self.assertEqual(subscription.notification_interval, 'monthly')
+
+    def test_interval_radio_pre_selected_in_form(self):
+        """GET /subscriptions/ pre-selects the user's current interval."""
+        self.client.login(username='testuser', password='testpass123')
+        # Set weekly preference first
+        subscription, _ = Subscription.objects.get_or_create(
+            user=self.user,
+            defaults={'name': f'{self.user.username}_subscription'},
+        )
+        subscription.notification_interval = 'weekly'
+        subscription.save()
+
+        response = self.client.get(reverse('optimap:subscriptions'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'value="weekly"')
+        content = response.content.decode()
+        # The weekly radio should carry the checked attribute
+        self.assertIn('id="interval_weekly"', content)
+        self.assertIn('checked', content)
+
 
 class SubscriptionQueryTests(TestCase):
     """Tests for querying publications by subscribed regions"""
@@ -383,3 +436,11 @@ class SubscriptionQueryTests(TestCase):
         # Test reverse relationship
         self.assertEqual(self.africa.subscriptions.count(), 1)
         self.assertIn(subscription, self.africa.subscriptions.all())
+
+    def test_notification_interval_default_is_monthly(self):
+        """New subscriptions default to monthly notification interval."""
+        subscription = Subscription.objects.create(
+            user=self.user,
+            name="test_subscription",
+        )
+        self.assertEqual(subscription.notification_interval, 'monthly')

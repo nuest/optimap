@@ -282,10 +282,15 @@
         <i class="fas fa-calendar-alt fa-2x"></i>
       </div>
       <div class="info-content">
-        <h6 class="mb-1"><strong>Notification Schedule</strong></h6>
+        <h6 class="mb-1"><strong>Notification schedule</strong></h6>
         <p class="mb-0 small">
+          {% if notification_interval == 'weekly' %}
+          Email notifications are sent <strong>weekly</strong> every Monday,
+          {% else %}
           Email notifications are sent <strong>monthly</strong> on the last day of each month,
-          summarizing all new publications added to your selected regions.
+          {% endif %}
+          summarizing new publications added to your selected regions since your last notification.
+          Change the frequency in the form below.
         </p>
       </div>
     </div>
@@ -321,6 +326,25 @@
   <div class="subscription-card">
     <form method="POST" action="{% url 'optimap:addsubscriptions' %}" id="subscription-form">
       {% csrf_token %}
+
+      <!-- Notification frequency -->
+      <div class="mb-4">
+        <h5 class="mb-2">Notification frequency</h5>
+        <div class="form-check">
+          <input class="form-check-input interval-radio" type="radio" name="notification_interval"
+                 id="interval_weekly" value="weekly"
+                 {% if notification_interval == 'weekly' %}checked{% endif %}>
+          <label class="form-check-label" for="interval_weekly">Weekly (every Monday)</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input interval-radio" type="radio" name="notification_interval"
+                 id="interval_monthly" value="monthly"
+                 {% if notification_interval != 'weekly' %}checked{% endif %}>
+          <label class="form-check-label" for="interval_monthly">Monthly (last day of month)</label>
+        </div>
+      </div>
+
+      <hr class="my-3">
 
       <!-- Select All Section -->
       <div class="select-all-section">
@@ -396,12 +420,14 @@
   document.addEventListener('DOMContentLoaded', function() {
     const selectAllCheckbox = document.getElementById('select-all');
     const regionCheckboxes = document.querySelectorAll('.region-checkbox');
+    const intervalRadios = document.querySelectorAll('.interval-radio');
     const saveButton = document.getElementById('save-button');
     const saveButtonWrapper = document.getElementById('save-button-wrapper');
     const form = document.getElementById('subscription-form');
 
     // Store initial form state
     const initialState = getFormState();
+    const initialInterval = getSelectedInterval();
 
     // Get current form state as a Set of checked region IDs
     function getFormState() {
@@ -414,8 +440,19 @@
       return checkedRegions;
     }
 
+    function getSelectedInterval() {
+      for (const radio of intervalRadios) {
+        if (radio.checked) return radio.value;
+      }
+      return 'monthly';
+    }
+
     // Check if form has changed from initial state
     function hasFormChanged() {
+      if (getSelectedInterval() !== initialInterval) {
+        return true;
+      }
+
       const currentState = getFormState();
 
       // Check if sets are equal
@@ -484,6 +521,11 @@
     // Handle individual region checkboxes
     regionCheckboxes.forEach(function(checkbox) {
       checkbox.addEventListener('change', updateSelectAllState);
+    });
+
+    // Handle interval radio buttons
+    intervalRadios.forEach(function(radio) {
+      radio.addEventListener('change', updateSaveButtonState);
     });
   });
 </script>
