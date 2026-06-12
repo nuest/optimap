@@ -14,6 +14,29 @@ const _STATUS_BADGE_STYLE = {
   w: 'background:#dc3545;color:#fff',          // Withdrawn  — red
 };
 
+// HTML templates used with L.Util.template({key} substitution).
+// Only use for values we control (URLs, counts, dates, enum strings).
+// User-supplied free text (title, abstract, names) stays in template literals
+// to avoid conflicts with {…} patterns that may appear in scientific text.
+const _TMPL = {
+  statusBadge:
+    '<span style="display:inline-block;padding:2px 7px;border-radius:3px;font-size:11px;font-weight:600;{style}">{label}</span>',
+  workLink:
+    '<div style="margin-bottom:10px;"><a href="/work/{path}/" class="btn btn-sm btn-primary" style="color:white;text-decoration:none;padding:5px 10px;border-radius:3px;display:inline-block;">View work details</a></div>',
+  sourceSite:
+    '<div><a href="{url}" target="_blank"><i class="fas fa-external-link-alt"></i> Visit source website</a></div>',
+  sourceIssn:
+    '<div><strong>ISSN-L:</strong> <a href="https://openalex.org/sources/issn:{issn}" target="_blank"><i class="fas fa-external-link-alt"></i> {issn}</a></div>',
+  sourceAccess:  '<div><strong>Access:</strong> {access}</div>',
+  sourceCited:   '<div>Cited by {count} works</div>',
+  sourceWorks:   '<div>{count} works hosted</div>',
+  timeperiod:    '<div><strong>Timeperiod:</strong> from {start} to {end}</div>',
+  workUrl:
+    '<div><a href="{url}" target="_blank"><i class="fas fa-external-link-alt"></i> Visit work</a></div>',
+  openalexUrl:
+    '<div style="margin-top:8px;"><a href="{url}" target="_blank" style="color:#2563eb;"><i class="fas fa-external-link-alt"></i> View in OpenAlex</a></div>',
+};
+
 /**
  * Return a small inline-styled status badge (and a "not public" note for
  * unpublished statuses).  Returns '' when status is absent, so calling code
@@ -25,7 +48,7 @@ function publicationStatusBadgeHTML(status, statusDisplay) {
   if (!status) return '';
   const style = _STATUS_BADGE_STYLE[status] || 'background:#6c757d;color:#fff';
   const label = statusDisplay || status;
-  let html = `<span style="display:inline-block;padding:2px 7px;border-radius:3px;font-size:11px;font-weight:600;${style}">${label}</span>`;
+  let html = L.Util.template(_TMPL.statusBadge, { style, label });
   if (status !== 'p') {
     html += ' <small style="color:#888;">— not visible to anonymous users</small>';
   }
@@ -74,27 +97,27 @@ window.renderPublicationContent = function(p, featureId) {
       html += `<div><em>${s.abbreviated_title}</em></div>`;
     }
     if (s.homepage_url) {
-      html += `<div><a href="${s.homepage_url}" target="_blank"><i class="fas fa-external-link-alt"></i> Visit source website</a></div>`;
+      html += L.Util.template(_TMPL.sourceSite, { url: s.homepage_url });
     }
     if (s.issn_l) {
-      html += `<div><strong>ISSN-L:</strong> <a href="https://openalex.org/sources/issn:${s.issn_l}" target="_blank"><i class="fas fa-external-link-alt"></i> ${s.issn_l}</a></div>`;
+      html += L.Util.template(_TMPL.sourceIssn, { issn: s.issn_l });
     }
     if (s.publisher_name && s.publisher_name !== name) {
       html += `<div><strong>Publisher:</strong> ${s.publisher_name}</div>`;
     }
     if ('is_oa' in s) {
-      html += `<div><strong>Access:</strong> ${s.is_oa ? 'Open Access' : 'Closed Access'}</div>`;
+      html += L.Util.template(_TMPL.sourceAccess, { access: s.is_oa ? 'Open Access' : 'Closed Access' });
     }
     if (s.cited_by_count != null) {
-      html += `<div>Cited by ${s.cited_by_count} works</div>`;
+      html += L.Util.template(_TMPL.sourceCited, { count: s.cited_by_count });
     }
     if (s.works_count != null) {
-      html += `<div>${s.works_count} works hosted</div>`;
+      html += L.Util.template(_TMPL.sourceWorks, { count: s.works_count });
     }
   }
 
   if (p.timeperiod_startdate && p.timeperiod_enddate) {
-    html += `<div><strong>Timeperiod:</strong> from ${p.timeperiod_startdate} to ${p.timeperiod_enddate}</div>`;
+    html += L.Util.template(_TMPL.timeperiod, { start: p.timeperiod_startdate, end: p.timeperiod_enddate });
   }
 
   if (p.abstract) {
@@ -102,11 +125,11 @@ window.renderPublicationContent = function(p, featureId) {
   }
 
   if (p.url) {
-    html += `<div><a href="${p.url}" target="_blank"><i class="fas fa-external-link-alt"></i> Visit work</a></div>`;
+    html += L.Util.template(_TMPL.workUrl, { url: p.url });
   }
 
   if (p.openalex_id) {
-    html += `<div style="margin-top:8px;"><a href="${p.openalex_id}" target="_blank" style="color:#2563eb;"><i class="fas fa-external-link-alt"></i> View in OpenAlex</a></div>`;
+    html += L.Util.template(_TMPL.openalexUrl, { url: p.openalex_id });
   }
 
   return html;
@@ -128,9 +151,9 @@ function _renderHeader(p, featureId) {
   // "View work details" button
   const doi = p.doi;
   if (doi) {
-    html += `<div style="margin-bottom:10px;"><a href="/work/${encodeURIComponent(doi)}/" class="btn btn-sm btn-primary" style="color:white;text-decoration:none;padding:5px 10px;border-radius:3px;display:inline-block;">View work details</a></div>`;
+    html += L.Util.template(_TMPL.workLink, { path: encodeURIComponent(doi) });
   } else if (featureId) {
-    html += `<div style="margin-bottom:10px;"><a href="/work/${featureId}/" class="btn btn-sm btn-primary" style="color:white;text-decoration:none;padding:5px 10px;border-radius:3px;display:inline-block;">View work details</a></div>`;
+    html += L.Util.template(_TMPL.workLink, { path: featureId });
   }
   return html;
 }
