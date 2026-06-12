@@ -598,7 +598,7 @@
     if (publicationFeature) {
       layer = L.geoJSON(publicationFeature, {
         style: publicationStyle,
-        pointToLayer: (feat, latlng) => L.circleMarker(latlng, Object.assign({ radius: 6 }, publicationStyle(feat)))
+        pointToLayer: publicationPointToLayer
       });
       featureGroup.addLayer(layer);
 

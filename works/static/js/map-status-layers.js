@@ -51,13 +51,10 @@
       // (interaction, keyboard, search). Not added to the map directly — its
       // children are routed to the two FeatureGroups, which ARE on the map.
       this.allLayer = L.geoJSON(features, {
-        // Render GeoJSON Points as circleMarkers (same as the work landing page)
-        // instead of the default pin-marker. The style function is not called for
-        // layers created by pointToLayer, so we compute the style here directly.
         pointToLayer: (feature, latlng) => {
           const base = styleFn ? styleFn(feature) : {};
           const style = isUnpublished(feature) ? unpublishedStyle(base) : base;
-          return L.circleMarker(latlng, Object.assign({ radius: 6 }, style));
+          return publicationPointToLayer(feature, latlng, () => style);
         },
         style: (feature) => {
           const base = styleFn ? styleFn(feature) : {};

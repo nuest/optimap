@@ -400,10 +400,8 @@ class MapSearchManager {
     const styleFn = (typeof publicationStyle === 'function') ? publicationStyle : () => ({});
 
     // Create a new layer with the filtered publications, preserving the original symbology.
-    // pointToLayer is required so that GeoJSON Point features become CircleMarkers
-    // (matching the original layer) rather than falling back to default blue pin markers.
     this.filteredLayer = L.geoJSON(filteredGeoJSON, {
-      pointToLayer: (feature, latlng) => L.circleMarker(latlng, Object.assign({ radius: 6 }, styleFn(feature))),
+      pointToLayer: (feature, latlng) => publicationPointToLayer(feature, latlng, styleFn),
       style: styleFn,
       onEachFeature: popupFunc
     });

@@ -27,3 +27,17 @@ const OPTIMAP_MAP_STYLES = {
 function publicationStyle(/* feature */) {
   return OPTIMAP_MAP_STYLES.default;
 }
+
+/**
+ * Shared pointToLayer for L.geoJSON — renders GeoJSON Point features as
+ * circleMarkers so they match the styled polygon/line symbology instead of
+ * falling back to Leaflet's default blue-pin marker.
+ * @param {Object} feature - GeoJSON feature
+ * @param {L.LatLng} latlng
+ * @param {Function} [styleFn] - Optional override; defaults to publicationStyle.
+ * @returns {L.CircleMarker}
+ */
+function publicationPointToLayer(feature, latlng, styleFn) {
+  const style = (styleFn || publicationStyle)(feature);
+  return L.circleMarker(latlng, Object.assign({ radius: 6 }, style));
+}
