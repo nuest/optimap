@@ -72,7 +72,7 @@ class PublicPagesBasicTests(TestCase):
         """Test feeds listing page loads with feed links."""
         response = self.client.get(reverse("optimap:feeds"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Feeds")
+        self.assertContains(response, "Regions")
         self.assertContains(response, "RSS")
         # Should not contain admin links
         self.assertNotContains(response, "/admin/")

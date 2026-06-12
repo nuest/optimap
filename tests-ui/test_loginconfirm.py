@@ -17,9 +17,3 @@ class LoginconfirmationTest(StaticLiveServerTestCase):
                 click(Button("×"))
         finally:
             kill_browser()
-
-    start_chrome(f"{self.live_server_url}/loginconfirm/", headless=True)
-    get_driver().save_screenshot(os.path.join(os.getcwd(), "tests-ui", "screenshots", "UserMenu.png"))
-    if Text("Welcome to OPTIMAP!").exists():
-        click(Button("×"))
-    kill_browser()

@@ -46,7 +46,7 @@ class LoginresponseTest(StaticLiveServerTestCase):
 
             # Verify success message appears
             self.assertTrue(
-                Text("Awesome!").exists() or Text("We sent a link").exists(), "Login response message not found"
+                Text("We sent a login link").exists(), "Login response message not found"
             )
 
             # Now test the actual login using the token

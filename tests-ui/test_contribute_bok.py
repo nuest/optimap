@@ -73,7 +73,7 @@ class BokLandingPageTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         body = resp.content.decode()
         self.assertIn("Cartography and Visualization", body)
-        self.assertIn("http://bok.eo4geo.eu/CV", body)
+        self.assertIn("https://geospacebok.eu/CV", body)
         # Editor card is gated behind `can_tag_bok`.
         self.assertNotIn('id="bok-edit-card"', body)
 
