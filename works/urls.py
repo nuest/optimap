@@ -95,6 +95,7 @@ urlpatterns = [
 
     # Works
     path("works/", work_views.works_list, name="works"),
+    path('contribute/next/', work_views.contribute_next, name="contribute-next"),
     path('contribute/', work_views.contribute, name="contribute"),
 
     # Unified work URLs - accepts DOI, ID, or other identifiers

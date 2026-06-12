@@ -17,7 +17,8 @@ from urllib.parse import unquote
 
 logger = logging.getLogger(__name__)
 
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib import messages
 from django.contrib.gis.geos import GeometryCollection
 from django.core.cache import caches
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
@@ -108,6 +109,66 @@ def contribute(request):
         'filter_invalid': filter_invalid,
     }
     return render(request, 'contribute.html', context)
+
+
+def contribute_next(request):
+    """Redirect to a random work needing geolocation — entry point for the georeferencing game.
+
+    Accepts the same ``?collection=<id|identifier|short_slug>`` filter as
+    ``contribute()``. When a logged-in user visits, works they have already
+    made any contribution to are excluded (they either flipped to status 'c'
+    already, or were reset by an admin).
+
+    After picking a work, redirects to its landing page with
+    ``?game=1&done=<N>&collection=<identifier>`` so the landing page can
+    show the game banner, auto-run NER, and chain to the next work on submit.
+    """
+    is_admin = request.user.is_authenticated and request.user.is_staff
+    filter_raw = request.GET.get('collection', '').strip()
+    filter_collection = None
+    if filter_raw:
+        candidates = Collection.objects.all() if is_admin else Collection.objects.filter(is_published=True)
+        if filter_raw.isdigit():
+            filter_collection = candidates.filter(pk=int(filter_raw)).first()
+        if filter_collection is None:
+            filter_collection = (
+                candidates.filter(identifier=filter_raw).first()
+                or candidates.filter(short_slug=filter_raw).first()
+            )
+
+    qs = Work.objects.filter(status='h').filter(
+        Q(geometry__isnull=True)
+        | Q(geometry__isempty=True)
+        | Q(timeperiod_startdate__isnull=True)
+        | Q(timeperiod_enddate__isnull=True)
+    )
+    if filter_collection:
+        qs = qs.filter(collections=filter_collection)
+    if request.user.is_authenticated:
+        qs = qs.exclude(contributions__user=request.user)
+
+    work = qs.order_by('?').first()
+
+    if work is None:
+        messages.success(
+            request,
+            "Great job — all works in the queue are georeferenced! "
+            "Check back later as new works are harvested regularly."
+        )
+        dest = reverse('optimap:contribute')
+        if filter_collection:
+            dest += f'?collection={filter_collection.identifier}'
+        return redirect(dest)
+
+    done = request.GET.get('done', '0')
+    params = [f'game=1', f'done={done}']
+    if filter_collection:
+        params.append(f'collection={filter_collection.identifier}')
+    elif filter_raw:
+        params.append(f'collection={filter_raw}')
+    dest = reverse('optimap:work-landing', args=[work.get_identifier()]) + '?' + '&'.join(params)
+    return redirect(dest)
+
 
 def _format_timeperiod(work):
     """
@@ -340,6 +401,12 @@ def work_landing(request, identifier):
 
     is_admin = request.user.is_authenticated and request.user.is_staff
 
+    # Game-mode params — read before any expensive DB work so they're
+    # available throughout the rest of the view.
+    game_mode = request.GET.get('game') == '1'
+    game_done = max(0, int(request.GET.get('done', '0') or 0))
+    game_coll_raw = request.GET.get('collection', '').strip()
+
     # Resolve identifier to work object.
     work, identifier_type = resolve_work_identifier(identifier)
 
@@ -448,6 +515,17 @@ def work_landing(request, identifier):
         visible_collections_qs = visible_collections_qs.filter(is_published=True)
     visible_collections = list(visible_collections_qs)
 
+    # Build game-mode URLs. game_next_url (used after a successful contribution)
+    # increments done; game_skip_url (used by the Skip button) preserves the count.
+    base_game_params = []
+    if game_coll_raw:
+        base_game_params.append(f'collection={game_coll_raw}')
+    contribute_next_base = reverse('optimap:contribute-next')
+    game_next_params = [f'done={game_done + 1}'] + base_game_params
+    game_skip_params  = [f'done={game_done}']    + base_game_params
+    game_next_url = contribute_next_base + '?' + '&'.join(game_next_params)
+    game_skip_url = contribute_next_base + '?' + '&'.join(game_skip_params)
+
     context = {
         **{k: v for k, v in cacheable.items() if k != "schema_org"},
         "work": work,
@@ -468,6 +546,10 @@ def work_landing(request, identifier):
         "latest_wikidata_export": latest_wikidata_export,
         "all_wikidata_exports": all_wikidata_exports,
         "visible_collections": visible_collections,
+        "game_mode": game_mode,
+        "game_done": game_done,
+        "game_next_url": game_next_url,
+        "game_skip_url": game_skip_url,
     }
     response = render(request, "work_landing_page.html", context)
     if is_anonymous:

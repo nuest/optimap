@@ -57,6 +57,7 @@ def contribute_geometry_by_id(request, work_id):
         geojson = data.get('geometry')
         temporal_extent = data.get('temporal_extent')
         provenance_hint = data.get('provenance_hint')
+        game = True if data.get('game') else None
 
         logger.info("Received contribution request for work ID: %s, data: %s", work_id, data)
 
@@ -118,6 +119,7 @@ def contribute_geometry_by_id(request, work_id):
             status_from=status_from,
             status_to=status_to,
             geometry_source=provenance_hint if isinstance(provenance_hint, dict) else None,
+            game=game,
         )
         work.status = status_to
         work.save()

@@ -22,6 +22,20 @@
 
 <h1 class="page-title">{{ work.title }}</h1>
 
+{% if game_mode %}
+<div class="alert alert-primary d-flex justify-content-between align-items-center flex-wrap" id="game-mode-banner">
+  <span>
+    <i class="fas fa-gamepad"></i> <strong>Georeferencing game</strong>{% if game_done > 0 %} &mdash; {{ game_done }} work{{ game_done|pluralize }} georeferenced this session{% endif %}
+  </span>
+  <a href="{{ game_skip_url }}" class="btn btn-outline-primary btn-sm mt-1 mt-sm-0 ml-sm-3">
+    <i class="fas fa-forward"></i> Skip to next
+  </a>
+</div>
+{% if can_contribute %}
+<span id="game-next-url" data-url="{{ game_next_url }}" style="display:none;"></span>
+{% endif %}
+{% endif %}
+
 {% if is_admin %}
   <div class="alert
     {% if work.status == 'p' %}alert-success
@@ -785,6 +799,9 @@
           if (startDate) submissionData.temporal_extent.start_date = startDate;
           if (endDate) submissionData.temporal_extent.end_date = endDate;
         }
+        // Mark game-mode contributions for the provenance log.
+        const gameNextEl = document.getElementById('game-next-url');
+        if (gameNextEl) { submissionData.game = true; }
 
         const url = useIdUrls ? `/work/${pubId}/contribute-geometry/` : `/work/${doi}/contribute-geometry/`;
         console.log('Submitting contribution:', submissionData);
@@ -807,7 +824,12 @@
         })
         .then(data => {
           if (data.success) {
-            location.reload();
+            const gameNext = document.getElementById('game-next-url');
+            if (gameNext) {
+              window.location.href = gameNext.dataset.url;
+            } else {
+              location.reload();
+            }
           } else {
             OPTIMAP_FLASH('error', 'Error: ' + (data.error || 'Unknown error'));
           }
@@ -1455,6 +1477,17 @@
     };
   });
 }());
+</script>
+{% endif %}
+
+{% if game_mode and can_contribute %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var nerBody = document.getElementById('ner-suggest-body');
+  if (nerBody && typeof $ !== 'undefined') { $(nerBody).collapse('show'); }
+  var nerBtn = document.getElementById('ner-suggest-btn');
+  if (nerBtn) { nerBtn.click(); }
+});
 </script>
 {% endif %}
 

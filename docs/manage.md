@@ -361,6 +361,13 @@ Returns the work's provenance record as JSON. No authentication required. The re
 - `openalex_match.top_candidate` — verbose raw OpenAlex API response
 - `events[*].user_id` — personal data
 
+**Event quick-reference** — `contribution` events carry these optional fields in addition to `kinds`, `at`, and the privileged identity keys:
+
+| Field | Type | When present |
+|-------|------|-------------|
+| `game` | `true` | Contribution was submitted via the georeferencing game (`/contribute/next/` flow) |
+| `geometry_source` | object | NER/geoextent provenance hint passed from the frontend |
+
 **HTTP caching:**
 
 - Anonymous responses: `Cache-Control: public, max-age=3600` (1 hour).

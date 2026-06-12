@@ -54,6 +54,13 @@
         <strong>{{ total_count }}</strong> publication{{ total_count|pluralize }} need{{ total_count|pluralize:"s," }} geolocation data{% if filter_collection %} in this collection{% endif %}.
       </div>
 
+      {% if request.user.is_authenticated %}
+      <a href="{% url 'optimap:contribute-next' %}{% if filter_collection %}?collection={{ filter_collection.identifier }}{% endif %}"
+         class="btn btn-primary mb-3">
+        <i class="fas fa-gamepad"></i> Play georeferencing game
+      </a>
+      {% endif %}
+
       <!-- Pagination controls (top) -->
       {% include "_pagination.html" with show_meta=True pagination_label="Works pagination" %}
 

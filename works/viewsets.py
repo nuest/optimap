@@ -207,7 +207,7 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
             "|--------|-------------|-------------|\n"
             "| `harvest_update` | `harvesting_event_id` | Recorded each time an existing work is re-harvested |\n"
             "| `doi_backfill` | `doi`, `harvesting_event_id` | DOI was added to a previously DOI-less work |\n"
-            "| `contribution` | `kinds` (array: `spatial`, `temporal`, `bok`), `user_id`\\*, `user_email`\\* | User added spatial/temporal/BoK metadata |\n"
+            "| `contribution` | `kinds` (array: `spatial`, `temporal`, `bok`), `user_id`\\*, `user_email`\\*, `game` (bool, optional) | User added spatial/temporal/BoK metadata; `game: true` when submitted via the georeferencing game |\n"
             "| `publish` | `status_from`, `status_to`, `user_id`\\*, `user_email`\\* | Work was published |\n"
             "| `unpublish` | `status_from`, `user_id`\\*, `user_email`\\* | Work was unpublished |\n\n"
             "\\* `user_id` and `user_email` are present for staff and curators only.\n\n"

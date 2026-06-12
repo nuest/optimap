@@ -33,6 +33,7 @@ from .auth import (
 
 from .work_views import (
     contribute,
+    contribute_next,
     works_list,
     work_landing,
     work_preview_png,
@@ -68,6 +69,7 @@ __all__ = [
     'finalize_account_deletion',
     # Work views
     'contribute',
+    'contribute_next',
     'works_list',
     'work_landing',
     'work_preview_png',
