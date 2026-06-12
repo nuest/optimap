@@ -35,7 +35,7 @@ import requests
 import geopandas as gpd
 import folium
 
-# Fetch publications within a bounding box (central Europe)
+# Fetch works within a bounding box (central Europe)
 resp = requests.get(
     "https://optimap.geo.tu-dresden.de/ogcapi/collections/works/items",
     params={"bbox": "5,47,15,55", "limit": 100},

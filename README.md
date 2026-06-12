@@ -9,12 +9,12 @@ The development is continued in the project KOMET (<https://projects.tib.eu/kome
 
 The OPTIMAP has the following features:
 
-- Start page with a full screen map (showing geometries and metadata) and a time line of the areas and time periods of interest for scientific publications
+- Start page with a full screen map (showing geometries and metadata) and a time line of the areas and time periods of interest for scientific works
 - Passwordless login via email
 - RESTful API at `/api`
 - **Multi-source harvesting**: OAI-PMH, RSS, Crossref-prefix, Janeway, and Mountain Wetlands Repository — each with per-source deduplication, careful re-harvest updates that preserve user-contributed metadata, and OpenAlex enrichment to fill gaps
 - **Curated collections**: groupings of works under a curator-managed identifier (e.g. `mountain-wetlands`), with public `/collections/<identifier>/` pages, vanity short slugs, and per-collection curator roles to add/remove works from any landing page
-- **Crowdsourced metadata contribution**: Logged-in users can contribute spatial and temporal extent data for publications
+- **Crowdsourced metadata contribution**: Logged-in users can contribute spatial and temporal extent data for works
 - **Publication workflow**: Harvested → Contributed → Published status transitions with full provenance tracking
 - **Admin controls**: Publish/unpublish functionality with audit trails
 - **Recognition Board** at `/recognition-board/`: opt-in public leaderboard for contributors of spatial/temporal metadata, organised into explorer-named tiers
@@ -24,9 +24,9 @@ The OPTIMAP has the following features:
 - **Sharing-friendly metadata**: Open Graph, Twitter Card, schema.org, and Google Scholar tags on landing pages, plus a per-work `og:image` map preview
 - **Geoextent service** at `/geoextent/`: interactive tool to extract spatial/temporal extents from uploaded files or remote repositories (Zenodo, PANGAEA, OSF, Figshare, Dryad, Dataverse, GFZ Data Services)
 
-## Publication Status Workflow
+## Work Status Workflow
 
-Publications in OPTIMAP follow a status-based workflow with six possible states:
+Works in OPTIMAP follow a status-based workflow with six possible states:
 
 ### Status Definitions
 
@@ -48,13 +48,13 @@ Publications in OPTIMAP follow a status-based workflow with six possible states:
 
 **Direct Publishing (Skip Contribution):**
 
-- Harvested publications with **at least one extent type** (spatial OR temporal) can be published directly by admins without user contribution
+- Harvested works with **at least one extent type** (spatial OR temporal) can be published directly by admins without user contribution
 
 **Contribution Requirements:**
 
-- Users can only contribute to publications with **Harvested** (`h`) status
-- Harvested publications **without any extent** require user contribution before publishing
-- Contributed publications can always be published after admin review
+- Users can only contribute to works with **Harvested** (`h`) status
+- Harvested works **without any extent** require user contribution before publishing
+- Contributed works can be published after admin review
 
 **Visibility Rules:**
 
@@ -67,9 +67,9 @@ Publications in OPTIMAP follow a status-based workflow with six possible states:
 - Users can contribute **spatial extent** (geographic location) via interactive map with drawing tools
 - Users can contribute **temporal extent** (time period) via date form (formats: YYYY, YYYY-MM, YYYY-MM-DD)
 - Both extent types can be contributed separately or together in a single submission
-- Publications without DOI are supported via ID-based URLs (`/work/<id>/`)
+- Works without DOI are supported via ID-based URLs (`/work/<id>/`)
 - All contributions are tracked with full provenance (user, timestamp, changes)
-- Contribute page lists publications missing either spatial OR temporal extent
+- Contribute page lists works missing either spatial OR temporal extent
 
 OPTIMAP is based on [Django](https://www.djangoproject.com/) (with [GeoDjango](https://docs.djangoproject.com/en/4.1/ref/contrib/gis/) and [Django REST framework](https://www.django-rest-framework.org/)) with a [PostgreSQL](https://www.postgresql.org/)/[PostGIS](https://postgis.net/) database backend.
 
@@ -183,7 +183,7 @@ python manage.py load_global_regions
 # Uses the OPTIMAP_DB_* env vars; make sure they match your DATABASE_URL.
 python manage.py generate_pygeoapi_openapi
 
-# Harvest publications from real sources
+# Harvest works from real sources
 python manage.py harvest_sources --list  # List available sources
 python manage.py harvest_sources --all --max-records 20 --create-sources  # Initial harvesting of all sources (limited to 20 records each)
 python manage.py harvest_sources --source essd --source geo-leo  # Harvest specific sources

@@ -159,7 +159,7 @@ DATABASES = {
 SPECTACULAR_SETTINGS = {
     'TITLE': 'OPTIMAP API',
     'DESCRIPTION': """
-OPTIMAP is a geospatial discovery portal for scientific publications. The API exposes the same
+OPTIMAP is a geospatial discovery portal for scientific works. The API exposes the same
 data that powers the OPTIMAP web UI: harvested **works** with spatial / temporal metadata,
 **sources** that fed them, **collections** they belong to, **subscriptions** that drive email
 alerts, and helper services for **geoextent extraction** and **gazetteer** lookups.

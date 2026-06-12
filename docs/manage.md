@@ -124,7 +124,7 @@ All three actions are **non-blocking**: they queue work and return. Progress is 
 
 > **Why async?** Earlier versions ran the harvest synchronously inside the admin request, which routinely tripped gunicorn's worker timeout on non-trivial sources. The new actions hand off to Django-Q immediately. The cluster must be running for them to actually execute.
 
-CLI alternatives still work and are documented in README §[Harvest publications from real sources](../README.md#harvest-publications-from-real-sources): `python manage.py harvest_sources --source <slug>` (with `--list`, `--all`, `--create-sources`, `--user-email`, `--max-records`).
+CLI alternatives still work and are documented in README §[Harvest works from real sources](../README.md#harvest-works-from-real-sources): `python manage.py harvest_sources --source <slug>` (with `--list`, `--all`, `--create-sources`, `--user-email`, `--max-records`).
 
 **Recover from a thundering-herd schedule state:** `python manage.py reset_harvest_schedules` rebuilds every `Harvest Source <id>` recurring schedule with a properly deferred `next_run` and (by default) staggers them across the smallest harvest interval so the cluster doesn't get hit with every source at once. Use this after a bulk `--insert-sources` run on a deployment that pre-dated the `Source.save()` fix, or any time you find every source firing simultaneously. Flags: `--dry-run` (preview), `--no-stagger` (set every `next_run` to `now + its own interval`), `--clear-manual` (also delete leftover `Manual Harvest Source <id>` one-off rows from the admin "Schedule harvesting" action).
 
@@ -516,7 +516,7 @@ python manage.py qinfo      # one-shot stats: cluster status, queue depth, last 
 
 The following sections are **suggested, not yet written**. They cover the rest of the admin surface and are worth filling in as the corresponding features stabilise. Each entry lists what the section should cover and the relevant code/admin URLs so an author can pick one up without further investigation.
 
-### Manage works (publications)
+### Manage works
 
 `/admin/works/work/` — the core `Work` model.
 
