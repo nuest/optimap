@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-06-12
+
 ### Added
 
 - Add Ruff code formatter with enforcement via test suite and CI (#70). Configuration in `pyproject.toml` (line length 119, rules E/F/I). VSCode format-on-save via `.vscode/settings.json`; PyCharm via the Ruff plugin.
