@@ -23,6 +23,9 @@ class SourceSerializer(serializers.ModelSerializer):
     collection = serializers.SerializerMethodField(
         help_text="Default collection for works harvested from this source: identifier, name, and absolute API URL. Null if no collection is set.",
     )
+    latest_coverage = serializers.SerializerMethodField(
+        help_text="Most recent SourceCoverageSnapshot: optimap_count, openalex_total, coverage_pct, computed_at. Null if no snapshot exists.",
+    )
 
     class Meta:
         model = Source
@@ -44,6 +47,7 @@ class SourceSerializer(serializers.ModelSerializer):
             "is_preprint",
             "source_url",
             "collection",
+            "latest_coverage",
         )
 
     @extend_schema_field(serializers.URLField())
@@ -76,6 +80,38 @@ class SourceSerializer(serializers.ModelSerializer):
             "collection_url": coll_url,
         }
 
+    @extend_schema_field(
+        inline_serializer(
+            name="SourceCoverageRef",
+            fields={
+                "optimap_count": serializers.IntegerField(),
+                "openalex_total": serializers.IntegerField(allow_null=True),
+                "coverage_pct": serializers.FloatField(allow_null=True),
+                "spatial_rate": serializers.FloatField(allow_null=True),
+                "temporal_rate": serializers.FloatField(allow_null=True),
+                "open_access_ratio": serializers.FloatField(allow_null=True),
+                "contributors_count": serializers.IntegerField(),
+                "by_year": serializers.ListField(child=serializers.DictField()),
+                "computed_at": serializers.DateTimeField(),
+            },
+            allow_null=True,
+        )
+    )
+    def get_latest_coverage(self, obj):
+        snap = obj.coverage_snapshots.order_by('-computed_at').first()
+        if snap is None:
+            return None
+        return {
+            "optimap_count": snap.optimap_count,
+            "openalex_total": snap.openalex_total,
+            "coverage_pct": snap.coverage_pct,
+            "spatial_rate": snap.spatial_rate,
+            "temporal_rate": snap.temporal_rate,
+            "open_access_ratio": snap.open_access_ratio,
+            "contributors_count": snap.contributors_count,
+            "by_year": snap.by_year,
+            "computed_at": snap.computed_at,
+        }
 
 
 class WorkSerializer(GeoFeatureModelSerializer):

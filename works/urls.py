@@ -31,6 +31,7 @@ urlpatterns = [
     path("pages/", general_views.sitemap_page, name="sitemap-page"),
     path("feeds/", general_views.feeds, name="feeds"),
     path("geoextent/", general_views.geoextent, name="geoextent"),
+    path("statistics/", work_views.statistics_page, name="statistics"),
 
     # Admin
     path('admin/', admin.site.urls),

@@ -601,3 +601,86 @@ def work_preview_png(request, identifier):
     response = FileResponse(open(cache_file, "rb"), content_type="image/png")
     response["Cache-Control"] = "public, max-age=3600"
     return response
+
+
+def statistics_page(request):
+    """Standalone statistics page showing snapshot data with Chart.js plots."""
+    import json as _json
+    from works.models import StatisticsSnapshot, SourceCoverageSnapshot, GlobalRegion
+
+    try:
+        snapshot = StatisticsSnapshot.objects.latest()
+    except StatisticsSnapshot.DoesNotExist:
+        snapshot = None
+
+    # Last 90 snapshots for time-series charts (one per day ≈ 3 months)
+    history = list(
+        StatisticsSnapshot.objects.order_by('computed_at')
+        .values('computed_at', 'published_works', 'total_works',
+                'with_geometry', 'with_temporal', 'contributors')
+        .reverse()[:90]
+    )
+    history.reverse()  # chronological order for Chart.js
+
+    # Latest coverage snapshot per source, only those with data
+    sources_coverage = list(
+        SourceCoverageSnapshot.objects
+        .filter(openalex_total__gt=0)
+        .select_related('source')
+        .order_by('source_id', '-computed_at')
+        .distinct('source_id')
+    )
+
+    # Per-source history for the dropdown chart (last 52 weekly snapshots each)
+    source_history = {}
+    for snap in sources_coverage:
+        history_qs = list(
+            SourceCoverageSnapshot.objects
+            .filter(source=snap.source)
+            .order_by('computed_at')
+            .values('computed_at', 'coverage_pct', 'optimap_count', 'openalex_total')
+            .reverse()[:52]
+        )
+        history_qs.reverse()
+        source_history[snap.source_id] = {
+            'name': snap.source.name,
+            'history': [
+                {
+                    'date': str(h['computed_at'].date()),
+                    'coverage_pct': h['coverage_pct'],
+                    'optimap_count': h['optimap_count'],
+                    'openalex_total': h['openalex_total'],
+                }
+                for h in history_qs
+            ],
+        }
+
+    # Annotate by_continent / by_ocean entries with the region landing-page URL
+    # so the template can render names as links without template-dict lookups.
+    region_urls = {r.name: r.get_absolute_url() for r in GlobalRegion.objects.all()}
+
+    def _with_url(rows):
+        return [{'name': r['name'], 'count': r['count'], 'url': region_urls.get(r['name'])}
+                for r in rows]
+
+    snapshot_by_continent = _with_url(snapshot.by_continent) if snapshot else []
+    snapshot_by_ocean     = _with_url(snapshot.by_ocean)     if snapshot else []
+
+    return render(request, 'statistics.html', {
+        'snapshot': snapshot,
+        'snapshot_by_continent': snapshot_by_continent,
+        'snapshot_by_ocean': snapshot_by_ocean,
+        'history_json': _json.dumps([
+            {
+                'date': str(h['computed_at'].date()),
+                'published_works': h['published_works'],
+                'total_works': h['total_works'],
+                'with_geometry': h['with_geometry'],
+                'with_temporal': h['with_temporal'],
+                'contributors': h['contributors'],
+            }
+            for h in history
+        ]),
+        'sources_coverage': sources_coverage,
+        'source_history_json': _json.dumps(source_history),
+    })

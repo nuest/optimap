@@ -37,6 +37,7 @@ from .work_views import (
     works_list,
     work_landing,
     work_preview_png,
+    statistics_page,
 )
 
 from .data import (

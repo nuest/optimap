@@ -1,0 +1,417 @@
+{# SPDX-FileCopyrightText: 2026 OPTIMETA and KOMET projects <https://projects.tib.eu/komet> #}
+{# SPDX-License-Identifier: GPL-3.0-or-later #}
+
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Statistics - {% endblock %}
+
+{% block extra_meta %}
+<script src="{% static 'js/chart.umd.min.js' %}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <h1>Statistics</h1>
+
+  {% if not snapshot %}
+  <div class="alert alert-info">
+    No statistics snapshot available yet. The nightly job will generate the first one soon.
+    {% if request.user.is_staff %}
+    You can trigger an immediate computation using the button below.
+    {% endif %}
+  </div>
+  {% else %}
+
+  <p class="text-muted small">
+    Last computed: {{ snapshot.computed_at|date:"Y-m-d H:i" }} UTC
+    {% if snapshot.next_update %}— next update: {{ snapshot.next_update|date:"Y-m-d H:i" }} UTC{% endif %}.
+    Machine-readable data: <a href="/api/v1/statistics/">/api/v1/statistics/</a>.
+  </p>
+  {% endif %}
+
+  {% if request.user.is_staff %}
+  <div class="mb-4">
+    <button id="calcNowBtn" class="btn btn-sm btn-outline-secondary">
+      <i class="fas fa-sync-alt"></i> Calculate statistics now
+    </button>
+    <span id="calcNowStatus" class="ml-2 small text-muted d-none"></span>
+  </div>
+  {% endif %}
+
+  {% if snapshot %}
+
+  <!-- Key numbers -->
+  <div class="row mt-4">
+    <div class="col-md-4 mb-3">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="card-title">Works</h5>
+          <dl class="row mb-0 small">
+            <dt class="col-8">Published</dt>
+            <dd class="col-4 text-right">{{ snapshot.published_works }}</dd>
+            <dt class="col-8">Harvested</dt>
+            <dd class="col-4 text-right">{{ snapshot.harvested_works }}</dd>
+            <dt class="col-8">Contributed</dt>
+            <dd class="col-4 text-right">{{ snapshot.contributed_works }}</dd>
+            <dt class="col-8">Total in database</dt>
+            <dd class="col-4 text-right">{{ snapshot.total_works }}</dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4 mb-3">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="card-title">Metadata coverage</h5>
+          <dl class="row mb-0 small">
+            <dt class="col-8">With geometry</dt>
+            <dd class="col-4 text-right">{{ snapshot.with_geometry }}</dd>
+            <dt class="col-8">With temporal extent</dt>
+            <dd class="col-4 text-right">{{ snapshot.with_temporal }}</dd>
+            <dt class="col-8">With authors</dt>
+            <dd class="col-4 text-right">{{ snapshot.with_authors }}</dd>
+            <dt class="col-8">
+              Complete metadata
+              <i class="fas fa-info-circle text-muted"
+                 data-toggle="tooltip"
+                 title="Published works that have geometry, at least one temporal date (start or end), and at least one author."
+                 style="cursor:help;"></i>
+            </dt>
+            <dd class="col-4 text-right">{{ snapshot.with_complete_metadata }} ({{ snapshot.complete_percentage }}%)</dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4 mb-3">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="card-title">Community</h5>
+          <dl class="row mb-0 small">
+            <dt class="col-8">Registered users</dt>
+            <dd class="col-4 text-right">{{ snapshot.users }}</dd>
+            <dt class="col-8">Contributors</dt>
+            <dd class="col-4 text-right">{{ snapshot.contributors }}</dd>
+            <dt class="col-8">Sources</dt>
+            <dd class="col-4 text-right">{{ snapshot.sources }}</dd>
+            <dt class="col-8">Collections</dt>
+            <dd class="col-4 text-right">{{ snapshot.collections }}</dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Time series chart -->
+  {% if history_json != "[]" %}
+  <h2 class="mt-4">Works over time</h2>
+  <div class="card mb-4">
+    <div class="card-body">
+      <canvas id="worksTimeChart" height="80"></canvas>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Breakdowns -->
+  <div class="row mt-2">
+    <div class="col-md-6 mb-4">
+      <h2>By continent</h2>
+      {% if snapshot_by_continent %}
+      <table class="table table-sm table-striped">
+        <thead><tr><th>Continent</th><th class="text-right">Works</th></tr></thead>
+        <tbody>
+          {% for row in snapshot_by_continent %}
+          <tr>
+            <td>{% if row.url %}<a href="{{ row.url }}">{{ row.name }}</a>{% else %}{{ row.name }}{% endif %}</td>
+            <td class="text-right">{{ row.count }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="text-muted small">No data yet.</p>{% endif %}
+    </div>
+    <div class="col-md-6 mb-4">
+      <h2>By ocean</h2>
+      {% if snapshot_by_ocean %}
+      <table class="table table-sm table-striped">
+        <thead><tr><th>Ocean</th><th class="text-right">Works</th></tr></thead>
+        <tbody>
+          {% for row in snapshot_by_ocean %}
+          <tr>
+            <td>{% if row.url %}<a href="{{ row.url }}">{{ row.name }}</a>{% else %}{{ row.name }}{% endif %}</td>
+            <td class="text-right">{{ row.count }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="text-muted small">No data yet.</p>{% endif %}
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-md-6 mb-4">
+      <h2>By country <small class="text-muted" style="font-size:0.6em">(ISO 3166-1 code, top 100)</small></h2>
+      {% if snapshot.by_country %}
+      <div style="max-height: 320px; overflow-y: auto;">
+        <table class="table table-sm table-striped mb-0">
+          <thead><tr><th>Country</th><th class="text-right">Works</th></tr></thead>
+          <tbody>
+            {% for row in snapshot.by_country %}
+            <tr><td>{{ row.name }}</td><td class="text-right">{{ row.count }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}<p class="text-muted small">No data yet.</p>{% endif %}
+    </div>
+    <div class="col-md-6 mb-4">
+      <h2>By publisher <small class="text-muted" style="font-size:0.6em">(top 50)</small></h2>
+      {% if snapshot.by_publisher %}
+      <div style="max-height: 320px; overflow-y: auto;">
+        <table class="table table-sm table-striped mb-0">
+          <thead><tr><th>Publisher</th><th class="text-right">Works</th></tr></thead>
+          <tbody>
+            {% for row in snapshot.by_publisher %}
+            <tr><td>{{ row.name }}</td><td class="text-right">{{ row.count }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}<p class="text-muted small">No data yet.</p>{% endif %}
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-md-6 mb-4">
+      <h2>By journal / source <small class="text-muted" style="font-size:0.6em">(top 50)</small></h2>
+      {% if snapshot.by_journal %}
+      <div style="max-height: 320px; overflow-y: auto;">
+        <table class="table table-sm table-striped mb-0">
+          <thead><tr><th>Journal / source</th><th class="text-right">Works</th></tr></thead>
+          <tbody>
+            {% for row in snapshot.by_journal %}
+            <tr><td>{{ row.name }}</td><td class="text-right">{{ row.count }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}<p class="text-muted small">No data yet.</p>{% endif %}
+    </div>
+    <div class="col-md-6 mb-4">
+      <h2>By collection</h2>
+      {% if snapshot.by_collection %}
+      <table class="table table-sm table-striped">
+        <thead><tr><th>Collection</th><th class="text-right">Works</th></tr></thead>
+        <tbody>
+          {% for row in snapshot.by_collection %}
+          <tr>
+            <td><a href="{{ row.url }}">{{ row.name }}</a></td>
+            <td class="text-right">{{ row.count }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="text-muted small">No published collections yet. Collections must be marked as published to appear here.</p>{% endif %}
+    </div>
+  </div>
+
+  <!-- Source coverage -->
+  {% if sources_coverage %}
+  <h2 class="mt-2">Source coverage</h2>
+  <p class="text-muted small">
+    Compares the number of published works in OPTIMAP with the total works in OpenAlex for each source.
+    Updated weekly.
+  </p>
+  <div class="row mb-3">
+    <div class="col-md-5">
+      <label for="coverageSourceSelect" class="font-weight-bold small">Select source</label>
+      <select id="coverageSourceSelect" class="form-control form-control-sm">
+        {% for snap in sources_coverage %}
+        <option value="{{ snap.source_id }}">{{ snap.source.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+  <div class="card mb-4">
+    <div class="card-body">
+      <canvas id="sourceCoverageChart" height="80"></canvas>
+    </div>
+  </div>
+  <div class="table-responsive mb-4">
+    <table class="table table-sm table-striped">
+      <thead>
+        <tr>
+          <th>Source</th>
+          <th class="text-right">OPTIMAP works</th>
+          <th class="text-right">OpenAlex total</th>
+          <th class="text-right">Coverage
+            <i class="fas fa-info-circle text-muted" data-toggle="tooltip"
+               title="Share of OpenAlex-indexed works present in OPTIMAP. N/A when the source has no OpenAlex ID."
+               style="cursor:help;"></i>
+          </th>
+          <th class="text-right">With geometry</th>
+          <th class="text-right">With temporal</th>
+          <th class="text-right">Open access</th>
+          <th class="text-right">Contributors</th>
+          <th>Last updated</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for snap in sources_coverage %}
+        <tr>
+          <td>{{ snap.source.name }}</td>
+          <td class="text-right">{{ snap.optimap_count }}</td>
+          <td class="text-right">{% if snap.openalex_total is not None %}{{ snap.openalex_total }}{% else %}<span class="text-muted">N/A</span>{% endif %}</td>
+          <td class="text-right">{% if snap.coverage_pct is not None %}{{ snap.coverage_pct }}%{% else %}<span class="text-muted">N/A</span>{% endif %}</td>
+          <td class="text-right">{% if snap.spatial_rate is not None %}{{ snap.spatial_rate }}%{% else %}<span class="text-muted">—</span>{% endif %}</td>
+          <td class="text-right">{% if snap.temporal_rate is not None %}{{ snap.temporal_rate }}%{% else %}<span class="text-muted">—</span>{% endif %}</td>
+          <td class="text-right">{% if snap.open_access_ratio is not None %}{{ snap.open_access_ratio }}%{% else %}<span class="text-muted">—</span>{% endif %}</td>
+          <td class="text-right">{{ snap.contributors_count }}</td>
+          <td>{{ snap.computed_at|date:"Y-m-d" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% endif %}{# end if snapshot #}
+</div>
+
+<script>
+// Initialize Bootstrap tooltips on this page.
+$(function () { $('[data-toggle="tooltip"]').tooltip(); });
+
+(function () {
+  const historyData = {{ history_json|safe }};
+  const sourceHistoryData = {{ source_history_json|safe }};
+
+  // Works over time chart
+  if (historyData.length > 1) {
+    const labels = historyData.map(d => d.date);
+    const ctx = document.getElementById('worksTimeChart');
+    if (ctx) {
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Published',
+              data: historyData.map(d => d.published_works),
+              borderColor: '#0d6efd',
+              backgroundColor: 'rgba(13,110,253,0.08)',
+              tension: 0.2,
+              fill: true,
+            },
+            {
+              label: 'With geometry',
+              data: historyData.map(d => d.with_geometry),
+              borderColor: '#198754',
+              backgroundColor: 'transparent',
+              tension: 0.2,
+            },
+            {
+              label: 'With temporal extent',
+              data: historyData.map(d => d.with_temporal),
+              borderColor: '#fd7e14',
+              backgroundColor: 'transparent',
+              tension: 0.2,
+            },
+            {
+              label: 'Contributors',
+              data: historyData.map(d => d.contributors),
+              borderColor: '#6f42c1',
+              backgroundColor: 'transparent',
+              tension: 0.2,
+              yAxisID: 'y2',
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          interaction: { mode: 'index', intersect: false },
+          scales: {
+            y:  { title: { display: true, text: 'Works' } },
+            y2: { position: 'right', title: { display: true, text: 'Contributors' }, grid: { drawOnChartArea: false } },
+          },
+        },
+      });
+    }
+  }
+
+  // Source coverage chart
+  const coverageCtx = document.getElementById('sourceCoverageChart');
+  let coverageChart = null;
+
+  function renderCoverageChart(sourceId) {
+    const data = sourceHistoryData[sourceId];
+    if (!data || !coverageCtx) return;
+    if (coverageChart) coverageChart.destroy();
+    coverageChart = new Chart(coverageCtx, {
+      type: 'line',
+      data: {
+        labels: data.history.map(d => d.date),
+        datasets: [{
+          label: 'Coverage %',
+          data: data.history.map(d => d.coverage_pct),
+          borderColor: '#0d6efd',
+          backgroundColor: 'rgba(13,110,253,0.08)',
+          tension: 0.2,
+          fill: true,
+          yAxisID: 'y',
+        }, {
+          label: 'OPTIMAP works',
+          data: data.history.map(d => d.optimap_count),
+          borderColor: '#198754',
+          backgroundColor: 'transparent',
+          tension: 0.2,
+          yAxisID: 'y2',
+        }],
+      },
+      options: {
+        responsive: true,
+        interaction: { mode: 'index', intersect: false },
+        plugins: { title: { display: true, text: data.name } },
+        scales: {
+          y:  { title: { display: true, text: 'Coverage (%)' }, min: 0, max: 100 },
+          y2: { position: 'right', title: { display: true, text: 'OPTIMAP works' }, grid: { drawOnChartArea: false } },
+        },
+      },
+    });
+  }
+
+  const sel = document.getElementById('coverageSourceSelect');
+  if (sel) {
+    sel.addEventListener('change', () => renderCoverageChart(sel.value));
+    renderCoverageChart(sel.value);
+  }
+})();
+
+// "Calculate now" button — staff only
+(function () {
+  const btn = document.getElementById('calcNowBtn');
+  if (!btn) return;
+  const status = document.getElementById('calcNowStatus');
+  btn.addEventListener('click', function () {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Calculating…';
+    status.textContent = '';
+    status.classList.add('d-none');
+    fetch('/api/v1/statistics/?now', {
+      method: 'GET',
+      headers: { 'X-CSRFToken': document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '' },
+      credentials: 'same-origin',
+    })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(() => { window.location.href = window.location.pathname; })
+      .catch(err => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-sync-alt"></i> Calculate statistics now';
+        status.textContent = 'Error: ' + err;
+        status.classList.remove('d-none');
+      });
+  });
+})();
+</script>
+{% endblock %}

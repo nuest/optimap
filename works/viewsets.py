@@ -1421,8 +1421,33 @@ class StatisticsViewSet(viewsets.ViewSet):
     permission_classes = [AllowAny]
 
     def list(self, request):
-        from works.utils.statistics import get_cached_statistics
+        from works.models import StatisticsSnapshot
+        from works.utils.statistics import (
+            get_cached_statistics, save_statistics_snapshot, update_statistics_cache,
+        )
+
+        force_now = 'now' in request.query_params
+        if force_now:
+            if not (request.user.is_authenticated and request.user.is_staff):
+                return Response(
+                    {'detail': '?now requires staff authentication.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            snapshot = save_statistics_snapshot()
+            update_statistics_cache()
+        else:
+            try:
+                snapshot = StatisticsSnapshot.objects.latest()
+            except StatisticsSnapshot.DoesNotExist:
+                snapshot = None
+
         stats = get_cached_statistics()
         is_staff = request.user.is_authenticated and request.user.is_staff
         total_for_user = stats.get('total_works', 0) if is_staff else stats.get('published_works', 0)
-        return Response({**stats, 'total_works_for_user': total_for_user})
+
+        return Response({
+            **stats,
+            'total_works_for_user': total_for_user,
+            'computed_at': snapshot.computed_at if snapshot else None,
+            'next_update': snapshot.next_update if snapshot else None,
+        })

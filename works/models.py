@@ -800,3 +800,70 @@ class Contribution(models.Model):
         who = self.user.username if self.user else "(deleted)"
         return f"{who} → {self.get_kind_display()} on {self.work_id}"
 
+
+class StatisticsSnapshot(models.Model):
+    """One nightly snapshot of aggregate publication statistics (for time-series tracking)."""
+
+    computed_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    next_update = models.DateTimeField(null=True, blank=True)
+
+    total_works             = models.IntegerField(default=0)
+    published_works         = models.IntegerField(default=0)
+    harvested_works         = models.IntegerField(default=0)
+    contributed_works       = models.IntegerField(default=0)
+    with_geometry           = models.IntegerField(default=0)
+    with_temporal           = models.IntegerField(default=0)
+    with_complete_metadata  = models.IntegerField(default=0)
+    complete_percentage     = models.FloatField(default=0)
+    with_authors            = models.IntegerField(default=0)
+    with_doi                = models.IntegerField(default=0)
+    with_abstract           = models.IntegerField(default=0)
+    open_access             = models.IntegerField(default=0)
+    sources                 = models.IntegerField(default=0)
+    collections             = models.IntegerField(default=0)
+    users                   = models.IntegerField(default=0)
+    contributors            = models.IntegerField(default=0)
+
+    # Breakdowns: list of {"name": str, "count": int} sorted descending by count.
+    # by_country uses ISO 3166-1 alpha-2 codes as the "name" key.
+    by_continent = models.JSONField(default=list)
+    by_ocean     = models.JSONField(default=list)
+    by_country   = models.JSONField(default=list)
+    by_publisher = models.JSONField(default=list)
+    by_journal     = models.JSONField(default=list)
+    by_collection  = models.JSONField(default=list)
+
+    class Meta:
+        ordering = ['-computed_at']
+        get_latest_by = 'computed_at'
+
+    def __str__(self):
+        return f"StatisticsSnapshot {self.computed_at:%Y-%m-%d %H:%M}"
+
+
+class SourceCoverageSnapshot(models.Model):
+    """Weekly coverage snapshot: how many works from a Source are in OPTIMAP vs OpenAlex."""
+
+    source      = models.ForeignKey('Source', on_delete=models.CASCADE,
+                                    related_name='coverage_snapshots')
+    computed_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    # null when the source has no OpenAlex ID (coverage is incalculable)
+    openalex_total  = models.IntegerField(null=True, blank=True, default=None)
+    optimap_count   = models.IntegerField(default=0)
+    coverage_pct    = models.FloatField(null=True, blank=True, default=None)
+    # metadata quality rates (null when optimap_count == 0)
+    spatial_rate    = models.FloatField(null=True, blank=True, default=None)
+    temporal_rate   = models.FloatField(null=True, blank=True, default=None)
+    open_access_ratio = models.FloatField(null=True, blank=True, default=None)
+    contributors_count = models.IntegerField(default=0)
+    # published works per year: [{"year": 2023, "count": 42}, ...]
+    by_year         = models.JSONField(default=list)
+
+    class Meta:
+        ordering = ['-computed_at']
+        get_latest_by = 'computed_at'
+
+    def __str__(self):
+        pct = f"{self.coverage_pct:.1f}%" if self.coverage_pct is not None else "N/A"
+        return f"Coverage {self.source_id} @ {self.computed_at:%Y-%m-%d}: {pct}"
+
