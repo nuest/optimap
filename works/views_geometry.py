@@ -157,19 +157,25 @@ def contribute_geometry_by_id(request, work_id):
         return JsonResponse({'error': str(e)}, status=500)
 
 
-@staff_member_required
 @require_POST
 def publish_work_by_id(request, work_id):
     """
-    API endpoint for admins to publish a work by ID.
-    Used for publications without a DOI.
-    Changes status from 'Contributed' or 'Harvested' to 'Published'.
-    For harvested publications, requires that at least one extent (spatial or temporal) exists.
+    API endpoint for admins and collection curators to publish a work by ID.
+    Changes status from Contributed, Harvested, or Draft to Published.
+    Harvested works require at least one spatial or temporal extent.
     """
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
     try:
         work = Work.objects.get(id=work_id)
     except Work.DoesNotExist:
         return JsonResponse({'error': 'Work not found'}, status=404)
+
+    is_staff = request.user.is_staff
+    is_curator = not is_staff and work.collections.filter(curators=request.user).exists()
+    if not (is_staff or is_curator):
+        return JsonResponse({'error': 'Permission denied'}, status=403)
 
     # Check if work has any extent information
     has_geometry = work.geometry and not work.geometry.empty
@@ -178,12 +184,11 @@ def publish_work_by_id(request, work_id):
         any(d is not None for d in (work.timeperiod_enddate or []))
     )
 
-    # Allow publishing of contributed publications or harvested publications with at least one extent
     if work.status == 'c':
-        # Contributed - can always publish
         old_status = 'Contributed'
+    elif work.status == 'd':
+        old_status = 'Draft'
     elif work.status == 'h':
-        # Harvested - only if it has at least one extent type
         if not (has_geometry or has_temporal):
             return JsonResponse({
                 'error': 'Cannot publish harvested work without spatial or temporal extent'
@@ -191,7 +196,7 @@ def publish_work_by_id(request, work_id):
         old_status = 'Harvested'
     else:
         return JsonResponse({
-            'error': 'Can only publish contributed or harvested publications'
+            'error': 'Can only publish contributed, draft, or harvested publications'
         }, status=400)
 
     try:

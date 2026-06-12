@@ -632,7 +632,16 @@
       drawnItems = featureGroup;
 
       if (publicationFeature) {
-        L.geoJSON(publicationFeature).eachLayer(function(l) {
+        // GeometryCollection must be split into individual features; L.geoJSON
+        // wraps the whole collection in a nested FeatureGroup that Leaflet.Draw
+        // cannot edit directly.
+        const geom = publicationFeature.geometry;
+        const editFeatures = (geom && geom.type === 'GeometryCollection')
+          ? geom.geometries.map(function(g) {
+              return { type: 'Feature', geometry: g, properties: publicationFeature.properties };
+            })
+          : [publicationFeature];
+        L.geoJSON({ type: 'FeatureCollection', features: editFeatures }).eachLayer(function(l) {
           drawnItems.addLayer(l);
         });
       }

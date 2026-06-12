@@ -452,8 +452,13 @@ def work_landing(request, identifier):
         not request.user.is_authenticated
         and work.status in ('h', 'c')
     )
-    can_publish = is_admin and (
-        work.status == 'c'
+    is_curator = (
+        request.user.is_authenticated
+        and not is_admin
+        and work.collections.filter(curators=request.user).exists()
+    )
+    can_publish = (is_admin or is_curator) and (
+        work.status in ('c', 'd')
         or (work.status == 'h' and (cacheable["has_geometry"] or cacheable["has_temporal"]))
     )
     can_unpublish = is_admin and work.status == 'p'
