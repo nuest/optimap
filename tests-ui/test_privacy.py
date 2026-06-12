@@ -1,29 +1,29 @@
 # SPDX-FileCopyrightText: 2022 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import unittest
-from django.test import TestCase
+import os
+
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.urls import reverse
-from helium import start_chrome,click,get_driver,kill_browser
-import os
+from helium import click, get_driver, kill_browser, start_chrome
+
 
 class PrivacypageTests(StaticLiveServerTestCase):
     def test_privacy_link(self):
-        start_chrome(f'{self.live_server_url}/', headless=True)
-        click("privacy")    
-        get_driver().save_screenshot(os.path.join(os.getcwd(), 'tests-ui', 'screenshots', 'privacy.png'))
+        start_chrome(f"{self.live_server_url}/", headless=True)
+        click("privacy")
+        get_driver().save_screenshot(os.path.join(os.getcwd(), "tests-ui", "screenshots", "privacy.png"))
         kill_browser()
 
     def test_url_exists_at_correct_location(self):
         response = self.client.get("/privacy/")
         self.assertEqual(response.status_code, 200)
 
-    def test_url_available_by_name(self):  
+    def test_url_available_by_name(self):
         response = self.client.get(reverse("optimap:privacy"))
         self.assertEqual(response.status_code, 200)
 
-    def test_template_name_correct(self):  
+    def test_template_name_correct(self):
         response = self.client.get(reverse("optimap:privacy"))
         self.assertTemplateUsed(response, "privacy.html")
 

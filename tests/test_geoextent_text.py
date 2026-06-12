@@ -9,9 +9,8 @@ import unittest
 from unittest.mock import patch
 
 import requests as _requests
-
 from django.contrib.auth import get_user_model
-from django.test import Client, TestCase, tag, override_settings
+from django.test import Client, TestCase, override_settings, tag
 
 from works.models import Source, Work
 
@@ -96,7 +95,6 @@ def _make_work():
 
 
 class ExtractTextEndpointTests(TestCase):
-
     def setUp(self):
         self.client = Client()
 
@@ -230,11 +228,8 @@ class ExtractTextEndpointTests(TestCase):
 
 
 class ProvenanceHintTests(TestCase):
-
     def setUp(self):
-        self.user = User.objects.create_user(
-            username="testuser", email="testuser@example.com", password="pass"
-        )
+        self.user = User.objects.create_user(username="testuser", email="testuser@example.com", password="pass")
         self.client = Client()
         self.client.login(username="testuser", password="pass")
         self.work = _make_work()
@@ -309,11 +304,13 @@ class ExtractTextOnlineTests(TestCase):
         self._skip_if_nominatim_unreachable()
         resp = self.client.post(
             "/api/v1/geoextent/extract-text/",
-            data=json.dumps({
-                "text": "Fieldwork was conducted in the city of Hannover, Germany.",
-                "gazetteer": "nominatim",
-                "ner_ambiguity": "top",
-            }),
+            data=json.dumps(
+                {
+                    "text": "Fieldwork was conducted in the city of Hannover, Germany.",
+                    "gazetteer": "nominatim",
+                    "ner_ambiguity": "top",
+                }
+            ),
             content_type="application/json",
         )
         self.assertEqual(resp.status_code, 200)

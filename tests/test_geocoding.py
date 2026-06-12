@@ -26,7 +26,7 @@ from __future__ import annotations
 import json
 from unittest import mock
 
-from django.contrib.gis.geos import GEOSGeometry, GeometryCollection, Point
+from django.contrib.gis.geos import GeometryCollection, GEOSGeometry, Point
 from django.core.cache import caches
 from django.test import TestCase, override_settings
 
@@ -62,20 +62,28 @@ class _FakeLocation:
 # Pre-canned address dicts for a handful of cities — keep tests legible
 # without inlining sprawling Nominatim payloads.
 _BERLIN = {
-    "country_code": "de", "country": "Germany",
-    "state": "Berlin", "city": "Berlin",
+    "country_code": "de",
+    "country": "Germany",
+    "state": "Berlin",
+    "city": "Berlin",
 }
 _HAMBURG = {
-    "country_code": "de", "country": "Germany",
-    "state": "Hamburg", "city": "Hamburg",
+    "country_code": "de",
+    "country": "Germany",
+    "state": "Hamburg",
+    "city": "Hamburg",
 }
 _MUNICH = {
-    "country_code": "de", "country": "Germany",
-    "state": "Bavaria", "city": "Munich",
+    "country_code": "de",
+    "country": "Germany",
+    "state": "Bavaria",
+    "city": "Munich",
 }
 _PARIS = {
-    "country_code": "fr", "country": "France",
-    "state": "Île-de-France", "city": "Paris",
+    "country_code": "fr",
+    "country": "France",
+    "state": "Île-de-France",
+    "city": "Paris",
 }
 
 
@@ -88,10 +96,10 @@ class ReverseGeocodeServiceTests(TestCase):
     def test_cache_miss_invokes_geocoder_and_caches_result(self):
         fake_geocoder = mock.Mock()
         fake_geocoder.reverse.return_value = _FakeLocation(
-            "Berlin, Germany", _BERLIN,
+            "Berlin, Germany",
+            _BERLIN,
         )
-        with mock.patch.object(geocoding, "_build_geocoder",
-                               return_value=fake_geocoder):
+        with mock.patch.object(geocoding, "_build_geocoder", return_value=fake_geocoder):
             placename, country = geocoding.reverse_geocode(52.52, 13.4)
         self.assertEqual(placename, "Berlin, Germany")
         self.assertEqual(country, "DE")  # upper-cased in the helper.
@@ -112,20 +120,16 @@ class ReverseGeocodeServiceTests(TestCase):
     def test_geocoder_failure_returns_none_pair_and_does_not_cache(self):
         fake_geocoder = mock.Mock()
         fake_geocoder.reverse.side_effect = RuntimeError("network down")
-        with mock.patch.object(geocoding, "_build_geocoder",
-                               return_value=fake_geocoder):
+        with mock.patch.object(geocoding, "_build_geocoder", return_value=fake_geocoder):
             result = geocoding.reverse_geocode(0.0, 0.0)
         self.assertEqual(result, (None, None))
         # Transient failures must NOT poison the 30-day cache.
-        self.assertIsNone(caches[geocoding._CACHE_ALIAS].get(
-            geocoding._cache_key(0.0, 0.0)
-        ))
+        self.assertIsNone(caches[geocoding._CACHE_ALIAS].get(geocoding._cache_key(0.0, 0.0)))
 
     def test_no_location_returns_none_pair(self):
         fake_geocoder = mock.Mock()
         fake_geocoder.reverse.return_value = None
-        with mock.patch.object(geocoding, "_build_geocoder",
-                               return_value=fake_geocoder):
+        with mock.patch.object(geocoding, "_build_geocoder", return_value=fake_geocoder):
             result = geocoding.reverse_geocode(0.0, 0.0)
         self.assertEqual(result, (None, None))
 
@@ -138,9 +142,7 @@ class _LookupTable:
     """
 
     def __init__(self, table: dict[tuple[float, float], dict | None]):
-        self.table = {
-            (round(k[0], 3), round(k[1], 3)): v for k, v in table.items()
-        }
+        self.table = {(round(k[0], 3), round(k[1], 3)): v for k, v in table.items()}
 
     def __call__(self, lat, lon):
         info = self.table.get((round(lat, 3), round(lon, 3)))
@@ -162,31 +164,35 @@ class GeocodeGeometryLcaTests(TestCase):
 
     def test_single_point_returns_full_display_name(self):
         # Equivalence with reverse_geocode: one point → that placename.
-        lookup = _LookupTable({
-            (52.52, 13.40): {"address": _BERLIN, "display_name": "Berlin, Germany"},
-        })
+        lookup = _LookupTable(
+            {
+                (52.52, 13.40): {"address": _BERLIN, "display_name": "Berlin, Germany"},
+            }
+        )
         with mock.patch.object(
-            geocoding, "_reverse_geocode_lookup", side_effect=lookup,
+            geocoding,
+            "_reverse_geocode_lookup",
+            side_effect=lookup,
         ):
-            placename, country, n = geocoding.geocode_geometry(
-                self._gc((13.40, 52.52))
-            )
+            placename, country, n = geocoding.geocode_geometry(self._gc((13.40, 52.52)))
         # Most specific first: city, state, country.
         self.assertEqual(placename, "Berlin, Berlin, Germany")
         self.assertEqual(country, "DE")
         self.assertEqual(n, 1)
 
     def test_two_points_same_city_share_full_lca(self):
-        lookup = _LookupTable({
-            (52.520, 13.400): {"address": _BERLIN, "display_name": "Berlin"},
-            (52.515, 13.380): {"address": _BERLIN, "display_name": "Berlin"},
-        })
+        lookup = _LookupTable(
+            {
+                (52.520, 13.400): {"address": _BERLIN, "display_name": "Berlin"},
+                (52.515, 13.380): {"address": _BERLIN, "display_name": "Berlin"},
+            }
+        )
         with mock.patch.object(
-            geocoding, "_reverse_geocode_lookup", side_effect=lookup,
+            geocoding,
+            "_reverse_geocode_lookup",
+            side_effect=lookup,
         ):
-            placename, country, n = geocoding.geocode_geometry(
-                self._gc((13.400, 52.520), (13.380, 52.515))
-            )
+            placename, country, n = geocoding.geocode_geometry(self._gc((13.400, 52.520), (13.380, 52.515)))
         # Country, state, city all agree.
         self.assertEqual(placename, "Berlin, Berlin, Germany")
         self.assertEqual(country, "DE")
@@ -195,31 +201,35 @@ class GeocodeGeometryLcaTests(TestCase):
     def test_two_points_different_states_collapse_to_country(self):
         # Berlin (state=Berlin) + Munich (state=Bavaria) → state diverges,
         # LCA stops at country.
-        lookup = _LookupTable({
-            (52.52, 13.40): {"address": _BERLIN, "display_name": "Berlin"},
-            (48.14, 11.58): {"address": _MUNICH, "display_name": "Munich"},
-        })
+        lookup = _LookupTable(
+            {
+                (52.52, 13.40): {"address": _BERLIN, "display_name": "Berlin"},
+                (48.14, 11.58): {"address": _MUNICH, "display_name": "Munich"},
+            }
+        )
         with mock.patch.object(
-            geocoding, "_reverse_geocode_lookup", side_effect=lookup,
+            geocoding,
+            "_reverse_geocode_lookup",
+            side_effect=lookup,
         ):
-            placename, country, n = geocoding.geocode_geometry(
-                self._gc((13.40, 52.52), (11.58, 48.14))
-            )
+            placename, country, n = geocoding.geocode_geometry(self._gc((13.40, 52.52), (11.58, 48.14)))
         self.assertEqual(placename, "Germany")
         self.assertEqual(country, "DE")
         self.assertEqual(n, 2)
 
     def test_points_in_different_countries_have_no_lca(self):
-        lookup = _LookupTable({
-            (52.52, 13.40): {"address": _BERLIN, "display_name": "Berlin"},
-            (48.86, 2.35):  {"address": _PARIS,  "display_name": "Paris"},
-        })
+        lookup = _LookupTable(
+            {
+                (52.52, 13.40): {"address": _BERLIN, "display_name": "Berlin"},
+                (48.86, 2.35): {"address": _PARIS, "display_name": "Paris"},
+            }
+        )
         with mock.patch.object(
-            geocoding, "_reverse_geocode_lookup", side_effect=lookup,
+            geocoding,
+            "_reverse_geocode_lookup",
+            side_effect=lookup,
         ):
-            placename, country, n = geocoding.geocode_geometry(
-                self._gc((13.40, 52.52), (2.35, 48.86))
-            )
+            placename, country, n = geocoding.geocode_geometry(self._gc((13.40, 52.52), (2.35, 48.86)))
         self.assertIsNone(placename)
         self.assertIsNone(country)
         self.assertEqual(n, 2)
@@ -228,16 +238,18 @@ class GeocodeGeometryLcaTests(TestCase):
         # One point geocodes successfully, the other returns None
         # (Nominatim has no result there). The LCA is just the successful
         # address, n == 1.
-        lookup = _LookupTable({
-            (52.52, 13.40): {"address": _BERLIN, "display_name": "Berlin"},
-            (0.0, 0.0): None,
-        })
+        lookup = _LookupTable(
+            {
+                (52.52, 13.40): {"address": _BERLIN, "display_name": "Berlin"},
+                (0.0, 0.0): None,
+            }
+        )
         with mock.patch.object(
-            geocoding, "_reverse_geocode_lookup", side_effect=lookup,
+            geocoding,
+            "_reverse_geocode_lookup",
+            side_effect=lookup,
         ):
-            placename, country, n = geocoding.geocode_geometry(
-                self._gc((13.40, 52.52), (0.0, 0.0))
-            )
+            placename, country, n = geocoding.geocode_geometry(self._gc((13.40, 52.52), (0.0, 0.0)))
         self.assertEqual(country, "DE")
         self.assertIn("Berlin", placename)
         self.assertEqual(n, 1)
@@ -248,6 +260,7 @@ class GeocodeGeometryLcaTests(TestCase):
         # interior placename. The 4-vertex closing ring is still NOT
         # geocoded vertex-by-vertex (would explode for high-resolution rings).
         from django.contrib.gis.geos import Polygon
+
         poly = Polygon(
             ((10.0, 50.0), (11.0, 50.0), (11.0, 51.0), (10.0, 51.0), (10.0, 50.0)),
             srid=4326,
@@ -260,16 +273,31 @@ class GeocodeGeometryLcaTests(TestCase):
             return {"address": _BERLIN, "display_name": "Berlin"}
 
         with mock.patch.object(
-            geocoding, "_reverse_geocode_lookup", side_effect=lookup,
+            geocoding,
+            "_reverse_geocode_lookup",
+            side_effect=lookup,
         ):
             placename, country, n = geocoding.geocode_geometry(gc)
         # Four corners + one interior point — five lookups, not the five
         # ring vertices (which would include the duplicated closing point).
         self.assertEqual(len(seen_coords), 5, f"polygon: corners + interior, got {seen_coords}")
-        self.assertEqual(set([c for c in seen_coords if c in {
-            (50.0, 10.0), (50.0, 11.0), (51.0, 10.0), (51.0, 11.0),
-        }]), {(50.0, 10.0), (50.0, 11.0), (51.0, 10.0), (51.0, 11.0)},
-            "all four envelope corners must be sampled")
+        self.assertEqual(
+            set(
+                [
+                    c
+                    for c in seen_coords
+                    if c
+                    in {
+                        (50.0, 10.0),
+                        (50.0, 11.0),
+                        (51.0, 10.0),
+                        (51.0, 11.0),
+                    }
+                ]
+            ),
+            {(50.0, 10.0), (50.0, 11.0), (51.0, 10.0), (51.0, 11.0)},
+            "all four envelope corners must be sampled",
+        )
         self.assertEqual(country, "DE")
 
     def test_polygon_spanning_two_countries_lca_falls_back(self):
@@ -280,27 +308,34 @@ class GeocodeGeometryLcaTests(TestCase):
         # past country (no shared continent in our test fixture either) and
         # the work no longer claims a misleading specific placename.
         from django.contrib.gis.geos import Polygon
+
         # Envelope corners → (lat, lon):
         #   (50, 10) DE, (50, 20) PL, (52, 10) DE, (52, 20) PL
         # Interior (point_on_surface for an axis-aligned rectangle) → (51, 15) — DE.
         _POLAND = {
-            "country_code": "pl", "country": "Poland",
-            "state": "Łódź Voivodeship", "city": "Mniszki",
+            "country_code": "pl",
+            "country": "Poland",
+            "state": "Łódź Voivodeship",
+            "city": "Mniszki",
         }
-        lookup = _LookupTable({
-            (50.0, 10.0): {"address": _BERLIN,  "display_name": "Berlin"},
-            (50.0, 20.0): {"address": _POLAND,  "display_name": "Mniszki"},
-            (52.0, 10.0): {"address": _BERLIN,  "display_name": "Berlin"},
-            (52.0, 20.0): {"address": _POLAND,  "display_name": "Mniszki"},
-            (51.0, 15.0): {"address": _BERLIN,  "display_name": "Berlin"},
-        })
+        lookup = _LookupTable(
+            {
+                (50.0, 10.0): {"address": _BERLIN, "display_name": "Berlin"},
+                (50.0, 20.0): {"address": _POLAND, "display_name": "Mniszki"},
+                (52.0, 10.0): {"address": _BERLIN, "display_name": "Berlin"},
+                (52.0, 20.0): {"address": _POLAND, "display_name": "Mniszki"},
+                (51.0, 15.0): {"address": _BERLIN, "display_name": "Berlin"},
+            }
+        )
         poly = Polygon(
             ((10.0, 50.0), (20.0, 50.0), (20.0, 52.0), (10.0, 52.0), (10.0, 50.0)),
             srid=4326,
         )
         gc = GeometryCollection(poly, srid=4326)
         with mock.patch.object(
-            geocoding, "_reverse_geocode_lookup", side_effect=lookup,
+            geocoding,
+            "_reverse_geocode_lookup",
+            side_effect=lookup,
         ):
             placename, country, n = geocoding.geocode_geometry(gc)
         # Two countries appear among the corners → no shared country → both
@@ -322,7 +357,9 @@ class GeocodeGeometryLcaTests(TestCase):
             return {"address": _BERLIN, "display_name": "Berlin"}
 
         with mock.patch.object(
-            geocoding, "_reverse_geocode_lookup", side_effect=lookup,
+            geocoding,
+            "_reverse_geocode_lookup",
+            side_effect=lookup,
         ):
             geocoding.geocode_geometry(gc, max_points=5)
         self.assertEqual(call_count["n"], 5)
@@ -333,7 +370,8 @@ class WorkPreSaveGeocodeSignalTests(TestCase):
         caches[geocoding._CACHE_ALIAS].clear()
         self.source = _make_source()
         self.geom = GeometryCollection(
-            Point(13.4, 52.52, srid=4326), srid=4326,
+            Point(13.4, 52.52, srid=4326),
+            srid=4326,
         )
 
     @override_settings(GEOCODE_WORKS_ON_SAVE=False)

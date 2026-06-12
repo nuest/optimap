@@ -1,37 +1,34 @@
 # SPDX-FileCopyrightText: 2025 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import os
-import django
 import subprocess
-from django.contrib.staticfiles.testing import StaticLiveServerTestCase
-from helium import *
-from django.contrib.auth import get_user_model
-from works.models import BlockedEmail, BlockedDomain
 from time import sleep
 
+from django.contrib.auth import get_user_model
+from django.contrib.staticfiles.testing import StaticLiveServerTestCase
+from helium import *
+
+from works.models import BlockedDomain, BlockedEmail
+
 User = get_user_model()
+
 
 class AdminBlockUserTests(StaticLiveServerTestCase):
     def setUp(self):
         """Set up a superuser, test user, and start the browser before each test."""
         self.superuser, _ = User.objects.get_or_create(
-            username="admin",
-            email="admin@example.com",
-            defaults={"is_staff": True, "is_superuser": True}
+            username="admin", email="admin@example.com", defaults={"is_staff": True, "is_superuser": True}
         )
         self.superuser.set_password("admin123")
         self.superuser.save()
 
         User.objects.filter(email="blocked@test.com").delete()
         self.test_user = User.objects.create_user(
-            username="testuser",
-            email="blocked@test.com",
-            password="password123"
+            username="testuser", email="blocked@test.com", password="password123"
         )
         self.test_user.save()
 
-        #self.kill_existing_firefox_processes()
+        # self.kill_existing_firefox_processes()
         try:
             self.browser = start_chrome(f"{self.live_server_url}/admin/", headless=True)
         except Exception as e:
@@ -67,9 +64,7 @@ class AdminBlockUserTests(StaticLiveServerTestCase):
 
             if not User.objects.filter(email="blocked@test.com").exists():
                 self.test_user = User.objects.create_user(
-                    username="testuser",
-                    email="blocked@test.com",
-                    password="password123"
+                    username="testuser", email="blocked@test.com", password="password123"
                 )
                 self.test_user.save()
 
@@ -118,9 +113,10 @@ class AdminBlockUserTests(StaticLiveServerTestCase):
 
             self.assertFalse(user_exists)
             self.assertTrue(email_blocked)
-            self.assertTrue(domain_blocked) 
+            self.assertTrue(domain_blocked)
         except Exception as e:
             print(f"Error in test_delete_user_and_block_email_and_domain: {e}")
+
 
 if __name__ == "__main__":
     unittest.main()

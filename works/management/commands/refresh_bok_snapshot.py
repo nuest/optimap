@@ -44,13 +44,9 @@ class Command(BaseCommand):
         count = len(snapshot)
 
         if dry_run:
-            self.stdout.write(self.style.WARNING(
-                f"Dry run — fetched {count} concepts, cache NOT written."
-            ))
+            self.stdout.write(self.style.WARNING(f"Dry run — fetched {count} concepts, cache NOT written."))
             return
 
         key = bok_client._cache_key(version)
         cache.set(key, snapshot, timeout=bok_client.BOK_CACHE_TIMEOUT)
-        self.stdout.write(self.style.SUCCESS(
-            f"Cached {count} concepts at key {key!r}."
-        ))
+        self.stdout.write(self.style.SUCCESS(f"Cached {count} concepts at key {key!r}."))

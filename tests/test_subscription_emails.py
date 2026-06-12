@@ -2,20 +2,22 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import os
+
 import django
+
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "optimap.settings")
 django.setup()
 
 from datetime import timedelta
-
-from django.test import TestCase
-from django.contrib.auth import get_user_model
-from django.contrib.gis.geos import MultiPolygon, Polygon, Point, GeometryCollection
-from django.utils import timezone
-from works.models import Subscription, GlobalRegion, Work, Source, EmailLog
-from works.tasks import send_subscription_based_email
 from unittest.mock import patch
-from django.conf import settings
+
+from django.contrib.auth import get_user_model
+from django.contrib.gis.geos import GeometryCollection, MultiPolygon, Point, Polygon
+from django.test import TestCase
+from django.utils import timezone
+
+from works.models import EmailLog, GlobalRegion, Source, Subscription, Work
+from works.tasks import send_subscription_based_email
 
 User = get_user_model()
 
@@ -98,29 +100,25 @@ class SubscriptionEmailTests(TestCase):
     def test_globalregion_get_absolute_url(self):
         """Test that GlobalRegion generates correct URLs"""
         africa_url = self.africa.get_absolute_url()
-        self.assertIn('/regions/continent/africa/', africa_url)
+        self.assertIn("/regions/continent/africa/", africa_url)
 
         pacific_url = self.pacific.get_absolute_url()
-        self.assertIn('/regions/ocean/pacific-ocean/', pacific_url)
+        self.assertIn("/regions/ocean/pacific-ocean/", pacific_url)
 
     def test_globalregion_str_representation(self):
         """Test the __str__ method of GlobalRegion"""
         self.assertEqual(str(self.africa), "Africa (Continent)")
         self.assertEqual(str(self.pacific), "Pacific Ocean (Ocean)")
 
-    @patch('works.tasks.EmailMessage')
+    @patch("works.tasks.EmailMessage")
     def test_email_sent_for_subscribed_regions(self, mock_email):
         """Test that emails are sent when publications match subscribed regions"""
         # Create subscription for Africa
-        subscription = Subscription.objects.create(
-            user=self.user,
-            name="test_subscription",
-            subscribed=True
-        )
+        subscription = Subscription.objects.create(user=self.user, name="test_subscription", subscribed=True)
         subscription.regions.add(self.africa)
 
         # Send emails
-        send_subscription_based_email(trigger_source='test')
+        send_subscription_based_email(trigger_source="test")
 
         # Verify email was sent
         self.assertTrue(mock_email.called)
@@ -135,19 +133,15 @@ class SubscriptionEmailTests(TestCase):
         self.assertIn("Africa", content)
         self.assertIn("African Study on Climate Change", content)
 
-    @patch('works.tasks.EmailMessage')
+    @patch("works.tasks.EmailMessage")
     def test_email_grouped_by_region(self, mock_email):
         """Test that email content groups publications by region"""
         # Create subscription for multiple regions
-        subscription = Subscription.objects.create(
-            user=self.user,
-            name="multi_region_subscription",
-            subscribed=True
-        )
+        subscription = Subscription.objects.create(user=self.user, name="multi_region_subscription", subscribed=True)
         subscription.regions.add(self.africa, self.asia)
 
         # Send emails
-        send_subscription_based_email(trigger_source='test')
+        send_subscription_based_email(trigger_source="test")
 
         # Verify email structure
         self.assertTrue(mock_email.called)
@@ -164,17 +158,13 @@ class SubscriptionEmailTests(TestCase):
         # Pacific publication should NOT be included
         self.assertNotIn("Pacific Ocean Current Patterns", content)
 
-    @patch('works.tasks.EmailMessage')
+    @patch("works.tasks.EmailMessage")
     def test_email_includes_region_landing_page_links(self, mock_email):
         """Test that email includes links to region landing pages"""
-        subscription = Subscription.objects.create(
-            user=self.user,
-            name="test_subscription",
-            subscribed=True
-        )
+        subscription = Subscription.objects.create(user=self.user, name="test_subscription", subscribed=True)
         subscription.regions.add(self.africa)
 
-        send_subscription_based_email(trigger_source='test')
+        send_subscription_based_email(trigger_source="test")
 
         content = mock_email.call_args[0][1]
 
@@ -182,53 +172,41 @@ class SubscriptionEmailTests(TestCase):
         self.assertIn("View all publications in this region", content)
         self.assertIn("/regions/continent/africa/", content)
 
-    @patch('works.tasks.EmailMessage')
+    @patch("works.tasks.EmailMessage")
     def test_no_email_sent_when_no_publications(self, mock_email):
         """Test that no email is sent when there are no matching publications"""
         # Create subscription for Pacific (which has a publication)
-        subscription = Subscription.objects.create(
-            user=self.user,
-            name="test_subscription",
-            subscribed=True
-        )
+        subscription = Subscription.objects.create(user=self.user, name="test_subscription", subscribed=True)
         subscription.regions.add(self.pacific)
 
         # Delete the Pacific publication
         self.pub_pacific.delete()
 
         # Send emails
-        send_subscription_based_email(trigger_source='test')
+        send_subscription_based_email(trigger_source="test")
 
         # Verify no email was sent
         self.assertFalse(mock_email.called)
 
-    @patch('works.tasks.EmailMessage')
+    @patch("works.tasks.EmailMessage")
     def test_no_email_sent_when_no_regions_selected(self, mock_email):
         """Test that no email is sent when user has no regions selected"""
         # Create subscription without regions
-        Subscription.objects.create(
-            user=self.user,
-            name="empty_subscription",
-            subscribed=True
-        )
+        Subscription.objects.create(user=self.user, name="empty_subscription", subscribed=True)
 
         # Send emails
-        send_subscription_based_email(trigger_source='test')
+        send_subscription_based_email(trigger_source="test")
 
         # Verify no email was sent
         self.assertFalse(mock_email.called)
 
-    @patch('works.tasks.EmailMessage')
+    @patch("works.tasks.EmailMessage")
     def test_email_includes_manage_subscriptions_link(self, mock_email):
         """Test that email includes link to manage subscriptions"""
-        subscription = Subscription.objects.create(
-            user=self.user,
-            name="test_subscription",
-            subscribed=True
-        )
+        subscription = Subscription.objects.create(user=self.user, name="test_subscription", subscribed=True)
         subscription.regions.add(self.africa)
 
-        send_subscription_based_email(trigger_source='test')
+        send_subscription_based_email(trigger_source="test")
 
         content = mock_email.call_args[0][1]
 
@@ -237,7 +215,7 @@ class SubscriptionEmailTests(TestCase):
         self.assertIn("/subscriptions", content)
         self.assertIn("Unsubscribe from all notifications", content)
 
-    @patch('works.tasks.EmailMessage')
+    @patch("works.tasks.EmailMessage")
     def test_email_shows_correct_publication_count(self, mock_email):
         """Test that email shows correct count of publications per region"""
         # Add a second publication to Africa
@@ -247,17 +225,13 @@ class SubscriptionEmailTests(TestCase):
             doi="10.1234/africa2.2024",
             status="p",
             source=self.source,
-            geometry=GeometryCollection(africa_point2)
+            geometry=GeometryCollection(africa_point2),
         )
 
-        subscription = Subscription.objects.create(
-            user=self.user,
-            name="test_subscription",
-            subscribed=True
-        )
+        subscription = Subscription.objects.create(user=self.user, name="test_subscription", subscribed=True)
         subscription.regions.add(self.africa)
 
-        send_subscription_based_email(trigger_source='test')
+        send_subscription_based_email(trigger_source="test")
 
         content = mock_email.call_args[0][1]
 
@@ -268,7 +242,7 @@ class SubscriptionEmailTests(TestCase):
         # Check count per region
         self.assertIn("Africa (Continent) - 2 work(s)", content)
 
-    @patch('works.tasks.EmailMessage')
+    @patch("works.tasks.EmailMessage")
     def test_only_published_works_included(self, mock_email):
         """Test that only published works are included in notifications"""
         # Create a draft publication in Africa
@@ -278,17 +252,13 @@ class SubscriptionEmailTests(TestCase):
             doi="10.1234/africa_draft.2024",
             status="d",  # Draft
             source=self.source,
-            geometry=GeometryCollection(africa_point_draft)
+            geometry=GeometryCollection(africa_point_draft),
         )
 
-        subscription = Subscription.objects.create(
-            user=self.user,
-            name="test_subscription",
-            subscribed=True
-        )
+        subscription = Subscription.objects.create(user=self.user, name="test_subscription", subscribed=True)
         subscription.regions.add(self.africa)
 
-        send_subscription_based_email(trigger_source='test')
+        send_subscription_based_email(trigger_source="test")
 
         content = mock_email.call_args[0][1]
 
@@ -297,28 +267,24 @@ class SubscriptionEmailTests(TestCase):
         # Only the published one
         self.assertIn("African Study on Climate Change", content)
 
-    @patch('works.tasks.EmailMessage')
+    @patch("works.tasks.EmailMessage")
     def test_email_limits_publications_per_region(self, mock_email):
         """Test that email limits the number of publications shown per region"""
         # Create 15 publications in Africa (more than the 10 per region limit)
         for i in range(15):
             point = Point(5 + i * 0.1, 5 + i * 0.1)
             Work.objects.create(
-                title=f"African Study {i+2}",
-                doi=f"10.1234/africa{i+2}.2024",
+                title=f"African Study {i + 2}",
+                doi=f"10.1234/africa{i + 2}.2024",
                 status="p",
                 source=self.source,
-                geometry=GeometryCollection(point)
+                geometry=GeometryCollection(point),
             )
 
-        subscription = Subscription.objects.create(
-            user=self.user,
-            name="test_subscription",
-            subscribed=True
-        )
+        subscription = Subscription.objects.create(user=self.user, name="test_subscription", subscribed=True)
         subscription.regions.add(self.africa)
 
-        send_subscription_based_email(trigger_source='test')
+        send_subscription_based_email(trigger_source="test")
 
         content = mock_email.call_args[0][1]
 
@@ -328,18 +294,14 @@ class SubscriptionEmailTests(TestCase):
 
     def test_email_log_created_on_success(self):
         """Test that EmailLog entry is created when email is sent successfully"""
-        subscription = Subscription.objects.create(
-            user=self.user,
-            name="test_subscription",
-            subscribed=True
-        )
+        subscription = Subscription.objects.create(user=self.user, name="test_subscription", subscribed=True)
         subscription.regions.add(self.africa)
 
-        with patch('works.tasks.EmailMessage') as mock_email:
+        with patch("works.tasks.EmailMessage") as mock_email:
             mock_instance = mock_email.return_value
             mock_instance.send.return_value = None
 
-            send_subscription_based_email(trigger_source='test')
+            send_subscription_based_email(trigger_source="test")
 
             # Check EmailLog was created
             log_entry = EmailLog.objects.filter(recipient_email=self.user.email).first()
@@ -350,21 +312,19 @@ class SubscriptionEmailTests(TestCase):
     # Interval filtering and last_notified tracking (issue #85)
     # ------------------------------------------------------------------
 
-    @patch('works.tasks.EmailMessage')
+    @patch("works.tasks.EmailMessage")
     def test_weekly_interval_only_includes_recent_works(self, mock_email):
         """Weekly subscriptions only see works published in the last 7 days."""
         subscription = Subscription.objects.create(
             user=self.user,
             name="test_subscription",
             subscribed=True,
-            notification_interval='weekly',
+            notification_interval="weekly",
         )
         subscription.regions.add(self.africa)
 
         # Move pub_africa back to 10 days ago (outside weekly window)
-        Work.objects.filter(pk=self.pub_africa.pk).update(
-            creationDate=timezone.now() - timedelta(days=10)
-        )
+        Work.objects.filter(pk=self.pub_africa.pk).update(creationDate=timezone.now() - timedelta(days=10))
         # Create a recent work (3 days ago, inside weekly window)
         recent = Work.objects.create(
             title="Very Recent African Study",
@@ -373,32 +333,28 @@ class SubscriptionEmailTests(TestCase):
             source=self.source,
             geometry=GeometryCollection(Point(5, 5)),
         )
-        Work.objects.filter(pk=recent.pk).update(
-            creationDate=timezone.now() - timedelta(days=3)
-        )
+        Work.objects.filter(pk=recent.pk).update(creationDate=timezone.now() - timedelta(days=3))
 
-        send_subscription_based_email(trigger_source='test', interval='weekly')
+        send_subscription_based_email(trigger_source="test", interval="weekly")
 
         self.assertTrue(mock_email.called)
         content = mock_email.call_args[0][1]
         self.assertIn("Very Recent African Study", content)
         self.assertNotIn("African Study on Climate Change", content)
 
-    @patch('works.tasks.EmailMessage')
+    @patch("works.tasks.EmailMessage")
     def test_monthly_interval_only_includes_recent_works(self, mock_email):
         """Monthly subscriptions only see works published in the last 31 days."""
         subscription = Subscription.objects.create(
             user=self.user,
             name="test_subscription",
             subscribed=True,
-            notification_interval='monthly',
+            notification_interval="monthly",
         )
         subscription.regions.add(self.africa)
 
         # Move pub_africa back to 40 days ago (outside monthly window)
-        Work.objects.filter(pk=self.pub_africa.pk).update(
-            creationDate=timezone.now() - timedelta(days=40)
-        )
+        Work.objects.filter(pk=self.pub_africa.pk).update(creationDate=timezone.now() - timedelta(days=40))
         # Create a work 10 days ago (inside monthly window)
         mid = Work.objects.create(
             title="Mid-Month African Study",
@@ -407,33 +363,31 @@ class SubscriptionEmailTests(TestCase):
             source=self.source,
             geometry=GeometryCollection(Point(5, 5)),
         )
-        Work.objects.filter(pk=mid.pk).update(
-            creationDate=timezone.now() - timedelta(days=10)
-        )
+        Work.objects.filter(pk=mid.pk).update(creationDate=timezone.now() - timedelta(days=10))
 
-        send_subscription_based_email(trigger_source='test', interval='monthly')
+        send_subscription_based_email(trigger_source="test", interval="monthly")
 
         self.assertTrue(mock_email.called)
         content = mock_email.call_args[0][1]
         self.assertIn("Mid-Month African Study", content)
         self.assertNotIn("African Study on Climate Change", content)
 
-    @patch('works.tasks.EmailMessage')
+    @patch("works.tasks.EmailMessage")
     def test_interval_filter_skips_wrong_interval(self, mock_email):
         """Calling with interval='weekly' skips monthly subscribers and vice versa."""
         subscription = Subscription.objects.create(
             user=self.user,
             name="test_subscription",
             subscribed=True,
-            notification_interval='monthly',
+            notification_interval="monthly",
         )
         subscription.regions.add(self.africa)
 
-        send_subscription_based_email(trigger_source='test', interval='weekly')
+        send_subscription_based_email(trigger_source="test", interval="weekly")
 
         self.assertFalse(mock_email.called)
 
-    @patch('works.tasks.EmailMessage')
+    @patch("works.tasks.EmailMessage")
     def test_last_notified_updated_after_send(self, mock_email):
         """last_notified is set on the subscription after a successful send."""
         subscription = Subscription.objects.create(
@@ -445,7 +399,7 @@ class SubscriptionEmailTests(TestCase):
         self.assertIsNone(subscription.last_notified)
 
         before = timezone.now()
-        send_subscription_based_email(trigger_source='test')
+        send_subscription_based_email(trigger_source="test")
         after = timezone.now()
 
         subscription.refresh_from_db()
@@ -453,7 +407,7 @@ class SubscriptionEmailTests(TestCase):
         self.assertGreaterEqual(subscription.last_notified, before)
         self.assertLessEqual(subscription.last_notified, after)
 
-    @patch('works.tasks.EmailMessage')
+    @patch("works.tasks.EmailMessage")
     def test_last_notified_not_updated_when_no_new_pubs(self, mock_email):
         """last_notified is NOT updated when there are no new publications."""
         subscription = Subscription.objects.create(
@@ -464,17 +418,15 @@ class SubscriptionEmailTests(TestCase):
         subscription.regions.add(self.africa)
 
         # Push pub_africa far into the past so it falls outside the 31-day window
-        Work.objects.filter(pk=self.pub_africa.pk).update(
-            creationDate=timezone.now() - timedelta(days=60)
-        )
+        Work.objects.filter(pk=self.pub_africa.pk).update(creationDate=timezone.now() - timedelta(days=60))
 
-        send_subscription_based_email(trigger_source='test')
+        send_subscription_based_email(trigger_source="test")
 
         self.assertFalse(mock_email.called)
         subscription.refresh_from_db()
         self.assertIsNone(subscription.last_notified)
 
-    @patch('works.tasks.EmailMessage')
+    @patch("works.tasks.EmailMessage")
     def test_last_notified_used_as_cutoff(self, mock_email):
         """When last_notified is set, only works created after it are included."""
         five_days_ago = timezone.now() - timedelta(days=5)
@@ -495,11 +447,9 @@ class SubscriptionEmailTests(TestCase):
             source=self.source,
             geometry=GeometryCollection(Point(5, 5)),
         )
-        Work.objects.filter(pk=old.pk).update(
-            creationDate=timezone.now() - timedelta(days=8)
-        )
+        Work.objects.filter(pk=old.pk).update(creationDate=timezone.now() - timedelta(days=8))
 
-        send_subscription_based_email(trigger_source='test')
+        send_subscription_based_email(trigger_source="test")
 
         self.assertTrue(mock_email.called)
         content = mock_email.call_args[0][1]

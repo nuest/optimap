@@ -68,10 +68,12 @@ def _bok_session() -> requests.Session:
     adapter = HTTPAdapter(max_retries=retry)
     session.mount("http://", adapter)
     session.mount("https://", adapter)
-    session.headers.update({
-        "User-Agent": settings.OPTIMAP_USER_AGENT,
-        "Accept": "application/json",
-    })
+    session.headers.update(
+        {
+            "User-Agent": settings.OPTIMAP_USER_AGENT,
+            "Accept": "application/json",
+        }
+    )
     return session
 
 
@@ -185,15 +187,17 @@ def resolve(codes: list[str], version: str | None = None) -> list[dict[str, Any]
     for code in codes or []:
         concept = snapshot.get(code)
         if concept is None:
-            out.append({
-                "code": code,
-                "name": code,
-                "uri": "",
-                "description": "",
-                "parent_code": "",
-                "breadcrumb": [],
-                "orphan": True,
-            })
+            out.append(
+                {
+                    "code": code,
+                    "name": code,
+                    "uri": "",
+                    "description": "",
+                    "parent_code": "",
+                    "breadcrumb": [],
+                    "orphan": True,
+                }
+            )
         else:
             out.append({**concept, "orphan": False})
     return out

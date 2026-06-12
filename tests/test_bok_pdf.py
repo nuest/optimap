@@ -13,40 +13,41 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "optimap.settings")
 django.setup()
 
 from works.harvesting.bok_pdf import (
+    _LINE_BREAK_IN_CODE_RE,
     _extract_from_file,
     _find_bok_section,
     _parse_bok_section,
     agile_giss_doi_to_pdf_url,
     extract_bok_from_agile_pdf,
-    _LINE_BREAK_IN_CODE_RE,
 )
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
+
 
 # Minimal BoK snapshot used in mocked tests
 def _entry(code, name):
     return {"code": code, "id": code, "name": name, "uri": "", "description": "", "parent_code": "", "breadcrumb": []}
 
+
 _MOCK_SNAPSHOT = {
     "TA12-6": _entry("TA12-6", "EO for infrastructure & transport"),
     "GS4-3b": _entry("GS4-3b", "Citizens and volunteered geographic information"),
-    "IP3":    _entry("IP3",    "image understanding"),
-    "GC1":    _entry("GC1",    "Geocomputation"),
-    "GD1":    _entry("GD1",    "Geospatial Data"),
+    "IP3": _entry("IP3", "image understanding"),
+    "GC1": _entry("GC1", "Geocomputation"),
+    "GD1": _entry("GD1", "Geospatial Data"),
     # codes for new-format tests
     "TA12-2": _entry("TA12-2", "EO for biodiversity & ecosystems"),
-    "GS3-4":  _entry("GS3-4",  "Use of geospatial information in environmental issues"),
-    "AM8":    _entry("AM8",    "Geostatistics"),
-    "GD4":    _entry("GD4",    "Data Quality, Metadata and Data Infrastructure"),
-    "IP":     _entry("IP",     "Image processing and analysis"),
-    "DM":     _entry("DM",     "Data modelling and management"),
-    "AM":     _entry("AM",     "Analytical Methods"),
-    "CF":     _entry("CF",     "Conceptual Foundations"),
+    "GS3-4": _entry("GS3-4", "Use of geospatial information in environmental issues"),
+    "AM8": _entry("AM8", "Geostatistics"),
+    "GD4": _entry("GD4", "Data Quality, Metadata and Data Infrastructure"),
+    "IP": _entry("IP", "Image processing and analysis"),
+    "DM": _entry("DM", "Data modelling and management"),
+    "AM": _entry("AM", "Analytical Methods"),
+    "CF": _entry("CF", "Conceptual Foundations"),
 }
 
 
 class TestDoiToPdfUrl(TestCase):
-
     def test_valid_doi(self):
         url = agile_giss_doi_to_pdf_url("10.5194/agile-giss-6-2-2025")
         self.assertEqual(
@@ -70,7 +71,6 @@ class TestDoiToPdfUrl(TestCase):
 
 
 class TestFindBokSection(TestCase):
-
     def test_finds_section(self):
         text = "Abstract\n\nSome text.\n\nBoK Concepts. [TA12-6] Infrastructure\n\nKeywords. city"
         section = _find_bok_section(text)
@@ -132,7 +132,6 @@ class TestLineBreakNorm(TestCase):
 
 
 class TestParseBokSection(TestCase):
-
     def _with_snapshot(self):
         return patch("works.bok.client.get_concepts", return_value=_MOCK_SNAPSHOT)
 
@@ -183,9 +182,7 @@ class TestParseBokSection(TestCase):
     def test_line_break_within_code(self):
         # Format: code hyphenated across a line break "TA12-\n2" → "TA12-2"
         with self._with_snapshot():
-            codes = _parse_bok_section(
-                "EO for biodiversity & ecosystems (TA12-\n2), geospatial use\n(GS3-4)"
-            )
+            codes = _parse_bok_section("EO for biodiversity & ecosystems (TA12-\n2), geospatial use\n(GS3-4)")
         self.assertIn("TA12-2", codes)
         self.assertIn("GS3-4", codes)
 
@@ -248,8 +245,7 @@ class TestExtractBokFromAgile(TestCase):
         doi = "10.5194/agile-giss-6-2-2025"
         pdf_url = agile_giss_doi_to_pdf_url(doi)
         pdf_bytes = (FIXTURES / "bok_bracketed.pdf").read_bytes()
-        responses.add(responses.GET, pdf_url, body=pdf_bytes, status=200,
-                      content_type="application/pdf")
+        responses.add(responses.GET, pdf_url, body=pdf_bytes, status=200, content_type="application/pdf")
         with self._with_snapshot():
             codes = extract_bok_from_agile_pdf(doi)
         self.assertIn("TA12-6", codes)

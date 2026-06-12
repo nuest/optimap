@@ -11,8 +11,9 @@ Tests center coordinate calculation for different geometry types:
 - GeometryCollection
 """
 
+from django.contrib.gis.geos import GeometryCollection, LineString, Point, Polygon
 from django.test import TestCase
-from django.contrib.gis.geos import Point, LineString, Polygon, GeometryCollection
+
 from works.models import Work
 
 
@@ -21,11 +22,7 @@ class CenterCoordinateTest(TestCase):
 
     def setUp(self):
         """Create a base publication for testing."""
-        self.work = Work.objects.create(
-            title="Test Publication",
-            doi="10.1234/test",
-            status="p"
-        )
+        self.work = Work.objects.create(title="Test Publication", doi="10.1234/test", status="p")
 
     def test_center_coordinate_point(self):
         """Test center coordinate calculation for a single Point geometry."""
@@ -107,13 +104,7 @@ class CenterCoordinateTest(TestCase):
     def test_center_coordinate_complex_polygon(self):
         """Test center coordinate calculation for a complex polygon (not centered at origin)."""
         # Create a polygon from (100, 50) to (120, 70)
-        polygon = Polygon([
-            (100.0, 50.0),
-            (120.0, 50.0),
-            (120.0, 70.0),
-            (100.0, 70.0),
-            (100.0, 50.0)
-        ])
+        polygon = Polygon([(100.0, 50.0), (120.0, 50.0), (120.0, 70.0), (100.0, 70.0), (100.0, 50.0)])
         self.work.geometry = GeometryCollection(polygon)
         self.work.save()
 
@@ -132,11 +123,7 @@ class ExtremePointsTest(TestCase):
 
     def setUp(self):
         """Create a base publication for testing."""
-        self.work = Work.objects.create(
-            title="Test Publication",
-            doi="10.1234/test-extremes",
-            status="p"
-        )
+        self.work = Work.objects.create(title="Test Publication", doi="10.1234/test-extremes", status="p")
 
     def test_extreme_points_single_point(self):
         """Test extreme points for a single point - all should be the same."""
@@ -148,14 +135,14 @@ class ExtremePointsTest(TestCase):
 
         self.assertIsNotNone(extremes)
         # All extreme points should be the same for a single point
-        self.assertAlmostEqual(extremes['north'][0], 10.0, places=5)
-        self.assertAlmostEqual(extremes['north'][1], 20.0, places=5)
-        self.assertAlmostEqual(extremes['south'][0], 10.0, places=5)
-        self.assertAlmostEqual(extremes['south'][1], 20.0, places=5)
-        self.assertAlmostEqual(extremes['east'][0], 10.0, places=5)
-        self.assertAlmostEqual(extremes['east'][1], 20.0, places=5)
-        self.assertAlmostEqual(extremes['west'][0], 10.0, places=5)
-        self.assertAlmostEqual(extremes['west'][1], 20.0, places=5)
+        self.assertAlmostEqual(extremes["north"][0], 10.0, places=5)
+        self.assertAlmostEqual(extremes["north"][1], 20.0, places=5)
+        self.assertAlmostEqual(extremes["south"][0], 10.0, places=5)
+        self.assertAlmostEqual(extremes["south"][1], 20.0, places=5)
+        self.assertAlmostEqual(extremes["east"][0], 10.0, places=5)
+        self.assertAlmostEqual(extremes["east"][1], 20.0, places=5)
+        self.assertAlmostEqual(extremes["west"][0], 10.0, places=5)
+        self.assertAlmostEqual(extremes["west"][1], 20.0, places=5)
 
     def test_extreme_points_linestring(self):
         """Test extreme points for a diagonal line."""
@@ -167,17 +154,17 @@ class ExtremePointsTest(TestCase):
 
         self.assertIsNotNone(extremes)
         # Northernmost point (highest Y)
-        self.assertAlmostEqual(extremes['north'][0], 10.0, places=5)
-        self.assertAlmostEqual(extremes['north'][1], 10.0, places=5)
+        self.assertAlmostEqual(extremes["north"][0], 10.0, places=5)
+        self.assertAlmostEqual(extremes["north"][1], 10.0, places=5)
         # Southernmost point (lowest Y)
-        self.assertAlmostEqual(extremes['south'][0], 0.0, places=5)
-        self.assertAlmostEqual(extremes['south'][1], 0.0, places=5)
+        self.assertAlmostEqual(extremes["south"][0], 0.0, places=5)
+        self.assertAlmostEqual(extremes["south"][1], 0.0, places=5)
         # Easternmost point (highest X)
-        self.assertAlmostEqual(extremes['east'][0], 10.0, places=5)
-        self.assertAlmostEqual(extremes['east'][1], 10.0, places=5)
+        self.assertAlmostEqual(extremes["east"][0], 10.0, places=5)
+        self.assertAlmostEqual(extremes["east"][1], 10.0, places=5)
         # Westernmost point (lowest X)
-        self.assertAlmostEqual(extremes['west'][0], 0.0, places=5)
-        self.assertAlmostEqual(extremes['west'][1], 0.0, places=5)
+        self.assertAlmostEqual(extremes["west"][0], 0.0, places=5)
+        self.assertAlmostEqual(extremes["west"][1], 0.0, places=5)
 
     def test_extreme_points_rectangle(self):
         """Test extreme points for a rectangular polygon."""
@@ -190,37 +177,29 @@ class ExtremePointsTest(TestCase):
 
         self.assertIsNotNone(extremes)
         # Northernmost point (highest Y = 20)
-        self.assertAlmostEqual(extremes['north'][1], 20.0, places=5)
+        self.assertAlmostEqual(extremes["north"][1], 20.0, places=5)
         # X can be either 0 or 10 (both vertices have Y=20)
-        self.assertIn(extremes['north'][0], [0.0, 10.0])
+        self.assertIn(extremes["north"][0], [0.0, 10.0])
 
         # Southernmost point (lowest Y = 0)
-        self.assertAlmostEqual(extremes['south'][1], 0.0, places=5)
+        self.assertAlmostEqual(extremes["south"][1], 0.0, places=5)
         # X can be either 0 or 10 (both vertices have Y=0)
-        self.assertIn(extremes['south'][0], [0.0, 10.0])
+        self.assertIn(extremes["south"][0], [0.0, 10.0])
 
         # Easternmost point (highest X = 10)
-        self.assertAlmostEqual(extremes['east'][0], 10.0, places=5)
+        self.assertAlmostEqual(extremes["east"][0], 10.0, places=5)
         # Y can be either 0 or 20 (both vertices have X=10)
-        self.assertIn(extremes['east'][1], [0.0, 20.0])
+        self.assertIn(extremes["east"][1], [0.0, 20.0])
 
         # Westernmost point (lowest X = 0)
-        self.assertAlmostEqual(extremes['west'][0], 0.0, places=5)
+        self.assertAlmostEqual(extremes["west"][0], 0.0, places=5)
         # Y can be either 0 or 20 (both vertices have X=0)
-        self.assertIn(extremes['west'][1], [0.0, 20.0])
+        self.assertIn(extremes["west"][1], [0.0, 20.0])
 
     def test_extreme_points_complex_polygon(self):
         """Test extreme points for a more complex polygon."""
         # Create an L-shaped polygon
-        polygon = Polygon([
-            (0.0, 0.0),
-            (10.0, 0.0),
-            (10.0, 5.0),
-            (5.0, 5.0),
-            (5.0, 10.0),
-            (0.0, 10.0),
-            (0.0, 0.0)
-        ])
+        polygon = Polygon([(0.0, 0.0), (10.0, 0.0), (10.0, 5.0), (5.0, 5.0), (5.0, 10.0), (0.0, 10.0), (0.0, 0.0)])
         self.work.geometry = GeometryCollection(polygon)
         self.work.save()
 
@@ -228,13 +207,13 @@ class ExtremePointsTest(TestCase):
 
         self.assertIsNotNone(extremes)
         # Northernmost point (highest Y = 10)
-        self.assertAlmostEqual(extremes['north'][1], 10.0, places=5)
+        self.assertAlmostEqual(extremes["north"][1], 10.0, places=5)
         # Southernmost point (lowest Y = 0)
-        self.assertAlmostEqual(extremes['south'][1], 0.0, places=5)
+        self.assertAlmostEqual(extremes["south"][1], 0.0, places=5)
         # Easternmost point (highest X = 10)
-        self.assertAlmostEqual(extremes['east'][0], 10.0, places=5)
+        self.assertAlmostEqual(extremes["east"][0], 10.0, places=5)
         # Westernmost point (lowest X = 0)
-        self.assertAlmostEqual(extremes['west'][0], 0.0, places=5)
+        self.assertAlmostEqual(extremes["west"][0], 0.0, places=5)
 
     def test_extreme_points_no_geometry(self):
         """Test extreme points when publication has no geometry."""
@@ -252,9 +231,7 @@ class ComplexGeometryTest(TestCase):
     def setUp(self):
         """Create a base publication for testing."""
         self.work = Work.objects.create(
-            title="Test Publication - Complex Geometries",
-            doi="10.1234/test-complex",
-            status="p"
+            title="Test Publication - Complex Geometries", doi="10.1234/test-complex", status="p"
         )
 
     def test_triangle_geometry(self):
@@ -275,15 +252,16 @@ class ComplexGeometryTest(TestCase):
 
         # Extremes
         self.assertIsNotNone(extremes)
-        self.assertAlmostEqual(extremes['south'][1], 0.0, places=5)
-        self.assertAlmostEqual(extremes['north'][1], 8.66, places=2)
-        self.assertAlmostEqual(extremes['west'][0], 0.0, places=5)
-        self.assertAlmostEqual(extremes['east'][0], 10.0, places=5)
+        self.assertAlmostEqual(extremes["south"][1], 0.0, places=5)
+        self.assertAlmostEqual(extremes["north"][1], 8.66, places=2)
+        self.assertAlmostEqual(extremes["west"][0], 0.0, places=5)
+        self.assertAlmostEqual(extremes["east"][0], 10.0, places=5)
 
     def test_pentagon_geometry(self):
         """Test with a pentagon polygon."""
         # Regular pentagon (approximately)
         import math
+
         cx, cy, r = 50.0, 50.0, 10.0
         points = []
         for i in range(5):
@@ -309,23 +287,15 @@ class ComplexGeometryTest(TestCase):
 
         # Extremes should be within radius of center
         self.assertIsNotNone(extremes)
-        self.assertGreater(extremes['north'][1], cy - r)
-        self.assertLess(extremes['south'][1], cy + r)
-        self.assertGreater(extremes['east'][0], cx - r)
-        self.assertLess(extremes['west'][0], cx + r)
+        self.assertGreater(extremes["north"][1], cy - r)
+        self.assertLess(extremes["south"][1], cy + r)
+        self.assertGreater(extremes["east"][0], cx - r)
+        self.assertLess(extremes["west"][0], cx + r)
 
     def test_concave_polygon(self):
         """Test with a concave (non-convex) polygon."""
         # Star-like concave polygon
-        concave = Polygon([
-            (0.0, 5.0),
-            (2.0, 2.0),
-            (5.0, 0.0),
-            (3.0, 3.0),
-            (5.0, 5.0),
-            (2.5, 4.0),
-            (0.0, 5.0)
-        ])
+        concave = Polygon([(0.0, 5.0), (2.0, 2.0), (5.0, 0.0), (3.0, 3.0), (5.0, 5.0), (2.5, 4.0), (0.0, 5.0)])
         self.work.geometry = GeometryCollection(concave)
         self.work.save()
 
@@ -337,10 +307,10 @@ class ComplexGeometryTest(TestCase):
         self.assertIsNotNone(extremes)
 
         # Verify extreme points match the vertices
-        self.assertAlmostEqual(extremes['north'][1], 5.0, places=5)
-        self.assertAlmostEqual(extremes['south'][1], 0.0, places=5)
-        self.assertAlmostEqual(extremes['east'][0], 5.0, places=5)
-        self.assertAlmostEqual(extremes['west'][0], 0.0, places=5)
+        self.assertAlmostEqual(extremes["north"][1], 5.0, places=5)
+        self.assertAlmostEqual(extremes["south"][1], 0.0, places=5)
+        self.assertAlmostEqual(extremes["east"][0], 5.0, places=5)
+        self.assertAlmostEqual(extremes["west"][0], 0.0, places=5)
 
     def test_polygon_with_hole(self):
         """Test with a polygon that has an interior hole."""
@@ -366,10 +336,10 @@ class ComplexGeometryTest(TestCase):
 
         # Extremes should be from outer ring only
         self.assertIsNotNone(extremes)
-        self.assertAlmostEqual(extremes['north'][1], 10.0, places=5)
-        self.assertAlmostEqual(extremes['south'][1], 0.0, places=5)
-        self.assertAlmostEqual(extremes['east'][0], 10.0, places=5)
-        self.assertAlmostEqual(extremes['west'][0], 0.0, places=5)
+        self.assertAlmostEqual(extremes["north"][1], 10.0, places=5)
+        self.assertAlmostEqual(extremes["south"][1], 0.0, places=5)
+        self.assertAlmostEqual(extremes["east"][0], 10.0, places=5)
+        self.assertAlmostEqual(extremes["west"][0], 0.0, places=5)
 
     def test_mixed_point_and_line(self):
         """Test with a GeometryCollection containing both points and lines."""
@@ -390,10 +360,10 @@ class ComplexGeometryTest(TestCase):
 
         # Extremes
         self.assertIsNotNone(extremes)
-        self.assertAlmostEqual(extremes['south'][0], 0.0, places=5)
-        self.assertAlmostEqual(extremes['south'][1], 0.0, places=5)
-        self.assertAlmostEqual(extremes['north'][0], 20.0, places=5)
-        self.assertAlmostEqual(extremes['north'][1], 20.0, places=5)
+        self.assertAlmostEqual(extremes["south"][0], 0.0, places=5)
+        self.assertAlmostEqual(extremes["south"][1], 0.0, places=5)
+        self.assertAlmostEqual(extremes["north"][0], 20.0, places=5)
+        self.assertAlmostEqual(extremes["north"][1], 20.0, places=5)
 
     def test_mixed_point_line_polygon(self):
         """Test with a GeometryCollection containing point, line, and polygon."""
@@ -415,19 +385,14 @@ class ComplexGeometryTest(TestCase):
 
         # Extremes should span all geometries
         self.assertIsNotNone(extremes)
-        self.assertAlmostEqual(extremes['west'][0], 0.0, places=5)
-        self.assertAlmostEqual(extremes['east'][0], 30.0, places=5)
-        self.assertAlmostEqual(extremes['south'][1], 0.0, places=5)
-        self.assertAlmostEqual(extremes['north'][1], 10.0, places=5)
+        self.assertAlmostEqual(extremes["west"][0], 0.0, places=5)
+        self.assertAlmostEqual(extremes["east"][0], 30.0, places=5)
+        self.assertAlmostEqual(extremes["south"][1], 0.0, places=5)
+        self.assertAlmostEqual(extremes["north"][1], 10.0, places=5)
 
     def test_multipoint_geometry(self):
         """Test with multiple scattered points."""
-        points = [
-            Point(0.0, 0.0),
-            Point(100.0, 50.0),
-            Point(50.0, 100.0),
-            Point(-50.0, 25.0)
-        ]
+        points = [Point(0.0, 0.0), Point(100.0, 50.0), Point(50.0, 100.0), Point(-50.0, 25.0)]
         self.work.geometry = GeometryCollection(*points)
         self.work.save()
 
@@ -443,10 +408,10 @@ class ComplexGeometryTest(TestCase):
 
         # Extremes
         self.assertIsNotNone(extremes)
-        self.assertAlmostEqual(extremes['west'][0], -50.0, places=5)
-        self.assertAlmostEqual(extremes['east'][0], 100.0, places=5)
-        self.assertAlmostEqual(extremes['south'][1], 0.0, places=5)
-        self.assertAlmostEqual(extremes['north'][1], 100.0, places=5)
+        self.assertAlmostEqual(extremes["west"][0], -50.0, places=5)
+        self.assertAlmostEqual(extremes["east"][0], 100.0, places=5)
+        self.assertAlmostEqual(extremes["south"][1], 0.0, places=5)
+        self.assertAlmostEqual(extremes["north"][1], 100.0, places=5)
 
     def test_multilinestring_geometry(self):
         """Test with multiple line segments."""
@@ -467,22 +432,18 @@ class ComplexGeometryTest(TestCase):
         self.assertAlmostEqual(lat, 5.0, places=5)
 
         self.assertIsNotNone(extremes)
-        self.assertAlmostEqual(extremes['west'][0], 0.0, places=5)
-        self.assertAlmostEqual(extremes['east'][0], 10.0, places=5)
-        self.assertAlmostEqual(extremes['south'][1], 0.0, places=5)
-        self.assertAlmostEqual(extremes['north'][1], 10.0, places=5)
+        self.assertAlmostEqual(extremes["west"][0], 0.0, places=5)
+        self.assertAlmostEqual(extremes["east"][0], 10.0, places=5)
+        self.assertAlmostEqual(extremes["south"][1], 0.0, places=5)
+        self.assertAlmostEqual(extremes["north"][1], 10.0, places=5)
 
     def test_very_small_geometry(self):
         """Test with a very small geometry (sub-meter precision)."""
         # Small square, 1 meter on each side (in degrees, approximately)
         small_size = 0.00001  # About 1 meter at equator
-        small_polygon = Polygon([
-            (0.0, 0.0),
-            (small_size, 0.0),
-            (small_size, small_size),
-            (0.0, small_size),
-            (0.0, 0.0)
-        ])
+        small_polygon = Polygon(
+            [(0.0, 0.0), (small_size, 0.0), (small_size, small_size), (0.0, small_size), (0.0, 0.0)]
+        )
         self.work.geometry = GeometryCollection(small_polygon)
         self.work.save()
 
@@ -501,13 +462,15 @@ class ComplexGeometryTest(TestCase):
     def test_very_large_geometry(self):
         """Test with a very large geometry spanning multiple continents."""
         # Rectangle spanning from Europe to Asia
-        large_polygon = Polygon([
-            (0.0, 40.0),    # Europe
-            (140.0, 40.0),  # East Asia
-            (140.0, 60.0),
-            (0.0, 60.0),
-            (0.0, 40.0)
-        ])
+        large_polygon = Polygon(
+            [
+                (0.0, 40.0),  # Europe
+                (140.0, 40.0),  # East Asia
+                (140.0, 60.0),
+                (0.0, 60.0),
+                (0.0, 40.0),
+            ]
+        )
         self.work.geometry = GeometryCollection(large_polygon)
         self.work.save()
 
@@ -521,16 +484,16 @@ class ComplexGeometryTest(TestCase):
         self.assertAlmostEqual(lat, 50.0, places=5)
 
         self.assertIsNotNone(extremes)
-        self.assertAlmostEqual(extremes['west'][0], 0.0, places=5)
-        self.assertAlmostEqual(extremes['east'][0], 140.0, places=5)
-        self.assertAlmostEqual(extremes['south'][1], 40.0, places=5)
-        self.assertAlmostEqual(extremes['north'][1], 60.0, places=5)
+        self.assertAlmostEqual(extremes["west"][0], 0.0, places=5)
+        self.assertAlmostEqual(extremes["east"][0], 140.0, places=5)
+        self.assertAlmostEqual(extremes["south"][1], 40.0, places=5)
+        self.assertAlmostEqual(extremes["north"][1], 60.0, places=5)
 
 
 class GlobalFeedsFixtureTest(TestCase):
     """Test geometry calculations using complex shapes from the global feeds fixture."""
 
-    fixtures = ['test_data_global_feeds.json']
+    fixtures = ["test_data_global_feeds.json"]
 
     def test_triangle_from_fixture(self):
         """Test triangle geometry from global feeds fixture."""
@@ -552,10 +515,10 @@ class GlobalFeedsFixtureTest(TestCase):
         self.assertGreater(lat, 30)
 
         # All extremes should be present
-        self.assertIsNotNone(extremes['north'])
-        self.assertIsNotNone(extremes['south'])
-        self.assertIsNotNone(extremes['east'])
-        self.assertIsNotNone(extremes['west'])
+        self.assertIsNotNone(extremes["north"])
+        self.assertIsNotNone(extremes["south"])
+        self.assertIsNotNone(extremes["east"])
+        self.assertIsNotNone(extremes["west"])
 
     def test_pentagon_from_fixture(self):
         """Test pentagon geometry from global feeds fixture."""
@@ -677,8 +640,8 @@ class GlobalFeedsFixtureTest(TestCase):
         self.assertLess(lat, 52.53)
 
         # All extreme points should be very close to each other
-        north_lon, north_lat = extremes['north']
-        south_lon, south_lat = extremes['south']
+        north_lon, north_lat = extremes["north"]
+        south_lon, south_lat = extremes["south"]
         # Latitude difference should be very small (meters)
         lat_diff = north_lat - south_lat
         self.assertLess(lat_diff, 0.001)  # Less than ~100 meters
@@ -698,8 +661,8 @@ class GlobalFeedsFixtureTest(TestCase):
         self.assertIsNotNone(extremes)
 
         # Should span from Americas to Asia
-        east_lon, _ = extremes['east']
-        west_lon, _ = extremes['west']
+        east_lon, _ = extremes["east"]
+        west_lon, _ = extremes["west"]
         lon_span = east_lon - west_lon
         self.assertGreater(lon_span, 200)  # Spans multiple continents
 

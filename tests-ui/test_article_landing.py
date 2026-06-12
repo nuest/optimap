@@ -2,10 +2,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import unittest
+
+from django.contrib.gis.geos import GeometryCollection, Point
 from django.test import TestCase
 from django.urls import reverse
+
 from works.models import Work
-from django.contrib.gis.geos import Point, GeometryCollection
+
 
 @unittest.skip("Enable after /article/<doi> landing page is implemented and routed.")
 class ArticleLandingTests(TestCase):
@@ -44,9 +47,9 @@ class ArticleLandingTests(TestCase):
         self.assertNotContains(resp, 'id="mini-map"')
 
     def test_unknown_doi_returns_404(self):
-            url = reverse("optimap:work-landing", args=["10.9999/missing"])
-            self.assertEqual(self.client.get(url).status_code, 404)
-    
+        url = reverse("optimap:work-landing", args=["10.9999/missing"])
+        self.assertEqual(self.client.get(url).status_code, 404)
+
     class ArticleLandingTests(TestCase):
         def setUp(self):
             self.pub_with_geom = Work.objects.create(
@@ -61,7 +64,7 @@ class ArticleLandingTests(TestCase):
                 status="p",
                 geometry=None,
             )
-    
+
         def test_page_renders_with_map_when_geometry_present(self):
             url = reverse("optimap:work-landing", args=[self.pub_with_geom.doi])
             resp = self.client.get(url)
@@ -71,7 +74,7 @@ class ArticleLandingTests(TestCase):
             self.assertIsNotNone(resp.context["feature_json"])
             # mini-map div present
             self.assertContains(resp, 'id="mini-map"', count=1)
-    
+
         def test_page_hides_map_when_no_geometry(self):
             url = reverse("optimap:work-landing", args=[self.pub_no_geom.doi])
             resp = self.client.get(url)
@@ -81,7 +84,7 @@ class ArticleLandingTests(TestCase):
             self.assertIsNone(resp.context["feature_json"])
             # no map container
             self.assertNotContains(resp, 'id="mini-map"')
-    
+
         def test_unknown_doi_returns_404(self):
             url = reverse("optimap:work-landing", args=["10.9999/missing"])
             self.assertEqual(self.client.get(url).status_code, 404)

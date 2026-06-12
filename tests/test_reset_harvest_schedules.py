@@ -50,9 +50,7 @@ class ResetHarvestSchedulesTest(TestCase):
 
         call_command("reset_harvest_schedules", stdout=StringIO())
 
-        runs = sorted(
-            Schedule.objects.filter(name__startswith="Harvest Source ").values_list("next_run", flat=True)
-        )
+        runs = sorted(Schedule.objects.filter(name__startswith="Harvest Source ").values_list("next_run", flat=True))
         self.assertEqual(len(runs), 4)
         # Spread should be roughly 0/30/60/90 minutes from the first run.
         spread = (runs[-1] - runs[0]).total_seconds() / 60
@@ -80,15 +78,11 @@ class ResetHarvestSchedulesTest(TestCase):
             schedule_type=Schedule.ONCE,
             next_run=timezone.now(),
         )
-        self.assertEqual(
-            Schedule.objects.filter(name__startswith="Manual Harvest Source ").count(), 1
-        )
+        self.assertEqual(Schedule.objects.filter(name__startswith="Manual Harvest Source ").count(), 1)
 
         call_command("reset_harvest_schedules", "--clear-manual", stdout=StringIO())
 
-        self.assertEqual(
-            Schedule.objects.filter(name__startswith="Manual Harvest Source ").count(), 0
-        )
+        self.assertEqual(Schedule.objects.filter(name__startswith="Manual Harvest Source ").count(), 0)
 
     def test_clear_manual_is_opt_in(self):
         source = _make_source("ManualKept", interval=120)
@@ -103,6 +97,7 @@ class ResetHarvestSchedulesTest(TestCase):
         call_command("reset_harvest_schedules", stdout=StringIO())
 
         self.assertEqual(
-            Schedule.objects.filter(name__startswith="Manual Harvest Source ").count(), 1,
+            Schedule.objects.filter(name__startswith="Manual Harvest Source ").count(),
+            1,
             "Manual one-off rows must be preserved unless --clear-manual is given",
         )

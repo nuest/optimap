@@ -34,85 +34,81 @@ def build_openalex_fields(title, doi=None, author=None, existing_metadata=None):
 
     try:
         matcher = get_openalex_matcher()
-        openalex_data, partial_matches = matcher.match_publication(
-            title=title,
-            doi=doi,
-            author=author
-        )
+        openalex_data, partial_matches = matcher.match_publication(title=title, doi=doi, author=author)
 
         if openalex_data:
-            logger.debug("OpenAlex match found for: %s", title[:50] if title else 'No title')
+            logger.debug("OpenAlex match found for: %s", title[:50] if title else "No title")
 
-            if existing_metadata.get('authors'):
-                openalex_fields['authors'] = existing_metadata['authors']
-                metadata_provenance['authors'] = 'original_source'
-            elif openalex_data.get('authors'):
-                openalex_fields['authors'] = openalex_data['authors']
-                metadata_provenance['authors'] = 'openalex'
+            if existing_metadata.get("authors"):
+                openalex_fields["authors"] = existing_metadata["authors"]
+                metadata_provenance["authors"] = "original_source"
+            elif openalex_data.get("authors"):
+                openalex_fields["authors"] = openalex_data["authors"]
+                metadata_provenance["authors"] = "openalex"
 
-            if existing_metadata.get('keywords'):
-                openalex_fields['keywords'] = existing_metadata['keywords']
-                metadata_provenance['keywords'] = 'original_source'
-            elif openalex_data.get('keywords'):
-                openalex_fields['keywords'] = openalex_data['keywords']
-                metadata_provenance['keywords'] = 'openalex'
+            if existing_metadata.get("keywords"):
+                openalex_fields["keywords"] = existing_metadata["keywords"]
+                metadata_provenance["keywords"] = "original_source"
+            elif openalex_data.get("keywords"):
+                openalex_fields["keywords"] = openalex_data["keywords"]
+                metadata_provenance["keywords"] = "openalex"
 
-            if openalex_data.get('topics'):
-                openalex_fields['topics'] = openalex_data['topics']
-                metadata_provenance['topics'] = 'openalex'
+            if openalex_data.get("topics"):
+                openalex_fields["topics"] = openalex_data["topics"]
+                metadata_provenance["topics"] = "openalex"
 
-            if openalex_data.get('type'):
-                openalex_fields['type'] = openalex_data['type']
-                metadata_provenance['type'] = 'openalex'
+            if openalex_data.get("type"):
+                openalex_fields["type"] = openalex_data["type"]
+                metadata_provenance["type"] = "openalex"
 
-            openalex_fields['openalex_id'] = openalex_data.get('openalex_id')
-            openalex_fields['openalex_fulltext_origin'] = openalex_data.get('openalex_fulltext_origin')
-            openalex_fields['openalex_is_retracted'] = openalex_data.get('openalex_is_retracted', False)
-            openalex_fields['openalex_ids'] = openalex_data.get('openalex_ids', {})
-            openalex_fields['openalex_open_access_status'] = openalex_data.get('openalex_open_access_status')
+            openalex_fields["openalex_id"] = openalex_data.get("openalex_id")
+            openalex_fields["openalex_fulltext_origin"] = openalex_data.get("openalex_fulltext_origin")
+            openalex_fields["openalex_is_retracted"] = openalex_data.get("openalex_is_retracted", False)
+            openalex_fields["openalex_ids"] = openalex_data.get("openalex_ids", {})
+            openalex_fields["openalex_open_access_status"] = openalex_data.get("openalex_open_access_status")
 
-            for biblio_key in ('volume', 'issue', 'first_page', 'last_page'):
+            for biblio_key in ("volume", "issue", "first_page", "last_page"):
                 if openalex_data.get(biblio_key):
                     openalex_fields[biblio_key] = openalex_data[biblio_key]
-                    metadata_provenance[biblio_key] = 'openalex'
+                    metadata_provenance[biblio_key] = "openalex"
 
-            metadata_provenance['openalex_metadata'] = 'openalex'
+            metadata_provenance["openalex_metadata"] = "openalex"
 
         elif partial_matches:
-            openalex_fields['openalex_id'] = None
-            openalex_fields['openalex_match_info'] = partial_matches
-            logger.debug("OpenAlex partial matches found for: %s", title[:50] if title else 'No title')
+            openalex_fields["openalex_id"] = None
+            openalex_fields["openalex_match_info"] = partial_matches
+            logger.debug("OpenAlex partial matches found for: %s", title[:50] if title else "No title")
 
-            if existing_metadata.get('authors'):
-                openalex_fields['authors'] = existing_metadata['authors']
-                metadata_provenance['authors'] = 'original_source'
-            if existing_metadata.get('keywords'):
-                openalex_fields['keywords'] = existing_metadata['keywords']
-                metadata_provenance['keywords'] = 'original_source'
+            if existing_metadata.get("authors"):
+                openalex_fields["authors"] = existing_metadata["authors"]
+                metadata_provenance["authors"] = "original_source"
+            if existing_metadata.get("keywords"):
+                openalex_fields["keywords"] = existing_metadata["keywords"]
+                metadata_provenance["keywords"] = "original_source"
 
         else:
-            openalex_fields['openalex_id'] = None
+            openalex_fields["openalex_id"] = None
             if doi:
-                logger.warning("No OpenAlex match for work with DOI %s: %s", doi, title[:50] if title else 'No title')
+                logger.warning("No OpenAlex match for work with DOI %s: %s", doi, title[:50] if title else "No title")
             else:
-                logger.debug("No OpenAlex match for: %s", title[:50] if title else 'No title')
+                logger.debug("No OpenAlex match for: %s", title[:50] if title else "No title")
 
-            if existing_metadata.get('authors'):
-                openalex_fields['authors'] = existing_metadata['authors']
-                metadata_provenance['authors'] = 'original_source'
-            if existing_metadata.get('keywords'):
-                openalex_fields['keywords'] = existing_metadata['keywords']
-                metadata_provenance['keywords'] = 'original_source'
+            if existing_metadata.get("authors"):
+                openalex_fields["authors"] = existing_metadata["authors"]
+                metadata_provenance["authors"] = "original_source"
+            if existing_metadata.get("keywords"):
+                openalex_fields["keywords"] = existing_metadata["keywords"]
+                metadata_provenance["keywords"] = "original_source"
 
     except Exception as openalex_err:
-        logger.warning("OpenAlex matching failed for '%s': %s", title[:50] if title else 'No title', openalex_err)
-        openalex_fields['openalex_id'] = None
+        logger.warning("OpenAlex matching failed for '%s': %s", title[:50] if title else "No title", openalex_err)
+        openalex_fields["openalex_id"] = None
 
-        if existing_metadata.get('authors'):
-            openalex_fields['authors'] = existing_metadata['authors']
-            metadata_provenance['authors'] = 'original_source'
-        if existing_metadata.get('keywords'):
-            openalex_fields['keywords'] = existing_metadata['keywords']
-            metadata_provenance['keywords'] = 'original_source'
+        if existing_metadata.get("authors"):
+            openalex_fields["authors"] = existing_metadata["authors"]
+            metadata_provenance["authors"] = "original_source"
+        if existing_metadata.get("keywords"):
+            openalex_fields["keywords"] = existing_metadata["keywords"]
+            metadata_provenance["keywords"] = "original_source"
 
     return openalex_fields, metadata_provenance

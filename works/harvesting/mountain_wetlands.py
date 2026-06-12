@@ -15,7 +15,7 @@ import logging
 from datetime import date
 
 import requests
-from django.contrib.gis.geos import GEOSGeometry, GeometryCollection, Point
+from django.contrib.gis.geos import GeometryCollection, GEOSGeometry, Point
 from django.utils import timezone
 
 from works.models import HarvestingEvent, Source, Work
@@ -49,7 +49,7 @@ def _mwr_item_url(source_url, item_id):
     Uses the API path so every harvest of the same record collapses onto the
     same row (Work.url is unique).
     """
-    base = source_url.rstrip('/').split('?')[0]
+    base = source_url.rstrip("/").split("?")[0]
     return f"{base.rstrip('/')}/{item_id}"
 
 
@@ -57,9 +57,9 @@ def _mwr_geometry_from_study_sites(study_sites):
     """Build a ``GeometryCollection`` of points from the API's ``study_sites``."""
     points = []
     for site in study_sites or []:
-        loc = site.get('location') or {}
-        lat = loc.get('latitude')
-        lon = loc.get('longitude')
+        loc = site.get("location") or {}
+        lat = loc.get("latitude")
+        lon = loc.get("longitude")
         if lat is None or lon is None:
             continue
         try:
@@ -78,10 +78,10 @@ def _mwr_geometry_from_study_sites(study_sites):
 def _mwr_first_author_surname(creators):
     """Return the first non-trivial creator surname, or None."""
     for c in creators or []:
-        last = (c.get('lastName') or '').strip()
+        last = (c.get("lastName") or "").strip()
         if not last:
             continue
-        if last.lower() in ('et al.', 'et al', 'others'):
+        if last.lower() in ("et al.", "et al", "others"):
             continue
         return last
     return None
@@ -91,8 +91,8 @@ def _mwr_authors_list(creators):
     """Build a ``[<First Last>, ...]`` author list from the API record."""
     authors = []
     for c in creators or []:
-        last = (c.get('lastName') or '').strip()
-        first = (c.get('firstName') or '').strip()
+        last = (c.get("lastName") or "").strip()
+        first = (c.get("firstName") or "").strip()
         if last and first:
             authors.append(f"{first} {last}")
         elif last:
@@ -108,12 +108,12 @@ def _mwr_clean_doi(raw):
     if not s:
         return None
     lower = s.lower()
-    for prefix in ('https://doi.org/', 'http://doi.org/', 'https://dx.doi.org/', 'http://dx.doi.org/', 'doi:'):
+    for prefix in ("https://doi.org/", "http://doi.org/", "https://dx.doi.org/", "http://dx.doi.org/", "doi:"):
         if lower.startswith(prefix):
-            s = s[len(prefix):]
+            s = s[len(prefix) :]
             break
-    s = s.lstrip('/').strip()
-    if not s.lower().startswith('10.'):
+    s = s.lstrip("/").strip()
+    if not s.lower().startswith("10."):
         return None
     return s
 
@@ -137,8 +137,14 @@ def _mwr_publication_year(date_str):
 
 
 def parse_mountain_wetlands_response_and_save_works(
-    payload, source, event, max_records=None, processed_so_far=0, warning_collector=None,
-    update_existing=False, stats=None,
+    payload,
+    source,
+    event,
+    max_records=None,
+    processed_so_far=0,
+    warning_collector=None,
+    update_existing=False,
+    stats=None,
 ):
     """Save one page of MaRESS items. Returns ``(saved, processed)`` for this page.
 
@@ -146,7 +152,7 @@ def parse_mountain_wetlands_response_and_save_works(
     .created / .updated / .skipped_* on it across multiple pages — the
     harvester then reads .updated to populate ``HarvestingEvent.records_updated``.
     """
-    items = payload.get('data') or []
+    items = payload.get("data") or []
     saved = 0
     processed = 0
     admin_user = get_or_create_admin_command_user()
@@ -158,8 +164,8 @@ def parse_mountain_wetlands_response_and_save_works(
             break
         processed += 1
 
-        item_id = item.get('id')
-        title = (item.get('title') or '').strip()
+        item_id = item.get("id")
+        title = (item.get("title") or "").strip()
         if not title:
             logger.info("Skipping MaRESS item with no title (id=%s)", item_id)
             continue
@@ -169,23 +175,23 @@ def parse_mountain_wetlands_response_and_save_works(
 
         item_url = _mwr_item_url(source.url_field, item_id)
 
-        creators = item.get('creators') or []
+        creators = item.get("creators") or []
         api_authors = _mwr_authors_list(creators)
         first_author_surname = _mwr_first_author_surname(creators)
-        pub_date = _mwr_publication_year(item.get('date'))
-        geom_obj = _mwr_geometry_from_study_sites(item.get('study_sites'))
-        abstract = (item.get('abstractNote') or None) or None
-        api_doi = _mwr_clean_doi(item.get('DOI'))
+        pub_date = _mwr_publication_year(item.get("date"))
+        geom_obj = _mwr_geometry_from_study_sites(item.get("study_sites"))
+        abstract = (item.get("abstractNote") or None) or None
+        api_doi = _mwr_clean_doi(item.get("DOI"))
 
         existing_metadata = {}
         if api_authors:
-            existing_metadata['authors'] = api_authors
+            existing_metadata["authors"] = api_authors
 
         # Skip OpenAlex when the API already supplies both a DOI and authors —
         # no extra metadata to recover, and the call is wasted rate-limit budget.
         if api_doi and api_authors:
             openalex_fields, metadata_provenance = {}, {}
-            match_status = 'skipped'
+            match_status = "skipped"
         else:
             openalex_fields, metadata_provenance = build_openalex_fields(
                 title=title,
@@ -193,49 +199,49 @@ def parse_mountain_wetlands_response_and_save_works(
                 author=first_author_surname,
                 existing_metadata=existing_metadata,
             )
-            if openalex_fields.get('openalex_id'):
-                match_status = 'verified'
-            elif openalex_fields.get('openalex_match_info'):
-                match_status = 'candidate'
+            if openalex_fields.get("openalex_id"):
+                match_status = "verified"
+            elif openalex_fields.get("openalex_match_info"):
+                match_status = "candidate"
             else:
-                match_status = 'none'
+                match_status = "none"
 
         doi_value = api_doi
         if not doi_value:
-            ids_blob = openalex_fields.get('openalex_ids') or {}
-            if match_status == 'verified' and ids_blob.get('doi'):
-                doi_value = _mwr_clean_doi(ids_blob['doi'])
+            ids_blob = openalex_fields.get("openalex_ids") or {}
+            if match_status == "verified" and ids_blob.get("doi"):
+                doi_value = _mwr_clean_doi(ids_blob["doi"])
 
-        if not metadata_provenance.get('authors') and api_authors:
-            metadata_provenance['authors'] = 'original_source'
-        metadata_provenance['geometry'] = 'study_sites' if not geom_obj.empty else None
-        metadata_provenance['date'] = 'original_source (year-only)' if pub_date else None
+        if not metadata_provenance.get("authors") and api_authors:
+            metadata_provenance["authors"] = "original_source"
+        metadata_provenance["geometry"] = "study_sites" if not geom_obj.empty else None
+        metadata_provenance["date"] = "original_source (year-only)" if pub_date else None
         if api_doi:
-            metadata_provenance['doi'] = 'original_source'
+            metadata_provenance["doi"] = "original_source"
         elif doi_value:
-            metadata_provenance['doi'] = 'openalex'
+            metadata_provenance["doi"] = "openalex"
 
         provenance = {
-            'harvest': {
-                'harvester': 'harvest_mountain_wetlands',
-                'source_url': source.url_field,
-                'source_type': source.source_type,
-                'source_name': source.name,
-                'harvested_at': timezone.now().isoformat(),
-                'harvesting_event_id': event.id,
-                'external_id': item_id,
-                'original_record': item,
+            "harvest": {
+                "harvester": "harvest_mountain_wetlands",
+                "source_url": source.url_field,
+                "source_type": source.source_type,
+                "source_name": source.name,
+                "harvested_at": timezone.now().isoformat(),
+                "harvesting_event_id": event.id,
+                "external_id": item_id,
+                "original_record": item,
             },
-            'metadata_sources': {k: v for k, v in metadata_provenance.items() if v is not None},
-            'openalex_match': {
-                'status': match_status,
-                'matched_id': openalex_fields.get('openalex_id'),
-                'first_author_surname_used': first_author_surname,
+            "metadata_sources": {k: v for k, v in metadata_provenance.items() if v is not None},
+            "openalex_match": {
+                "status": match_status,
+                "matched_id": openalex_fields.get("openalex_id"),
+                "first_author_surname_used": first_author_surname,
             },
         }
 
-        if 'type' not in openalex_fields:
-            openalex_fields['type'] = source.default_work_type or 'article'
+        if "type" not in openalex_fields:
+            openalex_fields["type"] = source.default_work_type or "article"
 
         try:
             work_kwargs = dict(
@@ -245,7 +251,7 @@ def parse_mountain_wetlands_response_and_save_works(
                 url=item_url,
                 doi=doi_value,
                 source=source,
-                status='h',
+                status="h",
                 geometry=geom_obj,
                 timeperiod_startdate=None,
                 timeperiod_enddate=None,
@@ -255,21 +261,28 @@ def parse_mountain_wetlands_response_and_save_works(
                 **openalex_fields,
             )
             work, action = _save_or_update_work(
-                work_kwargs, source, event, update_existing=update_existing,
+                work_kwargs,
+                source,
+                event,
+                update_existing=update_existing,
             )
             stats.record(action)
-            if action in ('created', 'updated') and source.collection_id:
+            if action in ("created", "updated") and source.collection_id:
                 work.collections.add(source.collection_id)
-            if action == 'created':
+            if action == "created":
                 saved += 1
                 logger.info(
                     "Saved MaRESS work id=%s (%s) status=%s",
-                    work.id, item_id, match_status,
+                    work.id,
+                    item_id,
+                    match_status,
                 )
-            elif action == 'updated':
+            elif action == "updated":
                 logger.info(
                     "Updated MaRESS work id=%s (%s) status=%s",
-                    work.id, item_id, match_status,
+                    work.id,
+                    item_id,
+                    match_status,
                 )
         except Exception as save_err:
             logger.warning("Failed to save MaRESS item %s: %s", item_id, save_err)
@@ -291,7 +304,7 @@ def harvest_mountain_wetlands(source_id, user=None, max_records=None, update_exi
     # run if the source has none, mirroring the OAI-PMH path. Idempotent — re-runs
     # are no-ops once the source has a collection assigned.
     ensure_collection_for_source(source)
-    event = HarvestingEvent.objects.create(source=source, status='in_progress')
+    event = HarvestingEvent.objects.create(source=source, status="in_progress")
 
     warning_collector = HarvestWarningCollector()
     warning_collector.setLevel(logging.INFO)
@@ -303,9 +316,9 @@ def harvest_mountain_wetlands(source_id, user=None, max_records=None, update_exi
     try:
         session = _mwr_session()
         skip = 0
-        base_url = source.url_field.split('?')[0]
+        base_url = source.url_field.split("?")[0]
         while True:
-            params = {'limit': MWR_PAGE_SIZE, 'skip': skip, 'scope': 'all'}
+            params = {"limit": MWR_PAGE_SIZE, "skip": skip, "scope": "all"}
             logger.info("Fetching MaRESS items: skip=%d limit=%d", skip, MWR_PAGE_SIZE)
             try:
                 response = session.get(base_url, params=params, timeout=MWR_HTTP_TIMEOUT)
@@ -322,7 +335,9 @@ def harvest_mountain_wetlands(source_id, user=None, max_records=None, update_exi
                 raise RuntimeError(f"MaRESS response was not valid JSON: {e}") from e
 
             saved, processed = parse_mountain_wetlands_response_and_save_works(
-                payload, source, event,
+                payload,
+                source,
+                event,
                 max_records=max_records,
                 processed_so_far=total_processed,
                 warning_collector=warning_collector,
@@ -332,8 +347,8 @@ def harvest_mountain_wetlands(source_id, user=None, max_records=None, update_exi
             total_saved += saved
             total_processed += processed
 
-            count = payload.get('count') or 0
-            page_data = payload.get('data') or []
+            count = payload.get("count") or 0
+            page_data = payload.get("data") or []
             if not page_data:
                 break
             if max_records and total_processed >= max_records:
@@ -347,59 +362,70 @@ def harvest_mountain_wetlands(source_id, user=None, max_records=None, update_exi
         spatial_count = (
             Work.objects.filter(job=event)
             .exclude(geometry__isnull=True)
-            .exclude(geometry__exact=GEOSGeometry('GEOMETRYCOLLECTION EMPTY'))
+            .exclude(geometry__exact=GEOSGeometry("GEOMETRYCOLLECTION EMPTY"))
             .count()
         )
         spatial_count, temporal_count = complete_harvest(
-            event, stats, warning_collector, spatial_count=spatial_count,
+            event,
+            stats,
+            warning_collector,
+            spatial_count=spatial_count,
         )
 
         collection_label = source.collection.name if source.collection else source.name
-        subject, body = render_harvest_email('email/harvest_success.en.txt', {
-            'subject_prefix': '',
-            'source_label': collection_label,
-            'detail_header': 'MaRESS harvest details:',
-            'source_name': source.name,
-            'source_url': source.url_field,
-            'url_label': 'URL',
-            'collection_label': None,
-            'records_added_label': 'New works saved',
-            'records_added': stats.created,
-            'records_updated_label': 'Updated works',
-            'records_updated': stats.updated,
-            'spatial_label': 'With spatial extent',
-            'spatial_count': spatial_count,
-            'temporal_label': 'With temporal extent',
-            'temporal_count': temporal_count,
-            'event_started': f'{event.started_at:%Y-%m-%d %H:%M:%S}',
-            'event_completed': f'{event.completed_at:%Y-%m-%d %H:%M:%S}',
-            'warning_summary': warning_collector.get_summary(),
-            'resolved_prefix': None,
-            'container_title_filters': None,
-            'openalex_source_id': None,
-            'records_seen': None,
-            'records_processed': total_processed,
-        })
+        subject, body = render_harvest_email(
+            "email/harvest_success.en.txt",
+            {
+                "subject_prefix": "",
+                "source_label": collection_label,
+                "detail_header": "MaRESS harvest details:",
+                "source_name": source.name,
+                "source_url": source.url_field,
+                "url_label": "URL",
+                "collection_label": None,
+                "records_added_label": "New works saved",
+                "records_added": stats.created,
+                "records_updated_label": "Updated works",
+                "records_updated": stats.updated,
+                "spatial_label": "With spatial extent",
+                "spatial_count": spatial_count,
+                "temporal_label": "With temporal extent",
+                "temporal_count": temporal_count,
+                "event_started": f"{event.started_at:%Y-%m-%d %H:%M:%S}",
+                "event_completed": f"{event.completed_at:%Y-%m-%d %H:%M:%S}",
+                "warning_summary": warning_collector.get_summary(),
+                "resolved_prefix": None,
+                "container_title_filters": None,
+                "openalex_source_id": None,
+                "records_seen": None,
+                "records_processed": total_processed,
+            },
+        )
         send_harvest_email(user, subject, body)
 
     except Exception as e:
         logger.error(
-            "MaRESS harvesting failed for source %s: %s", source.url_field, str(e),
+            "MaRESS harvesting failed for source %s: %s",
+            source.url_field,
+            str(e),
         )
         fail_harvest(event, e, warning_collector)
-        subject, body = render_harvest_email('email/harvest_failure.en.txt', {
-            'subject_prefix': '',
-            'source_label': source.name,
-            'source_type_label': 'MaRESS',
-            'source_name': source.name,
-            'source_url': source.url_field,
-            'collection_label': None,
-            'resolved_prefix': None,
-            'event_started': None,
-            'event_failed': None,
-            'error': str(e),
-            'warning_summary': warning_collector.get_summary(),
-        })
+        subject, body = render_harvest_email(
+            "email/harvest_failure.en.txt",
+            {
+                "subject_prefix": "",
+                "source_label": source.name,
+                "source_type_label": "MaRESS",
+                "source_name": source.name,
+                "source_url": source.url_field,
+                "collection_label": None,
+                "resolved_prefix": None,
+                "event_started": None,
+                "event_failed": None,
+                "error": str(e),
+                "warning_summary": warning_collector.get_summary(),
+            },
+        )
         send_harvest_email(user, subject, body, fail_silently=True)
         raise
     finally:

@@ -6,15 +6,14 @@ plugin (issues #18 + #15). Hits the local development server at
 http://localhost:8000/dqj/ and is skipped automatically when that server is not
 reachable, so this file is safe to keep in the regular test suite.
 """
+
 import unittest
 
 import requests
-
 from django.test import TestCase
 
 from works.models import Source, Work
 from works.tasks import harvest_oai_endpoint
-
 
 JANEWAY_OAI_URL = "http://localhost:8000/dqj/api/oai/"
 SULAWESI_ARTICLE_URL = "http://localhost:8000/dqj/article/id/53/"
@@ -59,13 +58,10 @@ class TestJanewayLocal(TestCase):
         try:
             sulawesi = Work.objects.get(url=SULAWESI_ARTICLE_URL)
         except Work.DoesNotExist:
-            self.skipTest(
-                f"Article 53 not present in this DQJ deployment ({SULAWESI_ARTICLE_URL})"
-            )
+            self.skipTest(f"Article 53 not present in this DQJ deployment ({SULAWESI_ARTICLE_URL})")
 
         self.assertIsNotNone(sulawesi.geometry)
-        self.assertFalse(sulawesi.geometry.empty,
-                         "Sulawesi article should have a non-empty geometry")
+        self.assertFalse(sulawesi.geometry.empty, "Sulawesi article should have a non-empty geometry")
         west, south, east, north = sulawesi.geometry.extent
         self.assertGreaterEqual(west, 119.0 - 1)
         self.assertLessEqual(east, 125.0 + 1)
@@ -79,15 +75,18 @@ class TestJanewayLocal(TestCase):
         # Provenance should record which signal we used (structured JSON since 0.13.0).
         # JSON-LD wins on this article; if the publisher ever drops it, "DC.SpatialCoverage"
         # or "DC.box" would be acceptable too.
-        metadata_sources = sulawesi.provenance.get('metadata_sources', {})
-        geometry_label = metadata_sources.get('geometry')
+        metadata_sources = sulawesi.provenance.get("metadata_sources", {})
+        geometry_label = metadata_sources.get("geometry")
         self.assertIsNotNone(geometry_label, f"no geometry source label in {sulawesi.provenance!r}")
         self.assertTrue(
-            any(label in geometry_label for label in (
-                "schema.org JSON-LD",
-                "link rel=alternate geo+json",
-                "DC.SpatialCoverage",
-                "DC.box",
-            )),
+            any(
+                label in geometry_label
+                for label in (
+                    "schema.org JSON-LD",
+                    "link rel=alternate geo+json",
+                    "DC.SpatialCoverage",
+                    "DC.box",
+                )
+            ),
             f"unexpected geometry provenance: {geometry_label!r}",
         )

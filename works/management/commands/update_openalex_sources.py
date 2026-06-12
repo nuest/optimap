@@ -3,18 +3,19 @@
 
 # publications/management/commands/update_openalex_sources.py
 
-import logging
-import requests
 import hashlib
 import json
+import logging
 
+import requests
 from django.core.management.base import BaseCommand
 from django.db.models import Q
+
 from works.models import Source
 
 logger = logging.getLogger(__name__)
 
-ISSN_ENDPOINT   = "https://api.openalex.org/sources/issn:{issn}"
+ISSN_ENDPOINT = "https://api.openalex.org/sources/issn:{issn}"
 SEARCH_ENDPOINT = "https://api.openalex.org/sources"
 
 
@@ -32,11 +33,7 @@ def fetch_by_issn(issn: str) -> dict | None:
 
 def fetch_by_name(name: str) -> dict | None:
     try:
-        resp = requests.get(
-            SEARCH_ENDPOINT,
-            params={"filter": f"display_name.search:{name}"},
-            timeout=10
-        )
+        resp = requests.get(SEARCH_ENDPOINT, params={"filter": f"display_name.search:{name}"}, timeout=10)
         resp.raise_for_status()
         results = resp.json().get("results", [])
         return results[0] if results else None
@@ -70,9 +67,7 @@ class Command(BaseCommand):
                 works_count = data.get("works_count")
                 works_api_url = data.get("works_api_url")
                 raw_host = data.get("host_organization")
-                publisher = (
-                    raw_host.get("display_name") if isinstance(raw_host, dict) else data.get("display_name")
-                )
+                publisher = raw_host.get("display_name") if isinstance(raw_host, dict) else data.get("display_name")
 
                 metadata = {
                     "openalex_id": new_id,
@@ -95,7 +90,7 @@ class Command(BaseCommand):
                 for field, val in metadata.items():
                     if val is not None and val != getattr(src, field, None):
                         updates[field] = val
-                updates['last_sync_hash'] = new_hash
+                updates["last_sync_hash"] = new_hash
 
                 if updates:
                     Source.objects.filter(pk=src.pk).update(**updates)

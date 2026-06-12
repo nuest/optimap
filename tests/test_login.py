@@ -3,12 +3,15 @@
 
 import os
 import unittest
-from django.test import TestCase, Client
+
 from django.contrib.auth import get_user_model
+from django.test import Client, TestCase
+
 User = get_user_model()
 from datetime import datetime
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'optimap.settings')
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "optimap.settings")
+
 
 class SimpleTest(TestCase):
     def setUp(self):
@@ -18,7 +21,9 @@ class SimpleTest(TestCase):
         """Test that fields for logged in users are set correctly"""
         # Guard against a stale row left by an earlier unittest.TestCase run on --keepdb.
         User.objects.filter(username="test@example.com").delete()
-        self.user = User.objects.create_user(username="test@example.com", email="test@example.com", password="password")
+        self.user = User.objects.create_user(
+            username="test@example.com", email="test@example.com", password="password"
+        )
         self.client.login(username="testuser", password="password")
 
         # fetch user from DB
@@ -36,16 +41,16 @@ class SimpleTest(TestCase):
 
         self.assertEqual(user.username, user.email, "Email and username must be the same")
 
-    @unittest.skip('UI tests need to adjusted for new UI')
+    @unittest.skip("UI tests need to adjusted for new UI")
     def test_login_page(self):
-        response = self.client.get('/login/')
+        response = self.client.get("/login/")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.get('Content-Type'), 'text/html; charset=utf-8')
+        self.assertEqual(response.get("Content-Type"), "text/html; charset=utf-8")
 
-        response = self.client.post('/login/', {'email': 'optimap@dev.dev'})
+        response = self.client.post("/login/", {"email": "optimap@dev.dev"})
         self.assertEqual(response.status_code, 302)
-        self.assertRegex(response.url, 'success')
+        self.assertRegex(response.url, "success")
 
         # FIXME test login above does not trigger setting the last_login field
         user = User.objects.filter(id=self.user.id).first()
@@ -54,7 +59,7 @@ class SimpleTest(TestCase):
 
         # see also https://github.com/GeoinformationSystems/optimap/issues/125
 
-    @unittest.skip('UI tests need to adjusted for new UI')
+    @unittest.skip("UI tests need to adjusted for new UI")
     def test_login_page_errors(self):
-        response = self.client.put('/login/')
+        response = self.client.put("/login/")
         self.assertEqual(response.status_code, 400)

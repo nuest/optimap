@@ -13,25 +13,25 @@ Covers:
 """
 
 import os
+
 import django
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "optimap.settings")
 django.setup()
 
-import responses
 from datetime import date
+
+import responses
 from django.test import TestCase
 
-from works.models import Source, HarvestingEvent, Work
+from works.models import HarvestingEvent, Source, Work
 from works.tasks import (
     _build_crossref_filter,
     _crossref_item_to_work_kwargs,
     _strip_jats,
     fetch_copernicus_abstract,
     harvest_crossref_prefix,
-    parse_crossref_response_and_save_works,
 )
-
 
 SAMPLE_LANDING_HTML = """
 <html><head>
@@ -54,7 +54,6 @@ SAMPLE_LANDING_NO_ABSTRACT_DIV = """
 
 
 class StripJatsTests(TestCase):
-
     def test_returns_none_for_falsy(self):
         self.assertIsNone(_strip_jats(""))
         self.assertIsNone(_strip_jats(None))
@@ -65,14 +64,12 @@ class StripJatsTests(TestCase):
 
     def test_strips_inline_markup(self):
         out = _strip_jats(
-            "<jats:p>Hello <jats:italic>world</jats:italic> "
-            "with <jats:sub>2</jats:sub> subscripts.</jats:p>"
+            "<jats:p>Hello <jats:italic>world</jats:italic> with <jats:sub>2</jats:sub> subscripts.</jats:p>"
         )
         self.assertEqual(out, "Hello world with 2 subscripts.")
 
 
 class BuildCrossrefFilterTests(TestCase):
-
     def test_only_prefix(self):
         self.assertEqual(_build_crossref_filter("10.5194"), "prefix:10.5194")
 
@@ -91,15 +88,13 @@ class BuildCrossrefFilterTests(TestCase):
 
 
 class CrossrefItemConversionTests(TestCase):
-
     def setUp(self):
         self.source = Source.objects.create(
-            name="Crossref Test", url_field="https://api.crossref.org/works",
+            name="Crossref Test",
+            url_field="https://api.crossref.org/works",
             harvest_interval_minutes=60,
         )
-        self.event = HarvestingEvent.objects.create(
-            source=self.source, status="in_progress"
-        )
+        self.event = HarvestingEvent.objects.create(source=self.source, status="in_progress")
 
     def _item(self, **overrides):
         item = {
@@ -114,15 +109,21 @@ class CrossrefItemConversionTests(TestCase):
 
     def test_returns_none_without_doi(self):
         out = _crossref_item_to_work_kwargs(
-            {"title": ["x"]}, self.source, self.event,
-            fetch_abstract_from_publisher=False, abstract_session=None,
+            {"title": ["x"]},
+            self.source,
+            self.event,
+            fetch_abstract_from_publisher=False,
+            abstract_session=None,
         )
         self.assertIsNone(out)
 
     def test_uses_crossref_abstract_when_publisher_disabled(self):
         out = _crossref_item_to_work_kwargs(
-            self._item(), self.source, self.event,
-            fetch_abstract_from_publisher=False, abstract_session=None,
+            self._item(),
+            self.source,
+            self.event,
+            fetch_abstract_from_publisher=False,
+            abstract_session=None,
         )
         self.assertEqual(out["doi"], "10.5194/essd-14-4681-2022")
         self.assertEqual(out["abstract"], "JATS-rendered fallback abstract.")
@@ -139,8 +140,11 @@ class CrossrefItemConversionTests(TestCase):
             status=200,
         )
         out = _crossref_item_to_work_kwargs(
-            self._item(), self.source, self.event,
-            fetch_abstract_from_publisher=True, abstract_session=None,
+            self._item(),
+            self.source,
+            self.event,
+            fetch_abstract_from_publisher=True,
+            abstract_session=None,
         )
         self.assertIn("urbanisation", out["abstract"].lower())
         # The literal "Abstract" lead should have been stripped.
@@ -157,14 +161,16 @@ class CrossrefItemConversionTests(TestCase):
             status=404,
         )
         out = _crossref_item_to_work_kwargs(
-            self._item(), self.source, self.event,
-            fetch_abstract_from_publisher=True, abstract_session=None,
+            self._item(),
+            self.source,
+            self.event,
+            fetch_abstract_from_publisher=True,
+            abstract_session=None,
         )
         self.assertEqual(out["abstract"], "JATS-rendered fallback abstract.")
 
 
 class FetchCopernicusAbstractTests(TestCase):
-
     @responses.activate
     def test_uses_div_abstract_when_present(self):
         responses.add(
@@ -174,9 +180,7 @@ class FetchCopernicusAbstractTests(TestCase):
             content_type="text/html",
             status=200,
         )
-        out = fetch_copernicus_abstract(
-            "https://essd.copernicus.org/articles/14/4681/2022/"
-        )
+        out = fetch_copernicus_abstract("https://essd.copernicus.org/articles/14/4681/2022/")
         self.assertIn("urbanisation", out.lower())
 
     @responses.activate
@@ -188,9 +192,7 @@ class FetchCopernicusAbstractTests(TestCase):
             content_type="text/html",
             status=200,
         )
-        out = fetch_copernicus_abstract(
-            "https://example.copernicus.org/article/"
-        )
+        out = fetch_copernicus_abstract("https://example.copernicus.org/article/")
         self.assertEqual(out, "From the meta tag, fallback only.")
 
     @responses.activate
@@ -200,9 +202,11 @@ class FetchCopernicusAbstractTests(TestCase):
             "https://example.copernicus.org/down/",
             status=503,
         )
-        self.assertIsNone(fetch_copernicus_abstract(
-            "https://example.copernicus.org/down/",
-        ))
+        self.assertIsNone(
+            fetch_copernicus_abstract(
+                "https://example.copernicus.org/down/",
+            )
+        )
 
     def test_returns_none_for_empty_url(self):
         self.assertIsNone(fetch_copernicus_abstract(""))
@@ -210,12 +214,12 @@ class FetchCopernicusAbstractTests(TestCase):
 
 
 class HarvestCrossrefPrefixEndToEndTests(TestCase):
-
     def setUp(self):
         from works.models import Collection
+
         collection, _ = Collection.objects.get_or_create(
-            identifier='copernicus-publications',
-            defaults={'name': 'Copernicus Publications', 'is_published': True},
+            identifier="copernicus-publications",
+            defaults={"name": "Copernicus Publications", "is_published": True},
         )
         self.source = Source.objects.create(
             name="Copernicus Crossref",
@@ -289,8 +293,10 @@ class HarvestCrossrefPrefixEndToEndTests(TestCase):
     def test_skips_existing_dois(self):
         # Pre-create one Work by DOI; the harvester should skip it.
         Work.objects.create(
-            title="Pre-existing", doi="10.5194/already-here",
-            source=self.source, status="p",
+            title="Pre-existing",
+            doi="10.5194/already-here",
+            source=self.source,
+            status="p",
         )
         items = [
             {
@@ -316,7 +322,8 @@ class HarvestCrossrefPrefixEndToEndTests(TestCase):
         )
         # Only the "new" landing page will be hit (publisher fetch off).
         harvest_crossref_prefix(
-            self.source.id, fetch_abstract_from_publisher=False,
+            self.source.id,
+            fetch_abstract_from_publisher=False,
         )
         # 1 pre-existing + 1 new = 2 total
         self.assertEqual(Work.objects.filter(source=self.source).count(), 2)
@@ -341,7 +348,8 @@ class HarvestCrossrefPrefixEndToEndTests(TestCase):
             status=200,
         )
         harvest_crossref_prefix(
-            self.source.id, max_records=2,
+            self.source.id,
+            max_records=2,
             fetch_abstract_from_publisher=False,
         )
         self.assertEqual(Work.objects.filter(source=self.source).count(), 2)

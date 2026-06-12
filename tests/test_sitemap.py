@@ -1,10 +1,13 @@
 # SPDX-FileCopyrightText: 2023 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from django.test import TestCase
-from django.contrib.gis.geos import MultiPolygon, Polygon
 from http import HTTPStatus
+
+from django.contrib.gis.geos import MultiPolygon, Polygon
+from django.test import TestCase
+
 from works.models import GlobalRegion
+
 
 class SitemapTest(TestCase):
     def test_index(self):
@@ -34,40 +37,40 @@ class SitemapTest(TestCase):
         # Create test GlobalRegion instances
         test_polygon = MultiPolygon(Polygon(((0, 0), (0, 1), (1, 1), (1, 0), (0, 0))))
 
-        continent = GlobalRegion.objects.create(
+        GlobalRegion.objects.create(
             name="Test Continent",
             region_type=GlobalRegion.CONTINENT,
             source_url="http://example.com",
             license="CC BY 4.0",
-            geom=test_polygon
+            geom=test_polygon,
         )
 
-        ocean = GlobalRegion.objects.create(
+        GlobalRegion.objects.create(
             name="Test Ocean",
             region_type=GlobalRegion.OCEAN,
             source_url="http://example.com",
             license="CC BY 4.0",
-            geom=test_polygon
+            geom=test_polygon,
         )
 
         # Get the feeds sitemap
         response = self.client.get("/sitemap-feeds.xml")
-        content = response.content.decode('utf-8')
+        content = response.content.decode("utf-8")
 
         # Verify response
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertIn('<?xml version="1.0" encoding="UTF-8"?>', content)
-        self.assertIn('<urlset', content)
+        self.assertIn("<urlset", content)
 
         # Verify continent region URL is included
-        self.assertIn('/regions/continent/test-continent/', content)
+        self.assertIn("/regions/continent/test-continent/", content)
 
         # Verify ocean region URL is included
-        self.assertIn('/regions/ocean/test-ocean/', content)
+        self.assertIn("/regions/ocean/test-ocean/", content)
 
         # Verify priority and changefreq
-        self.assertIn('<priority>0.6</priority>', content)
-        self.assertIn('<changefreq>daily</changefreq>', content)
+        self.assertIn("<priority>0.6</priority>", content)
+        self.assertIn("<changefreq>daily</changefreq>", content)
 
     def test_feeds_index_reference(self):
         """Test that feeds sitemap is referenced in main sitemap index.
@@ -83,12 +86,12 @@ class SitemapTest(TestCase):
             region_type=GlobalRegion.CONTINENT,
             source_url="http://example.com",
             license="CC BY 4.0",
-            geom=test_polygon
+            geom=test_polygon,
         )
 
         response = self.client.get("/sitemap.xml")
-        content = response.content.decode('utf-8')
+        content = response.content.decode("utf-8")
 
         self.assertEqual(response.status_code, HTTPStatus.OK)
         # Verify the feeds sitemap is listed in the index
-        self.assertIn('sitemap-feeds.xml', content)
+        self.assertIn("sitemap-feeds.xml", content)

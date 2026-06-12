@@ -10,34 +10,34 @@ This module handles:
 - Work contribution pages
 """
 
-import logging
 import json
+import logging
 import re
-from urllib.parse import unquote
 
 logger = logging.getLogger(__name__)
 
-from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib import messages
-from django.contrib.gis.geos import GeometryCollection
-from django.core.cache import caches
-from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.db.models import Q
-from django.utils.cache import add_never_cache_headers, patch_response_headers
-from django.views.decorators.cache import never_cache
 from django.conf import settings
+from django.contrib import messages
+from django.core.cache import caches
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
+from django.db.models import Q
+from django.http import FileResponse, Http404
+from django.shortcuts import redirect, render
 from django.urls import reverse
-from django.http import Http404, FileResponse
+from django.utils.cache import add_never_cache_headers, patch_response_headers
 from django.views.decorators.http import require_GET
+
 from works.models import Collection, Work
 from works.seo import build_schema_org_for_work, build_work_meta, citation_meta_tags, coins_title, geo_meta_tags
+from works.serializers import get_available_gazetteers as _ner_available_gazetteers
 from works.services.preview_image import (
     cache_path_for as _preview_cache_path,
+)
+from works.services.preview_image import (
     render_work_preview,
 )
 from works.utils.identifiers import resolve_work_identifier
 from works.utils.statistics import get_cached_statistics
-from works.serializers import get_available_gazetteers as _ner_available_gazetteers
 
 
 def contribute(request):
@@ -47,26 +47,30 @@ def contribute(request):
     to a single Collection (anonymous / non-staff users only see published
     collections; unknown values surface a warning).
     """
-    page_size = request.GET.get('size', settings.WORKS_PAGE_SIZE_DEFAULT)
+    page_size = request.GET.get("size", settings.WORKS_PAGE_SIZE_DEFAULT)
     try:
         page_size = int(page_size)
         page_size = max(settings.WORKS_PAGE_SIZE_MIN, min(page_size, settings.WORKS_PAGE_SIZE_MAX))
     except (ValueError, TypeError):
         page_size = settings.WORKS_PAGE_SIZE_DEFAULT
 
-    page_number = request.GET.get('page', 1)
+    page_number = request.GET.get("page", 1)
 
-    publications_query = Work.objects.filter(
-        status='h',
-    ).filter(
-        Q(geometry__isnull=True)
-        | Q(geometry__isempty=True)
-        | Q(timeperiod_startdate__isnull=True)
-        | Q(timeperiod_enddate__isnull=True)
-    ).order_by('-creationDate')
+    publications_query = (
+        Work.objects.filter(
+            status="h",
+        )
+        .filter(
+            Q(geometry__isnull=True)
+            | Q(geometry__isempty=True)
+            | Q(timeperiod_startdate__isnull=True)
+            | Q(timeperiod_enddate__isnull=True)
+        )
+        .order_by("-creationDate")
+    )
 
     filter_collection = None
-    filter_raw = request.GET.get('collection', '').strip()
+    filter_raw = request.GET.get("collection", "").strip()
     filter_invalid = False
     if filter_raw:
         is_admin = request.user.is_authenticated and request.user.is_staff
@@ -75,7 +79,9 @@ def contribute(request):
         if filter_raw.isdigit():
             match = candidates.filter(pk=int(filter_raw)).first()
         if match is None:
-            match = candidates.filter(identifier=filter_raw).first() or candidates.filter(short_slug=filter_raw).first()
+            match = (
+                candidates.filter(identifier=filter_raw).first() or candidates.filter(short_slug=filter_raw).first()
+            )
         if match is not None:
             filter_collection = match
             publications_query = publications_query.filter(collections=match)
@@ -93,22 +99,21 @@ def contribute(request):
     works = list(page_obj)
     for w in works:
         w.has_geo = bool(w.geometry and not w.geometry.empty)
-        w.has_temporal = (
-            any(d is not None for d in (w.timeperiod_startdate or []))
-            or any(d is not None for d in (w.timeperiod_enddate or []))
+        w.has_temporal = any(d is not None for d in (w.timeperiod_startdate or [])) or any(
+            d is not None for d in (w.timeperiod_enddate or [])
         )
 
     context = {
-        'works': works,
-        'page_obj': page_obj,
-        'page_size': page_size,
-        'page_size_options': settings.WORKS_PAGE_SIZE_OPTIONS,
-        'total_count': paginator.count,
-        'filter_collection': filter_collection,
-        'filter_raw': filter_raw,
-        'filter_invalid': filter_invalid,
+        "works": works,
+        "page_obj": page_obj,
+        "page_size": page_size,
+        "page_size_options": settings.WORKS_PAGE_SIZE_OPTIONS,
+        "total_count": paginator.count,
+        "filter_collection": filter_collection,
+        "filter_raw": filter_raw,
+        "filter_invalid": filter_invalid,
     }
-    return render(request, 'contribute.html', context)
+    return render(request, "contribute.html", context)
 
 
 def contribute_next(request):
@@ -124,7 +129,7 @@ def contribute_next(request):
     show the game banner, auto-run NER, and chain to the next work on submit.
     """
     is_admin = request.user.is_authenticated and request.user.is_staff
-    filter_raw = request.GET.get('collection', '').strip()
+    filter_raw = request.GET.get("collection", "").strip()
     filter_collection = None
     if filter_raw:
         candidates = Collection.objects.all() if is_admin else Collection.objects.filter(is_published=True)
@@ -132,11 +137,10 @@ def contribute_next(request):
             filter_collection = candidates.filter(pk=int(filter_raw)).first()
         if filter_collection is None:
             filter_collection = (
-                candidates.filter(identifier=filter_raw).first()
-                or candidates.filter(short_slug=filter_raw).first()
+                candidates.filter(identifier=filter_raw).first() or candidates.filter(short_slug=filter_raw).first()
             )
 
-    qs = Work.objects.filter(status='h').filter(
+    qs = Work.objects.filter(status="h").filter(
         Q(geometry__isnull=True)
         | Q(geometry__isempty=True)
         | Q(timeperiod_startdate__isnull=True)
@@ -147,26 +151,26 @@ def contribute_next(request):
     if request.user.is_authenticated:
         qs = qs.exclude(contributions__user=request.user)
 
-    work = qs.order_by('?').first()
+    work = qs.order_by("?").first()
 
     if work is None:
         messages.success(
             request,
             "Great job — all works in the queue are georeferenced! "
-            "Check back later as new works are harvested regularly."
+            "Check back later as new works are harvested regularly.",
         )
-        dest = reverse('optimap:contribute')
+        dest = reverse("optimap:contribute")
         if filter_collection:
-            dest += f'?collection={filter_collection.identifier}'
+            dest += f"?collection={filter_collection.identifier}"
         return redirect(dest)
 
-    done = request.GET.get('done', '0')
-    params = [f'game=1', f'done={done}']
+    done = request.GET.get("done", "0")
+    params = ["game=1", f"done={done}"]
     if filter_collection:
-        params.append(f'collection={filter_collection.identifier}')
+        params.append(f"collection={filter_collection.identifier}")
     elif filter_raw:
-        params.append(f'collection={filter_raw}')
-    dest = reverse('optimap:work-landing', args=[work.get_identifier()]) + '?' + '&'.join(params)
+        params.append(f"collection={filter_raw}")
+    dest = reverse("optimap:work-landing", args=[work.get_identifier()]) + "?" + "&".join(params)
     return redirect(dest)
 
 
@@ -175,8 +179,8 @@ def _format_timeperiod(work):
     Work stores timeperiod as arrays of strings.
     We show the first start/end if present, in a compact human form.
     """
-    s_list = (work.timeperiod_startdate or [])
-    e_list = (work.timeperiod_enddate   or [])
+    s_list = work.timeperiod_startdate or []
+    e_list = work.timeperiod_enddate or []
     s = s_list[0] if s_list else None
     e = e_list[0] if e_list else None
 
@@ -187,6 +191,7 @@ def _format_timeperiod(work):
     if e:
         return f"until {e}"
     return None
+
 
 def _normalize_authors(work):
     """
@@ -210,6 +215,7 @@ def _normalize_authors(work):
         return items or None
     return None
 
+
 def works_list(request):
     """
     Public page that lists all works with pagination:
@@ -224,7 +230,7 @@ def works_list(request):
     is_admin = request.user.is_authenticated and request.user.is_staff
 
     # Get page size from request or use default
-    page_size = request.GET.get('size', settings.WORKS_PAGE_SIZE_DEFAULT)
+    page_size = request.GET.get("size", settings.WORKS_PAGE_SIZE_DEFAULT)
     try:
         page_size = int(page_size)
         # Clamp page size within allowed limits
@@ -233,13 +239,13 @@ def works_list(request):
         page_size = settings.WORKS_PAGE_SIZE_DEFAULT
 
     # Get page number from request
-    page_number = request.GET.get('page', 1)
+    page_number = request.GET.get("page", 1)
 
     # Base queryset
     if is_admin:
-        pubs = Work.objects.all().select_related('source')
+        pubs = Work.objects.all().select_related("source")
     else:
-        pubs = Work.objects.filter(status='p').select_related('source')
+        pubs = Work.objects.filter(status="p").select_related("source")
 
     pubs = pubs.order_by("-creationDate", "-id")
 
@@ -272,9 +278,8 @@ def works_list(request):
 
         if is_authenticated:
             work_data["has_geo"] = bool(work.geometry and not work.geometry.empty)
-            work_data["has_temporal"] = (
-                any(d is not None for d in (work.timeperiod_startdate or []))
-                or any(d is not None for d in (work.timeperiod_enddate or []))
+            work_data["has_temporal"] = any(d is not None for d in (work.timeperiod_startdate or [])) or any(
+                d is not None for d in (work.timeperiod_enddate or [])
             )
 
         works.append(work_data)
@@ -285,10 +290,7 @@ def works_list(request):
     # Build API URL for current page/size
     # DRF uses limit/offset pagination, so calculate offset from page number
     offset = (page_obj.number - 1) * page_size
-    api_url = request.build_absolute_uri(
-        '/api/v1/works/' +
-        f'?limit={page_size}&offset={offset}'
-    )
+    api_url = request.build_absolute_uri("/api/v1/works/" + f"?limit={page_size}&offset={offset}")
 
     context = {
         "works": works,
@@ -302,6 +304,7 @@ def works_list(request):
     }
 
     return render(request, "works.html", context)
+
 
 _WORK_LANDING_CACHE_TIMEOUT = 24 * 3600
 
@@ -317,10 +320,7 @@ def _work_landing_cache_key(work, request) -> str:
       so any edit immediately misses the old entry. No explicit invalidation
       signal needed; superseded entries age out via TTL.
     """
-    return (
-        f"work_landing:ctx:{request.get_host()}:{work.id}:"
-        f"{work.lastUpdate.timestamp() if work.lastUpdate else 0}"
-    )
+    return f"work_landing:ctx:{request.get_host()}:{work.id}:{work.lastUpdate.timestamp() if work.lastUpdate else 0}"
 
 
 def _build_work_landing_cacheable(request, work, identifier_type):
@@ -345,11 +345,11 @@ def _build_work_landing_cacheable(request, work, identifier_type):
     if bok_codes:
         try:
             from works.bok import client as bok_client
+
             bok_resolved = bok_client.resolve(bok_codes)
         except Exception:
             bok_resolved = [
-                {"code": c, "name": c, "uri": "", "parent_code": "",
-                 "breadcrumb": [], "orphan": True}
+                {"code": c, "name": c, "uri": "", "parent_code": "", "breadcrumb": [], "orphan": True}
                 for c in bok_codes
             ]
     else:
@@ -361,8 +361,8 @@ def _build_work_landing_cacheable(request, work, identifier_type):
         "authors_list": _normalize_authors(work),
         "has_geometry": bool(work.geometry and not work.geometry.empty),
         "has_temporal": (
-            any(d is not None for d in (work.timeperiod_startdate or [])) or
-            any(d is not None for d in (work.timeperiod_enddate or []))
+            any(d is not None for d in (work.timeperiod_startdate or []))
+            or any(d is not None for d in (work.timeperiod_enddate or []))
         ),
         "use_id_urls": not work.doi,
         "identifier_type": identifier_type,
@@ -370,9 +370,7 @@ def _build_work_landing_cacheable(request, work, identifier_type):
         "citation_tags": citation_meta_tags(work, request),
         "geo_tags": geo_meta_tags(work),
         "coins_ctx": coins_title(work),
-        "canonical_url": request.build_absolute_uri(
-            reverse("optimap:work-landing", args=[work.get_identifier()])
-        ),
+        "canonical_url": request.build_absolute_uri(reverse("optimap:work-landing", args=[work.get_identifier()])),
         "bok_concepts_resolved": bok_resolved,
         "bok_initial_codes_json": json.dumps(bok_codes),
     }
@@ -403,9 +401,9 @@ def work_landing(request, identifier):
 
     # Game-mode params — read before any expensive DB work so they're
     # available throughout the rest of the view.
-    game_mode = request.GET.get('game') == '1'
-    game_done = max(0, int(request.GET.get('done', '0') or 0))
-    game_coll_raw = request.GET.get('collection', '').strip()
+    game_mode = request.GET.get("game") == "1"
+    game_done = max(0, int(request.GET.get("done", "0") or 0))
+    game_coll_raw = request.GET.get("collection", "").strip()
 
     # Resolve identifier to work object.
     work, identifier_type = resolve_work_identifier(identifier)
@@ -416,11 +414,11 @@ def work_landing(request, identifier):
     # contribution form lives) — and so a successful contribution that flips
     # a work from 'h' to 'c' does not 404 the user on the post-reload. Drafts
     # ('d'), Testing ('t'), and Withdrawn ('w') remain admin-only.
-    if not is_admin and work.status not in ('p', 'h', 'c'):
+    if not is_admin and work.status not in ("p", "h", "c"):
         raise Http404("Work not found.")
 
     is_anonymous = not request.user.is_authenticated
-    cache_backend = caches['memory']
+    cache_backend = caches["memory"]
     cache_key = _work_landing_cache_key(work, request) if is_anonymous else None
 
     cacheable = None
@@ -441,44 +439,32 @@ def work_landing(request, identifier):
     # Pre-existing extents do NOT close the form: replacing user A's
     # geometry as user B is allowed; the provenance log records who did
     # what, and the Recognition Board dedupes per (user, work, kind).
-    can_contribute = (
-        request.user.is_authenticated
-        and (work.status in ('h', 'c') or (is_admin and work.status == 'd'))
-    )
+    can_contribute = request.user.is_authenticated and (work.status in ("h", "c") or (is_admin and work.status == "d"))
     # Anonymous visitors who land on a contributable work via the /contribute/
     # listing get a "log in to contribute" call-to-action instead of a silent
     # "no form here" page.
-    prompt_login_to_contribute = (
-        not request.user.is_authenticated
-        and work.status in ('h', 'c')
-    )
+    prompt_login_to_contribute = not request.user.is_authenticated and work.status in ("h", "c")
     is_curator = (
-        request.user.is_authenticated
-        and not is_admin
-        and work.collections.filter(curators=request.user).exists()
+        request.user.is_authenticated and not is_admin and work.collections.filter(curators=request.user).exists()
     )
     can_publish = (is_admin or is_curator) and (
-        work.status in ('c', 'd')
-        or (work.status == 'h' and (cacheable["has_geometry"] or cacheable["has_temporal"]))
+        work.status in ("c", "d") or (work.status == "h" and (cacheable["has_geometry"] or cacheable["has_temporal"]))
     )
-    can_unpublish = is_admin and work.status == 'p'
+    can_unpublish = is_admin and work.status == "p"
 
     # BoK tagging is open to any logged-in user while a work is still in the
     # contribution pipeline (h or c). Admins keep full control via the admin.
     # When OPTIMAP_BOK_ENABLED_COLLECTIONS is set, only works belonging to one
     # of the configured collections expose the editor.
     from works.bok import eligibility as bok_eligibility
+
     bok_eligible = bok_eligibility.is_work_eligible(work)
     can_tag_bok = (
         request.user.is_authenticated
-        and (work.status in ('h', 'c') or (is_admin and work.status == 'd'))
+        and (work.status in ("h", "c") or (is_admin and work.status == "d"))
         and bok_eligible
     )
-    prompt_login_to_tag_bok = (
-        not request.user.is_authenticated
-        and work.status in ('h', 'c')
-        and bok_eligible
-    )
+    prompt_login_to_tag_bok = not request.user.is_authenticated and work.status in ("h", "c") and bok_eligible
 
     # Single source of truth for the "missing information" alert on the
     # landing page — items the *current* viewer could fix if they were to
@@ -486,9 +472,9 @@ def work_landing(request, identifier):
     # the same item list with a "log in to contribute" CTA. Each item
     # carries the in-page anchor for a "jump to that section" link.
     has_bok = bool(cacheable.get("bok_concepts_resolved"))
-    _GEOM = {"label": "geographic location",        "anchor": "contribute-spatial"}
+    _GEOM = {"label": "geographic location", "anchor": "contribute-spatial"}
     _TIME = {"label": "temporal extent (time period)", "anchor": "contribute-temporal"}
-    _BOK  = {"label": "topics (EO4GEO BoK)",        "anchor": "bok-edit-card"}
+    _BOK = {"label": "topics (EO4GEO BoK)", "anchor": "bok-edit-card"}
 
     missing_for_logged_in = []
     if can_contribute and not cacheable["has_geometry"]:
@@ -506,16 +492,16 @@ def work_landing(request, identifier):
     if prompt_login_to_tag_bok and not has_bok:
         missing_for_anonymous.append(_BOK)
 
-    latest_wikidata_export = work.wikidata_exports.filter(
-        action__in=['created', 'updated']
-    ).order_by('-export_date').first()
+    latest_wikidata_export = (
+        work.wikidata_exports.filter(action__in=["created", "updated"]).order_by("-export_date").first()
+    )
     all_wikidata_exports = work.wikidata_exports.all() if is_admin else []
 
     # Collections this work belongs to — hidden unpublished collections from
     # anonymous users so visibility rules match /collections/ and the
     # collection detail page. Computed per request (not cached) because
     # collection.is_published can flip without bumping Work.lastUpdate.
-    visible_collections_qs = work.collections.all().order_by('name')
+    visible_collections_qs = work.collections.all().order_by("name")
     if not is_admin:
         visible_collections_qs = visible_collections_qs.filter(is_published=True)
     visible_collections = list(visible_collections_qs)
@@ -524,12 +510,12 @@ def work_landing(request, identifier):
     # increments done; game_skip_url (used by the Skip button) preserves the count.
     base_game_params = []
     if game_coll_raw:
-        base_game_params.append(f'collection={game_coll_raw}')
-    contribute_next_base = reverse('optimap:contribute-next')
-    game_next_params = [f'done={game_done + 1}'] + base_game_params
-    game_skip_params  = [f'done={game_done}']    + base_game_params
-    game_next_url = contribute_next_base + '?' + '&'.join(game_next_params)
-    game_skip_url = contribute_next_base + '?' + '&'.join(game_skip_params)
+        base_game_params.append(f"collection={game_coll_raw}")
+    contribute_next_base = reverse("optimap:contribute-next")
+    game_next_params = [f"done={game_done + 1}"] + base_game_params
+    game_skip_params = [f"done={game_done}"] + base_game_params
+    game_next_url = contribute_next_base + "?" + "&".join(game_next_params)
+    game_skip_url = contribute_next_base + "?" + "&".join(game_skip_params)
 
     context = {
         **{k: v for k, v in cacheable.items() if k != "schema_org"},
@@ -545,9 +531,9 @@ def work_landing(request, identifier):
         "prompt_login_to_tag_bok": prompt_login_to_tag_bok,
         "missing_for_logged_in": missing_for_logged_in,
         "missing_for_anonymous": missing_for_anonymous,
-        "geoextent_copy_ttl_seconds": getattr(settings, 'GEOEXTENT_COPY_TTL_SECONDS', 300),
-        "geometry_warn_size_kb": getattr(settings, 'GEOMETRY_WARN_SIZE_KB', 50),
-        "geometry_max_upload_kb": getattr(settings, 'GEOMETRY_MAX_UPLOAD_KB', 2048),
+        "geoextent_copy_ttl_seconds": getattr(settings, "GEOEXTENT_COPY_TTL_SECONDS", 300),
+        "geometry_warn_size_kb": getattr(settings, "GEOMETRY_WARN_SIZE_KB", 50),
+        "geometry_max_upload_kb": getattr(settings, "GEOMETRY_MAX_UPLOAD_KB", 2048),
         "ner_available_gazetteers": _ner_available_gazetteers(),
         "show_provenance": is_admin,
         "latest_wikidata_export": latest_wikidata_export,
@@ -591,7 +577,7 @@ def work_preview_png(request, identifier):
     work, _ = resolve_work_identifier(identifier)
     # Same visibility rule as work_landing — preview is the og:image for the
     # landing page, so it has to be reachable wherever the landing page is.
-    if not (request.user.is_authenticated and request.user.is_staff) and work.status not in ('p', 'h', 'c'):
+    if not (request.user.is_authenticated and request.user.is_staff) and work.status not in ("p", "h", "c"):
         raise Http404("Work not found.")
     if not work.geometry or work.geometry.empty:
         raise Http404("Work has no geometry — no preview available.")
@@ -613,7 +599,8 @@ def work_preview_png(request, identifier):
 def statistics_page(request):
     """Standalone statistics page showing snapshot data with Chart.js plots."""
     import json as _json
-    from works.models import StatisticsSnapshot, SourceCoverageSnapshot, GlobalRegion
+
+    from works.models import GlobalRegion, SourceCoverageSnapshot, StatisticsSnapshot
 
     try:
         snapshot = StatisticsSnapshot.objects.latest()
@@ -622,41 +609,38 @@ def statistics_page(request):
 
     # Last 90 snapshots for time-series charts (one per day ≈ 3 months)
     history = list(
-        StatisticsSnapshot.objects.order_by('computed_at')
-        .values('computed_at', 'published_works', 'total_works',
-                'with_geometry', 'with_temporal', 'contributors')
+        StatisticsSnapshot.objects.order_by("computed_at")
+        .values("computed_at", "published_works", "total_works", "with_geometry", "with_temporal", "contributors")
         .reverse()[:90]
     )
     history.reverse()  # chronological order for Chart.js
 
     # Latest coverage snapshot per source, only those with data
     sources_coverage = list(
-        SourceCoverageSnapshot.objects
-        .filter(openalex_total__gt=0)
-        .select_related('source')
-        .order_by('source_id', '-computed_at')
-        .distinct('source_id')
+        SourceCoverageSnapshot.objects.filter(openalex_total__gt=0)
+        .select_related("source")
+        .order_by("source_id", "-computed_at")
+        .distinct("source_id")
     )
 
     # Per-source history for the dropdown chart (last 52 weekly snapshots each)
     source_history = {}
     for snap in sources_coverage:
         history_qs = list(
-            SourceCoverageSnapshot.objects
-            .filter(source=snap.source)
-            .order_by('computed_at')
-            .values('computed_at', 'coverage_pct', 'optimap_count', 'openalex_total')
+            SourceCoverageSnapshot.objects.filter(source=snap.source)
+            .order_by("computed_at")
+            .values("computed_at", "coverage_pct", "optimap_count", "openalex_total")
             .reverse()[:52]
         )
         history_qs.reverse()
         source_history[snap.source_id] = {
-            'name': snap.source.name,
-            'history': [
+            "name": snap.source.name,
+            "history": [
                 {
-                    'date': str(h['computed_at'].date()),
-                    'coverage_pct': h['coverage_pct'],
-                    'optimap_count': h['optimap_count'],
-                    'openalex_total': h['openalex_total'],
+                    "date": str(h["computed_at"].date()),
+                    "coverage_pct": h["coverage_pct"],
+                    "optimap_count": h["optimap_count"],
+                    "openalex_total": h["openalex_total"],
                 }
                 for h in history_qs
             ],
@@ -667,27 +651,32 @@ def statistics_page(request):
     region_urls = {r.name: r.get_absolute_url() for r in GlobalRegion.objects.all()}
 
     def _with_url(rows):
-        return [{'name': r['name'], 'count': r['count'], 'url': region_urls.get(r['name'])}
-                for r in rows]
+        return [{"name": r["name"], "count": r["count"], "url": region_urls.get(r["name"])} for r in rows]
 
     snapshot_by_continent = _with_url(snapshot.by_continent) if snapshot else []
-    snapshot_by_ocean     = _with_url(snapshot.by_ocean)     if snapshot else []
+    snapshot_by_ocean = _with_url(snapshot.by_ocean) if snapshot else []
 
-    return render(request, 'statistics.html', {
-        'snapshot': snapshot,
-        'snapshot_by_continent': snapshot_by_continent,
-        'snapshot_by_ocean': snapshot_by_ocean,
-        'history_json': _json.dumps([
-            {
-                'date': str(h['computed_at'].date()),
-                'published_works': h['published_works'],
-                'total_works': h['total_works'],
-                'with_geometry': h['with_geometry'],
-                'with_temporal': h['with_temporal'],
-                'contributors': h['contributors'],
-            }
-            for h in history
-        ]),
-        'sources_coverage': sources_coverage,
-        'source_history_json': _json.dumps(source_history),
-    })
+    return render(
+        request,
+        "statistics.html",
+        {
+            "snapshot": snapshot,
+            "snapshot_by_continent": snapshot_by_continent,
+            "snapshot_by_ocean": snapshot_by_ocean,
+            "history_json": _json.dumps(
+                [
+                    {
+                        "date": str(h["computed_at"].date()),
+                        "published_works": h["published_works"],
+                        "total_works": h["total_works"],
+                        "with_geometry": h["with_geometry"],
+                        "with_temporal": h["with_temporal"],
+                        "contributors": h["contributors"],
+                    }
+                    for h in history
+                ]
+            ),
+            "sources_coverage": sources_coverage,
+            "source_history_json": _json.dumps(source_history),
+        },
+    )

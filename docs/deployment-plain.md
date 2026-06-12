@@ -537,18 +537,15 @@ sudo systemctl status optimap-worker
 
 ### Create site configuration
 
-This deployment uses an **existing** certbot installation rooted at
-`/var/www/komet/optimap/certbot/`, with `--config-dir
-/var/www/komet/optimap/certbot/conf` and webroot
-`/var/www/komet/optimap/certbot/www`. Certificates already live at:
+Certbot data lives at `/opt/optimap/certbot/` (config dir
+`/opt/optimap/certbot/conf`, webroot `/opt/optimap/certbot/www`).
+Certificates are at:
 
-- `…/certbot/conf/live/optimap.geo.tu-dresden.de/fullchain.pem`
-- `…/certbot/conf/live/optimap.geo.tu-dresden.de/privkey.pem`
+- `/opt/optimap/certbot/conf/live/optimap.geo.tu-dresden.de/fullchain.pem`
+- `/opt/optimap/certbot/conf/live/optimap.geo.tu-dresden.de/privkey.pem`
 
-If you are deploying a different host, replace `optimap.geo.tu-dresden.de` and
-the `…/certbot/{conf,www}` paths throughout. If certbot's config dir is the
-default (`/etc/letsencrypt/`), see the `## SSL certificate setup` section
-below for how the paths shift back.
+If you are deploying a different host, replace `optimap.geo.tu-dresden.de`
+and the `/opt/optimap/certbot/` paths throughout.
 
 Create `/etc/nginx/sites-available/optimap`:
 
@@ -570,7 +567,7 @@ server {
 
     # Let's Encrypt ACME challenge (matches certbot --webroot)
     location /.well-known/acme-challenge/ {
-        root /var/www/komet/optimap/certbot/www;
+        root /opt/optimap/certbot/www;
     }
 
     # Redirect all other traffic to HTTPS
@@ -585,13 +582,10 @@ server {
     listen [::]:443 ssl http2;
     server_name optimap.geo.tu-dresden.de;
 
-    # SSL configuration — paths point at the custom certbot --config-dir.
-    # Replace with /etc/letsencrypt/live/<domain>/… if certbot uses defaults.
-    ssl_certificate     /var/www/komet/optimap/certbot/conf/live/optimap.geo.tu-dresden.de/fullchain.pem;
-    ssl_certificate_key /var/www/komet/optimap/certbot/conf/live/optimap.geo.tu-dresden.de/privkey.pem;
+    ssl_certificate     /opt/optimap/certbot/conf/live/optimap.geo.tu-dresden.de/fullchain.pem;
+    ssl_certificate_key /opt/optimap/certbot/conf/live/optimap.geo.tu-dresden.de/privkey.pem;
 
-    # Modern SSL settings (replaces certbot's options-ssl-nginx.conf, which
-    # lives under /etc/letsencrypt and is absent with the custom config dir)
+    # Modern SSL settings
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_prefer_server_ciphers off;
     ssl_session_cache shared:SSL:10m;
@@ -666,8 +660,21 @@ server {
 
 ### Enable the site
 
-The certbot webroot (`/var/www/komet/optimap/certbot/www`) already exists in
-this deployment, so no `mkdir` is needed.
+Create the certbot directories if they do not yet exist. The webroot must
+be owned by root and world-traversable so both certbot (runs as root) and
+nginx (`www-data`) can access it. The `acme-challenge` subdirectory needs a
+default ACL so that challenge files written by root are world-readable:
+
+```bash
+sudo mkdir -p /opt/optimap/certbot/{www,conf,work,logs}
+sudo chown -R root:root /opt/optimap/certbot
+sudo chmod 755 /opt/optimap/certbot/www
+sudo chmod 700 /opt/optimap/certbot/conf
+sudo mkdir -p /opt/optimap/certbot/www/.well-known/acme-challenge
+sudo chmod 755 /opt/optimap/certbot/www/.well-known/acme-challenge
+sudo apt install -y acl
+sudo setfacl -d -m o::r /opt/optimap/certbot/www/.well-known/acme-challenge
+```
 
 ```bash
 # Enable site
@@ -682,65 +689,113 @@ sudo nginx -t
 
 ## SSL certificate setup
 
-This deployment already has a certbot install at
-`/var/www/komet/optimap/certbot/` with a valid certificate for
-`optimap.geo.tu-dresden.de`, so the initial cert acquisition is **not**
-needed — the nginx config above points straight at the existing files. Skip
-to "Automatic certificate renewal" below.
+If certs already exist at `/opt/optimap/certbot/conf/live/`, skip to
+"Automatic certificate renewal" below — the nginx config above points
+straight at them.
 
-The rest of this section documents how to (re)issue a certificate against
-the same custom config dir, e.g. for a new host or after a teardown.
+If the certificate was originally issued with a different config dir (e.g.
+`/etc/letsencrypt/` from a prior Docker-based setup), the renewal config may
+contain stale paths. Two things to check and fix:
 
-### (Optional) Issue a certificate with Let's Encrypt
+**1. Absolute paths in the top section** — renewal fails with
+`expected /etc/letsencrypt/live/…/cert.pem to be a symlink`:
+
+```bash
+sudo sed -i \
+  's|/etc/letsencrypt|/opt/optimap/certbot/conf|g' \
+  /opt/optimap/certbot/conf/renewal/optimap.geo.tu-dresden.de.conf
+```
+
+**2. Stale `[[webroot_map]]` entry** — renewal silently writes challenge
+files to the wrong directory (e.g. `/var/www/certbot`) instead of
+`/opt/optimap/certbot/www`, causing 404s from the CA even though
+`webroot_path` looks correct. The `[[webroot_map]]` entry takes precedence
+over `webroot_path`:
+
+```bash
+sudo sed -i \
+  's|optimap.geo.tu-dresden.de = .*|optimap.geo.tu-dresden.de = /opt/optimap/certbot/www|g' \
+  /opt/optimap/certbot/conf/renewal/optimap.geo.tu-dresden.de.conf
+```
+
+Verify the final state of the renewal config:
+
+```bash
+sudo cat /opt/optimap/certbot/conf/renewal/optimap.geo.tu-dresden.de.conf
+```
+
+All paths should point to `/opt/optimap/certbot/…` and the `[[webroot_map]]`
+entry should read `/opt/optimap/certbot/www`.
+
+### Issue a certificate
 
 If certs do not yet exist, bring nginx up with **only the HTTP server block**
 first (comment out the `listen 443 …` block, since it will fail to start
-without certs), reload nginx, then run certbot pointed at the custom
-directories:
+without certs), reload nginx, then issue the certificate:
 
 ```bash
 sudo certbot certonly \
-    --webroot -w /var/www/komet/optimap/certbot/www \
-    --config-dir /var/www/komet/optimap/certbot/conf \
-    --work-dir   /var/www/komet/optimap/certbot/work \
-    --logs-dir   /var/www/komet/optimap/certbot/logs \
+    --webroot -w /opt/optimap/certbot/www \
+    --config-dir /opt/optimap/certbot/conf \
+    --work-dir   /opt/optimap/certbot/work \
+    --logs-dir   /opt/optimap/certbot/logs \
+    --server https://acme.pki.cert.tu-dresden.de/ \
     -d optimap.geo.tu-dresden.de
 ```
 
 After this succeeds, restore the HTTPS server block in
 `/etc/nginx/sites-available/optimap` and `sudo systemctl reload nginx`.
 
-> If you are using certbot's default config dir (`/etc/letsencrypt/`), drop
-> the `--config-dir`/`--work-dir`/`--logs-dir` flags and use webroot
-> `/var/www/certbot` (creating it first with `sudo mkdir -p /var/www/certbot`).
-
 ### Automatic certificate renewal
 
-Because this deployment uses a non-default config dir, the standard
+Because this deployment uses a non-default certbot config dir, the standard
 `certbot.timer` systemd unit (which runs `certbot renew` against
-`/etc/letsencrypt/`) will **not** renew these certs. Either:
+`/etc/letsencrypt/`) will **not** renew these certs. Set up a deploy hook
+and a cron job instead.
 
-- Run renewals via a custom cron entry / systemd timer that passes the
-  same `--config-dir`/`--work-dir`/`--logs-dir` flags as above, plus
-  `--deploy-hook 'systemctl reload nginx'`.
-- Or, if a hook script in `…/certbot/conf/renewal-hooks/` already takes
-  care of reload, just verify that scheduling is in place.
+#### 1. Create the deploy hook
 
-Test the renewal command end-to-end with `--dry-run` before relying on it:
+The deploy hook runs after every successful renewal and reloads nginx so it
+picks up the new certificate:
+
+```bash
+sudo mkdir -p /opt/optimap/certbot/conf/renewal-hooks/deploy
+sudo tee /opt/optimap/certbot/conf/renewal-hooks/deploy/reload-nginx.sh > /dev/null << 'EOF'
+#!/bin/bash
+systemctl reload nginx
+EOF
+sudo chmod +x /opt/optimap/certbot/conf/renewal-hooks/deploy/reload-nginx.sh
+```
+
+#### 2. Test the renewal dry-run
+
+Verify the full renewal path (hook included) before scheduling it:
 
 ```bash
 sudo certbot renew --dry-run \
-    --config-dir /var/www/komet/optimap/certbot/conf \
-    --work-dir   /var/www/komet/optimap/certbot/work \
-    --logs-dir   /var/www/komet/optimap/certbot/logs
+    --config-dir /opt/optimap/certbot/conf \
+    --work-dir   /opt/optimap/certbot/work \
+    --logs-dir   /opt/optimap/certbot/logs
 ```
 
-If you are on certbot defaults, the much simpler form applies:
+#### 3. Schedule the renewal with cron
+
+Run the renewal twice daily (the times are intentionally offset from midnight
+to avoid thundering-herd load on ACME servers):
 
 ```bash
-sudo systemctl status certbot.timer
-sudo certbot renew --dry-run
+sudo crontab -e
 ```
+
+Add:
+
+```cron
+0 3,15 * * * certbot renew --quiet --config-dir /opt/optimap/certbot/conf --work-dir /opt/optimap/certbot/work --logs-dir /opt/optimap/certbot/logs
+```
+
+Certbot only contacts the ACME server when the certificate is within 30 days
+of expiry, so running the cron job twice daily is safe and is the standard
+recommendation.
 
 ## Firewall configuration
 
@@ -871,6 +926,7 @@ sudo -u optimap git pull origin main
 echo "Updating dependencies..."
 sudo -u optimap bash -c '
 source /opt/optimap/venv/bin/activate
+cd /opt/optimap/app
 
 # Update pip
 pip install --upgrade pip
@@ -892,6 +948,9 @@ python manage.py load_global_regions
 
 # Insert / update built-in sources from SOURCE_CONFIG.
 python manage.py harvest_sources --insert-sources
+
+# Regenerate OGC API OpenAPI document (required for /ogcapi/ endpoint).
+python manage.py generate_pygeoapi_openapi --force || echo "WARNING: OGC API setup failed (non-fatal)"
 ' #end of bash command
 
 # Start services

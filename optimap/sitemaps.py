@@ -2,12 +2,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from django.contrib.sitemaps import Sitemap
-from works.models import Work, GlobalRegion, Collection
 from django.urls import reverse
 
+from works.models import Collection, GlobalRegion, Work
 
-class WorksSitemap(Sitemap): # based on django.contrib.sitemaps.GenericSitemap
 
+class WorksSitemap(Sitemap):  # based on django.contrib.sitemaps.GenericSitemap
     priority = 0.5
     changefreq = "weekly"
     queryset = Work.objects.all().filter(status="p")
@@ -26,37 +26,40 @@ class WorksSitemap(Sitemap): # based on django.contrib.sitemaps.GenericSitemap
         """Return the last modification date of the work."""
         return item.lastUpdate
 
+
 class StaticViewSitemap(Sitemap):
     priority = 0.5
     changefreq = "monthly"
 
     def items(self):
         return [
-            "main",           # Home page (/)
-            "about",          # About page (/about/)
+            "main",  # Home page (/)
+            "about",  # About page (/about/)
             "accessibility",  # Accessibility statement (/accessibility/)
-            "collections",    # Collections index (/collections/)
-            "contribute",     # Contribute page (/contribute/)
-            "data",           # Data download page (/data/)
-            "feeds",          # RSS/Atom feeds listing (/feeds/)
-            "geoextent",      # Geoextent extraction tool (/geoextent/)
-            "privacy",        # Privacy policy (/privacy/)
-            "redoc",          # API schema UI (/api/schema/ui/)
-            "sitemap-page",   # Human-readable sitemap (/pages/)
-            "works",          # Works listing (/works/)
+            "collections",  # Collections index (/collections/)
+            "contribute",  # Contribute page (/contribute/)
+            "data",  # Data download page (/data/)
+            "feeds",  # RSS/Atom feeds listing (/feeds/)
+            "geoextent",  # Geoextent extraction tool (/geoextent/)
+            "privacy",  # Privacy policy (/privacy/)
+            "redoc",  # API schema UI (/api/schema/ui/)
+            "sitemap-page",  # Human-readable sitemap (/pages/)
+            "works",  # Works listing (/works/)
         ]
 
     def location(self, item):
         return reverse(f"optimap:{item}")
 
+
 class FeedsSitemap(Sitemap):
     """Sitemap for global regional feeds (continents and oceans)."""
+
     priority = 0.6
     changefreq = "daily"
 
     def items(self):
         """Return all GlobalRegion objects (continents and oceans)."""
-        return GlobalRegion.objects.all().order_by('region_type', 'name')
+        return GlobalRegion.objects.all().order_by("region_type", "name")
 
     def location(self, obj):
         """Return the feed page URL for each region."""
@@ -73,11 +76,12 @@ class CollectionsSitemap(Sitemap):
     Only published collections are exposed — unpublished ones are admin-only
     and must not leak via sitemaps.
     """
+
     priority = 0.6
     changefreq = "weekly"
 
     def items(self):
-        return Collection.objects.filter(is_published=True).order_by('name')
+        return Collection.objects.filter(is_published=True).order_by("name")
 
     def location(self, obj):
         return obj.get_absolute_url()
@@ -88,14 +92,13 @@ class CollectionsSitemap(Sitemap):
 
 class CollectionFeedsSitemap(Sitemap):
     """Sitemap for collection GeoRSS and Atom feed URLs (#248)."""
+
     priority = 0.6
     changefreq = "daily"
 
     def items(self):
         return [
-            (c, fmt)
-            for c in Collection.objects.filter(is_published=True).order_by("name")
-            for fmt in ("rss", "atom")
+            (c, fmt) for c in Collection.objects.filter(is_published=True).order_by("name") for fmt in ("rss", "atom")
         ]
 
     def location(self, item):
@@ -109,6 +112,7 @@ class CollectionFeedsSitemap(Sitemap):
 
 class CollectionDownloadsSitemap(Sitemap):
     """Sitemap for collection download endpoints (#217)."""
+
     priority = 0.5
     changefreq = "weekly"
 

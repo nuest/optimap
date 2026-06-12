@@ -2,32 +2,31 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import os
+
 import django
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'optimap.settings')
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "optimap.settings")
 django.setup()
-from works.tasks import harvest_oai_endpoint
-from django.test import TestCase
-from django.core import mail
-from django.conf import settings
+from unittest.mock import Mock, patch
+
 from django.contrib.auth import get_user_model
-from unittest.mock import patch, Mock
+from django.core import mail
+from django.test import TestCase
 from django.test.utils import override_settings
-from works.models import Source, Work, HarvestingEvent
+
+from works.models import HarvestingEvent, Source, Work
+from works.tasks import harvest_oai_endpoint
 
 User = get_user_model()
 
+
 @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
 class HarvestRegularMetadataTestCase(TestCase):
-    
     def setUp(self):
         Work.objects.all().delete()
         HarvestingEvent.objects.all().delete()
 
-        self.user = User.objects.create_user(
-            username="testuser", 
-            email="testuser@example.com", 
-            password="password123"
-        )
+        self.user = User.objects.create_user(username="testuser", email="testuser@example.com", password="password123")
         # No Collection is pre-assigned here on purpose: this test exercises
         # the unset-collection branch of harvest_oai_endpoint, which now
         # auto-creates one on first run via ensure_collection_for_source.
@@ -52,14 +51,16 @@ class HarvestRegularMetadataTestCase(TestCase):
         mock_session.get.return_value = fake_response
         mock_session_factory.return_value = mock_session
 
-        def fake_parser_func(content, event, max_records=None, warning_collector=None, update_existing=False, stats=None, **_kw):
+        def fake_parser_func(
+            content, event, max_records=None, warning_collector=None, update_existing=False, stats=None, **_kw
+        ):
             Work.objects.create(
                 title="Test Publication 1",
                 doi="10.1000/1",
                 job=event,
                 timeperiod_startdate=[],
                 timeperiod_enddate=[],
-                geometry=None
+                geometry=None,
             )
             Work.objects.create(
                 title="Test Publication 2",
@@ -67,7 +68,7 @@ class HarvestRegularMetadataTestCase(TestCase):
                 job=event,
                 timeperiod_startdate=[],
                 timeperiod_enddate=[],
-                geometry=None
+                geometry=None,
             )
             if stats is not None:
                 stats.created += 2

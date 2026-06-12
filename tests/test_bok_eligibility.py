@@ -13,21 +13,30 @@ from works.models import Collection, Source, Work
 class BokEligibilityTests(TestCase):
     def setUp(self):
         self.source = Source.objects.create(
-            name="Src", url_field="https://e.example/oai",
+            name="Src",
+            url_field="https://e.example/oai",
         )
         self.collection_a = Collection.objects.create(
-            identifier="alpha", name="Alpha", is_published=True,
+            identifier="alpha",
+            name="Alpha",
+            is_published=True,
         )
         self.collection_b = Collection.objects.create(
-            identifier="beta", name="Beta", is_published=True,
+            identifier="beta",
+            name="Beta",
+            is_published=True,
         )
         self.work_in_a = Work.objects.create(
-            title="In A", source=self.source, status="h",
+            title="In A",
+            source=self.source,
+            status="h",
             creationDate=timezone.now(),
         )
         self.work_in_a.collections.add(self.collection_a)
         self.work_loose = Work.objects.create(
-            title="Loose", source=self.source, status="h",
+            title="Loose",
+            source=self.source,
+            status="h",
             creationDate=timezone.now(),
         )
 

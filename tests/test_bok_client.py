@@ -8,10 +8,9 @@ import os
 from unittest.mock import patch
 
 from django.core.cache import cache
-from django.test import TestCase, override_settings, tag
+from django.test import TestCase, tag
 
 from works.bok import client as bok_client
-
 
 FIXTURE_PATH = os.path.join(os.path.dirname(__file__), "fixtures", "bok_sample.json")
 
@@ -60,7 +59,16 @@ class BokTrimAndDeriveTests(TestCase):
 
     def test_get_concepts_caches_after_first_call(self):
         with patch.object(bok_client, "fetch_bok_snapshot") as fake_fetch:
-            fake_fetch.return_value = {"CV": {"code": "CV", "name": "Cartography", "uri": "", "description": "", "parent_code": "", "breadcrumb": []}}
+            fake_fetch.return_value = {
+                "CV": {
+                    "code": "CV",
+                    "name": "Cartography",
+                    "uri": "",
+                    "description": "",
+                    "parent_code": "",
+                    "breadcrumb": [],
+                }
+            }
             cache.clear()
             bok_client.get_concepts()
             bok_client.get_concepts()
@@ -68,7 +76,16 @@ class BokTrimAndDeriveTests(TestCase):
 
     def test_resolve_marks_unknown_codes_as_orphan(self):
         with patch.object(bok_client, "fetch_bok_snapshot") as fake_fetch:
-            fake_fetch.return_value = {"CV": {"code": "CV", "name": "Cartography", "uri": "https://geospacebok.eu/CV", "description": "x", "parent_code": "", "breadcrumb": []}}
+            fake_fetch.return_value = {
+                "CV": {
+                    "code": "CV",
+                    "name": "Cartography",
+                    "uri": "https://geospacebok.eu/CV",
+                    "description": "x",
+                    "parent_code": "",
+                    "breadcrumb": [],
+                }
+            }
             cache.clear()
             resolved = bok_client.resolve(["CV", "REMOVED"])
         self.assertEqual(resolved[0]["code"], "CV")

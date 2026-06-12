@@ -14,8 +14,8 @@ Django's OGC API endpoint (/ogcapi/) will not activate until this file exists.
 import os
 from pathlib import Path
 
-from django.core.management.base import BaseCommand, CommandError
 from django.conf import settings
+from django.core.management.base import BaseCommand, CommandError
 
 
 class Command(BaseCommand):
@@ -37,10 +37,7 @@ class Command(BaseCommand):
 
         if openapi_path.exists() and not options["force"]:
             self.stdout.write(
-                self.style.WARNING(
-                    f"OpenAPI file already exists: {openapi_path}\n"
-                    "Use --force to regenerate."
-                )
+                self.style.WARNING(f"OpenAPI file already exists: {openapi_path}\nUse --force to regenerate.")
             )
             return
 
@@ -48,8 +45,8 @@ class Command(BaseCommand):
         os.environ.setdefault("PYGEOAPI_OPENAPI", str(openapi_path))
 
         try:
-            from pygeoapi.openapi import generate_openapi_document
             from pygeoapi.models.openapi import SupportedFormats
+            from pygeoapi.openapi import generate_openapi_document
         except ImportError as exc:
             raise CommandError(f"pygeoapi not installed: {exc}") from exc
 
@@ -65,6 +62,4 @@ class Command(BaseCommand):
 
         openapi_path.write_text(doc, encoding="utf-8")
         self.stdout.write(self.style.SUCCESS(f"Written to {openapi_path}"))
-        self.stdout.write(
-            "Restart the server to activate the /ogcapi/ endpoint."
-        )
+        self.stdout.write("Restart the server to activate the /ogcapi/ endpoint.")

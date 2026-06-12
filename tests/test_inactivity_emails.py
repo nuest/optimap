@@ -193,6 +193,7 @@ class SentinelAssignmentTests(TestCase):
 
     def test_contributions_reassigned_on_delete(self):
         from works.models import Contribution, Work
+
         user = _make_user("contrib", "contrib@example.com", last_login_days_ago=10)
         work = Work.objects.create(title="Test work", status="p")
         contrib = Contribution.objects.create(user=user, work=work, kind=Contribution.SPATIAL)
@@ -208,4 +209,5 @@ class SentinelAssignmentTests(TestCase):
         # Sentinel should survive the pre_delete guard (it would skip reassignment)
         # We just verify the guard doesn't raise
         from works.signals import reassign_contributions_before_user_delete
+
         reassign_contributions_before_user_delete(sender=CustomUser, instance=sentinel)

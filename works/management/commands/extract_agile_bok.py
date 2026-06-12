@@ -95,9 +95,7 @@ class Command(BaseCommand):
             if not codes:
                 self.stdout.write(f"  [{work.id}] {doi} — no BoK concepts found")
             else:
-                self.stdout.write(
-                    self.style.SUCCESS(f"  [{work.id}] {doi} — {codes}")
-                )
+                self.stdout.write(self.style.SUCCESS(f"  [{work.id}] {doi} — {codes}"))
                 if not dry_run:
                     work.bok_concepts = codes
                     prov = work.provenance if isinstance(work.provenance, dict) else {}

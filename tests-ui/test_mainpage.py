@@ -2,8 +2,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import os
+
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
-from helium import start_chrome, get_driver, kill_browser
+from helium import get_driver, kill_browser, start_chrome
 
 
 class MainpageTest(StaticLiveServerTestCase):
@@ -13,7 +14,7 @@ class MainpageTest(StaticLiveServerTestCase):
     that serves both the application and static files.
     """
 
-    fixtures = ['test_data_optimap.json']
+    fixtures = ["test_data_optimap.json"]
 
     @classmethod
     def setUpClass(cls):
@@ -22,6 +23,6 @@ class MainpageTest(StaticLiveServerTestCase):
 
     def test_mainpage_loads(self):
         """Test that the main page loads correctly."""
-        start_chrome(f'{self.live_server_url}/')
-        get_driver().save_screenshot(os.path.join(os.getcwd(), 'tests-ui', 'screenshots', 'UserMenu.png'))
+        start_chrome(f"{self.live_server_url}/")
+        get_driver().save_screenshot(os.path.join(os.getcwd(), "tests-ui", "screenshots", "UserMenu.png"))
         kill_browser()

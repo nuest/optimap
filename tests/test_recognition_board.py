@@ -10,14 +10,15 @@ Covers:
 - Username uniqueness is enforced by the settings view (no 500).
 - Internal counting persists for users without opt-in.
 """
+
 import json
 
 from django.contrib.auth import get_user_model
 from django.contrib.gis.geos import GeometryCollection, Point
 from django.test import TestCase
 
-from works.recognition import RECOGNITION_TIERS, group_by_tier, is_offensive, tier_for
 from works.models import Contribution, Source, UserProfile, Work
+from works.recognition import RECOGNITION_TIERS, group_by_tier, is_offensive, tier_for
 
 User = get_user_model()
 
@@ -59,13 +60,14 @@ class ContributionRecordingTests(TestCase):
 
     def test_combined_contribution_creates_two_rows(self):
         self.client.login(username="contrib@example.com", password="pw12345!")
-        resp = self._post_contribution({
-            "geometry": self.geom,
-            "temporal_extent": {"start_date": "2024-01-01", "end_date": "2024-12-31"},
-        })
+        resp = self._post_contribution(
+            {
+                "geometry": self.geom,
+                "temporal_extent": {"start_date": "2024-01-01", "end_date": "2024-12-31"},
+            }
+        )
         self.assertEqual(resp.status_code, 200)
-        kinds = set(Contribution.objects.filter(user=self.user, work=self.work)
-                    .values_list("kind", flat=True))
+        kinds = set(Contribution.objects.filter(user=self.user, work=self.work).values_list("kind", flat=True))
         self.assertEqual(kinds, {Contribution.SPATIAL, Contribution.TEMPORAL})
 
     def test_temporal_only_contribution_creates_temporal_row(self):
@@ -169,20 +171,23 @@ class RecognitionBoardViewTests(TestCase):
     def setUp(self):
         self.source = Source.objects.create(name="Test Source", is_oa=True, is_preprint=False)
         self.work = Work.objects.create(
-            title="W1", status="p", url="http://example.org/lb1",
-            geometry=GeometryCollection(Point(0, 0)), source=self.source,
+            title="W1",
+            status="p",
+            url="http://example.org/lb1",
+            geometry=GeometryCollection(Point(0, 0)),
+            source=self.source,
         )
-        self.opted_in = User.objects.create_user(
-            username="opt@example.com", email="opt@example.com", password="pw"
-        )
+        self.opted_in = User.objects.create_user(username="opt@example.com", email="opt@example.com", password="pw")
         self.opted_out = User.objects.create_user(
             username="silent@example.com", email="silent@example.com", password="pw"
         )
         UserProfile.objects.filter(user=self.opted_in).update(
-            recognition_opt_in=True, recognition_username="explorer-1",
+            recognition_opt_in=True,
+            recognition_username="explorer-1",
         )
         UserProfile.objects.filter(user=self.opted_out).update(
-            recognition_opt_in=False, recognition_username="hidden-1",
+            recognition_opt_in=False,
+            recognition_username="hidden-1",
         )
         # Both users have one spatial contribution
         Contribution.objects.create(user=self.opted_in, work=self.work, kind=Contribution.SPATIAL)
@@ -203,22 +208,30 @@ class RecognitionBoardViewTests(TestCase):
 class RecognitionBoardSettingsTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
-            username="settings@example.com", email="settings@example.com", password="pw",
+            username="settings@example.com",
+            email="settings@example.com",
+            password="pw",
         )
         self.other = User.objects.create_user(
-            username="other@example.com", email="other@example.com", password="pw",
+            username="other@example.com",
+            email="other@example.com",
+            password="pw",
         )
         UserProfile.objects.filter(user=self.other).update(
-            recognition_opt_in=True, recognition_username="taken-name",
+            recognition_opt_in=True,
+            recognition_username="taken-name",
         )
 
     def test_opt_in_with_username(self):
         self.client.login(username="settings@example.com", password="pw")
-        resp = self.client.post("/usersettings/", {
-            "form": "recognition",
-            "recognition_opt_in": "on",
-            "recognition_username": "marco-1492",
-        })
+        resp = self.client.post(
+            "/usersettings/",
+            {
+                "form": "recognition",
+                "recognition_opt_in": "on",
+                "recognition_username": "marco-1492",
+            },
+        )
         self.assertEqual(resp.status_code, 302)
         profile = UserProfile.objects.get(user=self.user)
         self.assertTrue(profile.recognition_opt_in)
@@ -226,11 +239,14 @@ class RecognitionBoardSettingsTests(TestCase):
 
     def test_opt_in_with_empty_username_autogenerates(self):
         self.client.login(username="settings@example.com", password="pw")
-        resp = self.client.post("/usersettings/", {
-            "form": "recognition",
-            "recognition_opt_in": "on",
-            "recognition_username": "",
-        })
+        resp = self.client.post(
+            "/usersettings/",
+            {
+                "form": "recognition",
+                "recognition_opt_in": "on",
+                "recognition_username": "",
+            },
+        )
         self.assertEqual(resp.status_code, 302)
         profile = UserProfile.objects.get(user=self.user)
         self.assertTrue(profile.recognition_opt_in)
@@ -239,22 +255,30 @@ class RecognitionBoardSettingsTests(TestCase):
 
     def test_duplicate_username_rejected(self):
         self.client.login(username="settings@example.com", password="pw")
-        resp = self.client.post("/usersettings/", {
-            "form": "recognition",
-            "recognition_opt_in": "on",
-            "recognition_username": "taken-name",
-        }, follow=True)
+        resp = self.client.post(
+            "/usersettings/",
+            {
+                "form": "recognition",
+                "recognition_opt_in": "on",
+                "recognition_username": "taken-name",
+            },
+            follow=True,
+        )
         self.assertEqual(resp.status_code, 200)  # not 500
         profile = UserProfile.objects.filter(user=self.user).first()
         # Profile should not have adopted the duplicate name.
         self.assertNotEqual(getattr(profile, "recognition_username", None), "taken-name")
 
     def _post_recognition(self, username, follow=True):
-        return self.client.post("/usersettings/", {
-            "form": "recognition",
-            "recognition_opt_in": "on",
-            "recognition_username": username,
-        }, follow=follow)
+        return self.client.post(
+            "/usersettings/",
+            {
+                "form": "recognition",
+                "recognition_opt_in": "on",
+                "recognition_username": username,
+            },
+            follow=follow,
+        )
 
     def _flash_messages(self, response):
         """Return list of (level_tag, text) tuples for messages on a `follow=True` response."""
@@ -280,14 +304,12 @@ class RecognitionBoardSettingsTests(TestCase):
 
     def test_offensive_username_in_various_positions_rejected(self):
         self.client.login(username="settings@example.com", password="pw")
-        for name in ["damn-it", "clever-stupid", "clever-stupid-puffin",
-                     "STUPID-Puffin", "hello_damn_world"]:
+        for name in ["damn-it", "clever-stupid", "clever-stupid-puffin", "STUPID-Puffin", "hello_damn_world"]:
             with self.subTest(name=name):
                 resp = self._post_recognition(name)
                 self.assertEqual(resp.status_code, 200)
                 profile = UserProfile.objects.get(user=self.user)
-                self.assertFalse(profile.recognition_opt_in,
-                                 f"{name!r} should not have been accepted")
+                self.assertFalse(profile.recognition_opt_in, f"{name!r} should not have been accepted")
 
     def test_clean_username_with_substring_of_profanity_accepted(self):
         """'classic-puffin' contains 'ass' as a substring; must NOT be rejected."""
@@ -300,11 +322,15 @@ class RecognitionBoardSettingsTests(TestCase):
 
     def test_invalid_format_message_visible(self):
         self.client.login(username="settings@example.com", password="pw")
-        resp = self.client.post("/usersettings/", {
-            "form": "recognition",
-            "recognition_opt_in": "on",
-            "recognition_username": "bad name!",
-        }, follow=True)
+        resp = self.client.post(
+            "/usersettings/",
+            {
+                "form": "recognition",
+                "recognition_opt_in": "on",
+                "recognition_username": "bad name!",
+            },
+            follow=True,
+        )
         messages_list = self._flash_messages(resp)
         self.assertEqual(len(messages_list), 1)
         level, text = messages_list[0]
@@ -334,11 +360,15 @@ class RecognitionBoardSettingsTests(TestCase):
 
     def test_invalid_username_rejected(self):
         self.client.login(username="settings@example.com", password="pw")
-        resp = self.client.post("/usersettings/", {
-            "form": "recognition",
-            "recognition_opt_in": "on",
-            "recognition_username": "bad name!",  # space and bang are invalid
-        }, follow=True)
+        resp = self.client.post(
+            "/usersettings/",
+            {
+                "form": "recognition",
+                "recognition_opt_in": "on",
+                "recognition_username": "bad name!",  # space and bang are invalid
+            },
+            follow=True,
+        )
         self.assertEqual(resp.status_code, 200)
         profile = UserProfile.objects.filter(user=self.user).first()
         self.assertFalse(profile.recognition_opt_in)

@@ -37,9 +37,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_AGILE_DOI_RE = re.compile(
-    r"^10\.5194/agile-giss-(\d+)-(\d+)-(\d{4})$", re.IGNORECASE
-)
+_AGILE_DOI_RE = re.compile(r"^10\.5194/agile-giss-(\d+)-(\d+)-(\d{4})$", re.IGNORECASE)
 
 # "BoK Concepts." or "BoK Concepts:" up to the next blank line or a capitalised
 # section label (a word ending in a period, e.g. "Keywords." or "Abstract.").
@@ -73,10 +71,7 @@ def agile_giss_doi_to_pdf_url(doi: str) -> str | None:
     if not m:
         return None
     vol, art, year = m.group(1), m.group(2), m.group(3)
-    return (
-        f"https://agile-giss.copernicus.org/articles/{vol}/{art}/{year}/"
-        f"agile-giss-{vol}-{art}-{year}.pdf"
-    )
+    return f"https://agile-giss.copernicus.org/articles/{vol}/{art}/{year}/agile-giss-{vol}-{art}-{year}.pdf"
 
 
 def _agile_pdf_session() -> requests.Session:
@@ -94,10 +89,12 @@ def _agile_pdf_session() -> requests.Session:
     adapter = HTTPAdapter(max_retries=retry)
     session.mount("http://", adapter)
     session.mount("https://", adapter)
-    session.headers.update({
-        "User-Agent": settings.OPTIMAP_USER_AGENT,
-        "Accept": "application/pdf, */*",
-    })
+    session.headers.update(
+        {
+            "User-Agent": settings.OPTIMAP_USER_AGENT,
+            "Accept": "application/pdf, */*",
+        }
+    )
     return session
 
 
@@ -234,6 +231,8 @@ def _extract_from_file(path: str, doi: str = "", pdf_url: str = "") -> list[str]
     codes = _parse_bok_section(section)
     logger.info(
         "BoK PDF extraction for %s: section=%r codes=%s",
-        doi or pdf_url, section[:120], codes,
+        doi or pdf_url,
+        section[:120],
+        codes,
     )
     return codes

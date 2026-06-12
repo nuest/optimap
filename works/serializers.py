@@ -3,16 +3,18 @@
 
 """publications serializers."""
 
-from rest_framework import serializers
-from rest_framework_gis.serializers import GeoFeatureModelSerializer
-from rest_framework import serializers as drf_serializers
-from drf_spectacular.utils import extend_schema_field, inline_serializer
-from .models import Work, Subscription, Source, GlobalRegion, Collection
-from django.contrib.auth import get_user_model
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.urls import reverse
+from drf_spectacular.utils import extend_schema_field, inline_serializer
+from rest_framework import serializers
+from rest_framework import serializers as drf_serializers
+from rest_framework_gis.serializers import GeoFeatureModelSerializer
+
+from .models import Collection, GlobalRegion, Source, Subscription, Work
 
 User = get_user_model()
+
 
 class SourceSerializer(serializers.ModelSerializer):
     openalex_url = serializers.ReadOnlyField()
@@ -98,7 +100,7 @@ class SourceSerializer(serializers.ModelSerializer):
         )
     )
     def get_latest_coverage(self, obj):
-        snap = obj.coverage_snapshots.order_by('-computed_at').first()
+        snap = obj.coverage_snapshots.order_by("-computed_at").first()
         if snap is None:
             return None
         return {
@@ -115,7 +117,9 @@ class SourceSerializer(serializers.ModelSerializer):
 
 
 class WorkSerializer(GeoFeatureModelSerializer):
-    source_details = serializers.SerializerMethodField(help_text="Embedded source row (same shape as `/api/v1/sources/<id>/`).")
+    source_details = serializers.SerializerMethodField(
+        help_text="Embedded source row (same shape as `/api/v1/sources/<id>/`)."
+    )
     status_display = serializers.CharField(source="get_status_display", read_only=True)
     bok_concepts_resolved = serializers.SerializerMethodField(
         help_text="Each BoK code resolved against the active EO4GEO BoK snapshot: code, name, uri, parent_code, breadcrumb, orphan flag."
@@ -167,16 +171,16 @@ class WorkSerializer(GeoFeatureModelSerializer):
             return []
         # Late import to avoid circular dependency at module load.
         from works.bok import client as bok_client
+
         try:
             return bok_client.resolve(codes)
         except Exception:
             # If the BoK snapshot is unreachable, fall back to bare codes
             # so the API stays responsive.
             return [
-                {"code": c, "name": c, "uri": "", "parent_code": "",
-                 "breadcrumb": [], "orphan": True}
-                for c in codes
+                {"code": c, "name": c, "uri": "", "parent_code": "", "breadcrumb": [], "orphan": True} for c in codes
             ]
+
 
 class WorkMinimalSerializer(GeoFeatureModelSerializer):
     """Slim serializer for chunked map loading — geometry + identifiers only."""
@@ -232,13 +236,13 @@ class UserSerializer(drf_serializers.ModelSerializer):
 # Geoextent API Serializers
 
 # Shared field definitions
-RESPONSE_FORMAT_CHOICES = ['geojson', 'wkt', 'wkb']
-RESPONSE_FORMAT_DEFAULT = 'geojson'
+RESPONSE_FORMAT_CHOICES = ["geojson", "wkt", "wkb"]
+RESPONSE_FORMAT_DEFAULT = "geojson"
 RESPONSE_FORMAT_HELP = "Response format: 'geojson' (default - GeoJSON FeatureCollection), 'wkt' (WKT string with metadata), 'wkb' (WKB hex string with metadata)"
 
 # All gazetteers the library supports.
-GAZETTEER_CHOICES = ['nominatim', 'geonames', 'photon']
-GAZETTEER_DEFAULT = 'nominatim'
+GAZETTEER_CHOICES = ["nominatim", "geonames", "photon"]
+GAZETTEER_DEFAULT = "nominatim"
 
 
 def get_available_gazetteers():
@@ -248,35 +252,31 @@ def get_available_gazetteers():
     absent or empty the library raises ValueError at call time, so we exclude
     it here to give users a clean 400 / empty dropdown instead of a 500.
     """
-    available = ['nominatim', 'photon']
-    if getattr(settings, 'GEOEXTENT_GEONAMES_USERNAME', ''):
-        available.append('geonames')
+    available = ["nominatim", "photon"]
+    if getattr(settings, "GEOEXTENT_GEONAMES_USERNAME", ""):
+        available.append("geonames")
     return available
 
 
 class GeoextentBaseSerializer(serializers.Serializer):
     """Base serializer with common geoextent parameters."""
+
     bbox = serializers.BooleanField(default=True)
     tbox = serializers.BooleanField(default=True)
     convex_hull = serializers.BooleanField(default=False)
     response_format = serializers.ChoiceField(
-        choices=RESPONSE_FORMAT_CHOICES,
-        default=RESPONSE_FORMAT_DEFAULT,
-        help_text=RESPONSE_FORMAT_HELP
+        choices=RESPONSE_FORMAT_CHOICES, default=RESPONSE_FORMAT_DEFAULT, help_text=RESPONSE_FORMAT_HELP
     )
     placename = serializers.BooleanField(default=False)
-    gazetteer = serializers.ChoiceField(
-        choices=GAZETTEER_CHOICES,
-        default=GAZETTEER_DEFAULT
-    )
+    gazetteer = serializers.ChoiceField(choices=GAZETTEER_CHOICES, default=GAZETTEER_DEFAULT)
     external_metadata = serializers.BooleanField(
         default=True,
-        help_text="Retrieve external metadata from CrossRef/DataCite for DOIs (only applies to remote resources)"
+        help_text="Retrieve external metadata from CrossRef/DataCite for DOIs (only applies to remote resources)",
     )
     external_metadata_method = serializers.ChoiceField(
-        choices=['auto', 'all', 'crossref', 'datacite'],
-        default='auto',
-        help_text="Method for retrieving metadata: 'auto' (default), 'all', 'crossref', or 'datacite'"
+        choices=["auto", "all", "crossref", "datacite"],
+        default="auto",
+        help_text="Method for retrieving metadata: 'auto' (default), 'all', 'crossref', or 'datacite'",
     )
 
     def validate_gazetteer(self, value):
@@ -293,23 +293,22 @@ class GeoextentBaseSerializer(serializers.Serializer):
 
 class GeoextentExtractSerializer(GeoextentBaseSerializer):
     """Serializer for extracting extent from uploaded file."""
+
     file = serializers.FileField(required=True)
 
 
 class GeoextentRemoteSerializer(GeoextentBaseSerializer):
     """Serializer for extracting extent from remote repository."""
+
     identifiers = serializers.ListField(
-        child=serializers.CharField(),
-        required=True,
-        min_length=1,
-        help_text="List of DOIs or repository URLs"
+        child=serializers.CharField(), required=True, min_length=1, help_text="List of DOIs or repository URLs"
     )
     file_limit = serializers.IntegerField(default=10, min_value=1, max_value=100)
     size_limit_mb = serializers.IntegerField(default=100, min_value=1)
 
     def validate_size_limit_mb(self, value):
         """Ensure requested size doesn't exceed server maximum."""
-        max_allowed = getattr(settings, 'GEOEXTENT_MAX_DOWNLOAD_SIZE_MB', 1000)
+        max_allowed = getattr(settings, "GEOEXTENT_MAX_DOWNLOAD_SIZE_MB", 1000)
         if value > max_allowed:
             raise serializers.ValidationError(
                 f"Requested size limit ({value}MB) exceeds server maximum ({max_allowed}MB)"
@@ -319,23 +318,21 @@ class GeoextentRemoteSerializer(GeoextentBaseSerializer):
 
 class GeoextentRemoteGetSerializer(GeoextentBaseSerializer):
     """Serializer for GET endpoint with URL parameters."""
-    identifiers = serializers.CharField(
-        required=True,
-        help_text="Comma-separated DOIs or repository URLs"
-    )
+
+    identifiers = serializers.CharField(required=True, help_text="Comma-separated DOIs or repository URLs")
     file_limit = serializers.IntegerField(default=10, min_value=1, max_value=100)
     size_limit_mb = serializers.IntegerField(default=100, min_value=1)
 
     def validate_identifiers(self, value):
         """Parse comma-separated identifiers and validate."""
-        identifiers = [i.strip() for i in value.split(',') if i.strip()]
+        identifiers = [i.strip() for i in value.split(",") if i.strip()]
         if not identifiers:
             raise serializers.ValidationError("At least one identifier must be provided")
         return identifiers
 
     def validate_size_limit_mb(self, value):
         """Ensure requested size doesn't exceed server maximum."""
-        max_allowed = getattr(settings, 'GEOEXTENT_MAX_DOWNLOAD_SIZE_MB', 1000)
+        max_allowed = getattr(settings, "GEOEXTENT_MAX_DOWNLOAD_SIZE_MB", 1000)
         if value > max_allowed:
             raise serializers.ValidationError(
                 f"Requested size limit ({value}MB) exceeds server maximum ({max_allowed}MB)"
@@ -345,12 +342,13 @@ class GeoextentRemoteGetSerializer(GeoextentBaseSerializer):
 
 class GeoextentBatchSerializer(GeoextentBaseSerializer):
     """Serializer for extracting extent from multiple files."""
+
     # files handled separately in view
     size_limit_mb = serializers.IntegerField(default=100, min_value=1)
 
     def validate_size_limit_mb(self, value):
         """Ensure total batch size doesn't exceed server maximum."""
-        max_allowed = getattr(settings, 'GEOEXTENT_MAX_BATCH_SIZE_MB', 500)
+        max_allowed = getattr(settings, "GEOEXTENT_MAX_BATCH_SIZE_MB", 500)
         if value > max_allowed:
             raise serializers.ValidationError(
                 f"Requested batch size ({value}MB) exceeds server maximum ({max_allowed}MB)"
@@ -360,6 +358,7 @@ class GeoextentBatchSerializer(GeoextentBaseSerializer):
 
 class GeoextentExtractTextSerializer(serializers.Serializer):
     """Serializer for NER-based location extraction from free text."""
+
     text = serializers.CharField(
         required=True,
         max_length=20000,
@@ -372,8 +371,8 @@ class GeoextentExtractTextSerializer(serializers.Serializer):
         help_text="Gazetteer service for geocoding found place names. Defaults to OPTIMAP_GEOEXTENT_NER_GAZETTEER.",
     )
     ner_ambiguity = serializers.ChoiceField(
-        choices=['drop', 'top'],
-        default='drop',
+        choices=["drop", "top"],
+        default="drop",
         help_text=(
             "'drop' (default): skip place names that match multiple gazetteer candidates. "
             "'top': keep the highest-ranked candidate when multiple are returned."
@@ -390,7 +389,7 @@ class GeoextentExtractTextSerializer(serializers.Serializer):
 
     def validate_gazetteer(self, value):
         if value is None:
-            value = getattr(settings, 'GEOEXTENT_NER_GAZETTEER', 'nominatim')
+            value = getattr(settings, "GEOEXTENT_NER_GAZETTEER", "nominatim")
         available = get_available_gazetteers()
         if value not in available:
             raise serializers.ValidationError(
@@ -408,9 +407,10 @@ class GeoextentExtractTextSerializer(serializers.Serializer):
 
 class GlobalRegionSerializer(GeoFeatureModelSerializer):
     """Serializer for GlobalRegion model with GeoJSON output."""
-    region_type_display = serializers.CharField(source='get_region_type_display', read_only=True)
-    slug = serializers.CharField(source='get_slug', read_only=True)
-    absolute_url = serializers.CharField(source='get_absolute_url', read_only=True)
+
+    region_type_display = serializers.CharField(source="get_region_type_display", read_only=True)
+    slug = serializers.CharField(source="get_slug", read_only=True)
+    absolute_url = serializers.CharField(source="get_absolute_url", read_only=True)
 
     class Meta:
         model = GlobalRegion
@@ -470,21 +470,31 @@ class CollectionSerializer(serializers.ModelSerializer):
     def get_collection_url(self, obj):
         return self._abs("optimap:collection-page", obj.identifier)
 
-    @extend_schema_field({"type": "object", "properties": {
-        "rss": {"type": "string", "format": "uri"},
-        "atom": {"type": "string", "format": "uri"},
-    }})
+    @extend_schema_field(
+        {
+            "type": "object",
+            "properties": {
+                "rss": {"type": "string", "format": "uri"},
+                "atom": {"type": "string", "format": "uri"},
+            },
+        }
+    )
     def get_feeds(self, obj):
         return {
             "rss": self._abs("optimap:api-collection-georss", obj.identifier),
             "atom": self._abs("optimap:api-collection-atom", obj.identifier),
         }
 
-    @extend_schema_field({"type": "object", "properties": {
-        "geojson": {"type": "string", "format": "uri"},
-        "gpkg": {"type": "string", "format": "uri"},
-        "csv": {"type": "string", "format": "uri"},
-    }})
+    @extend_schema_field(
+        {
+            "type": "object",
+            "properties": {
+                "geojson": {"type": "string", "format": "uri"},
+                "gpkg": {"type": "string", "format": "uri"},
+                "csv": {"type": "string", "format": "uri"},
+            },
+        }
+    )
     def get_downloads(self, obj):
         return {
             "geojson": self._abs("optimap:download-collection-geojson", obj.identifier),

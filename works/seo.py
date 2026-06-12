@@ -19,7 +19,6 @@ from django.conf import settings
 from django.urls import reverse
 from meta.views import Meta
 
-
 _WS = re.compile(r"\s+")
 
 
@@ -114,8 +113,10 @@ def build_work_meta(request, work, *, kwargs_schema: dict | None = None) -> Meta
     # plus nested dict construction). Callers may pass in a precomputed
     # value to skip the rebuild — see issue #180 for the work_landing
     # context cache that uses this hook.
-    schema = kwargs_schema if kwargs_schema is not None else _build_schema_org(
-        work, request, canonical, image, authors, keywords, description
+    schema = (
+        kwargs_schema
+        if kwargs_schema is not None
+        else _build_schema_org(work, request, canonical, image, authors, keywords, description)
     )
 
     meta = Meta(
@@ -347,10 +348,12 @@ def citation_meta_tags(work, request) -> list[dict]:
     for author in _normalize_author_list(work):
         tags.append({"name": "citation_author", "content": author})
     if work.publicationDate:
-        tags.append({
-            "name": "citation_publication_date",
-            "content": work.publicationDate.isoformat(),
-        })
+        tags.append(
+            {
+                "name": "citation_publication_date",
+                "content": work.publicationDate.isoformat(),
+            }
+        )
     if work.doi:
         tags.append({"name": "citation_doi", "content": work.doi})
     canonical = _abs(request, reverse("optimap:work-landing", args=[work.get_identifier()]))
@@ -461,16 +464,12 @@ def build_homepage_meta(request) -> Meta:
     return meta
 
 
-def build_feed_page_meta(request, *, region_name: str | None,
-                         region_bbox: Iterable[float] | None,
-                         page_url: str) -> Meta:
+def build_feed_page_meta(
+    request, *, region_name: str | None, region_bbox: Iterable[float] | None, page_url: str
+) -> Meta:
     """``CollectionPage`` schema.org for region/feed landing pages."""
     canonical = _abs(request, page_url)
-    title = (
-        f"{region_name} — OPTIMAP regional feed"
-        if region_name
-        else "OPTIMAP regions"
-    )
+    title = f"{region_name} — OPTIMAP regional feed" if region_name else "OPTIMAP regions"
     description = (
         f"Recent research articles with geographic coverage in {region_name}."
         if region_name
@@ -521,6 +520,7 @@ def _bok_defined_terms(work) -> list[dict]:
         return []
     try:
         from works.bok import client as bok_client
+
         resolved = bok_client.resolve(codes)
     except Exception:
         return []

@@ -35,8 +35,12 @@ class HarvestStats:
     """
 
     __slots__ = (
-        "created", "updated", "doi_backfilled",
-        "skipped_same_source", "skipped_cross_source", "skipped_existing",
+        "created",
+        "updated",
+        "doi_backfilled",
+        "skipped_same_source",
+        "skipped_cross_source",
+        "skipped_existing",
     )
 
     def __init__(self):
@@ -92,7 +96,9 @@ class HarvestWarningCollector(logging.Handler):
             self.errors.append(f"🔴 ERROR: {message}")
         elif record.levelno >= logging.WARNING:
             self.warnings.append(f"🟡 WARNING: {message}")
-        elif record.levelno >= logging.INFO and any(keyword in message.lower() for keyword in ['no openalex match', 'openalex matching failed', 'skipping']):
+        elif record.levelno >= logging.INFO and any(
+            keyword in message.lower() for keyword in ["no openalex match", "openalex matching failed", "skipping"]
+        ):
             self.info.append(f"🔵 INFO: {message}")
 
     def get_summary(self):
@@ -100,15 +106,15 @@ class HarvestWarningCollector(logging.Handler):
         summary_parts = []
 
         if self.errors:
-            summary_parts.append(f"\n{'='*70}\n🔴 ERRORS ({len(self.errors)})\n{'='*70}")
+            summary_parts.append(f"\n{'=' * 70}\n🔴 ERRORS ({len(self.errors)})\n{'=' * 70}")
             summary_parts.extend(self.errors)
 
         if self.warnings:
-            summary_parts.append(f"\n{'='*70}\n🟡 WARNINGS ({len(self.warnings)})\n{'='*70}")
+            summary_parts.append(f"\n{'=' * 70}\n🟡 WARNINGS ({len(self.warnings)})\n{'=' * 70}")
             summary_parts.extend(self.warnings)
 
         if self.info:
-            summary_parts.append(f"\n{'='*70}\n🔵 NOTABLE INFORMATION ({len(self.info)})\n{'='*70}")
+            summary_parts.append(f"\n{'=' * 70}\n🔵 NOTABLE INFORMATION ({len(self.info)})\n{'=' * 70}")
             summary_parts.extend(self.info)
 
         if not (self.errors or self.warnings or self.info):
@@ -122,15 +128,15 @@ class HarvestWarningCollector(logging.Handler):
 
 def get_or_create_admin_command_user():
     """Get or create the system user that owns harvested publications."""
-    username = 'django_admin_command'
-    email = 'django_admin_command@system.local'
+    username = "django_admin_command"
+    email = "django_admin_command@system.local"
     user, created = User.objects.get_or_create(
         username=username,
         defaults={
-            'email': email,
-            'is_active': False,
-            'is_staff': False,
-        }
+            "email": email,
+            "is_active": False,
+            "is_staff": False,
+        },
     )
     if created:
         logger.info("Created system user: %s", username)
@@ -157,11 +163,12 @@ def ensure_collection_for_source(source):
     """
     # Avoid a circular import: works.models imports works.harvesting via tasks.
     from django.utils.text import slugify
+
     from works.models import Collection
 
     if source.collection_id is not None:
         return source.collection
-    base_name = (source.name or '').strip()
+    base_name = (source.name or "").strip()
     if not base_name:
         logger.warning(
             "Source id=%s has no name — cannot auto-create a Collection.",
@@ -177,17 +184,20 @@ def ensure_collection_for_source(source):
     collection = Collection.objects.create(
         identifier=identifier,
         name=base_name,
-        description='',
+        description="",
         homepage_url=source.homepage_url or None,
         # Start unpublished — admins curate name/description and flip the
         # toggle when the collection is ready to be public.
         is_published=False,
     )
     source.collection = collection
-    source.save(update_fields=['collection'])
+    source.save(update_fields=["collection"])
     logger.info(
         "Auto-created Collection %r (id=%s) for source id=%s (%s)",
-        identifier, collection.id, source.id, base_name,
+        identifier,
+        collection.id,
+        source.id,
+        base_name,
     )
     return collection
 
@@ -205,13 +215,13 @@ def parse_publication_date(date_string):
     if not date_string:
         return None
     date_string = date_string.strip()
-    if re.match(r'^\d{4}-\d{2}-\d{2}$', date_string):
+    if re.match(r"^\d{4}-\d{2}-\d{2}$", date_string):
         return date_string
-    if re.match(r'^\d{4}-\d{2}$', date_string):
+    if re.match(r"^\d{4}-\d{2}$", date_string):
         return f"{date_string}-01"
-    if re.match(r'^\d{4}$', date_string):
+    if re.match(r"^\d{4}$", date_string):
         return f"{date_string}-01-01"
-    year_match = re.search(r'\b(\d{4})\b', date_string)
+    year_match = re.search(r"\b(\d{4})\b", date_string)
     if year_match:
         return f"{year_match.group(1)}-01-01"
     logger.warning("Could not parse date format: %s", date_string)
@@ -242,8 +252,8 @@ def parse_publication_date(date_string):
 #     a new "harvest_update" entry appended.
 # -----------------------------------------------------------------------------
 
-_HARVEST_PRESERVE_IF_NEW_EMPTY = ('geometry', 'timeperiod_startdate', 'timeperiod_enddate')
-_HARVEST_NEVER_OVERWRITE = ('status', 'created_by', 'creationDate')
+_HARVEST_PRESERVE_IF_NEW_EMPTY = ("geometry", "timeperiod_startdate", "timeperiod_enddate")
+_HARVEST_NEVER_OVERWRITE = ("status", "created_by", "creationDate")
 
 
 def _is_empty_for_update(value):
@@ -253,7 +263,7 @@ def _is_empty_for_update(value):
         return True
     if isinstance(value, list) and not value:
         return True
-    if hasattr(value, 'empty') and getattr(value, 'empty'):
+    if hasattr(value, "empty") and getattr(value, "empty"):
         return True
     return False
 
@@ -273,7 +283,7 @@ def _find_existing_work(doi=None, url=None):
 
 def _carefully_update_work(work, new_fields, event):
     """Update ``work`` in place from re-harvested ``new_fields``."""
-    new_provenance = new_fields.pop('provenance', None)
+    new_provenance = new_fields.pop("provenance", None)
 
     for field, new_value in new_fields.items():
         if field in _HARVEST_NEVER_OVERWRITE:
@@ -284,14 +294,16 @@ def _carefully_update_work(work, new_fields, event):
 
     existing_provenance = work.provenance if isinstance(work.provenance, dict) else {}
     if isinstance(new_provenance, dict):
-        for key in ('harvest', 'metadata_sources', 'openalex_match'):
+        for key in ("harvest", "metadata_sources", "openalex_match"):
             if key in new_provenance:
                 existing_provenance[key] = new_provenance[key]
-    existing_provenance.setdefault('events', []).append({
-        'type': 'harvest_update',
-        'at': timezone.now().isoformat(),
-        'harvesting_event_id': event.id if event else None,
-    })
+    existing_provenance.setdefault("events", []).append(
+        {
+            "type": "harvest_update",
+            "at": timezone.now().isoformat(),
+            "harvesting_event_id": event.id if event else None,
+        }
+    )
     work.provenance = existing_provenance
 
     work.job = event
@@ -316,17 +328,19 @@ def _backfill_empty_doi(work, new_doi, event):
     """
     work.doi = new_doi
     existing_provenance = work.provenance if isinstance(work.provenance, dict) else {}
-    existing_provenance.setdefault('events', []).append({
-        'type': 'doi_backfill',
-        'at': timezone.now().isoformat(),
-        'doi': new_doi,
-        'harvesting_event_id': event.id if event else None,
-    })
+    existing_provenance.setdefault("events", []).append(
+        {
+            "type": "doi_backfill",
+            "at": timezone.now().isoformat(),
+            "doi": new_doi,
+            "harvesting_event_id": event.id if event else None,
+        }
+    )
     work.provenance = existing_provenance
     # Include lastUpdate explicitly: with update_fields, auto_now fields are
     # not bumped automatically, and we want the work-landing cache key to
     # invalidate so the freshly populated DOI shows up immediately.
-    work.save(update_fields=['doi', 'provenance', 'lastUpdate'])
+    work.save(update_fields=["doi", "provenance", "lastUpdate"])
     logger.info("Backfilled empty DOI on work id=%s with %s", work.id, new_doi)
 
 
@@ -340,8 +354,8 @@ def _save_or_update_work(work_kwargs, source, event, update_existing=False):
       * ``'skipped_same_source'`` — same-source duplicate, ``update_existing`` was False,
       * ``'skipped_cross_source'`` — different-source duplicate (never auto-merged).
     """
-    doi_value = work_kwargs.get('doi')
-    url_value = work_kwargs.get('url')
+    doi_value = work_kwargs.get("doi")
+    url_value = work_kwargs.get("url")
 
     existing = _find_existing_work(doi=doi_value, url=url_value)
     if existing is not None:
@@ -352,29 +366,31 @@ def _save_or_update_work(work_kwargs, source, event, update_existing=False):
         if backfilled:
             _backfill_empty_doi(existing, doi_value, event)
 
-        if existing.source_id != getattr(source, 'id', None):
+        if existing.source_id != getattr(source, "id", None):
             logger.info(
                 "Skipping cross-source duplicate %s — already harvested under source id=%s",
-                doi_value or url_value, existing.source_id,
+                doi_value or url_value,
+                existing.source_id,
             )
-            return existing, 'doi_backfilled' if backfilled else 'skipped_cross_source'
+            return existing, "doi_backfilled" if backfilled else "skipped_cross_source"
         if not update_existing:
             logger.debug(
                 "Skipping same-source duplicate %s (use --update / update_existing=True to refresh)",
                 doi_value or url_value,
             )
-            return existing, 'doi_backfilled' if backfilled else 'skipped_same_source'
+            return existing, "doi_backfilled" if backfilled else "skipped_same_source"
         _carefully_update_work(existing, work_kwargs, event)
-        return existing, 'updated'
+        return existing, "updated"
 
     work = Work.objects.create(**work_kwargs)
-    return work, 'created'
+    return work, "created"
 
 
 # -----------------------------------------------------------------------------
 # Completion / failure / notify helpers — replace the previously duplicated
 # success and failure tail blocks across all four harvesters.
 # -----------------------------------------------------------------------------
+
 
 def resolve_user(user):
     """Admin actions enqueue with a user id rather than a pickled User instance."""
@@ -451,4 +467,5 @@ def render_harvest_email(template_name, context):
     so autoescape is off (plain-text output — no HTML entities in URLs, etc.).
     """
     from works.utils.email import render_email
+
     return render_email(template_name, context)

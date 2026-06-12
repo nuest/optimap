@@ -2,26 +2,27 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import csv
-import os
-import json
-import tempfile
 import gzip
-from django.test import TestCase
-from django.core.serializers import serialize
+import json
+import os
+import tempfile
+from pathlib import Path
+
 import fiona
-from django.urls import reverse
 from django.conf import settings
-from works.models import Work, Source, Collection
-from works.views import generate_geopackage
+from django.core.serializers import serialize
+from django.test import TestCase
+from django.urls import reverse
+
+from works.models import Collection, Source, Work
 from works.tasks import (
+    regenerate_all_data_dumps,
+    regenerate_csv_cache,
     regenerate_geojson_cache,
     regenerate_geopackage_cache,
-    regenerate_csv_cache,
-    regenerate_all_data_dumps,
-    generate_data_dump_filename,
-    cleanup_old_data_dumps,
 )
-from pathlib import Path
+from works.views import generate_geopackage
+
 
 class GeoDataAlternativeTestCase(TestCase):
     def setUp(self):
@@ -29,7 +30,7 @@ class GeoDataAlternativeTestCase(TestCase):
         wkt_point1 = "GEOMETRYCOLLECTION(POINT(7.59573 51.96944))"
         wkt_point2 = "GEOMETRYCOLLECTION(POINT(8.59573 52.96944))"
         wkt_point3 = "GEOMETRYCOLLECTION(POINT(9.59573 53.96944))"
-        
+
         s1 = Source.objects.create(name="Source One", url_field="http://example.com/1")
         Work.objects.create(
             title="Publication One",
@@ -65,10 +66,10 @@ class GeoDataAlternativeTestCase(TestCase):
             geometry=wkt_point3,
             timeperiod_startdate=["2020-09-01"],
             timeperiod_enddate=["2020-12-31"],
-        )    
+        )
 
     def test_geojson_generation(self):
-        geojson_data = serialize('geojson', Work.objects.all(), geometry_field='geometry')
+        geojson_data = serialize("geojson", Work.objects.all(), geometry_field="geometry")
         self.assertTrue(len(geojson_data) > 0, "GeoJSON data should not be empty")
         geojson_obj = json.loads(geojson_data)
         self.assertEqual(geojson_obj.get("type"), "FeatureCollection", "GeoJSON type should be FeatureCollection")
@@ -79,136 +80,140 @@ class GeoDataAlternativeTestCase(TestCase):
     def test_geopackage_generation(self):
         gpkg_path = generate_geopackage()
         self.assertTrue(os.path.exists(gpkg_path), "GeoPackage file should exist")
-        with fiona.open(gpkg_path, layer='works') as layer:
+        with fiona.open(gpkg_path, layer="works") as layer:
             features = list(layer)
-            self.assertEqual(len(features), Work.objects.count(),
-                             "Feature count in GeoPackage should match the Publication count")
+            self.assertEqual(
+                len(features), Work.objects.count(), "Feature count in GeoPackage should match the Publication count"
+            )
 
     def test_update_reflects_in_generated_data(self):
-        initial_geojson = serialize('geojson', Work.objects.all(), geometry_field='geometry')
+        initial_geojson = serialize("geojson", Work.objects.all(), geometry_field="geometry")
         initial_obj = json.loads(initial_geojson)
-        initial_title = initial_obj['features'][0]['properties']['title']
+        initial_title = initial_obj["features"][0]["properties"]["title"]
         pub = Work.objects.first()
         pub.title += " Updated"
         pub.save()
-        
-        updated_geojson = serialize('geojson', Work.objects.all(), geometry_field='geometry')
+
+        updated_geojson = serialize("geojson", Work.objects.all(), geometry_field="geometry")
         updated_obj = json.loads(updated_geojson)
-        updated_title = updated_obj['features'][0]['properties']['title']
-        self.assertNotEqual(initial_title, updated_title,
-                            "The title of the first publication should update in the GeoJSON output")
+        updated_title = updated_obj["features"][0]["properties"]["title"]
+        self.assertNotEqual(
+            initial_title, updated_title, "The title of the first publication should update in the GeoJSON output"
+        )
 
         # Test GeoPackage update
-        initial_gpkg = open(generate_geopackage(), 'rb').read()
-        updated_gpkg = open(generate_geopackage(), 'rb').read()
-        self.assertNotEqual(initial_gpkg, updated_gpkg,
-                            "The GeoPackage data should update when a Publication changes")
+        initial_gpkg = open(generate_geopackage(), "rb").read()
+        updated_gpkg = open(generate_geopackage(), "rb").read()
+        self.assertNotEqual(initial_gpkg, updated_gpkg, "The GeoPackage data should update when a Publication changes")
 
     def test_data_endpoint(self):
-        url = reverse('optimap:data')
+        url = reverse("optimap:data")
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200, "Data endpoint should return status 200")
         content = response.content.decode()
         self.assertIn(f"Data dumps run every {settings.DATA_DUMP_INTERVAL_HOURS} hour", content)
-        cache_dir = Path(tempfile.gettempdir()) / 'optimap_cache'
-        dumps = sorted(cache_dir.glob('optimap_data_dump_*.geojson'), reverse=True)
+        cache_dir = Path(tempfile.gettempdir()) / "optimap_cache"
+        dumps = sorted(cache_dir.glob("optimap_data_dump_*.geojson"), reverse=True)
         self.assertTrue(dumps, "At least one data dump should exist for Last updated check")
         self.assertIn("Last updated:", content)
 
     def test_download_geojson_gzip(self):
         regenerate_geojson_cache()
-        url = reverse('optimap:download_geojson')
-        response = self.client.get(url, HTTP_ACCEPT_ENCODING='gzip')
+        url = reverse("optimap:download_geojson")
+        response = self.client.get(url, HTTP_ACCEPT_ENCODING="gzip")
         self.assertEqual(response.status_code, 200, "Gzip download should return status 200")
-        self.assertEqual(response['Content-Encoding'], 'gzip', "Response should be gzipped when requested")
-        self.assertEqual(response['Content-Type'], 'application/json', "Content-Type should be application/json")
-        self.assertRegex(response['Content-Disposition'], r'optimap_data_dump_.*\.geojson\.gz')
+        self.assertEqual(response["Content-Encoding"], "gzip", "Response should be gzipped when requested")
+        self.assertEqual(response["Content-Type"], "application/json", "Content-Type should be application/json")
+        self.assertRegex(response["Content-Disposition"], r"optimap_data_dump_.*\.geojson\.gz")
 
     def test_download_geopackage_endpoint(self):
-        url = reverse('optimap:download_geopackage')
+        url = reverse("optimap:download_geopackage")
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200, "GeoPackage endpoint should return 200")
-        self.assertEqual(response['Content-Type'], 'application/geopackage+sqlite3',
-                         "Content-Type should be application/geopackage+sqlite3")
-        self.assertRegex(response['Content-Disposition'], r'optimap_data_dump_.*\.gpkg')
+        self.assertEqual(
+            response["Content-Type"],
+            "application/geopackage+sqlite3",
+            "Content-Type should be application/geopackage+sqlite3",
+        )
+        self.assertRegex(response["Content-Disposition"], r"optimap_data_dump_.*\.gpkg")
 
     def test_regenerate_geojson_cache_creates_files(self):
-        cache_dir = Path(tempfile.gettempdir()) / 'optimap_cache'
-        for f in cache_dir.glob('optimap_data_dump_*'):
+        cache_dir = Path(tempfile.gettempdir()) / "optimap_cache"
+        for f in cache_dir.glob("optimap_data_dump_*"):
             f.unlink()
 
         returned_path = regenerate_geojson_cache()
         self.assertTrue(Path(returned_path).exists(), "GeoJSON cache file should be created")
-        self.assertTrue(returned_path.endswith('.geojson'))
+        self.assertTrue(returned_path.endswith(".geojson"))
 
-        gzip_path = Path(returned_path + '.gz')
+        gzip_path = Path(returned_path + ".gz")
         self.assertTrue(gzip_path.exists(), "Gzipped GeoJSON cache file should be created")
 
     def test_cached_json_content_valid(self):
         returned = regenerate_geojson_cache()
-        with open(returned, 'r') as f:
+        with open(returned, "r") as f:
             obj = json.load(f)
-        self.assertEqual(obj.get('type'), 'FeatureCollection')
-        self.assertIn('features', obj)
-        self.assertEqual(len(obj['features']), Work.objects.filter(status='p').count())
+        self.assertEqual(obj.get("type"), "FeatureCollection")
+        self.assertIn("features", obj)
+        self.assertEqual(len(obj["features"]), Work.objects.filter(status="p").count())
 
     def test_cached_gzip_can_be_unpacked(self):
         returned = regenerate_geojson_cache()
-        gzip_path = returned + '.gz'
-        with gzip.open(gzip_path, 'rt') as f:
+        gzip_path = returned + ".gz"
+        with gzip.open(gzip_path, "rt") as f:
             obj = json.load(f)
-        self.assertEqual(obj.get('type'), 'FeatureCollection')
-        self.assertIn('features', obj)
-        self.assertEqual(len(obj['features']), Work.objects.filter(status='p').count())
+        self.assertEqual(obj.get("type"), "FeatureCollection")
+        self.assertIn("features", obj)
+        self.assertEqual(len(obj["features"]), Work.objects.filter(status="p").count())
 
     def test_download_geopackage(self):
-        url = reverse('optimap:download_geopackage')
+        url = reverse("optimap:download_geopackage")
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response['Content-Type'], 'application/geopackage+sqlite3')
-        self.assertRegex(response['Content-Disposition'], r'optimap_data_dump_.*\.gpkg')
+        self.assertEqual(response["Content-Type"], "application/geopackage+sqlite3")
+        self.assertRegex(response["Content-Disposition"], r"optimap_data_dump_.*\.gpkg")
 
     def test_data_page_hides_and_shows_links_correctly(self):
-        cache_dir = Path(tempfile.gettempdir()) / 'optimap_cache'
-        for f in cache_dir.glob('optimap_data_dump_*'):
+        cache_dir = Path(tempfile.gettempdir()) / "optimap_cache"
+        for f in cache_dir.glob("optimap_data_dump_*"):
             f.unlink()
 
-        response = self.client.get(reverse('optimap:data'))
+        response = self.client.get(reverse("optimap:data"))
         content = response.content.decode()
-        self.assertNotIn('Download GeoJSON', content)
-        self.assertNotIn('Download GeoPackage', content)
-        self.assertNotIn('Download CSV', content)
+        self.assertNotIn("Download GeoJSON", content)
+        self.assertNotIn("Download GeoPackage", content)
+        self.assertNotIn("Download CSV", content)
 
         regenerate_geojson_cache()
-        response = self.client.get(reverse('optimap:data'))
+        response = self.client.get(reverse("optimap:data"))
         content = response.content.decode()
-        self.assertIn('Download GeoJSON', content)
-        self.assertNotIn('Download GeoPackage', content)
-        self.assertNotIn('Download CSV', content)
+        self.assertIn("Download GeoJSON", content)
+        self.assertNotIn("Download GeoPackage", content)
+        self.assertNotIn("Download CSV", content)
 
         regenerate_geopackage_cache()
-        response = self.client.get(reverse('optimap:data'))
+        response = self.client.get(reverse("optimap:data"))
         content = response.content.decode()
-        self.assertIn('Download GeoJSON', content)
-        self.assertIn('Download GeoPackage', content)
-        self.assertNotIn('Download CSV', content)
+        self.assertIn("Download GeoJSON", content)
+        self.assertIn("Download GeoPackage", content)
+        self.assertNotIn("Download CSV", content)
 
         regenerate_csv_cache()
-        response = self.client.get(reverse('optimap:data'))
+        response = self.client.get(reverse("optimap:data"))
         content = response.content.decode()
-        self.assertIn('Download GeoJSON', content)
-        self.assertIn('Download GeoPackage', content)
-        self.assertIn('Download CSV', content)
+        self.assertIn("Download GeoJSON", content)
+        self.assertIn("Download GeoPackage", content)
+        self.assertIn("Download CSV", content)
 
     def test_regenerate_csv_cache_creates_file(self):
-        cache_dir = Path(tempfile.gettempdir()) / 'optimap_cache'
-        for f in cache_dir.glob('optimap_data_dump_*'):
+        cache_dir = Path(tempfile.gettempdir()) / "optimap_cache"
+        for f in cache_dir.glob("optimap_data_dump_*"):
             f.unlink()
 
         returned_path = regenerate_csv_cache()
         self.assertIsNotNone(returned_path, "ogr2ogr CSV conversion should succeed")
         self.assertTrue(Path(returned_path).exists(), "CSV cache file should be created")
-        self.assertTrue(returned_path.endswith('.csv'))
+        self.assertTrue(returned_path.endswith(".csv"))
 
     def test_csv_content_valid(self):
         # Publish one work so the CSV has at least one data row to inspect.
@@ -218,35 +223,40 @@ class GeoDataAlternativeTestCase(TestCase):
 
         csv_path = regenerate_csv_cache()
         self.assertIsNotNone(csv_path)
-        with open(csv_path, newline='') as f:
+        with open(csv_path, newline="") as f:
             rows = list(csv.DictReader(f))
-        self.assertEqual(len(rows), Work.objects.filter(status='p').count())
-        self.assertIn('WKT', rows[0],
-                      "CSV must carry a WKT geometry column (issue #206)")
-        valid_prefixes = ('POINT', 'MULTIPOINT', 'LINESTRING', 'MULTILINESTRING',
-                          'POLYGON', 'MULTIPOLYGON', 'GEOMETRYCOLLECTION')
+        self.assertEqual(len(rows), Work.objects.filter(status="p").count())
+        self.assertIn("WKT", rows[0], "CSV must carry a WKT geometry column (issue #206)")
+        valid_prefixes = (
+            "POINT",
+            "MULTIPOINT",
+            "LINESTRING",
+            "MULTILINESTRING",
+            "POLYGON",
+            "MULTIPOLYGON",
+            "GEOMETRYCOLLECTION",
+        )
         self.assertTrue(
-            rows[0]['WKT'].upper().startswith(valid_prefixes),
+            rows[0]["WKT"].upper().startswith(valid_prefixes),
             f"WKT column should hold a valid geometry type, got: {rows[0]['WKT']!r}",
         )
-        self.assertIn('title', rows[0],
-                      "CSV should expose the work title alongside the geometry")
+        self.assertIn("title", rows[0], "CSV should expose the work title alongside the geometry")
 
     def test_download_csv_endpoint(self):
         regenerate_csv_cache()
-        url = reverse('optimap:download_csv')
+        url = reverse("optimap:download_csv")
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response['Content-Type'], 'text/csv; charset=utf-8')
-        self.assertRegex(response['Content-Disposition'], r'optimap_data_dump_.*\.csv')
+        self.assertEqual(response["Content-Type"], "text/csv; charset=utf-8")
+        self.assertRegex(response["Content-Disposition"], r"optimap_data_dump_.*\.csv")
 
     def test_regenerate_all_data_dumps_creates_all_three(self):
-        cache_dir = Path(tempfile.gettempdir()) / 'optimap_cache'
-        for f in cache_dir.glob('optimap_data_dump_*'):
+        cache_dir = Path(tempfile.gettempdir()) / "optimap_cache"
+        for f in cache_dir.glob("optimap_data_dump_*"):
             f.unlink()
 
         result = regenerate_all_data_dumps()
-        self.assertSetEqual(set(result.keys()), {'geojson', 'gpkg', 'csv'})
+        self.assertSetEqual(set(result.keys()), {"geojson", "gpkg", "csv"})
         for fmt, path in result.items():
             self.assertIsNotNone(path, f"{fmt} dump should be produced")
             self.assertTrue(Path(path).exists(), f"{fmt} dump file should exist on disk")

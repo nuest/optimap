@@ -1,11 +1,13 @@
 # SPDX-FileCopyrightText: 2025 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import json
+
 from django.test import TestCase
-from rest_framework.test import APIClient
 from rest_framework import status
-from works.models import Source, Work, Collection
+from rest_framework.test import APIClient
+
+from works.models import Collection, Source, Work
+
 
 class SourceAPITest(TestCase):
     """
@@ -62,11 +64,22 @@ class SourceAPITest(TestCase):
         # Verify all expected fields for the populated source
         populated = next(x for x in sources_list if x["name"] == "Test source A")
         for key in [
-            "id", "name", "issn_l", "openalex_id", "openalex_url",
-            "publisher_name", "works_count", "works_api_url",
-            "source_type", "source_type_display", "homepage_url",
-            "abbreviated_title", "is_oa", "is_preprint",
-            "source_url", "collection",
+            "id",
+            "name",
+            "issn_l",
+            "openalex_id",
+            "openalex_url",
+            "publisher_name",
+            "works_count",
+            "works_api_url",
+            "source_type",
+            "source_type_display",
+            "homepage_url",
+            "abbreviated_title",
+            "is_oa",
+            "is_preprint",
+            "source_url",
+            "collection",
         ]:
             self.assertIn(key, populated)
 
@@ -110,9 +123,7 @@ class SourceAPITest(TestCase):
         """
         GET /api/v1/sources/{pk}/ should embed the collection dict when a collection is set.
         """
-        coll = Collection.objects.create(
-            identifier="test-coll", name="Test Collection", is_published=True
-        )
+        coll = Collection.objects.create(identifier="test-coll", name="Test Collection", is_published=True)
         src = Source.objects.create(
             name="Source with collection",
             collection=coll,
@@ -160,7 +171,7 @@ class PublicationAPITest(TestCase):
             timeperiod_startdate=["2020-01-01"],
             timeperiod_enddate=["2021-01-01"],
             provenance={},
-            status="p"
+            status="p",
         )
 
     def _unwrap_publications(self, data):
@@ -176,7 +187,9 @@ class PublicationAPITest(TestCase):
         if isinstance(data, dict) and "results" in data:
             results_block = data["results"]
             if not isinstance(results_block, dict):
-                self.fail(f"Expected 'results' to be a dict containing FeatureCollection, got {type(results_block).__name__}")
+                self.fail(
+                    f"Expected 'results' to be a dict containing FeatureCollection, got {type(results_block).__name__}"
+                )
             # Now expect results_block["features"] to be a list
             if "features" not in results_block or not isinstance(results_block["features"], list):
                 self.fail(f"Expected 'features' list inside paginated 'results', but got: {results_block}")
@@ -218,9 +231,17 @@ class PublicationAPITest(TestCase):
         self.assertIsInstance(details, dict)
 
         for key in [
-            "id", "name", "issn_l", "openalex_id", "openalex_url",
-            "publisher_name", "works_count", "works_api_url",
-            "source_type", "source_type_display", "source_url",
+            "id",
+            "name",
+            "issn_l",
+            "openalex_id",
+            "openalex_url",
+            "publisher_name",
+            "works_count",
+            "works_api_url",
+            "source_type",
+            "source_type_display",
+            "source_url",
         ]:
             self.assertIn(key, details)
 

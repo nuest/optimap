@@ -13,23 +13,24 @@ This module handles:
 
 import json
 import logging
+
 logger = logging.getLogger(__name__)
 
 import os
 import subprocess
+import tempfile
+from pathlib import Path
+
 from django.conf import settings
 from django.core.cache import cache
 from django.core.serializers import serialize
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404
-from django.views.decorators.http import require_GET
-import tempfile
-from pathlib import Path
-from drf_spectacular.utils import extend_schema, OpenApiResponse, inline_serializer
 from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiResponse, extend_schema, inline_serializer
+from rest_framework import serializers as drf_serializers
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
-from rest_framework import serializers as drf_serializers
 
 _DOWNLOAD_404 = OpenApiResponse(
     inline_serializer(
@@ -38,13 +39,14 @@ _DOWNLOAD_404 = OpenApiResponse(
     ),
     description="Cached dump is missing and could not be regenerated.",
 )
+from osgeo import ogr, osr
+
+from works.models import Collection, Work
 from works.tasks import (
+    regenerate_csv_cache,
     regenerate_geojson_cache,
     regenerate_geopackage_cache,
-    regenerate_csv_cache,
 )
-from osgeo import ogr, osr
-from works.models import Work, Collection
 
 ogr.UseExceptions()
 
@@ -59,7 +61,7 @@ ogr.UseExceptions()
         "regenerates on demand if the cache is missing."
     ),
     tags=["Downloads"],
-    responses={(200, 'application/json'): OpenApiTypes.BINARY},
+    responses={(200, "application/json"): OpenApiTypes.BINARY},
 )
 @api_view(["GET"])
 @permission_classes([AllowAny])
@@ -72,27 +74,22 @@ def download_geojson(request):
     cache_dir.mkdir(exist_ok=True)
     json_path = regenerate_geojson_cache()
     gzip_path = Path(str(json_path) + ".gz")
-    accept_enc = request.META.get('HTTP_ACCEPT_ENCODING', '')
+    accept_enc = request.META.get("HTTP_ACCEPT_ENCODING", "")
 
-    if 'gzip' in accept_enc and gzip_path.exists():
+    if "gzip" in accept_enc and gzip_path.exists():
         response = FileResponse(
-            open(gzip_path, 'rb'),
-            content_type="application/json",
-            as_attachment=True,
-            filename=gzip_path.name
+            open(gzip_path, "rb"), content_type="application/json", as_attachment=True, filename=gzip_path.name
         )
-        response['Content-Encoding'] = 'gzip'
-        response['Content-Disposition'] = f'attachment; filename="{gzip_path.name}"'
+        response["Content-Encoding"] = "gzip"
+        response["Content-Disposition"] = f'attachment; filename="{gzip_path.name}"'
     else:
         # Serve the plain JSON
         response = FileResponse(
-            open(json_path, 'rb'),
-            content_type="application/json",
-            as_attachment=True,
-            filename=Path(json_path).name
+            open(json_path, "rb"), content_type="application/json", as_attachment=True, filename=Path(json_path).name
         )
-        response['Content-Disposition'] = f'attachment; filename="{Path(json_path).name}"'
+        response["Content-Disposition"] = f'attachment; filename="{Path(json_path).name}"'
     return response
+
 
 def _unwrap_ogr_geometry(geom):
     """OGR-API mirror of _unwrap_geometry_collection for the global GeoPackage builder."""
@@ -163,6 +160,7 @@ def generate_geopackage():
     ds = None
     return gpkg_path
 
+
 @extend_schema(
     summary="Download all published works as a GeoPackage (.gpkg)",
     description=(
@@ -171,7 +169,7 @@ def generate_geopackage():
     ),
     tags=["Downloads"],
     responses={
-        (200, 'application/geopackage+sqlite3'): OpenApiTypes.BINARY,
+        (200, "application/geopackage+sqlite3"): OpenApiTypes.BINARY,
         404: _DOWNLOAD_404,
     },
 )
@@ -184,7 +182,7 @@ def download_geopackage(request):
     gpkg_path = regenerate_geopackage_cache()
     if not gpkg_path or not os.path.exists(gpkg_path):
         raise Http404("GeoPackage not available.")
-    return FileResponse(open(gpkg_path, 'rb'), as_attachment=True, filename=os.path.basename(gpkg_path))
+    return FileResponse(open(gpkg_path, "rb"), as_attachment=True, filename=os.path.basename(gpkg_path))
 
 
 @extend_schema(
@@ -195,7 +193,7 @@ def download_geopackage(request):
     ),
     tags=["Downloads"],
     responses={
-        (200, 'text/csv'): OpenApiTypes.BINARY,
+        (200, "text/csv"): OpenApiTypes.BINARY,
         404: _DOWNLOAD_404,
     },
 )
@@ -209,7 +207,7 @@ def download_csv(request):
     if not csv_path or not os.path.exists(csv_path):
         raise Http404("CSV not available.")
     return FileResponse(
-        open(csv_path, 'rb'),
+        open(csv_path, "rb"),
         content_type="text/csv; charset=utf-8",
         as_attachment=True,
         filename=os.path.basename(csv_path),
@@ -287,8 +285,7 @@ def _generate_collection_converted_bytes(collection, ogr_fmt, layer_creation_opt
         try:
             subprocess.check_output(cmd, stderr=subprocess.STDOUT, text=True)
         except subprocess.CalledProcessError as err:
-            logger.warning("ogr2ogr %s failed for collection %s: %s",
-                           ogr_fmt, collection.identifier, err.output)
+            logger.warning("ogr2ogr %s failed for collection %s: %s", ogr_fmt, collection.identifier, err.output)
             return None
         with open(out_path, "rb") as f:
             return f.read()

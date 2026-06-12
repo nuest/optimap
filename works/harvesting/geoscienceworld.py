@@ -17,13 +17,13 @@ import logging
 import time
 from datetime import datetime
 
-import requests
 import geoextent.lib.extent as geoextent_lib
+import requests
 from django.conf import settings
-from django.contrib.gis.geos import GEOSGeometry, GeometryCollection
+from django.contrib.gis.geos import GeometryCollection, GEOSGeometry
 from django.utils import timezone
 
-from works.models import HarvestingEvent, Source, Work
+from works.models import HarvestingEvent, Source
 
 from .common import (
     HarvestStats,
@@ -38,17 +38,17 @@ from .common import (
     resolve_user,
     send_harvest_email,
 )
-from .sessions import (
-    CROSSREF_API_URL,
-    CROSSREF_HTTP_TIMEOUT,
-    CROSSREF_PAGE_ROWS,
-    _crossref_session,
-)
 from .crossref import (
     _authors_from_crossref,
     _build_crossref_filter,
     _split_crossref_page,
     _strip_jats,
+)
+from .sessions import (
+    CROSSREF_API_URL,
+    CROSSREF_HTTP_TIMEOUT,
+    CROSSREF_PAGE_ROWS,
+    _crossref_session,
 )
 
 logger = logging.getLogger(__name__)
@@ -79,9 +79,14 @@ def _geom_from_geoextent_result(result):
 
 
 def parse_gsw_response_and_save_works(
-    source, event, prefix,
-    max_records=None, warning_collector=None,
-    update_existing=False, stats=None, throttle=None,
+    source,
+    event,
+    prefix,
+    max_records=None,
+    warning_collector=None,
+    update_existing=False,
+    stats=None,
+    throttle=None,
 ):
     """Enumerate articles from Crossref by DOI prefix, fetch coordinates from GSW.
 
@@ -96,7 +101,7 @@ def parse_gsw_response_and_save_works(
     if stats is None:
         stats = HarvestStats()
     if throttle is None:
-        throttle = getattr(settings, 'GEOSCIENCEWORLD_THROTTLE_SECONDS', GSW_THROTTLE_DEFAULT)
+        throttle = getattr(settings, "GEOSCIENCEWORLD_THROTTLE_SECONDS", GSW_THROTTLE_DEFAULT)
 
     admin_user = get_or_create_admin_command_user()
     session = _crossref_session()
@@ -111,8 +116,7 @@ def parse_gsw_response_and_save_works(
             "rows": str(CROSSREF_PAGE_ROWS),
             "cursor": cursor,
             "select": (
-                "DOI,title,abstract,published-print,published-online,"
-                "published,issued,URL,author,volume,issue,page"
+                "DOI,title,abstract,published-print,published-online,published,issued,URL,author,volume,issue,page"
             ),
         }
         try:
@@ -120,10 +124,7 @@ def parse_gsw_response_and_save_works(
         except requests.exceptions.RequestException as e:
             raise RuntimeError(f"Crossref request failed for prefix {prefix}: {e}") from e
         if not resp.ok:
-            raise RuntimeError(
-                f"Crossref returned HTTP {resp.status_code} for prefix {prefix!r}: "
-                f"{resp.text[:300]}"
-            )
+            raise RuntimeError(f"Crossref returned HTTP {resp.status_code} for prefix {prefix!r}: {resp.text[:300]}")
 
         data = resp.json().get("message", {})
         items = data.get("items", [])
@@ -168,7 +169,7 @@ def parse_gsw_response_and_save_works(
             # already in the database and we're not updating existing records.
             if not update_existing and _find_existing_work(doi=doi, url=url):
                 logger.debug("GSW: DOI %s already harvested, skipping", doi)
-                stats.record('skipped_existing')
+                stats.record("skipped_existing")
                 if max_records and seen >= max_records:
                     return saved, seen
                 continue
@@ -237,12 +238,15 @@ def parse_gsw_response_and_save_works(
 
             try:
                 work, action = _save_or_update_work(
-                    work_kwargs, source, event, update_existing=update_existing,
+                    work_kwargs,
+                    source,
+                    event,
+                    update_existing=update_existing,
                 )
                 stats.record(action)
-                if action in ('created', 'updated') and source.collection_id:
+                if action in ("created", "updated") and source.collection_id:
                     work.collections.add(source.collection_id)
-                if action in ('created', 'updated'):
+                if action in ("created", "updated"):
                     saved += 1
             except Exception as save_err:
                 logger.warning("Failed to save GSW work DOI=%s: %s", doi, save_err)
@@ -287,10 +291,14 @@ def harvest_geoscienceworld(source_id, user=None, max_records=None, update_exist
     try:
         logger.info(
             "Starting GSW harvest: source=%s prefix=%s max_records=%s",
-            source.name, prefix, max_records,
+            source.name,
+            prefix,
+            max_records,
         )
         saved, seen = parse_gsw_response_and_save_works(
-            source, event, prefix,
+            source,
+            event,
+            prefix,
             max_records=max_records,
             warning_collector=warning_collector,
             update_existing=update_existing,
@@ -300,49 +308,55 @@ def harvest_geoscienceworld(source_id, user=None, max_records=None, update_exist
         spatial_count, temporal_count = complete_harvest(event, stats, warning_collector)
 
         collection_label = source.collection.name if source.collection else source.name
-        subject, body = render_harvest_email('email/harvest_success.en.txt', {
-            'subject_prefix': 'GeoScienceWorld ',
-            'source_label': collection_label,
-            'detail_header': 'GeoScienceWorld harvest details:',
-            'source_name': source.name,
-            'source_url': source.url_field,
-            'url_label': 'URL',
-            'collection_label': None,
-            'records_added_label': 'New works saved',
-            'records_added': stats.created,
-            'records_updated_label': 'Updated works',
-            'records_updated': stats.updated,
-            'spatial_label': 'With spatial extent (GeoRef coordinates)',
-            'spatial_count': spatial_count,
-            'temporal_label': 'With temporal extent',
-            'temporal_count': temporal_count,
-            'event_started': f'{event.started_at:%Y-%m-%d %H:%M:%S}',
-            'event_completed': f'{event.completed_at:%Y-%m-%d %H:%M:%S}',
-            'warning_summary': warning_collector.get_summary(),
-            'resolved_prefix': prefix,
-            'container_title_filters': None,
-            'openalex_source_id': None,
-            'records_seen': seen,
-            'records_processed': seen,
-        })
+        subject, body = render_harvest_email(
+            "email/harvest_success.en.txt",
+            {
+                "subject_prefix": "GeoScienceWorld ",
+                "source_label": collection_label,
+                "detail_header": "GeoScienceWorld harvest details:",
+                "source_name": source.name,
+                "source_url": source.url_field,
+                "url_label": "URL",
+                "collection_label": None,
+                "records_added_label": "New works saved",
+                "records_added": stats.created,
+                "records_updated_label": "Updated works",
+                "records_updated": stats.updated,
+                "spatial_label": "With spatial extent (GeoRef coordinates)",
+                "spatial_count": spatial_count,
+                "temporal_label": "With temporal extent",
+                "temporal_count": temporal_count,
+                "event_started": f"{event.started_at:%Y-%m-%d %H:%M:%S}",
+                "event_completed": f"{event.completed_at:%Y-%m-%d %H:%M:%S}",
+                "warning_summary": warning_collector.get_summary(),
+                "resolved_prefix": prefix,
+                "container_title_filters": None,
+                "openalex_source_id": None,
+                "records_seen": seen,
+                "records_processed": seen,
+            },
+        )
         send_harvest_email(user, subject, body)
 
     except Exception as e:
         logger.error("GSW harvesting failed for source %s: %s", source.name, str(e))
         fail_harvest(event, e, warning_collector)
-        subject, body = render_harvest_email('email/harvest_failure.en.txt', {
-            'subject_prefix': 'GeoScienceWorld ',
-            'source_label': source.name,
-            'source_type_label': 'GeoScienceWorld',
-            'source_name': source.name,
-            'source_url': source.url_field,
-            'collection_label': None,
-            'resolved_prefix': prefix,
-            'event_started': None,
-            'event_failed': None,
-            'error_message': str(e),
-            'warning_summary': warning_collector.get_summary(),
-        })
+        subject, body = render_harvest_email(
+            "email/harvest_failure.en.txt",
+            {
+                "subject_prefix": "GeoScienceWorld ",
+                "source_label": source.name,
+                "source_type_label": "GeoScienceWorld",
+                "source_name": source.name,
+                "source_url": source.url_field,
+                "collection_label": None,
+                "resolved_prefix": prefix,
+                "event_started": None,
+                "event_failed": None,
+                "error_message": str(e),
+                "warning_summary": warning_collector.get_summary(),
+            },
+        )
         send_harvest_email(user, subject, body)
         raise
     finally:

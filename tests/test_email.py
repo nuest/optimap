@@ -1,28 +1,28 @@
 # SPDX-FileCopyrightText: 2025 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import django
 import os
-
-from django.test import TestCase, override_settings
-from django.core import mail
-from django.conf import settings
-from works.tasks import send_monthly_email
-from works.models import EmailLog, Work, UserProfile
-from django.utils.timezone import now
 from datetime import timedelta
-from django.contrib.gis.geos import Point, GeometryCollection
+
+import django
+from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.gis.geos import GeometryCollection, Point
+from django.core import mail
+from django.test import TestCase, override_settings
+from django.utils.timezone import now
+
+from works.models import EmailLog, UserProfile, Work
+from works.tasks import send_monthly_email
+
 User = get_user_model()
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "optimap.settings")
 django.setup()
 
+
 # Force in-memory email + a stable BASE_URL for permalink assertions
-@override_settings(
-    EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
-    BASE_URL='http://testserver'
-)
+@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend", BASE_URL="http://testserver")
 class EmailIntegrationTest(TestCase):
     """Class-level user fixture via ``setUpTestData`` — Django's per-test
     transaction rollback already handles cross-test isolation, so the
@@ -32,7 +32,9 @@ class EmailIntegrationTest(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = User.objects.create_user(
-            username="testuser1", email="test@example.com", password="testpass",
+            username="testuser1",
+            email="test@example.com",
+            password="testpass",
         )
         cls.user_profile = UserProfile.objects.get(user=cls.user)
         cls.user_profile.notify_new_manuscripts = True
@@ -69,7 +71,7 @@ class EmailIntegrationTest(TestCase):
 
         # recipient and log correctness
         self.assertEqual(sent_email.to, ["test@example.com"])
-        email_log = EmailLog.objects.latest('sent_at')
+        email_log = EmailLog.objects.latest("sent_at")
         self.assertEqual(email_log.recipient_email, "test@example.com")
         self.assertEqual(email_log.sent_by, self.user)
 

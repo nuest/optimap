@@ -32,8 +32,8 @@ class MagicLinkEmailContentTests(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         email = mail.outbox[0]
         self.assertIn("user@example.com", email.to)
-        self.assertIn("/login/", email.body)       # token URL
-        self.assertIn("10", email.body)            # validity period in minutes
+        self.assertIn("/login/", email.body)  # token URL
+        self.assertIn("10", email.body)  # validity period in minutes
         self.assertIn("user@example.com", email.body)
 
 
@@ -45,9 +45,7 @@ class MagicLinkEmailContentTests(TestCase):
 class EmailChangeEmailContentTests(TestCase):
     def setUp(self):
         self.client = Client()
-        self.user = User.objects.create_user(
-            username="old@example.com", email="old@example.com", password="pass"
-        )
+        self.user = User.objects.create_user(username="old@example.com", email="old@example.com", password="pass")
         self.client.force_login(self.user)
 
     def test_confirmation_email_contains_old_and_new_address_and_link(self):
@@ -64,19 +62,21 @@ class EmailChangeEmailContentTests(TestCase):
         self.assertIn("old@example.com", email.body)
         self.assertIn("new@example.com", email.body)
         self.assertIn("/confirm-email/", email.body)
-        self.assertIn("10", email.body)            # expiry in minutes
+        self.assertIn("10", email.body)  # expiry in minutes
 
     def test_notification_email_sent_to_old_address_after_confirmation(self):
         """After confirming an email change, the old address receives a security notice."""
         # Key format: EMAIL_CONFIRMATION_TOKEN_PREFIX + "_" + email_new = "email_confirmation__new@..."
-        cache.set("email_confirmation__new@example.com", {
-            "token": "testtoken123",
-            "old_email": "old@example.com",
-        }, timeout=600)
-        mail.outbox = []
-        self.client.get(
-            reverse("optimap:confirm_email_change", args=["testtoken123", "new@example.com"])
+        cache.set(
+            "email_confirmation__new@example.com",
+            {
+                "token": "testtoken123",
+                "old_email": "old@example.com",
+            },
+            timeout=600,
         )
+        mail.outbox = []
+        self.client.get(reverse("optimap:confirm_email_change", args=["testtoken123", "new@example.com"]))
         # Exactly one email is expected — the security notice to the old address.
         self.assertEqual(len(mail.outbox), 1, "Expected one security-notice email")
         notify = mail.outbox[0]

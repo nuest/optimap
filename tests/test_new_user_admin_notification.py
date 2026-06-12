@@ -13,7 +13,7 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.core import mail
 from django.core.cache import cache
-from django.test import TestCase, Client, override_settings
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
 from works.models import EmailLog
@@ -27,6 +27,7 @@ def _run_async_synchronously(*args, **kwargs):
     func_path = args[0]
     module_name, _, attr = func_path.rpartition(".")
     from importlib import import_module
+
     module = import_module(module_name)
     fn = getattr(module, attr)
     return fn(*args[1:], **kwargs)
@@ -43,14 +44,22 @@ class NewUserAdminNotificationTests(TestCase):
     def setUp(self):
         self.client = Client()
         self.admin1 = User.objects.create_user(
-            username="admin1", email="admin1@optimap.example", password="x", is_staff=True,
+            username="admin1",
+            email="admin1@optimap.example",
+            password="x",
+            is_staff=True,
         )
         self.admin2 = User.objects.create_user(
-            username="admin2", email="admin2@optimap.example", password="x", is_staff=True,
+            username="admin2",
+            email="admin2@optimap.example",
+            password="x",
+            is_staff=True,
         )
         # Sanity: a non-staff user already in the system should not receive notification.
         self.other = User.objects.create_user(
-            username="other", email="other@example.org", password="x",
+            username="other",
+            email="other@example.org",
+            password="x",
         )
         mail.outbox = []
 
@@ -62,18 +71,14 @@ class NewUserAdminNotificationTests(TestCase):
         token = self._prime_magic_link("brand-new@example.org")
 
         with patch("django_q.tasks.async_task", side_effect=_run_async_synchronously):
-            response = self.client.get(
-                reverse("optimap:magic_link", args=[token]) + "?confirmed=true"
-            )
+            response = self.client.get(reverse("optimap:magic_link", args=[token]) + "?confirmed=true")
 
         self.assertEqual(response.status_code, 302)
         self.assertTrue(User.objects.filter(email="brand-new@example.org").exists())
 
         recipients = sorted(addr for m in mail.outbox for addr in m.to)
         self.assertEqual(len(mail.outbox), 2)
-        self.assertEqual(
-            recipients, ["admin1@optimap.example", "admin2@optimap.example"]
-        )
+        self.assertEqual(recipients, ["admin1@optimap.example", "admin2@optimap.example"])
         subject = mail.outbox[0].subject
         self.assertIn("New user registered", subject)
         self.assertIn("brand-new@example.org", subject)
@@ -90,7 +95,8 @@ class NewUserAdminNotificationTests(TestCase):
     def test_existing_user_login_does_not_notify(self):
         """Returning users skip the create_user branch and must not trigger the email."""
         existing = User.objects.create_user(
-            username="returning@example.org", email="returning@example.org",
+            username="returning@example.org",
+            email="returning@example.org",
         )
         token = self._prime_magic_link(existing.email, token="tok-returning")
 
@@ -99,9 +105,7 @@ class NewUserAdminNotificationTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(len(mail.outbox), 0)
-        self.assertFalse(
-            EmailLog.objects.filter(subject__contains="New user registered").exists()
-        )
+        self.assertFalse(EmailLog.objects.filter(subject__contains="New user registered").exists())
 
     def test_unconfirmed_first_visit_does_not_notify(self):
         """First leg of the new-account flow (no ?confirmed=true) renders the
@@ -121,9 +125,7 @@ class NewUserAdminNotificationTests(TestCase):
         token = self._prime_magic_link("loneranger@example.org")
 
         with patch("django_q.tasks.async_task", side_effect=_run_async_synchronously):
-            response = self.client.get(
-                reverse("optimap:magic_link", args=[token]) + "?confirmed=true"
-            )
+            response = self.client.get(reverse("optimap:magic_link", args=[token]) + "?confirmed=true")
 
         self.assertEqual(response.status_code, 302)
         self.assertTrue(User.objects.filter(email="loneranger@example.org").exists())
@@ -132,14 +134,15 @@ class NewUserAdminNotificationTests(TestCase):
     def test_staff_with_empty_email_skipped(self):
         """A staff user with no email address must not appear as a recipient."""
         User.objects.create_user(
-            username="silent-admin", email="", password="x", is_staff=True,
+            username="silent-admin",
+            email="",
+            password="x",
+            is_staff=True,
         )
         token = self._prime_magic_link("freshie@example.org")
 
         with patch("django_q.tasks.async_task", side_effect=_run_async_synchronously):
-            self.client.get(
-                reverse("optimap:magic_link", args=[token]) + "?confirmed=true"
-            )
+            self.client.get(reverse("optimap:magic_link", args=[token]) + "?confirmed=true")
 
         recipients = sorted(addr for m in mail.outbox for addr in m.to)
         self.assertNotIn("", recipients)
@@ -154,9 +157,7 @@ class NewUserAdminNotificationTests(TestCase):
             "django_q.tasks.async_task",
             side_effect=RuntimeError("queue offline"),
         ):
-            response = self.client.get(
-                reverse("optimap:magic_link", args=[token]) + "?confirmed=true"
-            )
+            response = self.client.get(reverse("optimap:magic_link", args=[token]) + "?confirmed=true")
 
         self.assertEqual(response.status_code, 302)
         self.assertTrue(User.objects.filter(email="resilient@example.org").exists())
@@ -166,7 +167,8 @@ class NewUserAdminNotificationTests(TestCase):
         lookup in authenticate_via_magic_link always sees a lowercase value and
         finds the existing account without showing the consent screen."""
         User.objects.create_user(
-            username="case@example.org", email="case@example.org",
+            username="case@example.org",
+            email="case@example.org",
         )
         # Simulate loginres: the original input "Case@Example.ORG" is lowercased
         # before being written to cache.
@@ -186,9 +188,7 @@ class NewUserAdminNotificationTests(TestCase):
         token = self._prime_magic_link("newcomer@example.org")
 
         with patch("django_q.tasks.async_task", side_effect=_run_async_synchronously):
-            response = self.client.get(
-                reverse("optimap:magic_link", args=[token]) + "?confirmed=true"
-            )
+            response = self.client.get(reverse("optimap:magic_link", args=[token]) + "?confirmed=true")
 
         self.assertEqual(response.status_code, 302)
         user = User.objects.get(email="newcomer@example.org")
@@ -197,8 +197,10 @@ class NewUserAdminNotificationTests(TestCase):
     def test_consented_at_not_overwritten_on_returning_login(self):
         """Returning users skip the elif branch; consented_at remains unchanged."""
         from works.models import UserProfile
+
         existing = User.objects.create_user(
-            username="veteran@example.org", email="veteran@example.org",
+            username="veteran@example.org",
+            email="veteran@example.org",
         )
         token = self._prime_magic_link(existing.email, token="tok-veteran")
 
@@ -212,8 +214,10 @@ class NewUserAdminNotificationTests(TestCase):
         """Signal get_or_create guard: updating a legacy user without a UserProfile
         must not raise RelatedObjectDoesNotExist."""
         from works.models import UserProfile
+
         existing = User.objects.create_user(
-            username="legacy@example.org", email="legacy@example.org",
+            username="legacy@example.org",
+            email="legacy@example.org",
         )
         # Simulate a legacy account by deleting its auto-created profile.
         UserProfile.objects.filter(user=existing).delete()
@@ -232,20 +236,17 @@ class NewUserAdminNotificationTests(TestCase):
         With normalised email the initial lookup succeeds, so the elif branch
         is skipped entirely — but the test guards against regression."""
         User.objects.create_user(
-            username="dup@example.org", email="dup@example.org",
+            username="dup@example.org",
+            email="dup@example.org",
         )
         # Cache holds the normalised (lowercase) email, as loginres produces.
         token = self._prime_magic_link("dup@example.org", token="tok-dup")
 
         with patch("django_q.tasks.async_task", side_effect=_run_async_synchronously):
-            response = self.client.get(
-                reverse("optimap:magic_link", args=[token]) + "?confirmed=true"
-            )
+            response = self.client.get(reverse("optimap:magic_link", args=[token]) + "?confirmed=true")
 
         self.assertEqual(response.status_code, 302)
         # Exactly one user — no duplicate.
         self.assertEqual(User.objects.filter(email="dup@example.org").count(), 1)
         # No new-user email for an already-existing account.
-        self.assertFalse(
-            EmailLog.objects.filter(subject__contains="New user registered").exists()
-        )
+        self.assertFalse(EmailLog.objects.filter(subject__contains="New user registered").exists())

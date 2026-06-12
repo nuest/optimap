@@ -95,7 +95,7 @@ def _strip_doi_prefix(doi_url: str | None) -> str | None:
     doi = doi_url.strip()
     for prefix in ("https://doi.org/", "http://doi.org/", "doi.org/"):
         if doi.lower().startswith(prefix):
-            return doi[len(prefix):]
+            return doi[len(prefix) :]
     return doi
 
 
@@ -239,8 +239,13 @@ def _openalex_item_to_work_kwargs(item, source, event):
 
 
 def parse_openalex_response_and_save_works(
-    source, event, openalex_source_id, max_records=None, sort=None,
-    update_existing=False, stats=None,
+    source,
+    event,
+    openalex_source_id,
+    max_records=None,
+    sort=None,
+    update_existing=False,
+    stats=None,
 ):
     """Page through ``/works?filter=primary_location.source.id:<S-id>`` and persist.
 
@@ -276,8 +281,7 @@ def parse_openalex_response_and_save_works(
             raise RuntimeError(f"OpenAlex request failed: {e}") from e
         if not resp.ok:
             raise RuntimeError(
-                f"OpenAlex returned HTTP {resp.status_code} for filter "
-                f"{filter_value!r}: {resp.text[:300]}"
+                f"OpenAlex returned HTTP {resp.status_code} for filter {filter_value!r}: {resp.text[:300]}"
             )
 
         data = resp.json()
@@ -292,7 +296,10 @@ def parse_openalex_response_and_save_works(
                 continue
             try:
                 work, action = _save_or_update_work(
-                    kwargs, source, event, update_existing=update_existing,
+                    kwargs,
+                    source,
+                    event,
+                    update_existing=update_existing,
                 )
                 stats.record(action)
                 if action in ("created", "updated") and source and source.collection_id:
@@ -301,7 +308,9 @@ def parse_openalex_response_and_save_works(
                     saved += 1
             except Exception as e:
                 logger.warning(
-                    "Failed to persist OpenAlex work %s: %s", kwargs.get("doi") or kwargs.get("url"), e,
+                    "Failed to persist OpenAlex work %s: %s",
+                    kwargs.get("doi") or kwargs.get("url"),
+                    e,
                 )
             if max_records and seen >= max_records:
                 return saved, seen
@@ -315,7 +324,11 @@ def parse_openalex_response_and_save_works(
 
 
 def harvest_openalex_source(
-    source_id, user=None, max_records=None, sort=None, update_existing=False,
+    source_id,
+    user=None,
+    max_records=None,
+    sort=None,
+    update_existing=False,
 ):
     """Harvest publications from a configured OpenAlex source.
 
@@ -348,12 +361,15 @@ def harvest_openalex_source(
 
         logger.info(
             "Starting OpenAlex harvest: openalex_source=%s sort=%s max_records=%s",
-            openalex_source_id, sort, max_records,
+            openalex_source_id,
+            sort,
+            max_records,
         )
 
         stats = HarvestStats()
         saved, seen = parse_openalex_response_and_save_works(
-            source, event,
+            source,
+            event,
             openalex_source_id=openalex_source_id,
             max_records=max_records,
             sort=sort,
@@ -363,52 +379,59 @@ def harvest_openalex_source(
 
         spatial_count, temporal_count = complete_harvest(event, stats, warning_collector)
 
-        subject, body = render_harvest_email('email/harvest_success.en.txt', {
-            'subject_prefix': 'OpenAlex ',
-            'source_label': source.name,
-            'detail_header': 'OpenAlex harvest details:',
-            'source_name': source.name,
-            'source_url': None,
-            'url_label': None,
-            'collection_label': None,
-            'records_added_label': 'New works saved',
-            'records_added': stats.created,
-            'records_updated_label': 'Updated works',
-            'records_updated': stats.updated,
-            'spatial_label': 'Articles with spatial metadata',
-            'spatial_count': spatial_count,
-            'temporal_label': 'Articles with temporal metadata',
-            'temporal_count': temporal_count,
-            'event_started': f'{event.started_at:%Y-%m-%d %H:%M:%S}',
-            'event_completed': f'{event.completed_at:%Y-%m-%d %H:%M:%S}',
-            'warning_summary': warning_collector.get_summary(),
-            'resolved_prefix': None,
-            'container_title_filters': None,
-            'openalex_source_id': openalex_source_id,
-            'records_seen': seen,
-            'records_processed': None,
-        })
+        subject, body = render_harvest_email(
+            "email/harvest_success.en.txt",
+            {
+                "subject_prefix": "OpenAlex ",
+                "source_label": source.name,
+                "detail_header": "OpenAlex harvest details:",
+                "source_name": source.name,
+                "source_url": None,
+                "url_label": None,
+                "collection_label": None,
+                "records_added_label": "New works saved",
+                "records_added": stats.created,
+                "records_updated_label": "Updated works",
+                "records_updated": stats.updated,
+                "spatial_label": "Articles with spatial metadata",
+                "spatial_count": spatial_count,
+                "temporal_label": "Articles with temporal metadata",
+                "temporal_count": temporal_count,
+                "event_started": f"{event.started_at:%Y-%m-%d %H:%M:%S}",
+                "event_completed": f"{event.completed_at:%Y-%m-%d %H:%M:%S}",
+                "warning_summary": warning_collector.get_summary(),
+                "resolved_prefix": None,
+                "container_title_filters": None,
+                "openalex_source_id": openalex_source_id,
+                "records_seen": seen,
+                "records_processed": None,
+            },
+        )
         send_harvest_email(user, subject, body)
 
     except Exception as e:
         logger.error(
             "OpenAlex harvesting failed for source %s: %s",
-            source.url_field, str(e),
+            source.url_field,
+            str(e),
         )
         fail_harvest(event, e, warning_collector)
-        subject, body = render_harvest_email('email/harvest_failure.en.txt', {
-            'subject_prefix': 'OpenAlex ',
-            'source_label': source.name,
-            'source_type_label': 'OpenAlex',
-            'source_name': source.name,
-            'source_url': None,
-            'collection_label': None,
-            'resolved_prefix': None,
-            'event_started': None,
-            'event_failed': None,
-            'error': str(e),
-            'warning_summary': '',
-        })
+        subject, body = render_harvest_email(
+            "email/harvest_failure.en.txt",
+            {
+                "subject_prefix": "OpenAlex ",
+                "source_label": source.name,
+                "source_type_label": "OpenAlex",
+                "source_name": source.name,
+                "source_url": None,
+                "collection_label": None,
+                "resolved_prefix": None,
+                "event_started": None,
+                "event_failed": None,
+                "error": str(e),
+                "warning_summary": "",
+            },
+        )
         send_harvest_email(user, subject, body, fail_silently=True)
         raise
     finally:

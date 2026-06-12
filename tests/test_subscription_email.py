@@ -1,22 +1,22 @@
 # SPDX-FileCopyrightText: 2025 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from django.test import TestCase, override_settings
-from django.core import mail
-from django.conf import settings
-from works.models import Subscription, Work, EmailLog, UserProfile, GlobalRegion
-from works.tasks import send_subscription_based_email
-from django.contrib.auth import get_user_model
-from django.utils.timezone import now
 from datetime import timedelta
-from django.contrib.gis.geos import Point, GeometryCollection, Polygon, MultiPolygon
+
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.contrib.gis.geos import GeometryCollection, MultiPolygon, Point, Polygon
+from django.core import mail
+from django.test import TestCase, override_settings
+from django.utils.timezone import now
+
+from works.models import EmailLog, GlobalRegion, Subscription, UserProfile, Work
+from works.tasks import send_subscription_based_email
 
 User = get_user_model()
 
-@override_settings(
-    EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
-    BASE_URL='http://testserver'
-)
+
+@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend", BASE_URL="http://testserver")
 class SubscriptionEmailTest(TestCase):
     """Class-level fixture (``setUpTestData``) so the user/region/subscription
     seed runs once instead of once per test method — see the matching note in
@@ -25,7 +25,9 @@ class SubscriptionEmailTest(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = User.objects.create_user(
-            username="subuser", email="subuser@example.com", password="testpass",
+            username="subuser",
+            email="subuser@example.com",
+            password="testpass",
         )
         UserProfile.objects.get_or_create(user=cls.user)
         dresden_bbox = Polygon.from_bbox((13.5, 50.9, 13.9, 51.2))

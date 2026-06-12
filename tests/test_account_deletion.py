@@ -2,16 +2,21 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import os
+
 import django
+
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "optimap.settings")
 django.setup()
-from django.core import mail
-from django.test import TestCase, Client, override_settings
-from django.contrib.auth import get_user_model
-from django.core.cache import cache
-from django.urls import reverse
 import uuid
+
+from django.contrib.auth import get_user_model
+from django.core import mail
+from django.core.cache import cache
+from django.test import Client, TestCase, override_settings
+from django.urls import reverse
+
 User = get_user_model()
+
 
 class AccountDeletionTests(TestCase):
     def setUp(self):
@@ -69,7 +74,7 @@ class AccountDeletionTests(TestCase):
     def test_invalid_token(self):
         """Test invalid or expired deletion token"""
         response = self.client.get(reverse("optimap:confirm_delete", args=["invalidtoken"]))
-        messages_list = list(response.wsgi_request._messages)     
+        messages_list = list(response.wsgi_request._messages)
         self.assertEqual(response.status_code, 302)
         self.assertTrue(any("Invalid or expired deletion token" in str(m) for m in messages_list))
 
@@ -79,10 +84,12 @@ class AccountDeletionTests(TestCase):
 
         response = self.client.get(reverse("optimap:confirm_delete", args=[self.delete_token]))
 
-        self.assertEqual(response.status_code, 302, "Expected a redirect (302) after clicking the deletion link while logged out.")
+        self.assertEqual(
+            response.status_code, 302, "Expected a redirect (302) after clicking the deletion link while logged out."
+        )
 
         expected_redirect = reverse("optimap:main")
         self.assertTrue(
             response.url.startswith(expected_redirect),
-            f"Expected redirect to {expected_redirect}, but got {response.url}"
+            f"Expected redirect to {expected_redirect}, but got {response.url}",
         )

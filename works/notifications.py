@@ -43,6 +43,7 @@ User = get_user_model()
 # Public dispatch
 # ---------------------------------------------------------------------------
 
+
 def notify_work_event(work, event_type: str, actor=None) -> None:
     """Queue notifications for a ``Work`` state change.
 
@@ -58,13 +59,15 @@ def notify_work_event(work, event_type: str, actor=None) -> None:
     except Exception:  # noqa: BLE001 — notification must never crash the state change
         logger.exception(
             "notify_work_event(%r) failed for work id=%s; state change is unaffected.",
-            event_type, getattr(work, "pk", None),
+            event_type,
+            getattr(work, "pk", None),
         )
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _absolute_work_url(work) -> str:
     """Absolute URL to the public work landing page."""
@@ -84,10 +87,12 @@ def _opted_in(qs):
 
 def _curators_for_work(work):
     """Return a queryset of curator users for any collection that contains ``work``."""
-    return _opted_in(User.objects.filter(
-        curated_collections__in=work.collections.all(),
-        email__gt="",
-    ).distinct())
+    return _opted_in(
+        User.objects.filter(
+            curated_collections__in=work.collections.all(),
+            email__gt="",
+        ).distinct()
+    )
 
 
 def _admins():
@@ -120,6 +125,7 @@ def _format_role_summary(admins_count: int, curator_collections: list[str]) -> s
 # ---------------------------------------------------------------------------
 # Contribution review notification — admins + curators
 # ---------------------------------------------------------------------------
+
 
 def _enqueue_contribution_review(work, actor) -> None:
     from django_q.tasks import async_task  # local import to keep test isolation simple
@@ -176,19 +182,20 @@ def send_contribution_review_email(
     actor = User.objects.filter(pk=actor_id).first() if actor_id else None
     actor_label = actor.email if actor and actor.email else (actor.username if actor else "(unknown)")
 
-    subject, body = render_email('email/contribution_review.en.txt', {
-        'actor_label': actor_label,
-        'work_title': work.title[:120],
-        'work_doi': work.doi or '(none)',
-        'submitted_at': timezone.now().isoformat(timespec='seconds'),
-        'work_url': _absolute_work_url(work),
-        'role_summary': role_summary,
-    })
+    subject, body = render_email(
+        "email/contribution_review.en.txt",
+        {
+            "actor_label": actor_label,
+            "work_title": work.title[:120],
+            "work_doi": work.doi or "(none)",
+            "submitted_at": timezone.now().isoformat(timespec="seconds"),
+            "work_url": _absolute_work_url(work),
+            "role_summary": role_summary,
+        },
+    )
 
     recipients = list(
-        User.objects.filter(pk__in=list(recipient_ids))
-        .exclude(email__exact="")
-        .values_list("email", flat=True)
+        User.objects.filter(pk__in=list(recipient_ids)).exclude(email__exact="").values_list("email", flat=True)
     )
     for email in recipients:
         try:
@@ -201,6 +208,7 @@ def send_contribution_review_email(
 # Publication notification — original contributors
 # ---------------------------------------------------------------------------
 
+
 def _enqueue_publication_to_contributors(work, actor) -> None:
     from django_q.tasks import async_task
 
@@ -208,11 +216,13 @@ def _enqueue_publication_to_contributors(work, actor) -> None:
     provenance = work.provenance if isinstance(work.provenance, dict) else {}
     if provenance.get("publication_notified_at"):
         logger.debug(
-            "Work id=%s already notified on a previous publish — skipping.", work.pk,
+            "Work id=%s already notified on a previous publish — skipping.",
+            work.pk,
         )
         return
 
     from works.models import Contribution
+
     contributor_ids = list(
         Contribution.objects.filter(work=work)
         .exclude(user__pk=getattr(actor, "pk", None))
@@ -235,7 +245,7 @@ def _enqueue_publication_to_contributors(work, actor) -> None:
 
 def send_publication_to_contributor_emails(contributor_ids: Iterable[int], work_id: int) -> None:
     """Django-Q task: notify original contributors that a work has been published."""
-    from works.models import Work, Contribution
+    from works.models import Contribution, Work
 
     try:
         work = Work.objects.get(pk=work_id)
@@ -251,22 +261,24 @@ def send_publication_to_contributor_emails(contributor_ids: Iterable[int], work_
             continue
         # Per-contributor body so we can list the specific contribution kinds.
         kinds = list(
-            Contribution.objects.filter(work=work, user=contributor)
-            .values_list("kind", flat=True)
-            .distinct()
+            Contribution.objects.filter(work=work, user=contributor).values_list("kind", flat=True).distinct()
         )
         kind_label = ", ".join(sorted(kinds)) if kinds else "metadata"
-        subject, body = render_email('email/publication_to_contributor.en.txt', {
-            'work_title': work.title[:120],
-            'work_doi': work.doi or '(none)',
-            'kind_label': kind_label,
-            'work_url': work_url,
-        })
+        subject, body = render_email(
+            "email/publication_to_contributor.en.txt",
+            {
+                "work_title": work.title[:120],
+                "work_doi": work.doi or "(none)",
+                "kind_label": kind_label,
+                "work_url": work_url,
+            },
+        )
         try:
             send_mail(subject, body, settings.EMAIL_HOST_USER, [contributor.email], fail_silently=False)
         except Exception:  # noqa: BLE001
             logger.exception(
-                "Failed to send publication notification to contributor %s.", contributor.email,
+                "Failed to send publication notification to contributor %s.",
+                contributor.email,
             )
 
     # Stamp the suppression marker after the fan-out so a republish cycle
@@ -280,6 +292,7 @@ def send_publication_to_contributor_emails(contributor_ids: Iterable[int], work_
 # ---------------------------------------------------------------------------
 # User lifecycle — admins on first confirmed login (new account persisted).
 # ---------------------------------------------------------------------------
+
 
 def notify_admins_new_user_registered(user) -> None:
     """Queue an admin notification for a freshly persisted user account.
@@ -317,8 +330,8 @@ def notify_admins_new_user_registered(user) -> None:
         )
     except Exception:  # noqa: BLE001 — notification must never crash login
         logger.exception(
-            "notify_admins_new_user_registered failed for user id=%s; "
-            "login is unaffected.", getattr(user, "pk", None),
+            "notify_admins_new_user_registered failed for user id=%s; login is unaffected.",
+            getattr(user, "pk", None),
         )
 
 
@@ -335,24 +348,24 @@ def send_new_user_admin_email(recipient_ids: Iterable[int], user_id: int) -> Non
         user = User.objects.get(pk=user_id)
     except User.DoesNotExist:
         logger.warning(
-            "send_new_user_admin_email: user id=%s vanished before send.", user_id,
+            "send_new_user_admin_email: user id=%s vanished before send.",
+            user_id,
         )
         return
 
-    user_admin_url = (
-        f"{settings.BASE_URL}{reverse('admin:works_customuser_change', args=[user.pk])}"
+    user_admin_url = f"{settings.BASE_URL}{reverse('admin:works_customuser_change', args=[user.pk])}"
+    subject, body = render_email(
+        "email/new_user_admin.en.txt",
+        {
+            "user_email": user.email,
+            "username": user.username,
+            "registered_at": user.date_joined.isoformat(timespec="seconds"),
+            "user_admin_url": user_admin_url,
+        },
     )
-    subject, body = render_email('email/new_user_admin.en.txt', {
-        'user_email': user.email,
-        'username': user.username,
-        'registered_at': user.date_joined.isoformat(timespec='seconds'),
-        'user_admin_url': user_admin_url,
-    })
 
     admin_emails = list(
-        User.objects.filter(pk__in=list(recipient_ids))
-        .exclude(email__exact="")
-        .values_list("email", flat=True)
+        User.objects.filter(pk__in=list(recipient_ids)).exclude(email__exact="").values_list("email", flat=True)
     )
     for admin_email in admin_emails:
         try:
@@ -380,6 +393,7 @@ def send_new_user_admin_email(recipient_ids: Iterable[int], user_id: int) -> Non
 # Curator change notification — all curators + admins + actor + changed user
 # ---------------------------------------------------------------------------
 
+
 def notify_curator_change(collection, changed_user, action: str, actor) -> None:
     """Queue a notification when a curator is added to or removed from a collection.
 
@@ -392,14 +406,8 @@ def notify_curator_change(collection, changed_user, action: str, actor) -> None:
     try:
         from django_q.tasks import async_task
 
-        curator_ids = set(
-            collection.curators.exclude(email__exact="").values_list("id", flat=True)
-        )
-        admin_ids = set(
-            User.objects.filter(is_staff=True)
-            .exclude(email__exact="")
-            .values_list("id", flat=True)
-        )
+        curator_ids = set(collection.curators.exclude(email__exact="").values_list("id", flat=True))
+        admin_ids = set(User.objects.filter(is_staff=True).exclude(email__exact="").values_list("id", flat=True))
         candidate_ids = curator_ids | admin_ids
         if getattr(actor, "pk", None):
             candidate_ids.add(actor.pk)
@@ -408,14 +416,13 @@ def notify_curator_change(collection, changed_user, action: str, actor) -> None:
 
         # Filter to users that actually have a valid email address.
         recipient_ids = list(
-            User.objects.filter(pk__in=candidate_ids)
-            .exclude(email__exact="")
-            .values_list("id", flat=True)
+            User.objects.filter(pk__in=candidate_ids).exclude(email__exact="").values_list("id", flat=True)
         )
         if not recipient_ids:
             logger.info(
                 "Curator %s on collection id=%s — no recipients to notify.",
-                action, collection.pk,
+                action,
+                collection.pk,
             )
             return
 
@@ -464,22 +471,23 @@ def send_curator_change_email(
     curators_line = ", ".join(sorted(current_curators)) if current_curators else "(none)"
 
     collection_url = f"{settings.BASE_URL}{collection.get_absolute_url()}"
-    subject, body = render_email('email/curator_change.en.txt', {
-        'action': action,
-        'collection_name': collection.name,
-        'changed_label': changed_label,
-        'verb': verb,
-        'actor_label': actor_label,
-        'collection_url': collection_url,
-        'curators_line': curators_line,
-    })
+    subject, body = render_email(
+        "email/curator_change.en.txt",
+        {
+            "action": action,
+            "collection_name": collection.name,
+            "changed_label": changed_label,
+            "verb": verb,
+            "actor_label": actor_label,
+            "collection_url": collection_url,
+            "curators_line": curators_line,
+        },
+    )
 
     from works.models import EmailLog  # local: avoid circular import
 
     recipients = list(
-        User.objects.filter(pk__in=list(recipient_ids))
-        .exclude(email__exact="")
-        .values_list("email", flat=True)
+        User.objects.filter(pk__in=list(recipient_ids)).exclude(email__exact="").values_list("email", flat=True)
     )
     for email in recipients:
         try:
@@ -509,7 +517,7 @@ def send_curator_change_email(
 
 WORK_EVENT_HANDLERS = {
     "contribution": _enqueue_contribution_review,
-    "publish":      _enqueue_publication_to_contributors,
+    "publish": _enqueue_publication_to_contributors,
     # Future:
     # "unpublish":  _enqueue_unpublish_audit,
 }

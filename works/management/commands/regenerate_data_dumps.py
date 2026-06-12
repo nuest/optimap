@@ -71,9 +71,7 @@ class Command(BaseCommand):
                 else:
                     self.stdout.write(self.style.SUCCESS(f"  {name}: {path}"))
             ok = sum(1 for p in results.values() if p is not None)
-            self.stdout.write(self.style.SUCCESS(
-                f"Done — regenerated {ok}/{len(results)} format(s)."
-            ))
+            self.stdout.write(self.style.SUCCESS(f"Done — regenerated {ok}/{len(results)} format(s)."))
             return
 
         path = _FORMAT_DISPATCH[fmt]()

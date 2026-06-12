@@ -10,7 +10,7 @@ from django.contrib import admin as admin_site
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'optimap.settings')
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "optimap.settings")
 django.setup()
 
 from django.contrib.auth import get_user_model
@@ -65,9 +65,7 @@ class HarvestingEventLogPersistenceTest(TestCase):
         # Regression: admin actions enqueue with user.id (int), and harvest_oai_endpoint
         # used to assume `user` was a User instance — `user.email` blew up with
         # AttributeError on the failure-notification branch. The task must accept an int.
-        admin = User.objects.create_superuser(
-            username="opsadmin", email="ops@example.org", password="x"
-        )
+        admin = User.objects.create_superuser(username="opsadmin", email="ops@example.org", password="x")
         source = _make_source(url_field="http://does-not-exist.invalid/oai")
         responses.add(
             responses.GET,
@@ -127,9 +125,7 @@ class SourceAdminRegistrationTest(TestCase):
 
 class HarvestAdminActionsTest(TestCase):
     def setUp(self):
-        self.user = User.objects.create_superuser(
-            username="admin", email="admin@example.org", password="x"
-        )
+        self.user = User.objects.create_superuser(username="admin", email="admin@example.org", password="x")
         self.source = _make_source()
         self.rf = RequestFactory()
 
@@ -170,7 +166,8 @@ class HarvestAdminActionsTest(TestCase):
     @patch("works.admin.async_task")
     def test_trigger_action_dispatches_by_source_type_for_mountain_wetlands(self, mock_async):
         mwr = _make_source(
-            name="MWR", url_field="https://andes.example.org/api/v1/items/",
+            name="MWR",
+            url_field="https://andes.example.org/api/v1/items/",
             source_type="mountain-wetlands",
         )
         ma = admin_site.site._registry[Source]
@@ -185,7 +182,9 @@ class HarvestAdminActionsTest(TestCase):
     @patch("works.admin.async_task")
     def test_trigger_action_dispatches_by_source_type_for_rss(self, mock_async):
         rss = _make_source(
-            name="RSS", url_field="https://example.org/feed.rss", source_type="rss",
+            name="RSS",
+            url_field="https://example.org/feed.rss",
+            source_type="rss",
         )
         ma = admin_site.site._registry[Source]
         request = self._request()
@@ -197,8 +196,10 @@ class HarvestAdminActionsTest(TestCase):
 
     def test_schedule_action_picks_task_by_source_type(self):
         from django_q.models import Schedule
+
         mwr = _make_source(
-            name="MWR-sch", url_field="https://andes.example.org/api/v1/items2/",
+            name="MWR-sch",
+            url_field="https://andes.example.org/api/v1/items2/",
             source_type="mountain-wetlands",
         )
         ma = admin_site.site._registry[Source]
@@ -212,7 +213,8 @@ class HarvestAdminActionsTest(TestCase):
     @patch("works.admin.async_task")
     def test_retry_event_dispatches_by_current_source_type(self, mock_async):
         mwr = _make_source(
-            name="MWR-retry", url_field="https://andes.example.org/api/v1/items3/",
+            name="MWR-retry",
+            url_field="https://andes.example.org/api/v1/items3/",
             source_type="mountain-wetlands",
         )
         event = HarvestingEvent.objects.create(source=mwr, status="failed")
@@ -220,6 +222,7 @@ class HarvestAdminActionsTest(TestCase):
         request = self.rf.post("/admin/works/harvestingevent/")
         request.user = self.user
         from django.contrib.messages.storage.fallback import FallbackStorage
+
         setattr(request, "session", {})
         setattr(request, "_messages", FallbackStorage(request))
 
@@ -250,9 +253,7 @@ class HarvestAdminActionsTest(TestCase):
 
 class HarvestingEventAdminChangeViewTest(TestCase):
     def setUp(self):
-        self.user = User.objects.create_superuser(
-            username="admin", email="admin@example.org", password="x"
-        )
+        self.user = User.objects.create_superuser(username="admin", email="admin@example.org", password="x")
         self.client.force_login(self.user)
         self.source = _make_source()
         self.event = HarvestingEvent.objects.create(
@@ -283,8 +284,9 @@ class SourceScheduleTest(TestCase):
         # Regression: Schedule.next_run defaults to timezone.now, so brand-new
         # sources (e.g. those bulk-created by `--insert-sources`) all fired on
         # the next cluster tick. Source.save() must set next_run = now + interval.
-        from django.utils import timezone
         from datetime import timedelta
+
+        from django.utils import timezone
         from django_q.models import Schedule
 
         before = timezone.now()
@@ -293,7 +295,8 @@ class SourceScheduleTest(TestCase):
 
         expected_floor = before + timedelta(minutes=120)
         self.assertGreaterEqual(
-            sched.next_run, expected_floor,
+            sched.next_run,
+            expected_floor,
             "next_run must be at least one interval in the future after Source.save()",
         )
 
@@ -332,9 +335,7 @@ class SourceAdminChangelistTest(TestCase):
     """The Source changelist must render with sources that have / don't have events."""
 
     def setUp(self):
-        self.user = User.objects.create_superuser(
-            username="admin", email="admin@example.org", password="x"
-        )
+        self.user = User.objects.create_superuser(username="admin", email="admin@example.org", password="x")
         self.client.force_login(self.user)
 
     def test_changelist_renders_when_source_has_events(self):

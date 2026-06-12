@@ -1,12 +1,14 @@
 # SPDX-FileCopyrightText: 2025 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from django.test import TestCase, Client
-from works.models import Work, Source
-from django.contrib.gis.geos import Point, GeometryCollection
-from django.utils.timezone import now
 from datetime import timedelta
+
 from django.contrib.auth import get_user_model
+from django.contrib.gis.geos import GeometryCollection, Point
+from django.test import Client, TestCase
+from django.utils.timezone import now
+
+from works.models import Source, Work
 
 User = get_user_model()
 
@@ -22,7 +24,7 @@ class WorkLandingPageTest(TestCase):
             name="Test Journal",
             url_field="https://example.com/oai",
             homepage_url="https://example.com/journal",
-            issn_l="1234-5678"
+            issn_l="1234-5678",
         )
 
         # Create a test publication with DOI
@@ -34,7 +36,7 @@ class WorkLandingPageTest(TestCase):
             publicationDate=now() - timedelta(days=30),
             doi="10.1234/test-doi",
             geometry=GeometryCollection(Point(12.4924, 41.8902)),
-            source=self.source
+            source=self.source,
         )
 
         # Create a test publication without source homepage_url
@@ -42,7 +44,7 @@ class WorkLandingPageTest(TestCase):
             name="Test Journal No Homepage",
             url_field="https://example.com/oai2",
             homepage_url=None,
-            issn_l="8765-4321"
+            issn_l="8765-4321",
         )
 
         self.pub_no_homepage = Work.objects.create(
@@ -53,7 +55,7 @@ class WorkLandingPageTest(TestCase):
             publicationDate=now() - timedelta(days=20),
             doi="10.5678/another-doi",
             geometry=GeometryCollection(Point(13.4050, 52.5200)),
-            source=self.source_no_homepage
+            source=self.source_no_homepage,
         )
 
     def test_work_landing_page_loads(self):
@@ -67,7 +69,8 @@ class WorkLandingPageTest(TestCase):
         see a CTA pointing at the user menu, not just a silent page with no
         contribute affordance."""
         work = Work.objects.create(
-            title="Needs contributions", status="h",
+            title="Needs contributions",
+            status="h",
             doi="10.1234/anon-cta",
             geometry=GeometryCollection(),  # missing geometry → contributable
             source=self.source,
@@ -84,8 +87,11 @@ class WorkLandingPageTest(TestCase):
         # missing-information alert is still shown, but with the
         # "You can help by adding this information below!" wording.
         from django.contrib.auth import get_user_model
+
         contributor = get_user_model().objects.create_user(
-            username="cta-user", email="cta-user@example.org", password="x",
+            username="cta-user",
+            email="cta-user@example.org",
+            password="x",
         )
         self.client.force_login(contributor)
         resp = self.client.get(f"/work/{work.doi}/")
@@ -109,7 +115,8 @@ class WorkLandingPageTest(TestCase):
             )
             resp = self.client.get(f"/work/{work.doi}/")
             self.assertEqual(
-                resp.status_code, 200,
+                resp.status_code,
+                200,
                 f"Expected 200 for anonymous visit to status={visible_status!r}",
             )
 
@@ -123,7 +130,8 @@ class WorkLandingPageTest(TestCase):
             )
             resp = self.client.get(f"/work/{work.doi}/")
             self.assertEqual(
-                resp.status_code, 404,
+                resp.status_code,
+                404,
                 f"Expected 404 for anonymous visit to status={hidden_status!r}",
             )
 
@@ -135,18 +143,19 @@ class WorkLandingPageTest(TestCase):
         self.assertEqual(response.status_code, 200)
 
         # Verify feature_json is in context (requires json import to create)
-        self.assertIn('feature_json', response.context)
-        feature_json_str = response.context['feature_json']
+        self.assertIn("feature_json", response.context)
+        feature_json_str = response.context["feature_json"]
 
         # Verify it's valid JSON string that can be parsed
         self.assertIsInstance(feature_json_str, str)
 
         # Parse it to verify it's valid GeoJSON (this also tests json usage)
         import json
+
         feature_data = json.loads(feature_json_str)
-        self.assertEqual(feature_data['type'], 'Feature')
-        self.assertIn('geometry', feature_data)
-        self.assertIn('properties', feature_data)
+        self.assertEqual(feature_data["type"], "Feature")
+        self.assertIn("geometry", feature_data)
+        self.assertIn("properties", feature_data)
 
     def test_doi_link_is_correct(self):
         """Test that the DOI link points to the correct DOI resolver URL."""
@@ -154,7 +163,7 @@ class WorkLandingPageTest(TestCase):
         self.assertEqual(response.status_code, 200)
 
         # Check that the DOI link is present and correct
-        expected_doi_url = f'https://doi.org/{self.pub_with_doi.doi}'
+        expected_doi_url = f"https://doi.org/{self.pub_with_doi.doi}"
         self.assertContains(response, expected_doi_url)
         self.assertContains(response, f'<a href="{expected_doi_url}"')
 
@@ -176,7 +185,7 @@ class WorkLandingPageTest(TestCase):
         # Check that the source name is present but not as a link
         self.assertContains(response, self.source_no_homepage.name)
         # Should not have a link to the source since homepage_url is None
-        self.assertNotContains(response, f'<a href="None"')
+        self.assertNotContains(response, '<a href="None"')
 
     def test_raw_json_api_link_is_correct(self):
         """Test that the raw JSON API link is correct and uses the publication ID."""
@@ -184,9 +193,9 @@ class WorkLandingPageTest(TestCase):
         self.assertEqual(response.status_code, 200)
 
         # Check that the API link is present
-        expected_api_url = f'/api/v1/works/{self.pub_with_doi.id}/'
+        expected_api_url = f"/api/v1/works/{self.pub_with_doi.id}/"
         self.assertContains(response, expected_api_url)
-        self.assertContains(response, 'View raw JSON from API')
+        self.assertContains(response, "View raw JSON from API")
 
     def test_raw_json_api_returns_valid_json(self):
         """Test that the raw JSON API endpoint returns valid JSON data."""
@@ -195,25 +204,25 @@ class WorkLandingPageTest(TestCase):
         self.assertEqual(response.status_code, 200)
 
         # Now test the API endpoint
-        api_response = self.client.get(f'/api/v1/works/{self.pub_with_doi.id}/')
+        api_response = self.client.get(f"/api/v1/works/{self.pub_with_doi.id}/")
         self.assertEqual(api_response.status_code, 200)
-        self.assertIn('application/json', api_response['Content-Type'])
+        self.assertIn("application/json", api_response["Content-Type"])
 
         # Check that the JSON contains expected fields
         data = api_response.json()
 
         # GeoJSON Feature format has properties
-        if 'properties' in data:
+        if "properties" in data:
             # GeoFeatureModelSerializer returns GeoJSON Feature
-            self.assertEqual(data['type'], 'Feature')
-            self.assertEqual(data['properties']['title'], self.pub_with_doi.title)
-            self.assertEqual(data['properties']['doi'], self.pub_with_doi.doi)
-            self.assertEqual(data['properties']['abstract'], self.pub_with_doi.abstract)
+            self.assertEqual(data["type"], "Feature")
+            self.assertEqual(data["properties"]["title"], self.pub_with_doi.title)
+            self.assertEqual(data["properties"]["doi"], self.pub_with_doi.doi)
+            self.assertEqual(data["properties"]["abstract"], self.pub_with_doi.abstract)
         else:
             # Regular serializer format
-            self.assertEqual(data['title'], self.pub_with_doi.title)
-            self.assertEqual(data['doi'], self.pub_with_doi.doi)
-            self.assertEqual(data['abstract'], self.pub_with_doi.abstract)
+            self.assertEqual(data["title"], self.pub_with_doi.title)
+            self.assertEqual(data["doi"], self.pub_with_doi.doi)
+            self.assertEqual(data["abstract"], self.pub_with_doi.abstract)
 
     def test_all_links_have_security_attributes(self):
         """Test that external links have target='_blank' and rel='noopener'."""
@@ -230,32 +239,35 @@ class WorkLandingPageTest(TestCase):
         self.assertEqual(response.status_code, 200)
 
         # Extract the title tag content
-        content = response.content.decode('utf-8')
+        content = response.content.decode("utf-8")
 
         # Check that <title> tag contains the publication title
-        self.assertIn(f'<title>{self.pub_with_doi.title}', content)
+        self.assertIn(f"<title>{self.pub_with_doi.title}", content)
 
         # Check that <title> tag contains the DOI in parentheses
-        self.assertIn(f'({self.pub_with_doi.doi})', content)
+        self.assertIn(f"({self.pub_with_doi.doi})", content)
 
         # Check that OPTIMAP is also in the title
-        self.assertIn('OPTIMAP', content)
+        self.assertIn("OPTIMAP", content)
 
         # Verify the complete expected format: "Title (DOI) - OPTIMAP"
-        expected_title = f'<title>{self.pub_with_doi.title} ({self.pub_with_doi.doi}) - OPTIMAP</title>'
+        expected_title = f"<title>{self.pub_with_doi.title} ({self.pub_with_doi.doi}) - OPTIMAP</title>"
         self.assertIn(expected_title, content)
 
     def test_provenance_toggle_carries_show_and_hide_labels(self):
         # The provenance and Wikidata-history collapse toggles must carry
         # both labels so the small JS snippet on the landing page can swap
         # them on Bootstrap's show.bs.collapse / hide.bs.collapse events.
-        admin = User.objects.create_user(
-            username='adm@x.com', email='adm@x.com', password='p123', is_staff=True,
+        User.objects.create_user(
+            username="adm@x.com",
+            email="adm@x.com",
+            password="p123",
+            is_staff=True,
         )
         # Need provenance content to render the toggle.
-        self.pub_with_doi.provenance = {'harvest': {'harvester': 'test'}, 'events': []}
+        self.pub_with_doi.provenance = {"harvest": {"harvester": "test"}, "events": []}
         self.pub_with_doi.save()
-        self.client.login(username='adm@x.com', password='p123')
+        self.client.login(username="adm@x.com", password="p123")
         resp = self.client.get(f"/work/{self.pub_with_doi.doi}/")
         body = resp.content.decode()
         self.assertIn('data-label-show="Show provenance information"', body)
@@ -268,13 +280,14 @@ class WorkLandingPageTest(TestCase):
         self.assertEqual(response.status_code, 200)
 
         # Verify title has opening and closing tags
-        content = response.content.decode('utf-8')
-        self.assertIn('<title>', content)
-        self.assertIn('</title>', content)
+        content = response.content.decode("utf-8")
+        self.assertIn("<title>", content)
+        self.assertIn("</title>", content)
 
         # Verify the title appears in the <head> section (use re.DOTALL for multiline)
         import re
-        self.assertIsNotNone(re.search(r'<head>.*<title>.*</title>.*</head>', content, re.DOTALL))
+
+        self.assertIsNotNone(re.search(r"<head>.*<title>.*</title>.*</head>", content, re.DOTALL))
 
 
 class PublicationStatusVisibilityTest(TestCase):
@@ -288,7 +301,7 @@ class PublicationStatusVisibilityTest(TestCase):
             name="Test Journal",
             url_field="https://example.com/oai",
             homepage_url="https://example.com/journal",
-            issn_l="1234-5678"
+            issn_l="1234-5678",
         )
 
         # Create publications with different statuses
@@ -300,7 +313,7 @@ class PublicationStatusVisibilityTest(TestCase):
             doi="10.1234/published",
             publicationDate=now() - timedelta(days=30),
             geometry=GeometryCollection(Point(12.4924, 41.8902)),
-            source=self.source
+            source=self.source,
         )
 
         self.pub_draft = Work.objects.create(
@@ -311,7 +324,7 @@ class PublicationStatusVisibilityTest(TestCase):
             doi="10.1234/draft",
             publicationDate=now() - timedelta(days=20),
             geometry=GeometryCollection(Point(13.4050, 52.5200)),
-            source=self.source
+            source=self.source,
         )
 
         self.pub_testing = Work.objects.create(
@@ -321,7 +334,7 @@ class PublicationStatusVisibilityTest(TestCase):
             status="t",  # Testing
             doi="10.1234/testing",
             publicationDate=now() - timedelta(days=10),
-            source=self.source
+            source=self.source,
         )
 
         self.pub_withdrawn = Work.objects.create(
@@ -331,7 +344,7 @@ class PublicationStatusVisibilityTest(TestCase):
             status="w",  # Withdrawn
             doi="10.1234/withdrawn",
             publicationDate=now() - timedelta(days=5),
-            source=self.source
+            source=self.source,
         )
 
         self.pub_harvested = Work.objects.create(
@@ -341,26 +354,20 @@ class PublicationStatusVisibilityTest(TestCase):
             status="h",  # Harvested
             doi="10.1234/harvested",
             publicationDate=now() - timedelta(days=3),
-            source=self.source
+            source=self.source,
         )
 
         # Create regular user
-        self.regular_user = User.objects.create_user(
-            username='regular@example.com',
-            email='regular@example.com'
-        )
+        self.regular_user = User.objects.create_user(username="regular@example.com", email="regular@example.com")
 
         # Create admin user
         self.admin_user = User.objects.create_user(
-            username='admin@example.com',
-            email='admin@example.com',
-            is_staff=True,
-            is_superuser=True
+            username="admin@example.com", email="admin@example.com", is_staff=True, is_superuser=True
         )
 
     def test_works_list_public_only_shows_published(self):
         """Test that non-authenticated users only see published works."""
-        response = self.client.get('/works/')
+        response = self.client.get("/works/")
         self.assertEqual(response.status_code, 200)
 
         # Should show published
@@ -375,7 +382,7 @@ class PublicationStatusVisibilityTest(TestCase):
     def test_works_list_regular_user_only_shows_published(self):
         """Test that regular users only see published works."""
         self.client.force_login(self.regular_user)
-        response = self.client.get('/works/')
+        response = self.client.get("/works/")
         self.assertEqual(response.status_code, 200)
 
         # Should show published
@@ -388,7 +395,7 @@ class PublicationStatusVisibilityTest(TestCase):
     def test_works_list_admin_shows_all_with_labels(self):
         """Test that admin users see all publications with status labels."""
         self.client.force_login(self.admin_user)
-        response = self.client.get('/works/')
+        response = self.client.get("/works/")
         self.assertEqual(response.status_code, 200)
 
         # Should show all publications
@@ -399,27 +406,27 @@ class PublicationStatusVisibilityTest(TestCase):
         self.assertContains(response, self.pub_harvested.title)
 
         # Should show status badges
-        self.assertContains(response, 'Published')
-        self.assertContains(response, 'Draft')
-        self.assertContains(response, 'Testing')
-        self.assertContains(response, 'Withdrawn')
-        self.assertContains(response, 'Harvested')
+        self.assertContains(response, "Published")
+        self.assertContains(response, "Draft")
+        self.assertContains(response, "Testing")
+        self.assertContains(response, "Withdrawn")
+        self.assertContains(response, "Harvested")
 
         # Should show admin notice
-        self.assertContains(response, 'Admin view')
+        self.assertContains(response, "Admin view")
 
     def test_work_landing_public_cannot_access_unpublished(self):
         """Test that non-authenticated users cannot access unpublished works."""
         # Published should work
-        response = self.client.get(f'/work/{self.pub_published.doi}/')
+        response = self.client.get(f"/work/{self.pub_published.doi}/")
         self.assertEqual(response.status_code, 200)
 
         # Draft should return 404
-        response = self.client.get(f'/work/{self.pub_draft.doi}/')
+        response = self.client.get(f"/work/{self.pub_draft.doi}/")
         self.assertEqual(response.status_code, 404)
 
         # Testing should return 404
-        response = self.client.get(f'/work/{self.pub_testing.doi}/')
+        response = self.client.get(f"/work/{self.pub_testing.doi}/")
         self.assertEqual(response.status_code, 404)
 
     def test_work_landing_regular_user_cannot_access_unpublished(self):
@@ -427,11 +434,11 @@ class PublicationStatusVisibilityTest(TestCase):
         self.client.force_login(self.regular_user)
 
         # Published should work
-        response = self.client.get(f'/work/{self.pub_published.doi}/')
+        response = self.client.get(f"/work/{self.pub_published.doi}/")
         self.assertEqual(response.status_code, 200)
 
         # Draft should return 404
-        response = self.client.get(f'/work/{self.pub_draft.doi}/')
+        response = self.client.get(f"/work/{self.pub_draft.doi}/")
         self.assertEqual(response.status_code, 404)
 
     def test_work_landing_admin_can_access_all_with_label(self):
@@ -439,25 +446,25 @@ class PublicationStatusVisibilityTest(TestCase):
         self.client.force_login(self.admin_user)
 
         # Published should work without warning
-        response = self.client.get(f'/work/{self.pub_published.doi}/')
+        response = self.client.get(f"/work/{self.pub_published.doi}/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.pub_published.title)
-        self.assertContains(response, 'Admin view')
-        self.assertContains(response, 'Published')
+        self.assertContains(response, "Admin view")
+        self.assertContains(response, "Published")
 
         # Draft should work with warning
-        response = self.client.get(f'/work/{self.pub_draft.doi}/')
+        response = self.client.get(f"/work/{self.pub_draft.doi}/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.pub_draft.title)
-        self.assertContains(response, 'Admin view')
-        self.assertContains(response, 'Draft')
-        self.assertContains(response, 'not visible to the public')
+        self.assertContains(response, "Admin view")
+        self.assertContains(response, "Draft")
+        self.assertContains(response, "not visible to the public")
 
         # Testing should work with warning
-        response = self.client.get(f'/work/{self.pub_testing.doi}/')
+        response = self.client.get(f"/work/{self.pub_testing.doi}/")
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Testing')
-        self.assertContains(response, 'not visible to the public')
+        self.assertContains(response, "Testing")
+        self.assertContains(response, "not visible to the public")
 
     def test_authenticated_response_is_not_cached_by_middleware(self):
         # The publish/unpublish, contribute, and add/remove-from-collection
@@ -468,31 +475,32 @@ class PublicationStatusVisibilityTest(TestCase):
         # would not flip until ``CACHE_MIDDLEWARE_SECONDS`` expired. Same
         # production bug as the /collections/ page.
         self.client.force_login(self.admin_user)
-        response = self.client.get(f'/work/{self.pub_published.doi}/')
-        cache_control = response.headers.get('Cache-Control', '')
-        self.assertIn('no-cache', cache_control)
-        self.assertIn('no-store', cache_control)
+        response = self.client.get(f"/work/{self.pub_published.doi}/")
+        cache_control = response.headers.get("Cache-Control", "")
+        self.assertIn("no-cache", cache_control)
+        self.assertIn("no-store", cache_control)
 
     def test_anonymous_response_keeps_max_age_for_downstream_caching(self):
         # Sanity check the other branch: anonymous responses keep the
         # ``Cache-Control: max-age=…`` header set by ``patch_response_headers``
         # so browsers and intermediaries can still co-cache.
-        response = self.client.get(f'/work/{self.pub_published.doi}/')
-        cache_control = response.headers.get('Cache-Control', '')
-        self.assertIn('max-age=', cache_control)
-        self.assertNotIn('no-cache', cache_control)
-        self.assertNotIn('no-store', cache_control)
+        response = self.client.get(f"/work/{self.pub_published.doi}/")
+        cache_control = response.headers.get("Cache-Control", "")
+        self.assertIn("max-age=", cache_control)
+        self.assertNotIn("no-cache", cache_control)
+        self.assertNotIn("no-store", cache_control)
 
     def test_api_viewset_queryset_filtering(self):
         """Test that WorkViewSet filters correctly based on user permissions."""
-        from works.viewsets import WorkViewSet
-        from rest_framework.test import APIRequestFactory
         from django.contrib.auth.models import AnonymousUser
+        from rest_framework.test import APIRequestFactory
+
+        from works.viewsets import WorkViewSet
 
         factory = APIRequestFactory()
 
         # Test anonymous user
-        request = factory.get('/api/v1/works/')
+        request = factory.get("/api/v1/works/")
         request.user = AnonymousUser()
         viewset = WorkViewSet()
         viewset.request = request
@@ -504,7 +512,7 @@ class PublicationStatusVisibilityTest(TestCase):
         self.assertNotIn(self.pub_testing, queryset)
 
         # Test regular authenticated user
-        request = factory.get('/api/v1/works/')
+        request = factory.get("/api/v1/works/")
         request.user = self.regular_user
         viewset = WorkViewSet()
         viewset.request = request
@@ -515,7 +523,7 @@ class PublicationStatusVisibilityTest(TestCase):
         self.assertNotIn(self.pub_draft, queryset)
 
         # Test admin user
-        request = factory.get('/api/v1/works/')
+        request = factory.get("/api/v1/works/")
         request.user = self.admin_user
         viewset = WorkViewSet()
         viewset.request = request
@@ -540,7 +548,7 @@ class MultipleIdentifierAccessTest(TestCase):
             name="Test Journal",
             url_field="https://example.com/oai",
             homepage_url="https://example.com/journal",
-            issn_l="1234-5678"
+            issn_l="1234-5678",
         )
 
         # Create a work with DOI
@@ -552,7 +560,7 @@ class MultipleIdentifierAccessTest(TestCase):
             doi="10.1234/test-doi",
             publicationDate=now() - timedelta(days=30),
             geometry=GeometryCollection(Point(12.4924, 41.8902)),
-            source=self.source
+            source=self.source,
         )
 
         # Create a work without DOI
@@ -563,80 +571,80 @@ class MultipleIdentifierAccessTest(TestCase):
             status="p",
             publicationDate=now() - timedelta(days=20),
             geometry=GeometryCollection(Point(13.4050, 52.5200)),
-            source=self.source
+            source=self.source,
         )
 
     def test_access_work_by_doi(self):
         """Test that a work can be accessed by its DOI."""
-        response = self.client.get(f'/work/{self.work_with_doi.doi}/')
+        response = self.client.get(f"/work/{self.work_with_doi.doi}/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.work_with_doi.title)
         self.assertContains(response, self.work_with_doi.doi)
 
     def test_access_work_by_internal_id(self):
         """Test that a work can be accessed by its internal ID."""
-        response = self.client.get(f'/work/{self.work_with_doi.id}/')
+        response = self.client.get(f"/work/{self.work_with_doi.id}/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.work_with_doi.title)
 
     def test_access_work_without_doi_by_id(self):
         """Test that a work without DOI can be accessed by its internal ID."""
-        response = self.client.get(f'/work/{self.work_without_doi.id}/')
+        response = self.client.get(f"/work/{self.work_without_doi.id}/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.work_without_doi.title)
         # Should not show DOI link since work has no DOI
-        self.assertNotContains(response, 'https://doi.org/')
+        self.assertNotContains(response, "https://doi.org/")
 
     def test_work_with_doi_prefers_doi_identifier(self):
         """Test that DOI is detected correctly even if ID could also match."""
         # DOI starts with "10." so should be detected as DOI
-        response = self.client.get(f'/work/{self.work_with_doi.doi}/')
+        response = self.client.get(f"/work/{self.work_with_doi.doi}/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.work_with_doi.title)
 
     def test_numeric_id_resolves_correctly(self):
         """Test that numeric IDs are handled correctly."""
         # Access by numeric ID
-        response = self.client.get(f'/work/{self.work_with_doi.id}/')
+        response = self.client.get(f"/work/{self.work_with_doi.id}/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.work_with_doi.title)
 
     def test_invalid_identifier_returns_404(self):
         """Test that an invalid identifier returns 404."""
-        response = self.client.get('/work/99999999/')  # Non-existent ID
+        response = self.client.get("/work/99999999/")  # Non-existent ID
         self.assertEqual(response.status_code, 404)
 
-        response = self.client.get('/work/10.9999/nonexistent/')  # Non-existent DOI
+        response = self.client.get("/work/10.9999/nonexistent/")  # Non-existent DOI
         self.assertEqual(response.status_code, 404)
 
     def test_work_without_doi_title_format(self):
         """Test that works without DOI have correct title format (no DOI in parentheses)."""
-        response = self.client.get(f'/work/{self.work_without_doi.id}/')
+        response = self.client.get(f"/work/{self.work_without_doi.id}/")
         self.assertEqual(response.status_code, 200)
 
         # Extract the title tag content
-        content = response.content.decode('utf-8')
+        content = response.content.decode("utf-8")
 
         # Should have title without DOI
-        self.assertIn(f'<title>{self.work_without_doi.title} - OPTIMAP</title>', content)
+        self.assertIn(f"<title>{self.work_without_doi.title} - OPTIMAP</title>", content)
 
         # Should NOT have DOI in parentheses
-        self.assertNotIn(f'({self.work_without_doi.title})', content)
+        self.assertNotIn(f"({self.work_without_doi.title})", content)
 
     def test_template_handles_null_doi(self):
         """Test that the template correctly handles works with null DOI."""
-        response = self.client.get(f'/work/{self.work_without_doi.id}/')
+        response = self.client.get(f"/work/{self.work_without_doi.id}/")
         self.assertEqual(response.status_code, 200)
 
         # Should have title
         self.assertContains(response, self.work_without_doi.title)
 
         # Should NOT have DOI section
-        self.assertNotContains(response, '<strong>DOI:</strong>')
+        self.assertNotContains(response, "<strong>DOI:</strong>")
 
         # JavaScript variables should handle empty DOI
         self.assertContains(response, 'const doi = ""')
-        self.assertContains(response, 'const useIdUrls = true')
+        self.assertContains(response, "const useIdUrls = true")
 
     def test_url_encoded_doi_works(self):
         """Test that URL-encoded DOIs are properly decoded and work."""
@@ -646,10 +654,10 @@ class MultipleIdentifierAccessTest(TestCase):
             abstract="Test",
             status="p",
             doi="10.1234/test-doi/with-slash",
-            source=self.source
+            source=self.source,
         )
 
         # Django's URL routing should handle this automatically
-        response = self.client.get(f'/work/{work.doi}/')
+        response = self.client.get(f"/work/{work.doi}/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, work.title)

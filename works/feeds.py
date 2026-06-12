@@ -7,15 +7,16 @@ Improved feed implementation for OPTIMAP with caching, validation fixes, and reg
 
 import logging
 import urllib.parse
-from datetime import datetime, timedelta
-from django.contrib.syndication.views import Feed
-from django.utils.feedgenerator import Rss201rev2Feed, Atom1Feed
+from datetime import datetime
+
 from django.conf import settings
+from django.contrib.syndication.views import Feed
 from django.core.cache import cache
 from django.http import Http404
-from django.urls import reverse
 from django.shortcuts import get_object_or_404
-from .models import Work, GlobalRegion, Collection
+from django.utils.feedgenerator import Atom1Feed, Rss201rev2Feed
+
+from .models import Collection, GlobalRegion, Work
 
 logger = logging.getLogger(__name__)
 
@@ -41,12 +42,10 @@ class ValidGeoRssFeed(Rss201rev2Feed):
         super().add_root_elements(handler)
 
         # Add atom:link for feed self-reference (required for validation)
-        if self.feed.get('feed_url'):
-            handler.addQuickElement("atom:link", None, {
-                "href": self.feed['feed_url'],
-                "rel": "self",
-                "type": "application/rss+xml"
-            })
+        if self.feed.get("feed_url"):
+            handler.addQuickElement(
+                "atom:link", None, {"href": self.feed["feed_url"], "rel": "self", "type": "application/rss+xml"}
+            )
 
     def add_item_elements(self, handler, item):
         """Add item elements with proper GeoRSS formatting."""
@@ -76,8 +75,8 @@ class ValidGeoAtomFeed(Atom1Feed):
     def root_attributes(self):
         """Add proper namespace declarations."""
         attrs = super().root_attributes()
-        attrs['xmlns:georss'] = 'http://www.georss.org/georss'
-        attrs['xmlns:gml'] = 'http://www.opengis.net/gml'
+        attrs["xmlns:georss"] = "http://www.georss.org/georss"
+        attrs["xmlns:gml"] = "http://www.opengis.net/gml"
         return attrs
 
     def add_root_elements(self, handler):
@@ -155,7 +154,7 @@ def normalize_region_slug(slug):
 
     # Remove .geojson extension if present
     if decoded.endswith(".geojson"):
-        decoded = decoded[:-len(".geojson")]
+        decoded = decoded[: -len(".geojson")]
 
     # Replace underscores and spaces with hyphens
     normalized = decoded.replace("_", "-").replace(" ", "-")
@@ -218,7 +217,7 @@ class BaseCachedGeoFeed(Feed):
         Cache feeds for FEED_CACHE_HOURS unless ?now parameter is present.
         """
         # Check for ?now parameter to force refresh
-        force_refresh = request.GET.get('now') is not None
+        force_refresh = request.GET.get("now") is not None
 
         # Build cache key
         cache_key = self._get_cache_key(request, *args, **kwargs)
@@ -235,7 +234,7 @@ class BaseCachedGeoFeed(Feed):
         response = super().__call__(request, *args, **kwargs)
 
         # Cache the response
-        cache_hours = getattr(settings, 'FEED_CACHE_HOURS', 24)
+        cache_hours = getattr(settings, "FEED_CACHE_HOURS", 24)
         cache.set(cache_key, response, timeout=cache_hours * 3600)
 
         return response
@@ -258,7 +257,7 @@ class BaseCachedGeoFeed(Feed):
         feed = super().get_feed(obj, request)
 
         # Add feed_url for atom:link self-reference
-        feed.feed['feed_url'] = request.build_absolute_uri(request.path)
+        feed.feed["feed_url"] = request.build_absolute_uri(request.path)
 
         return feed
 
@@ -286,7 +285,7 @@ class BaseCachedGeoFeed(Feed):
     def item_updateddate(self, item):
         """Return item updated date (required for Atom feeds)."""
         # Use lastUpdate if available, otherwise fall back to creation date
-        if hasattr(item, 'lastUpdate') and item.lastUpdate:
+        if hasattr(item, "lastUpdate") and item.lastUpdate:
             return item.lastUpdate
         return item.creationDate
 
@@ -320,17 +319,17 @@ class BaseCachedGeoFeed(Feed):
         authors = []
 
         # Primary: Try authors field
-        if hasattr(item, 'authors') and item.authors:
+        if hasattr(item, "authors") and item.authors:
             authors = [a for a in item.authors if a]
             if authors:
                 return authors
 
         # Fallback: Try OpenAlex match info (for older works)
-        if hasattr(item, 'openalex_match_info') and item.openalex_match_info:
+        if hasattr(item, "openalex_match_info") and item.openalex_match_info:
             if isinstance(item.openalex_match_info, list) and len(item.openalex_match_info) > 0:
                 first_match = item.openalex_match_info[0]
-                if isinstance(first_match, dict) and 'authors' in first_match:
-                    match_authors = first_match['authors']
+                if isinstance(first_match, dict) and "authors" in first_match:
+                    match_authors = first_match["authors"]
                     if match_authors:
                         # Filter out None values
                         authors = [a for a in match_authors if a]
@@ -358,10 +357,10 @@ class BaseCachedGeoFeed(Feed):
                 extra[key] = value
 
         # Add source/publishing venue information
-        if hasattr(item, 'source') and item.source:
-            extra['source_name'] = item.source.name
-            if hasattr(item.source, 'homepage_url') and item.source.homepage_url:
-                extra['source_url'] = item.source.homepage_url
+        if hasattr(item, "source") and item.source:
+            extra["source_name"] = item.source.name
+            if hasattr(item.source, "homepage_url") and item.source.homepage_url:
+                extra["source_url"] = item.source.homepage_url
 
         return extra
 
@@ -370,11 +369,11 @@ class BaseCachedGeoFeed(Feed):
         categories = []
 
         # Add keywords
-        if hasattr(item, 'keywords') and item.keywords:
+        if hasattr(item, "keywords") and item.keywords:
             categories.extend([kw for kw in item.keywords if kw])
 
         # Add topics (limit to first 3 to avoid clutter)
-        if hasattr(item, 'topics') and item.topics:
+        if hasattr(item, "topics") and item.topics:
             topics = [t for t in item.topics if t][:3]
             categories.extend(topics)
 
@@ -390,8 +389,7 @@ class GlobalGeoFeed(BaseCachedGeoFeed):
 
     def title(self):
         """Return feed title."""
-        variant = self.feed_type_variant.upper()
-        return f"OPTIMAP - Latest works"
+        return "OPTIMAP - Latest works"
 
     def link(self):
         """Return feed link."""
@@ -403,14 +401,15 @@ class GlobalGeoFeed(BaseCachedGeoFeed):
 
     def items(self):
         """Return feed items."""
-        return Work.objects.filter(
-            status="p",
-            geometry__isnull=False,
-        ).exclude(
-            url__isnull=True
-        ).exclude(
-            url__exact=""
-        ).order_by('-creationDate')[:settings.FEED_MAX_ITEMS]
+        return (
+            Work.objects.filter(
+                status="p",
+                geometry__isnull=False,
+            )
+            .exclude(url__isnull=True)
+            .exclude(url__exact="")
+            .order_by("-creationDate")[: settings.FEED_MAX_ITEMS]
+        )
 
 
 class RegionalGeoFeed(BaseCachedGeoFeed):
@@ -423,7 +422,7 @@ class RegionalGeoFeed(BaseCachedGeoFeed):
     def get_object(self, request, **kwargs):
         """Get the region object from the slug."""
         # Accept both continent_slug and ocean_slug from URL patterns
-        region_slug = kwargs.get('continent_slug') or kwargs.get('ocean_slug')
+        region_slug = kwargs.get("continent_slug") or kwargs.get("ocean_slug")
         if not region_slug:
             raise Http404("No region slug provided")
 
@@ -434,7 +433,6 @@ class RegionalGeoFeed(BaseCachedGeoFeed):
 
     def title(self, obj):
         """Return feed title with region name."""
-        variant = self.feed_type_variant.upper()
         region_type = obj.get_region_type_display()
         return f"OPTIMAP - {obj.name} ({region_type}) - Latest works"
 
@@ -445,36 +443,34 @@ class RegionalGeoFeed(BaseCachedGeoFeed):
     def description(self, obj):
         """Return feed description with region name."""
         region_type = obj.get_region_type_display()
-        return (
-            f"Latest research works with geographic metadata from {obj.name} "
-            f"({region_type}) on OPTIMAP."
-        )
+        return f"Latest research works with geographic metadata from {obj.name} ({region_type}) on OPTIMAP."
 
     def items(self, obj):
         """Return feed items filtered by region geometry."""
         # Use bbox overlap first for performance
-        candidates = Work.objects.filter(
-            status="p",
-            geometry__isnull=False,
-            geometry__bboverlaps=obj.geom,
-        ).exclude(
-            url__isnull=True
-        ).exclude(
-            url__exact=""
-        ).order_by("-creationDate")
+        candidates = (
+            Work.objects.filter(
+                status="p",
+                geometry__isnull=False,
+                geometry__bboverlaps=obj.geom,
+            )
+            .exclude(url__isnull=True)
+            .exclude(url__exact="")
+            .order_by("-creationDate")
+        )
 
         # Prepare geometry for faster intersection checks
         prepared_geom = obj.geom.prepared
 
         # Filter by actual intersection and limit
-        filtered = [
-            work for work in candidates
-            if prepared_geom.intersects(work.geometry)
-        ][:settings.FEED_MAX_ITEMS]
+        filtered = [work for work in candidates if prepared_geom.intersects(work.geometry)][: settings.FEED_MAX_ITEMS]
 
         logger.debug(
             "Region feed '%s': %d candidates, %d after intersection with a limit of %d",
-            obj.name, candidates.count(), len(filtered), settings.FEED_MAX_ITEMS
+            obj.name,
+            candidates.count(),
+            len(filtered),
+            settings.FEED_MAX_ITEMS,
         )
 
         return filtered

@@ -22,7 +22,6 @@ from bs4 import BeautifulSoup
 from django.utils import timezone
 
 from works.models import HarvestingEvent, Source
-
 from works.utils.provenance import append_event
 
 from .bok_pdf import agile_giss_doi_to_pdf_url, extract_bok_from_agile_pdf
@@ -90,7 +89,8 @@ def fetch_copernicus_abstract(landing_url, session=None):
     if not resp.ok:
         logger.info(
             "Abstract fetch returned HTTP %s for %s",
-            resp.status_code, landing_url,
+            resp.status_code,
+            landing_url,
         )
         return None
     soup = BeautifulSoup(resp.content, "html.parser")
@@ -98,13 +98,11 @@ def fetch_copernicus_abstract(landing_url, session=None):
     if div:
         text = div.get_text(separator=" ", strip=True)
         if text.lower().startswith("abstract"):
-            text = text[len("abstract"):].lstrip(" .:")
+            text = text[len("abstract") :].lstrip(" .:")
         return text or None
     meta = soup.select_one('meta[name="citation_abstract"]')
     if meta and meta.get("content"):
-        return BeautifulSoup(meta["content"], "html.parser").get_text(
-            separator=" ", strip=True
-        ) or None
+        return BeautifulSoup(meta["content"], "html.parser").get_text(separator=" ", strip=True) or None
     return None
 
 
@@ -143,9 +141,7 @@ def _split_crossref_page(page):
     return text, None
 
 
-def _crossref_item_to_work_kwargs(
-    item, source, event, fetch_abstract_from_publisher, abstract_session
-):
+def _crossref_item_to_work_kwargs(item, source, event, fetch_abstract_from_publisher, abstract_session):
     """Convert a Crossref `works` JSON item to ``Work.objects.create`` kwargs.
 
     Returns ``None`` if the item lacks the minimum identifier (DOI). Abstract
@@ -255,10 +251,17 @@ def _try_bok_pdf_extraction(work, doi: str, session) -> None:
 
 
 def parse_crossref_response_and_save_works(
-    source, event, prefix, source_titles=None,
-    fetch_abstract_from_publisher=True, max_records=None,
-    warning_collector=None, update_existing=False, stats=None,
-    sort=None, order=None,
+    source,
+    event,
+    prefix,
+    source_titles=None,
+    fetch_abstract_from_publisher=True,
+    max_records=None,
+    warning_collector=None,
+    update_existing=False,
+    stats=None,
+    sort=None,
+    order=None,
 ):
     """Page through Crossref's ``works`` API and persist matched works.
 
@@ -297,15 +300,12 @@ def parse_crossref_response_and_save_works(
         if order:
             params["order"] = order
         try:
-            resp = session.get(
-                CROSSREF_API_URL, params=params, timeout=CROSSREF_HTTP_TIMEOUT
-            )
+            resp = session.get(CROSSREF_API_URL, params=params, timeout=CROSSREF_HTTP_TIMEOUT)
         except requests.exceptions.RequestException as e:
             raise RuntimeError(f"Crossref request failed: {e}") from e
         if not resp.ok:
             raise RuntimeError(
-                f"Crossref returned HTTP {resp.status_code} for filter "
-                f"{filter_value!r}: {resp.text[:300]}"
+                f"Crossref returned HTTP {resp.status_code} for filter {filter_value!r}: {resp.text[:300]}"
             )
 
         data = resp.json().get("message", {})
@@ -316,7 +316,9 @@ def parse_crossref_response_and_save_works(
         for item in items:
             seen += 1
             kwargs = _crossref_item_to_work_kwargs(
-                item, source, event,
+                item,
+                source,
+                event,
                 fetch_abstract_from_publisher,
                 session,
             )
@@ -324,17 +326,22 @@ def parse_crossref_response_and_save_works(
                 continue
             try:
                 work, action = _save_or_update_work(
-                    kwargs, source, event, update_existing=update_existing,
+                    kwargs,
+                    source,
+                    event,
+                    update_existing=update_existing,
                 )
                 stats.record(action)
-                if action in ('created', 'updated') and source and source.collection_id:
+                if action in ("created", "updated") and source and source.collection_id:
                     work.collections.add(source.collection_id)
-                if action == 'created':
+                if action == "created":
                     saved += 1
                     _try_bok_pdf_extraction(work, kwargs.get("doi", ""), session)
             except Exception as e:
                 logger.warning(
-                    "Failed to persist Crossref work %s: %s", kwargs.get("doi"), e,
+                    "Failed to persist Crossref work %s: %s",
+                    kwargs.get("doi"),
+                    e,
                 )
             if max_records and seen >= max_records:
                 return saved, seen
@@ -348,11 +355,15 @@ def parse_crossref_response_and_save_works(
 
 
 def harvest_crossref_prefix(
-    source_id, user=None, max_records=None,
-    source_titles=None, prefix=None,
+    source_id,
+    user=None,
+    max_records=None,
+    source_titles=None,
+    prefix=None,
     fetch_abstract_from_publisher=True,
     update_existing=False,
-    sort=None, order=None,
+    sort=None,
+    order=None,
 ):
     """Harvest publications from Crossref by DOI prefix.
 
@@ -360,26 +371,25 @@ def harvest_crossref_prefix(
     """
     user = resolve_user(user)
     source = Source.objects.get(id=source_id)
-    event  = HarvestingEvent.objects.create(source=source, status="in_progress")
+    event = HarvestingEvent.objects.create(source=source, status="in_progress")
 
     warning_collector = HarvestWarningCollector()
     warning_collector.setLevel(logging.INFO)
     logger.addHandler(warning_collector)
 
-    resolved_prefix = (
-        prefix
-        or (source.doi_prefix if source else None)
-        or "10.5194"
-    )
+    resolved_prefix = prefix or (source.doi_prefix if source else None) or "10.5194"
 
     try:
         logger.info(
             "Starting Crossref harvest: prefix=%s titles=%s max_records=%s",
-            resolved_prefix, source_titles, max_records,
+            resolved_prefix,
+            source_titles,
+            max_records,
         )
         stats = HarvestStats()
         saved, seen = parse_crossref_response_and_save_works(
-            source, event,
+            source,
+            event,
             prefix=resolved_prefix,
             source_titles=source_titles,
             fetch_abstract_from_publisher=fetch_abstract_from_publisher,
@@ -387,57 +397,65 @@ def harvest_crossref_prefix(
             warning_collector=warning_collector,
             update_existing=update_existing,
             stats=stats,
-            sort=sort, order=order,
+            sort=sort,
+            order=order,
         )
 
         spatial_count, temporal_count = complete_harvest(event, stats, warning_collector)
 
-        subject, body = render_harvest_email('email/harvest_success.en.txt', {
-            'subject_prefix': 'Crossref ',
-            'source_label': source.name,
-            'detail_header': 'Crossref harvest details:',
-            'source_name': source.name,
-            'source_url': None,
-            'url_label': None,
-            'collection_label': None,
-            'records_added_label': 'New works saved',
-            'records_added': stats.created,
-            'records_updated_label': 'Updated works',
-            'records_updated': stats.updated,
-            'spatial_label': 'Articles with spatial metadata',
-            'spatial_count': spatial_count,
-            'temporal_label': 'Articles with temporal metadata',
-            'temporal_count': temporal_count,
-            'event_started': f'{event.started_at:%Y-%m-%d %H:%M:%S}',
-            'event_completed': f'{event.completed_at:%Y-%m-%d %H:%M:%S}',
-            'warning_summary': warning_collector.get_summary(),
-            'resolved_prefix': resolved_prefix,
-            'container_title_filters': ', '.join(source_titles) if source_titles else '<all>',
-            'openalex_source_id': None,
-            'records_seen': seen,
-            'records_processed': None,
-        })
+        subject, body = render_harvest_email(
+            "email/harvest_success.en.txt",
+            {
+                "subject_prefix": "Crossref ",
+                "source_label": source.name,
+                "detail_header": "Crossref harvest details:",
+                "source_name": source.name,
+                "source_url": None,
+                "url_label": None,
+                "collection_label": None,
+                "records_added_label": "New works saved",
+                "records_added": stats.created,
+                "records_updated_label": "Updated works",
+                "records_updated": stats.updated,
+                "spatial_label": "Articles with spatial metadata",
+                "spatial_count": spatial_count,
+                "temporal_label": "Articles with temporal metadata",
+                "temporal_count": temporal_count,
+                "event_started": f"{event.started_at:%Y-%m-%d %H:%M:%S}",
+                "event_completed": f"{event.completed_at:%Y-%m-%d %H:%M:%S}",
+                "warning_summary": warning_collector.get_summary(),
+                "resolved_prefix": resolved_prefix,
+                "container_title_filters": ", ".join(source_titles) if source_titles else "<all>",
+                "openalex_source_id": None,
+                "records_seen": seen,
+                "records_processed": None,
+            },
+        )
         send_harvest_email(user, subject, body)
 
     except Exception as e:
         logger.error(
             "Crossref harvesting failed for source %s: %s",
-            source.url_field, str(e),
+            source.url_field,
+            str(e),
         )
         fail_harvest(event, e, warning_collector)
-        subject, body = render_harvest_email('email/harvest_failure.en.txt', {
-            'subject_prefix': 'Crossref ',
-            'source_label': source.name,
-            'source_type_label': 'Crossref',
-            'source_name': source.name,
-            'source_url': None,
-            'collection_label': None,
-            'resolved_prefix': resolved_prefix,
-            'event_started': None,
-            'event_failed': None,
-            'error': str(e),
-            'warning_summary': '',
-        })
+        subject, body = render_harvest_email(
+            "email/harvest_failure.en.txt",
+            {
+                "subject_prefix": "Crossref ",
+                "source_label": source.name,
+                "source_type_label": "Crossref",
+                "source_name": source.name,
+                "source_url": None,
+                "collection_label": None,
+                "resolved_prefix": resolved_prefix,
+                "event_started": None,
+                "event_failed": None,
+                "error": str(e),
+                "warning_summary": "",
+            },
+        )
         send_harvest_email(user, subject, body, fail_silently=True)
         raise
     finally:

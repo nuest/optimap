@@ -1,15 +1,16 @@
 # SPDX-FileCopyrightText: 2022 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 import os
-from helium import *
 from time import sleep
-from django.core.cache import cache
+
 from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
+from django.core.cache import cache
+from helium import *
 
 User = get_user_model()
+
 
 class LoginresponseTest(StaticLiveServerTestCase):
     def setUp(self):
@@ -21,10 +22,10 @@ class LoginresponseTest(StaticLiveServerTestCase):
         User.objects.filter(email=self.email).delete()
 
         # Create cache entry for login token (matching the structure in auth.py)
-        cache.set(self.token, {'email': self.email, 'next': '/'}, timeout=300)
+        cache.set(self.token, {"email": self.email, "next": "/"}, timeout=300)
 
         # Start browser
-        self.browser = start_chrome(f'{self.live_server_url}/', headless=True)
+        self.browser = start_chrome(f"{self.live_server_url}/", headless=True)
 
     def test_login_response(self):
         """Test login flow and response message."""
@@ -33,19 +34,20 @@ class LoginresponseTest(StaticLiveServerTestCase):
             click(S("#unifiedMenuDropdown"))
 
             # Fill in email and submit login form
-            write(self.email, into='email')
-            get_driver().save_screenshot(os.path.join(os.getcwd(), 'tests-ui', 'screenshots', 'Loginmailid.png'))
+            write(self.email, into="email")
+            get_driver().save_screenshot(os.path.join(os.getcwd(), "tests-ui", "screenshots", "Loginmailid.png"))
 
             # Click the Send/Login button
             click(S('button[type="submit"]'))
 
             # Wait for response page to load
             sleep(2)
-            get_driver().save_screenshot(os.path.join(os.getcwd(), 'tests-ui', 'screenshots', 'Loginresponse.png'))
+            get_driver().save_screenshot(os.path.join(os.getcwd(), "tests-ui", "screenshots", "Loginresponse.png"))
 
             # Verify success message appears
-            self.assertTrue(Text("Awesome!").exists() or Text("We sent a link").exists(),
-                          "Login response message not found")
+            self.assertTrue(
+                Text("Awesome!").exists() or Text("We sent a link").exists(), "Login response message not found"
+            )
 
             # Now test the actual login using the token
             go_to(f"{self.live_server_url}/login/{self.token}")
@@ -59,8 +61,9 @@ class LoginresponseTest(StaticLiveServerTestCase):
 
             # Verify we're logged in by checking for user menu
             click(S("#unifiedMenuDropdown"))
-            self.assertTrue(Text("My subscriptions").exists() or Text("Settings").exists(),
-                          "User menu items not found after login")
+            self.assertTrue(
+                Text("My subscriptions").exists() or Text("Settings").exists(), "User menu items not found after login"
+            )
 
         finally:
             kill_browser()

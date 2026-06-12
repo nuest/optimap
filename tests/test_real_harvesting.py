@@ -18,22 +18,24 @@ Environment variables:
 """
 
 import os
-import django
 from unittest import skipIf
+
+import django
 from django.test import TestCase
 
 # bootstrap Django
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'optimap.settings')
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "optimap.settings")
 django.setup()
 
-from works.models import Work, Source, HarvestingEvent
-from works.tasks import harvest_oai_endpoint
 from django.contrib.auth import get_user_model
+
+from works.models import HarvestingEvent, Source, Work
+from works.tasks import harvest_oai_endpoint
 
 User = get_user_model()
 
 # Skip these tests by default unless SKIP_REAL_HARVESTING=0
-SKIP_REAL_HARVESTING = os.environ.get('SKIP_REAL_HARVESTING', '1') == '1'
+SKIP_REAL_HARVESTING = os.environ.get("SKIP_REAL_HARVESTING", "1") == "1"
 skip_reason = "Real harvesting tests disabled. Set SKIP_REAL_HARVESTING=0 to enable."
 
 
@@ -54,9 +56,7 @@ class RealHarvestingTest(TestCase):
     def setUp(self):
         """Set up test user for harvesting events."""
         self.user = User.objects.create_user(
-            username="harvesting_test_user",
-            email="harvesting@test.optimap.science",
-            password="test_password"
+            username="harvesting_test_user", email="harvesting@test.optimap.science", password="test_password"
         )
 
     def tearDown(self):
@@ -67,12 +67,14 @@ class RealHarvestingTest(TestCase):
     def _create_source(self, name, url, collection_name=None):
         """Helper to create a test source. ``collection_name`` arg is kept for caller
         back-compat but is now stored as a real ``Collection`` FK."""
-        from works.models import Collection
         from django.utils.text import slugify
+
+        from works.models import Collection
+
         col_name = collection_name or name
         col, _ = Collection.objects.get_or_create(
-            identifier=slugify(col_name)[:100] or 'test-collection',
-            defaults={'name': col_name, 'is_published': True},
+            identifier=slugify(col_name)[:100] or "test-collection",
+            defaults={"name": col_name, "is_published": True},
         )
         return Source.objects.create(
             name=f"TEST: {name}",
@@ -93,28 +95,19 @@ class RealHarvestingTest(TestCase):
         event = HarvestingEvent.objects.filter(source=source).latest("started_at")
 
         # Check event completed successfully
-        self.assertEqual(
-            event.status,
-            "completed",
-            f"Harvesting event failed with status: {event.status}"
-        )
+        self.assertEqual(event.status, "completed", f"Harvesting event failed with status: {event.status}")
         self.assertIsNotNone(event.completed_at, "Harvesting event has no completion time")
 
         # Check publications were created
         pub_count = Work.objects.filter(job=event).count()
         self.assertGreaterEqual(
-            pub_count,
-            min_publications,
-            f"Expected at least {min_publications} publications, got {pub_count}"
+            pub_count, min_publications, f"Expected at least {min_publications} publications, got {pub_count}"
         )
 
         # Check that publications have required fields
         pubs = Work.objects.filter(job=event)
         for pub in pubs[:5]:  # Check first 5
-            self.assertTrue(
-                pub.title,
-                f"Publication {pub.id} missing title"
-            )
+            self.assertTrue(pub.title, f"Publication {pub.id} missing title")
             # DOI is optional but should be present for most journals
             # Geometry and temporal data are optional
 
@@ -128,9 +121,7 @@ class RealHarvestingTest(TestCase):
         Journal: https://essd.copernicus.org/
         """
         source = self._create_source(
-            name="Earth System Science Data",
-            url="https://oai-pmh.copernicus.org/oai.php",
-            collection_name="ESSD"
+            name="Earth System Science Data", url="https://oai-pmh.copernicus.org/oai.php", collection_name="ESSD"
         )
 
         # Harvest with limit of 20 records
@@ -148,9 +139,7 @@ class RealHarvestingTest(TestCase):
         Journal: https://www.agile-giscience-series.net/
         """
         source = self._create_source(
-            name="AGILE-GISS",
-            url="https://oai-pmh.copernicus.org/oai.php",
-            collection_name="AGILE-GISS"
+            name="AGILE-GISS", url="https://oai-pmh.copernicus.org/oai.php", collection_name="AGILE-GISS"
         )
 
         # Harvest with limit of 20 records
@@ -168,9 +157,7 @@ class RealHarvestingTest(TestCase):
         Repository: https://e-docs.geo-leo.de/
         """
         source = self._create_source(
-            name="GEO-LEO e-docs",
-            url="https://e-docs.geo-leo.de/server/oai/request",
-            collection_name="GEO-LEO"
+            name="GEO-LEO e-docs", url="https://e-docs.geo-leo.de/server/oai/request", collection_name="GEO-LEO"
         )
 
         # Harvest with limit of 20 records
@@ -214,23 +201,19 @@ class RealHarvestingTest(TestCase):
 
         # Bibliographic basics — these come from EarthArXiv directly and
         # don't depend on OpenAlex.
-        self.assertTrue(
-            any(p.authors for p in pubs),
-            "Expected at least one EarthArXiv work to have authors"
-        )
+        self.assertTrue(any(p.authors for p in pubs), "Expected at least one EarthArXiv work to have authors")
 
         # OpenAlex enrichment was attempted on every work; we look for the
         # provenance marker that the matcher actually ran successfully.
         enriched = [
-            p for p in pubs
+            p
+            for p in pubs
             if isinstance(p.provenance, dict)
-            and any('openalex' in str(v).lower()
-                    for v in (p.provenance.get('metadata_sources') or {}).values())
+            and any("openalex" in str(v).lower() for v in (p.provenance.get("metadata_sources") or {}).values())
         ]
         if not enriched:
             self.skipTest(
-                "OpenAlex did not return any matches during this run "
-                "(possible rate-limit / network); rerun later"
+                "OpenAlex did not return any matches during this run (possible rate-limit / network); rerun later"
             )
 
         # `topics` is OpenAlex-only — its presence on any work proves the
@@ -240,7 +223,7 @@ class RealHarvestingTest(TestCase):
         self.assertTrue(
             with_topics,
             f"Of {len(enriched)} OpenAlex-enriched works, none have topics "
-            f"populated — enrichment plumbing may have regressed"
+            f"populated — enrichment plumbing may have regressed",
         )
         # Sanity check on the topics array shape.
         sample_topics = with_topics[0].topics
@@ -267,7 +250,7 @@ class RealHarvestingTest(TestCase):
         source = self._create_source(
             name="ESS Open Archive",
             url="https://essopenarchive.org/oai/request",  # To be confirmed
-            collection_name="EssOAr"
+            collection_name="EssOAr",
         )
 
         harvest_oai_endpoint(source.id, user=self.user, max_records=20)
@@ -281,9 +264,7 @@ class RealHarvestingTest(TestCase):
         Uses ESSD as a test source known to have many records.
         """
         source = self._create_source(
-            name="ESSD (limited)",
-            url="https://oai-pmh.copernicus.org/oai.php",
-            collection_name="ESSD"
+            name="ESSD (limited)", url="https://oai-pmh.copernicus.org/oai.php", collection_name="ESSD"
         )
 
         # Harvest with very small limit
@@ -297,7 +278,7 @@ class RealHarvestingTest(TestCase):
         self.assertLessEqual(
             pub_count,
             max_records + 10,  # Allow some tolerance for batch processing
-            f"Harvested {pub_count} publications, expected around {max_records}"
+            f"Harvested {pub_count} publications, expected around {max_records}",
         )
         print(f"\n✓ max_records: Harvested {pub_count} publications (limit was {max_records})")
 
@@ -310,7 +291,7 @@ class RealHarvestingTest(TestCase):
         source = self._create_source(
             name="GEO-LEO (metadata test)",
             url="https://e-docs.geo-leo.de/server/oai/request",
-            collection_name="GEO-LEO"
+            collection_name="GEO-LEO",
         )
 
         harvest_oai_endpoint(source.id, user=self.user, max_records=20)
@@ -324,8 +305,10 @@ class RealHarvestingTest(TestCase):
         # Check if any publications have temporal metadata
         temporal_count = pubs.exclude(timeperiod_startdate=[]).count()
 
-        print(f"\n✓ Metadata extraction: {spatial_count} with geometry, "
-              f"{temporal_count} with temporal data out of {pubs.count()} total")
+        print(
+            f"\n✓ Metadata extraction: {spatial_count} with geometry, "
+            f"{temporal_count} with temporal data out of {pubs.count()} total"
+        )
 
         # We don't assert specific counts since metadata availability varies,
         # but we verify the harvesting completed successfully

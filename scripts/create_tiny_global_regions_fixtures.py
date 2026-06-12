@@ -19,11 +19,9 @@ do not depend on network access.
 """
 
 import json
-import os
 from pathlib import Path
 
-from shapely.geometry import Polygon, MultiPolygon, mapping, shape
-from shapely.ops import unary_union
+from shapely.geometry import MultiPolygon, Polygon, mapping, shape
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC_DIR = ROOT / "works" / "management" / "commands"
@@ -74,11 +72,13 @@ def shrink_features(features, tolerance, ndigits, max_size=None):
             g = shape(feat["geometry"])
             simplified = _simplify(g, tolerance)
             geom_mapping = _round_coords(mapping(simplified), ndigits=ndigits)
-            out.append({
-                "type": "Feature",
-                "geometry": geom_mapping,
-                "properties": feat["properties"],
-            })
+            out.append(
+                {
+                    "type": "Feature",
+                    "geometry": geom_mapping,
+                    "properties": feat["properties"],
+                }
+            )
         payload = {"type": "FeatureCollection", "features": out}
         encoded = json.dumps(payload, separators=(",", ":"))
         if max_size is None or len(encoded.encode("utf-8")) <= max_size:
@@ -103,31 +103,33 @@ def main():
     with OCEANS_SRC.open() as f:
         oceans_in = json.load(f)
     oceans_features = [
-        {"geometry": f["geometry"], "properties": slim_ocean_props(f["properties"])}
-        for f in oceans_in["features"]
+        {"geometry": f["geometry"], "properties": slim_ocean_props(f["properties"])} for f in oceans_in["features"]
     ]
     oceans_payload, oceans_json, used_tol = shrink_features(
         oceans_features, tolerance=2.0, ndigits=1, max_size=OCEAN_SIZE_TARGET
     )
     OCEANS_OUT.write_text(oceans_json)
-    print(f"oceans:    {OCEANS_OUT.relative_to(ROOT)}  "
-          f"size={len(oceans_json)} bytes  features={len(oceans_payload['features'])}  "
-          f"tolerance={used_tol}")
+    print(
+        f"oceans:    {OCEANS_OUT.relative_to(ROOT)}  "
+        f"size={len(oceans_json)} bytes  features={len(oceans_payload['features'])}  "
+        f"tolerance={used_tol}"
+    )
 
     # --- Continents ---
     with CONTS_SRC.open() as f:
         conts_in = json.load(f)
     cont_features = [
-        {"geometry": f["geometry"], "properties": slim_continent_props(f["properties"])}
-        for f in conts_in["features"]
+        {"geometry": f["geometry"], "properties": slim_continent_props(f["properties"])} for f in conts_in["features"]
     ]
     conts_payload, conts_json, used_tol = shrink_features(
         cont_features, tolerance=2.0, ndigits=1, max_size=OCEAN_SIZE_TARGET
     )
     CONTS_OUT.write_text(conts_json)
-    print(f"continents:{CONTS_OUT.relative_to(ROOT)}  "
-          f"size={len(conts_json)} bytes  features={len(conts_payload['features'])}  "
-          f"tolerance={used_tol}")
+    print(
+        f"continents:{CONTS_OUT.relative_to(ROOT)}  "
+        f"size={len(conts_json)} bytes  features={len(conts_payload['features'])}  "
+        f"tolerance={used_tol}"
+    )
 
 
 if __name__ == "__main__":

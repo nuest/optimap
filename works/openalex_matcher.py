@@ -9,11 +9,11 @@ that can be used across all harvesting workflows (OAI-PMH, RSS, etc).
 """
 
 import logging
-import requests
 import time
-from typing import Dict, Optional, List, Tuple
+from typing import Dict, List, Optional, Tuple
 from urllib.parse import quote
 
+import requests
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
@@ -34,10 +34,7 @@ class OpenAlexMatcher:
 
     def __init__(self):
         self.session = requests.Session()
-        self.session.headers.update({
-            'User-Agent': settings.OPTIMAP_USER_AGENT,
-            'Accept': 'application/json'
-        })
+        self.session.headers.update({"User-Agent": settings.OPTIMAP_USER_AGENT, "Accept": "application/json"})
         self.last_request_time = 0
 
     def _rate_limit(self):
@@ -73,15 +70,15 @@ class OpenAlexMatcher:
 
         # Clean DOI
         doi = doi.strip().lower()
-        if doi.startswith('http'):
-            doi = doi.split('doi.org/')[-1]
+        if doi.startswith("http"):
+            doi = doi.split("doi.org/")[-1]
 
         url = f"{OPENALEX_API_BASE}/works/doi:{quote(doi)}"
         logger.debug("Matching by DOI: %s", doi)
 
         data = self._make_request(url)
-        if data and data.get('id'):
-            logger.info("Found OpenAlex match by DOI: %s -> %s", doi, data['id'])
+        if data and data.get("id"):
+            logger.info("Found OpenAlex match by DOI: %s -> %s", doi, data["id"])
             return data
 
         return None
@@ -103,33 +100,33 @@ class OpenAlexMatcher:
             return None, []
 
         # Build search filter
-        filter_parts = [f'title.search:{quote(title)}']
+        filter_parts = [f"title.search:{quote(title)}"]
         if author:
-            filter_parts.append(f'author.search:{quote(author)}')
+            filter_parts.append(f"author.search:{quote(author)}")
 
-        filter_str = ','.join(filter_parts)
+        filter_str = ",".join(filter_parts)
         url = f"{OPENALEX_API_BASE}/works"
         params = {
-            'filter': filter_str,
-            'per-page': 5  # Get top 5 matches
+            "filter": filter_str,
+            "per-page": 5,  # Get top 5 matches
         }
 
         logger.debug("Matching by title%s: %s", " + author" if author else "", title[:50])
 
         data = self._make_request(url, params)
-        if not data or not data.get('results'):
+        if not data or not data.get("results"):
             return None, []
 
-        results = data['results']
+        results = data["results"]
         partial_matches = []
 
         for result in results:
             match_info = {
-                'openalex_id': result.get('id'),
-                'title': result.get('title'),
-                'doi': result.get('doi'),
-                'match_type': 'title+author' if author else 'title',
-                'authors': [a.get('author', {}).get('display_name') for a in result.get('authorships', [])[:3]]
+                "openalex_id": result.get("id"),
+                "title": result.get("title"),
+                "doi": result.get("doi"),
+                "match_type": "title+author" if author else "title",
+                "authors": [a.get("author", {}).get("display_name") for a in result.get("authorships", [])[:3]],
             }
             partial_matches.append(match_info)
 
@@ -137,8 +134,8 @@ class OpenAlexMatcher:
         if results and author:
             best_match = results[0]
             # Check if title is very similar (simple heuristic)
-            if self._titles_similar(title, best_match.get('title', '')):
-                logger.info("Found strong OpenAlex match by title+author: %s", best_match['id'])
+            if self._titles_similar(title, best_match.get("title", "")):
+                logger.info("Found strong OpenAlex match by title+author: %s", best_match["id"])
                 return best_match, partial_matches
 
         logger.info("Found %d partial OpenAlex matches for title: %s", len(partial_matches), title[:50])
@@ -181,85 +178,82 @@ class OpenAlexMatcher:
         """
         # Safely extract fulltext origin
         fulltext_origin = None
-        primary_location = work_data.get('primary_location')
+        primary_location = work_data.get("primary_location")
         if primary_location and isinstance(primary_location, dict):
-            source = primary_location.get('source')
+            source = primary_location.get("source")
             if source and isinstance(source, dict):
-                fulltext_origin = source.get('type')
+                fulltext_origin = source.get("type")
 
         # Bare DOI (no ``https://doi.org/`` prefix) so callers can write
         # straight into ``Work.doi``. We *only* emit this when OpenAlex
         # carries one — see ``backfill_openalex.py`` for the apply step
         # which uses ``setattr`` and would otherwise blank a populated
         # field with ``None``.
-        raw_doi = work_data.get('doi')
+        raw_doi = work_data.get("doi")
         bare_doi = None
         if raw_doi:
             bare_doi = raw_doi.strip()
-            for prefix in ('https://doi.org/', 'http://doi.org/', 'doi.org/'):
+            for prefix in ("https://doi.org/", "http://doi.org/", "doi.org/"):
                 if bare_doi.lower().startswith(prefix):
-                    bare_doi = bare_doi[len(prefix):]
+                    bare_doi = bare_doi[len(prefix) :]
                     break
 
         extracted = {
-            'openalex_id': work_data.get('id'),
-            'openalex_fulltext_origin': fulltext_origin,
-            'openalex_is_retracted': work_data.get('is_retracted', False),
-            'openalex_ids': work_data.get('ids', {}),
-            'type': work_data.get('type'),  # OpenAlex work type
-            'keywords': [],
-            'openalex_open_access_status': None,
-            'topics': [],
-            'authors': [],
-            'volume': None,
-            'issue': None,
-            'first_page': None,
-            'last_page': None,
+            "openalex_id": work_data.get("id"),
+            "openalex_fulltext_origin": fulltext_origin,
+            "openalex_is_retracted": work_data.get("is_retracted", False),
+            "openalex_ids": work_data.get("ids", {}),
+            "type": work_data.get("type"),  # OpenAlex work type
+            "keywords": [],
+            "openalex_open_access_status": None,
+            "topics": [],
+            "authors": [],
+            "volume": None,
+            "issue": None,
+            "first_page": None,
+            "last_page": None,
         }
         if bare_doi:
-            extracted['doi'] = bare_doi
+            extracted["doi"] = bare_doi
 
-        biblio = work_data.get('biblio') or {}
+        biblio = work_data.get("biblio") or {}
         if isinstance(biblio, dict):
-            for k in ('volume', 'issue', 'first_page', 'last_page'):
+            for k in ("volume", "issue", "first_page", "last_page"):
                 v = biblio.get(k)
-                if v not in (None, ''):
+                if v not in (None, ""):
                     extracted[k] = str(v)[:64]
 
         # Extract authors (display_name from authorships)
-        authorships = work_data.get('authorships', [])
+        authorships = work_data.get("authorships", [])
         if authorships:
             authors = []
             for authorship in authorships:
-                author = authorship.get('author', {})
-                if author and author.get('display_name'):
-                    authors.append(author.get('display_name'))
-            extracted['authors'] = authors
+                author = authorship.get("author", {})
+                if author and author.get("display_name"):
+                    authors.append(author.get("display_name"))
+            extracted["authors"] = authors
 
         # Extract keywords (display_name only)
-        keywords = work_data.get('keywords', [])
+        keywords = work_data.get("keywords", [])
         if keywords:
-            extracted['keywords'] = [kw.get('display_name') for kw in keywords if kw.get('display_name')]
+            extracted["keywords"] = [kw.get("display_name") for kw in keywords if kw.get("display_name")]
 
         # Extract open access status
-        open_access = work_data.get('open_access', {})
-        if open_access.get('is_oa'):
-            extracted['openalex_open_access_status'] = open_access.get('oa_status')
+        open_access = work_data.get("open_access", {})
+        if open_access.get("is_oa"):
+            extracted["openalex_open_access_status"] = open_access.get("oa_status")
         else:
-            extracted['openalex_open_access_status'] = None
+            extracted["openalex_open_access_status"] = None
 
         # Extract topics (display_name only)
-        topics = work_data.get('topics', [])
+        topics = work_data.get("topics", [])
         if topics:
-            extracted['topics'] = [topic.get('display_name') for topic in topics if topic.get('display_name')]
+            extracted["topics"] = [topic.get("display_name") for topic in topics if topic.get("display_name")]
 
         return extracted
 
     def match_publication(
-        self,
-        title: str,
-        doi: Optional[str] = None,
-        author: Optional[str] = None
+        self, title: str, doi: Optional[str] = None, author: Optional[str] = None
     ) -> Tuple[Optional[Dict], Optional[List[Dict]]]:
         """
         Main entry point for matching a work.
@@ -284,13 +278,15 @@ class OpenAlexMatcher:
             work_data = self.match_by_doi(doi)
             if work_data:
                 fields = self.extract_openalex_fields(work_data)
-                match_info = [{
-                    'openalex_id': work_data.get('id'),
-                    'title': work_data.get('title'),
-                    'doi': work_data.get('doi'),
-                    'match_type': 'doi',
-                    'matched': True
-                }]
+                match_info = [
+                    {
+                        "openalex_id": work_data.get("id"),
+                        "title": work_data.get("title"),
+                        "doi": work_data.get("doi"),
+                        "match_type": "doi",
+                        "matched": True,
+                    }
+                ]
                 return fields, match_info
 
         # Strategy 2 & 3: Title-based matching

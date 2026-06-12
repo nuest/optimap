@@ -9,22 +9,21 @@ Tests verify:
 3. No admin-only content is visible to anonymous users
 """
 
-from django.test import TestCase
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
+from django.test import TestCase
 from django.urls import reverse
 from helium import (
-    start_chrome,
-    kill_browser,
-    get_driver,
     Text,
-    S,
+    get_driver,
+    kill_browser,
+    start_chrome,
 )
 
 
 class PublicPagesBasicTests(TestCase):
     """Basic tests for all public pages - ensure they load and contain expected content."""
 
-    fixtures = ['test_data_optimap.json', 'test_data_global_feeds.json']
+    fixtures = ["test_data_optimap.json", "test_data_global_feeds.json"]
 
     def test_about_page(self):
         """Test about page loads with expected content."""
@@ -114,16 +113,17 @@ class PublicPagesBasicTests(TestCase):
 class RegionalFeedPagesTests(TestCase):
     """Tests for regional feed landing pages."""
 
-    fixtures = ['test_data_global_feeds.json']
+    fixtures = ["test_data_global_feeds.json"]
 
     def test_continent_feed_page_loads(self):
         """Test that a continent feed page loads successfully."""
         # First check if global regions are loaded
         from works.models import GlobalRegion
-        if not GlobalRegion.objects.exists():
-            self.skipTest('Global regions not loaded - run load_global_regions management command')
 
-        response = self.client.get('/regions/continent/europe/')
+        if not GlobalRegion.objects.exists():
+            self.skipTest("Global regions not loaded - run load_global_regions management command")
+
+        response = self.client.get("/regions/continent/europe/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Europe")
         # Should not contain admin links
@@ -133,10 +133,11 @@ class RegionalFeedPagesTests(TestCase):
         """Test that an ocean feed page loads successfully."""
         # First check if global regions are loaded
         from works.models import GlobalRegion
-        if not GlobalRegion.objects.exists():
-            self.skipTest('Global regions not loaded - run load_global_regions management command')
 
-        response = self.client.get('/regions/ocean/north-atlantic-ocean/')
+        if not GlobalRegion.objects.exists():
+            self.skipTest("Global regions not loaded - run load_global_regions management command")
+
+        response = self.client.get("/regions/ocean/north-atlantic-ocean/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "North Atlantic Ocean")
         # Should not contain admin links
@@ -150,7 +151,7 @@ class PublicPagesBrowserTests(StaticLiveServerTestCase):
     that serves both the application and static files.
     """
 
-    fixtures = ['test_data_optimap.json']
+    fixtures = ["test_data_optimap.json"]
 
     @classmethod
     def setUpClass(cls):
@@ -160,7 +161,7 @@ class PublicPagesBrowserTests(StaticLiveServerTestCase):
     def test_about_page_browser(self):
         """Test about page renders correctly in browser."""
         try:
-            start_chrome(f'{self.live_server_url}/about/', headless=True)
+            start_chrome(f"{self.live_server_url}/about/", headless=True)
             driver = get_driver()
 
             # Check page loaded
@@ -179,7 +180,7 @@ class PublicPagesBrowserTests(StaticLiveServerTestCase):
     def test_data_page_browser(self):
         """Test data page renders correctly in browser."""
         try:
-            start_chrome(f'{self.live_server_url}/data/', headless=True)
+            start_chrome(f"{self.live_server_url}/data/", headless=True)
             driver = get_driver()
 
             # Check page loaded
@@ -198,7 +199,7 @@ class PublicPagesBrowserTests(StaticLiveServerTestCase):
     def test_accessibility_page_browser(self):
         """Test accessibility page renders correctly in browser."""
         try:
-            start_chrome(f'{self.live_server_url}/accessibility/', headless=True)
+            start_chrome(f"{self.live_server_url}/accessibility/", headless=True)
             driver = get_driver()
 
             # Check page loaded

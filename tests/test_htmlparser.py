@@ -3,11 +3,11 @@
 
 from bs4 import BeautifulSoup
 from django.test import TestCase
+
 from works.tasks import extract_geometry_from_html, extract_timeperiod_from_html
 
 
 class SimpleTest(TestCase):
-
     def test_parse_geometry(self):
         html_doc = """
         <meta name="DC.Coverage" xml:lang="en" content="Earth, Europe, Republic of France, Pays de la Loire"/>
@@ -17,14 +17,14 @@ class SimpleTest(TestCase):
         <meta name="ISO 19139" content="<gmd:EX_GeographicBoundingBox><gmd:westBoundLongitude><gco:Decimal>-2.6257394729017</gco:Decimal></gmd:westBoundLongitude><gmd:eastBoundLongitude><gco:Decimal>0.91665065791138</gco:Decimal></gmd:eastBoundLongitude><gmd:southBoundLatitude><gco:Decimal>46.26666162307</gco:Decimal></gmd:southBoundLatitude><gmd:northBoundLatitude><gco:Decimal>48.567994064425</gco:Decimal></gmd:northBoundLatitude></gmd:EX_GeographicBoundingBox>" />
         """
 
-        soup = BeautifulSoup(html_doc, 'html.parser')
+        soup = BeautifulSoup(html_doc, "html.parser")
         geom_object, source_label = extract_geometry_from_html(soup)
-        self.assertEqual(geom_object.geom_type, 'GeometryCollection')
+        self.assertEqual(geom_object.geom_type, "GeometryCollection")
         self.assertEqual(geom_object.num_geom, 1)
-        self.assertEqual(geom_object[0].geom_type, 'LineString')
+        self.assertEqual(geom_object[0].geom_type, "LineString")
         self.assertEqual(geom_object[0].num_points, 2)
         # The DC.SpatialCoverage GeoJSON path should be the labelled source.
-        self.assertEqual(source_label, 'DC.SpatialCoverage')
+        self.assertEqual(source_label, "DC.SpatialCoverage")
 
     def test_parse_time(self):
         html_doc = """
@@ -33,21 +33,20 @@ class SimpleTest(TestCase):
         <meta name="DC.PeriodOfTime" scheme="ISO8601" content="2023-06-01/2023-06-08" />
         """
 
-        soup = BeautifulSoup(html_doc, 'html.parser')
+        soup = BeautifulSoup(html_doc, "html.parser")
         period_start, period_end = extract_timeperiod_from_html(soup)
-        self.assertEqual(period_start, ['2022-06-01'])
-        self.assertEqual(period_end,   ['2022-06-08'])
+        self.assertEqual(period_start, ["2022-06-01"])
+        self.assertEqual(period_end, ["2022-06-08"])
 
         html_doc = """
         <meta name="DC.Coverage" xml:lang="en" content="Earth, Europe, Republic of France, Pays de la Loire"/>
         <meta name="DC.PeriodOfTime" scheme="ISO8601" content="2023-06-01/2023-06-08" />
         """
 
-        soup = BeautifulSoup(html_doc, 'html.parser')
+        soup = BeautifulSoup(html_doc, "html.parser")
         period_start, period_end = extract_timeperiod_from_html(soup)
-        self.assertEqual(period_start, ['2023-06-01'])
-        self.assertEqual(period_end,   ['2023-06-08'])
-
+        self.assertEqual(period_start, ["2023-06-01"])
+        self.assertEqual(period_end, ["2023-06-08"])
 
     def test_content_location_single_point(self):
         html_doc = """
@@ -56,13 +55,13 @@ class SimpleTest(TestCase):
          "contentLocation": {"@type": "GeoCoordinates", "latitude": 60.17, "longitude": 24.94}}
         </script>
         """
-        soup = BeautifulSoup(html_doc, 'html.parser')
+        soup = BeautifulSoup(html_doc, "html.parser")
         geom, label = extract_geometry_from_html(soup)
         self.assertIsNotNone(geom)
-        self.assertEqual(label, 'schema.org contentLocation')
-        self.assertEqual(geom.geom_type, 'GeometryCollection')
+        self.assertEqual(label, "schema.org contentLocation")
+        self.assertEqual(geom.geom_type, "GeometryCollection")
         self.assertEqual(geom.num_geom, 1)
-        self.assertEqual(geom[0].geom_type, 'Point')
+        self.assertEqual(geom[0].geom_type, "Point")
         self.assertAlmostEqual(geom[0].x, 24.94, places=5)
         self.assertAlmostEqual(geom[0].y, 60.17, places=5)
 
@@ -76,11 +75,11 @@ class SimpleTest(TestCase):
          ]}
         </script>
         """
-        soup = BeautifulSoup(html_doc, 'html.parser')
+        soup = BeautifulSoup(html_doc, "html.parser")
         geom, label = extract_geometry_from_html(soup)
         self.assertIsNotNone(geom)
-        self.assertEqual(label, 'schema.org contentLocation')
-        self.assertEqual(geom.geom_type, 'GeometryCollection')
+        self.assertEqual(label, "schema.org contentLocation")
+        self.assertEqual(geom.geom_type, "GeometryCollection")
         self.assertEqual(geom.num_geom, 2)
 
     def test_content_location_place_with_geo(self):
@@ -94,12 +93,12 @@ class SimpleTest(TestCase):
          }}
         </script>
         """
-        soup = BeautifulSoup(html_doc, 'html.parser')
+        soup = BeautifulSoup(html_doc, "html.parser")
         geom, label = extract_geometry_from_html(soup)
         self.assertIsNotNone(geom)
-        self.assertEqual(label, 'schema.org contentLocation')
+        self.assertEqual(label, "schema.org contentLocation")
         self.assertEqual(geom.num_geom, 1)
-        self.assertEqual(geom[0].geom_type, 'Point')
+        self.assertEqual(geom[0].geom_type, "Point")
         self.assertAlmostEqual(geom[0].x, 151.21, places=5)
 
     def test_content_location_priority_below_spatial_coverage(self):
@@ -111,10 +110,10 @@ class SimpleTest(TestCase):
          "contentLocation": {"@type": "GeoCoordinates", "latitude": 5.0, "longitude": 5.0}}
         </script>
         """
-        soup = BeautifulSoup(html_doc, 'html.parser')
+        soup = BeautifulSoup(html_doc, "html.parser")
         geom, label = extract_geometry_from_html(soup)
-        self.assertEqual(label, 'schema.org JSON-LD')
-        self.assertEqual(geom[0].geom_type, 'Polygon')
+        self.assertEqual(label, "schema.org JSON-LD")
+        self.assertEqual(geom[0].geom_type, "Polygon")
 
     def test_content_location_rejects_projected_coordinates(self):
         """GeoCoordinates with projected (non-WGS84) values must be silently dropped.
@@ -133,9 +132,9 @@ class SimpleTest(TestCase):
          ]}}
         </script>
         """
-        soup = BeautifulSoup(html_doc, 'html.parser')
+        soup = BeautifulSoup(html_doc, "html.parser")
         geom, label = extract_geometry_from_html(soup)
-        self.assertEqual(label, 'schema.org contentLocation')
+        self.assertEqual(label, "schema.org contentLocation")
         self.assertEqual(geom.num_geom, 1)
         self.assertAlmostEqual(geom[0].x, -90.286299, places=4)
         self.assertAlmostEqual(geom[0].y, 21.441017, places=4)
@@ -147,7 +146,7 @@ class SimpleTest(TestCase):
         <meta name="DC.Language" scheme="ISO639-1" content="en"/>
         """
 
-        soup = BeautifulSoup(html_doc, 'html.parser')
+        soup = BeautifulSoup(html_doc, "html.parser")
         geom_object, source_label = extract_geometry_from_html(soup)
         period_start, period_end = extract_timeperiod_from_html(soup)
         self.assertIsNone(geom_object)

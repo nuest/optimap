@@ -12,7 +12,7 @@ from django.core import mail
 from django.test import TestCase, override_settings
 
 from works.models import Collection, Contribution, EmailLog, Source, Work
-from works.notifications import notify_work_event, notify_curator_change
+from works.notifications import notify_curator_change, notify_work_event
 
 User = get_user_model()
 
@@ -23,6 +23,7 @@ def _run_async_synchronously(*args, **kwargs):
     func_path = args[0]
     module_name, _, attr = func_path.rpartition(".")
     from importlib import import_module
+
     module = import_module(module_name)
     fn = getattr(module, attr)
     return fn(*args[1:], **kwargs)
@@ -37,19 +38,31 @@ class ContributionReviewNotificationTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.actor = User.objects.create_user(
-            username="actor", email="actor@example.org", password="x",
+            username="actor",
+            email="actor@example.org",
+            password="x",
         )
         cls.admin1 = User.objects.create_user(
-            username="admin1", email="admin1@optimap.example", password="x", is_staff=True,
+            username="admin1",
+            email="admin1@optimap.example",
+            password="x",
+            is_staff=True,
         )
         cls.admin2 = User.objects.create_user(
-            username="admin2", email="admin2@optimap.example", password="x", is_staff=True,
+            username="admin2",
+            email="admin2@optimap.example",
+            password="x",
+            is_staff=True,
         )
         cls.curator_a = User.objects.create_user(
-            username="curatorA", email="curator-a@example.org", password="x",
+            username="curatorA",
+            email="curator-a@example.org",
+            password="x",
         )
         cls.curator_b = User.objects.create_user(
-            username="curatorB", email="curator-b@example.org", password="x",
+            username="curatorB",
+            email="curator-b@example.org",
+            password="x",
         )
         cls.col_mw = Collection.objects.create(identifier="mw", name="Mountain Wetlands")
         cls.col_mw.curators.add(cls.curator_a)
@@ -57,10 +70,13 @@ class ContributionReviewNotificationTests(TestCase):
         cls.col_agile.curators.add(cls.curator_b)
 
         cls.source = Source.objects.create(
-            name="X", url_field="https://example.org/api", source_type="oai-pmh",
+            name="X",
+            url_field="https://example.org/api",
+            source_type="oai-pmh",
         )
         cls.work = Work.objects.create(
-            title="A Study of Wetlands and Maps", status="c",
+            title="A Study of Wetlands and Maps",
+            status="c",
             doi="10.1234/wetlands-1",
             geometry=GeometryCollection(Point(11.0, 12.0)),
             source=cls.source,
@@ -97,8 +113,10 @@ class ContributionReviewNotificationTests(TestCase):
 
     def test_actor_excluded_when_actor_is_also_admin(self):
         admin_actor = User.objects.create_user(
-            username="admin_actor", email="admin-actor@optimap.example",
-            password="x", is_staff=True,
+            username="admin_actor",
+            email="admin-actor@optimap.example",
+            password="x",
+            is_staff=True,
         )
         with patch("django_q.tasks.async_task", side_effect=_run_async_synchronously):
             notify_work_event(self.work, "contribution", actor=admin_actor)
@@ -116,22 +134,32 @@ class PublicationNotificationTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.contrib_user = User.objects.create_user(
-            username="cu", email="contributor@example.org", password="x",
+            username="cu",
+            email="contributor@example.org",
+            password="x",
         )
         cls.publishing_admin = User.objects.create_user(
-            username="pa", email="admin@optimap.example", password="x", is_staff=True,
+            username="pa",
+            email="admin@optimap.example",
+            password="x",
+            is_staff=True,
         )
         cls.source = Source.objects.create(
-            name="X", url_field="https://example.org/api", source_type="oai-pmh",
+            name="X",
+            url_field="https://example.org/api",
+            source_type="oai-pmh",
         )
         cls.work = Work.objects.create(
-            title="A Once-Contributed Work", status="p",
+            title="A Once-Contributed Work",
+            status="p",
             doi="10.1234/c1",
             geometry=GeometryCollection(Point(11.0, 12.0)),
             source=cls.source,
         )
         Contribution.objects.create(
-            user=cls.contrib_user, work=cls.work, kind=Contribution.SPATIAL,
+            user=cls.contrib_user,
+            work=cls.work,
+            kind=Contribution.SPATIAL,
         )
 
     def setUp(self):
@@ -157,7 +185,9 @@ class PublicationNotificationTests(TestCase):
         # The publishing admin previously contributed too: they should NOT
         # receive the "your work was published" email — they did the publish.
         Contribution.objects.create(
-            user=self.publishing_admin, work=self.work, kind=Contribution.TEMPORAL,
+            user=self.publishing_admin,
+            work=self.work,
+            kind=Contribution.TEMPORAL,
         )
         with patch("django_q.tasks.async_task", side_effect=_run_async_synchronously):
             notify_work_event(self.work, "publish", actor=self.publishing_admin)
@@ -179,7 +209,9 @@ class PublicationNotificationTests(TestCase):
 
     def test_no_contributors_means_no_email(self):
         empty_work = Work.objects.create(
-            title="No-one Contributed", status="p", doi="10.1234/nope",
+            title="No-one Contributed",
+            status="p",
+            doi="10.1234/nope",
             geometry=GeometryCollection(Point(0.0, 0.0)),
             source=self.source,
         )
@@ -212,24 +244,34 @@ class WorkEventOptOutTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.actor = User.objects.create_user(
-            username="actor", email="actor@example.org", password="x",
+            username="actor",
+            email="actor@example.org",
+            password="x",
         )
         cls.opted_in_admin = User.objects.create_user(
-            username="optin_admin", email="optin-admin@optimap.example",
-            password="x", is_staff=True,
+            username="optin_admin",
+            email="optin-admin@optimap.example",
+            password="x",
+            is_staff=True,
         )
         cls.opted_out_admin = User.objects.create_user(
-            username="optout_admin", email="optout-admin@optimap.example",
-            password="x", is_staff=True,
+            username="optout_admin",
+            email="optout-admin@optimap.example",
+            password="x",
+            is_staff=True,
         )
         cls.opted_out_admin.userprofile.notify_work_events = False
         cls.opted_out_admin.userprofile.save()
 
         cls.opted_in_curator = User.objects.create_user(
-            username="optin_cur", email="optin-curator@example.org", password="x",
+            username="optin_cur",
+            email="optin-curator@example.org",
+            password="x",
         )
         cls.opted_out_curator = User.objects.create_user(
-            username="optout_cur", email="optout-curator@example.org", password="x",
+            username="optout_cur",
+            email="optout-curator@example.org",
+            password="x",
         )
         cls.opted_out_curator.userprofile.notify_work_events = False
         cls.opted_out_curator.userprofile.save()
@@ -238,10 +280,13 @@ class WorkEventOptOutTests(TestCase):
         cls.col.curators.add(cls.opted_in_curator, cls.opted_out_curator)
 
         cls.source = Source.objects.create(
-            name="X", url_field="https://example.org/api", source_type="oai-pmh",
+            name="X",
+            url_field="https://example.org/api",
+            source_type="oai-pmh",
         )
         cls.work = Work.objects.create(
-            title="Opt-Out Coverage Work", status="c",
+            title="Opt-Out Coverage Work",
+            status="c",
             doi="10.1234/optout-1",
             geometry=GeometryCollection(Point(11.0, 12.0)),
             source=cls.source,
@@ -282,15 +327,21 @@ class WorkEventOptOutTests(TestCase):
         # A contributor with notify_work_events=False does NOT get the
         # "your work was published" email.
         published = Work.objects.create(
-            title="Published Work", status="p", doi="10.1234/pub-1",
+            title="Published Work",
+            status="p",
+            doi="10.1234/pub-1",
             geometry=GeometryCollection(Point(0.0, 0.0)),
             source=self.source,
         )
         Contribution.objects.create(
-            user=self.opted_in_curator, work=published, kind=Contribution.SPATIAL,
+            user=self.opted_in_curator,
+            work=published,
+            kind=Contribution.SPATIAL,
         )
         Contribution.objects.create(
-            user=self.opted_out_curator, work=published, kind=Contribution.TEMPORAL,
+            user=self.opted_out_curator,
+            work=published,
+            kind=Contribution.TEMPORAL,
         )
 
         with patch("django_q.tasks.async_task", side_effect=_run_async_synchronously):
@@ -318,14 +369,20 @@ class CuratorChangeNotificationTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.admin = User.objects.create_user(
-            username="curator-admin", email="curator-admin@example.org",
-            password="x", is_staff=True,
+            username="curator-admin",
+            email="curator-admin@example.org",
+            password="x",
+            is_staff=True,
         )
         cls.existing_curator = User.objects.create_user(
-            username="existing-curator", email="existing@example.org", password="x",
+            username="existing-curator",
+            email="existing@example.org",
+            password="x",
         )
         cls.new_curator = User.objects.create_user(
-            username="new-curator", email="new@example.org", password="x",
+            username="new-curator",
+            email="new@example.org",
+            password="x",
         )
         cls.col = Collection.objects.create(identifier="notify-col", name="Notify Col")
         cls.col.curators.add(cls.existing_curator)
@@ -354,15 +411,15 @@ class CuratorChangeNotificationTests(TestCase):
     def test_add_notifies_all_curators_admins_and_actor(self):
         self._add_and_notify()
         recipients = sorted(addr for m in mail.outbox for addr in m.to)
-        self.assertIn("curator-admin@example.org", recipients)    # admin + actor
-        self.assertIn("existing@example.org", recipients)         # existing curator
-        self.assertIn("new@example.org", recipients)              # newly added curator
+        self.assertIn("curator-admin@example.org", recipients)  # admin + actor
+        self.assertIn("existing@example.org", recipients)  # existing curator
+        self.assertIn("new@example.org", recipients)  # newly added curator
 
     def test_remove_notifies_removed_curator_too(self):
         self.col.curators.add(self.new_curator)
         self._remove_and_notify()
         recipients = sorted(addr for m in mail.outbox for addr in m.to)
-        self.assertIn("new@example.org", recipients)              # removed — still gets mail
+        self.assertIn("new@example.org", recipients)  # removed — still gets mail
 
     def test_no_duplicate_emails_when_actor_is_also_admin(self):
         # Admin acting as actor: only one email per address.

@@ -17,37 +17,41 @@ https://djangocentral.com/environment-variables-in-django/
 """
 
 import os
-import sys
-import environ
-import dj_database_url
 import re
+import sys
 from pathlib import Path
+
+import dj_database_url
+import environ
+
 # .env file in the same directory as settings.py
 env = environ.Env()
 environ.Env.read_env()
 
 # use this if setting up on Windows 10 with GDAL installed from OSGeo4W using defaults
-if os.name == 'nt':
-    VIRTUAL_ENV_BASE = os.environ['VIRTUAL_ENV']
-    os.environ['PATH'] = os.path.join(VIRTUAL_ENV_BASE, r'.\Lib\site-packages\osgeo') + ';' + os.environ['PATH']
-    os.environ['PROJ_LIB'] = os.path.join(VIRTUAL_ENV_BASE, r'.\Lib\site-packages\osgeo\data\proj') + ';' + os.environ['PATH']
-    GDAL_LIBRARY_PATH = os.path.join(VIRTUAL_ENV_BASE,r'.\Lib\site-packages\osgeo\gdal304.dll')
-    GEOS_LIBRARY_PATH = os.path.join(VIRTUAL_ENV_BASE,r'.\Lib\site-packages\osgeo\geos_c.dll')
+if os.name == "nt":
+    VIRTUAL_ENV_BASE = os.environ["VIRTUAL_ENV"]
+    os.environ["PATH"] = os.path.join(VIRTUAL_ENV_BASE, r".\Lib\site-packages\osgeo") + ";" + os.environ["PATH"]
+    os.environ["PROJ_LIB"] = (
+        os.path.join(VIRTUAL_ENV_BASE, r".\Lib\site-packages\osgeo\data\proj") + ";" + os.environ["PATH"]
+    )
+    GDAL_LIBRARY_PATH = os.path.join(VIRTUAL_ENV_BASE, r".\Lib\site-packages\osgeo\gdal304.dll")
+    GEOS_LIBRARY_PATH = os.path.join(VIRTUAL_ENV_BASE, r".\Lib\site-packages\osgeo\geos_c.dll")
 
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = env('SECRET_KEY', default='django-insecure')
+SECRET_KEY = env("SECRET_KEY", default="django-insecure")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env('OPTIMAP_DEBUG', default=False)
+DEBUG = env("OPTIMAP_DEBUG", default=False)
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-ALLOWED_HOSTS = [i.strip('[]') for i in env('OPTIMAP_ALLOWED_HOST', default='*').split(',')]
+ALLOWED_HOSTS = [i.strip("[]") for i in env("OPTIMAP_ALLOWED_HOST", default="*").split(",")]
 
-OPTIMAP_SUPERUSER_EMAILS = [i.strip('[]') for i in env('OPTIMAP_SUPERUSER_EMAILS', default='').split(',')]
+OPTIMAP_SUPERUSER_EMAILS = [i.strip("[]") for i in env("OPTIMAP_SUPERUSER_EMAILS", default="").split(",")]
 
-TEST_HARVESTING_ONLINE = env('OPTIMAP_TEST_HARVESTING_ONLINE', default=False)
+TEST_HARVESTING_ONLINE = env("OPTIMAP_TEST_HARVESTING_ONLINE", default=False)
 
 # Reverse-geocoding via Nominatim (issue #222) — populates Work.placename and
 # Work.country_code on save when geometry changes. Default is on in production
@@ -58,15 +62,13 @@ TEST_HARVESTING_ONLINE = env('OPTIMAP_TEST_HARVESTING_ONLINE', default=False)
 # runner so the suite stays offline; opt out in a deployment by setting
 # OPTIMAP_GEOCODE_WORKS_ON_SAVE=False (e.g. during a bulk import where you
 # want to backfill placenames separately via `manage.py backfill_placenames`).
-_RUNNING_TESTS = (
-    'test' in sys.argv or 'pytest' in sys.modules or env('PYTEST_CURRENT_TEST', default='') != ''
-)
+_RUNNING_TESTS = "test" in sys.argv or "pytest" in sys.modules or env("PYTEST_CURRENT_TEST", default="") != ""
 GEOCODE_WORKS_ON_SAVE = env(
-    'OPTIMAP_GEOCODE_WORKS_ON_SAVE',
+    "OPTIMAP_GEOCODE_WORKS_ON_SAVE",
     default=False if _RUNNING_TESTS else True,
 )
 
-ROOT_URLCONF = 'optimap.urls'
+ROOT_URLCONF = "optimap.urls"
 
 DATA_DUMP_RETENTION = int(os.getenv("OPTIMAP_DATA_DUMP_RETENTION", 3))
 
@@ -83,82 +85,82 @@ OCEAN_SIMPLIFICATION_PERCENTILE = float(os.getenv("OPTIMAP_OCEAN_SIMPLIFICATION_
 GLOBAL_REGIONS_DATA_DIR = os.getenv("OPTIMAP_GLOBAL_REGIONS_DATA_DIR", None)
 
 AUTHENTICATION_BACKENDS = [
-    'django.contrib.auth.backends.ModelBackend',
+    "django.contrib.auth.backends.ModelBackend",
 ]
 
 # Login/Logout URLs for @login_required decorator
-LOGIN_URL = '/'
-LOGIN_REDIRECT_URL = '/'
-LOGOUT_REDIRECT_URL = '/'
+LOGIN_URL = "/"
+LOGIN_REDIRECT_URL = "/"
+LOGOUT_REDIRECT_URL = "/"
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
-    'django.contrib.gis',
-    'django.contrib.sitemaps',
-    'django.contrib.humanize',
-    'works',
-    'rest_framework',
-    'rest_framework_gis',
-    'django_q',
-    'drf_spectacular',
-    'drf_spectacular_sidecar',
-    'leaflet',
-    'import_export',
-    'meta',
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "django.contrib.gis",
+    "django.contrib.sitemaps",
+    "django.contrib.humanize",
+    "works",
+    "rest_framework",
+    "rest_framework_gis",
+    "django_q",
+    "drf_spectacular",
+    "drf_spectacular_sidecar",
+    "leaflet",
+    "import_export",
+    "meta",
 ]
 
 
 # django-meta — emits Open Graph, Twitter Card, and schema.org JSON-LD tags
 # from Meta objects passed in the template context. See works/seo.py for the
 # OPTIMAP-side helpers and base.html for the include site.
-META_SITE_PROTOCOL = env('OPTIMAP_META_SITE_PROTOCOL', default='http')
-META_SITE_DOMAIN = env('OPTIMAP_META_SITE_DOMAIN', default='localhost:8000')
-META_SITE_NAME = 'OPTIMAP'
+META_SITE_PROTOCOL = env("OPTIMAP_META_SITE_PROTOCOL", default="http")
+META_SITE_DOMAIN = env("OPTIMAP_META_SITE_DOMAIN", default="localhost:8000")
+META_SITE_NAME = "OPTIMAP"
 META_DEFAULT_KEYWORDS = [
-    'geospatial',
-    'open access',
-    'research articles',
-    'metadata',
-    'OPTIMAP',
-    'KOMET',
+    "geospatial",
+    "open access",
+    "research articles",
+    "metadata",
+    "OPTIMAP",
+    "KOMET",
 ]
 META_USE_OG_PROPERTIES = True
 META_USE_TWITTER_PROPERTIES = True
 META_USE_SCHEMAORG_PROPERTIES = True
 META_USE_JSON_LD_SCHEMA = True  # emit `<script type="application/ld+json">`
-META_DEFAULT_TYPE = 'website'
+META_DEFAULT_TYPE = "website"
 META_USE_SITES = False  # we set domain/protocol via META_SITE_* above
 META_USE_TITLE_TAG = False  # templates render their own <title>
-META_INCLUDE_KEYWORDS = ['geospatial', 'OPTIMAP', 'KOMET']
+META_INCLUDE_KEYWORDS = ["geospatial", "OPTIMAP", "KOMET"]
 
-AUTH_USER_MODEL = "works.CustomUser" 
+AUTH_USER_MODEL = "works.CustomUser"
 
 REST_FRAMEWORK = {
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
-    'DEFAULT_PAGINATION_CLASS': 'works.pagination.LinkHeaderPagination',
-	'PAGE_SIZE': 999,
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_PAGINATION_CLASS": "works.pagination.LinkHeaderPagination",
+    "PAGE_SIZE": 999,
 }
 
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 # https://pypi.org/project/dj-database-url/
 DATABASES = {
-    'default': dj_database_url.config( # this uses DATABASE_URL environment variable
+    "default": dj_database_url.config(  # this uses DATABASE_URL environment variable
         # value must be URL-encoded: postgres://user:p%23ssword!@localhost/foobar
-        default='postgis://optimap:optimap@localhost:5432/optimap',
-        conn_max_age=600
-        )
+        default="postgis://optimap:optimap@localhost:5432/optimap",
+        conn_max_age=600,
+    )
 }
 
 # https://github.com/tfranzel/drf-spectacular
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'OPTIMAP API',
-    'DESCRIPTION': """
+    "TITLE": "OPTIMAP API",
+    "DESCRIPTION": """
 OPTIMAP is a geospatial discovery portal for scientific works. The API exposes the same
 data that powers the OPTIMAP web UI: harvested **works** with spatial / temporal metadata,
 **sources** that fed them, **collections** they belong to, **subscriptions** that drive email
@@ -223,52 +225,60 @@ Collection slugs match `Collection.identifier`; list all published collections v
 [`/api/v1/collections/`](/api/v1/collections/). Each collection response embeds the feed and
 download URLs directly.
 """.strip(),
-    'VERSION': '1.0.0',
-    'SERVE_INCLUDE_SCHEMA': False,
-    'SCHEMA_PATH_PREFIX': r'/api/v1',  # strips the redundant "v1_" prefix from operationIds
-    'TAGS': [
-        {'name': 'Works', 'description': 'Harvested scientific works with spatial / temporal metadata, returned as GeoJSON.'},
-        {'name': 'Sources', 'description': 'Configured harvest origins (OAI-PMH endpoints, RSS feeds, OpenAlex sources, etc.).'},
-        {'name': 'Subscriptions', 'description': 'Per-user regional subscriptions that drive email alerts. Session auth required.'},
-        {'name': 'Global regions', 'description': 'Continent and ocean polygons used by feeds and subscriptions.'},
-        {'name': 'Geoextent', 'description': 'Extract a spatial / temporal extent from an uploaded file or a remote DOI/URL. Powered by the [geoextent](https://nuest.github.io/geoextent/) Python library.'},
-        {'name': 'Gazetteer', 'description': 'Server-side proxy for forward / reverse geocoding via Nominatim or Photon.'},
-        {'name': 'Downloads', 'description': 'Flat-file dumps of the full work corpus (GeoJSON, GeoPackage, CSV).'},
-        {'name': 'Collections', 'description': 'Curated groups of published works. The list/detail endpoints return collection metadata with a `works_count` and embedded links to feeds and downloads. Per-collection GeoRSS/GeoAtom feeds are served by the Django syndication framework and are documented in the API description above.'},
-        {'name': 'Body of Knowledge', 'description': 'Search the cached [EO4GEO Body of Knowledge](https://geospacebok.eu) for concept tagging.'},
-        {'name': 'Statistics', 'description': 'Cached aggregate counts for works, sources, collections, and users. Refreshed every 24 h.'},
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "SCHEMA_PATH_PREFIX": r"/api/v1",  # strips the redundant "v1_" prefix from operationIds
+    "TAGS": [
+        {
+            "name": "Works",
+            "description": "Harvested scientific works with spatial / temporal metadata, returned as GeoJSON.",
+        },
+        {
+            "name": "Sources",
+            "description": "Configured harvest origins (OAI-PMH endpoints, RSS feeds, OpenAlex sources, etc.).",
+        },
+        {
+            "name": "Subscriptions",
+            "description": "Per-user regional subscriptions that drive email alerts. Session auth required.",
+        },
+        {"name": "Global regions", "description": "Continent and ocean polygons used by feeds and subscriptions."},
+        {
+            "name": "Geoextent",
+            "description": "Extract a spatial / temporal extent from an uploaded file or a remote DOI/URL. Powered by the [geoextent](https://nuest.github.io/geoextent/) Python library.",
+        },
+        {
+            "name": "Gazetteer",
+            "description": "Server-side proxy for forward / reverse geocoding via Nominatim or Photon.",
+        },
+        {"name": "Downloads", "description": "Flat-file dumps of the full work corpus (GeoJSON, GeoPackage, CSV)."},
+        {
+            "name": "Collections",
+            "description": "Curated groups of published works. The list/detail endpoints return collection metadata with a `works_count` and embedded links to feeds and downloads. Per-collection GeoRSS/GeoAtom feeds are served by the Django syndication framework and are documented in the API description above.",
+        },
+        {
+            "name": "Body of Knowledge",
+            "description": "Search the cached [EO4GEO Body of Knowledge](https://geospacebok.eu) for concept tagging.",
+        },
+        {
+            "name": "Statistics",
+            "description": "Cached aggregate counts for works, sources, collections, and users. Refreshed every 24 h.",
+        },
     ],
-    'SWAGGER_UI_DIST': 'SIDECAR',  # shorthand to use the sidecar instead
-    'SWAGGER_UI_FAVICON_HREF': 'SIDECAR',
-    'REDOC_DIST': 'SIDECAR',
+    "SWAGGER_UI_DIST": "SIDECAR",  # shorthand to use the sidecar instead
+    "SWAGGER_UI_FAVICON_HREF": "SIDECAR",
+    "REDOC_DIST": "SIDECAR",
     # https://github.com/Redocly/redoc#redoc-options-object
-    'REDOC_UI_SETTINGS': {
+    "REDOC_UI_SETTINGS": {
         # https://github.com/Redocly/redoc#redoc-theme-object
-        'theme': {
-            'sidebar': {
+        "theme": {
+            "sidebar": {
                 # 'backgroundColor': '#ff0000',
             },
-            'colors': {
-                'primary': {
-                    'main': '#158F9B',
-                    'light': '#B9F0F6'
-                },
-                "http": {
-                    "get": "#158F9B",
-                    "post": "#3C159B",
-                    "put": "#3C159B",
-                    "delete": "#9B2115"
-                },
-                "success": {
-                    "main": "#158F9B",
-                    "light": "#9B7115",
-                    "dark": "#3C159B",
-                    "contrastText": "#000"
-                },
-                "text": {
-                    "primary": "rgba(0, 0, 0, 1)",
-                    "secondary": "#158F9B"
-                },
+            "colors": {
+                "primary": {"main": "#158F9B", "light": "#B9F0F6"},
+                "http": {"get": "#158F9B", "post": "#3C159B", "put": "#3C159B", "delete": "#9B2115"},
+                "success": {"main": "#158F9B", "light": "#9B7115", "dark": "#3C159B", "contrastText": "#000"},
+                "text": {"primary": "rgba(0, 0, 0, 1)", "secondary": "#158F9B"},
             },
             "typography": {
                 "heading1": {
@@ -280,58 +290,51 @@ download URLs directly.
                 "heading3": {
                     "color": "#158F9B",
                 },
-                "links": {
-                    "color": "#158F9B",
-                    "visited": "#158F9B",
-                    "hover": "#3C159B"
-                }
+                "links": {"color": "#158F9B", "visited": "#158F9B", "hover": "#3C159B"},
             },
         }
     },
 }
 
 Q_CLUSTER = {
-    'name': 'optimap',
-    'workers': 1,
-    'timeout': 60 * 10, # seconds, must be less than retry
-    'retry': 60 * 11,
-    'save_limit': 0, # unlimited
-    'queue_limit': 50,
-    'bulk': 10,
-    'orm': 'default',
-    'max_attempts': 5
+    "name": "optimap",
+    "workers": 1,
+    "timeout": 60 * 10,  # seconds, must be less than retry
+    "retry": 60 * 11,
+    "save_limit": 0,  # unlimited
+    "queue_limit": 50,
+    "bulk": 10,
+    "orm": "default",
+    "max_attempts": 5,
 }
 
 CACHES = {
     # Default: persists across processes (login tokens, email confirmations,
     # GeoRSS feed bodies). See https://docs.djangoproject.com/en/4.1/topics/cache/
-    'default': {
-        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
-        'LOCATION': 'cache',
+    "default": {
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": "cache",
     },
-
     # Per-process in-memory cache for hot anonymous reads — view-level
     # @cache_page decorators on static / low-change pages (feeds list,
     # sitemap, robots, privacy, …) and the work_landing context cache.
     # Each gunicorn worker keeps its own copy; first hit per worker is a
     # miss, subsequent hits are pure dict lookups (no DB roundtrip).
-    'memory': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'optimap-locmem',
+    "memory": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "optimap-locmem",
     },
-
     # Use for development to disable caching entirely (OPTIMAP_CACHE=dummy).
-    'dummy': {
-        'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
+    "dummy": {
+        "BACKEND": "django.core.cache.backends.dummy.DummyCache",
     },
-
     #'redis': {
     #    "BACKEND": "django_redis.cache.RedisCache",
     #    "LOCATION": "redis://127.0.0.1:6379/1",
     #    "OPTIONS": {
     #        "CLIENT_CLASS": "django_redis.client.DefaultClient",
     #    },
-    #}
+    # }
 }
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -340,28 +343,28 @@ FIXTURE_DIRS = [
     BASE_DIR / "fixtures",
 ]
 
-SESSION_ENGINE = "django.contrib.sessions.backends.cached_db" # store session data in database, it's persistent and fast enough for us
+SESSION_ENGINE = "django.contrib.sessions.backends.cached_db"  # store session data in database, it's persistent and fast enough for us
 
-CACHE_MIDDLEWARE_ALIAS = env('OPTIMAP_CACHE', default='default')
-CACHE_MIDDLEWARE_SECONDS = env('OPTIMAP_CACHE_SECONDS', default=3600)
+CACHE_MIDDLEWARE_ALIAS = env("OPTIMAP_CACHE", default="default")
+CACHE_MIDDLEWARE_SECONDS = env("OPTIMAP_CACHE_SECONDS", default=3600)
 
 # for testing email sending EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_BACKEND =       env('OPTIMAP_EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
-EMAIL_HOST =          env('OPTIMAP_EMAIL_HOST', default='optimap.dev')
-EMAIL_PORT =          env('OPTIMAP_EMAIL_PORT_SMTP', default=587)
-EMAIL_HOST_IMAP =     env('OPTIMAP_EMAIL_HOST_IMAP', default='optimap.imap')
-EMAIL_PORT_IMAP =     env('OPTIMAP_EMAIL_PORT_IMAP', default=993)
-EMAIL_HOST_USER =     env('OPTIMAP_EMAIL_HOST_USER', default='optimap@dev')
-EMAIL_HOST_PASSWORD = env('OPTIMAP_EMAIL_HOST_PASSWORD', default='')
-EMAIL_USE_TLS =       env('OPTIMAP_EMAIL_USE_TLS', default=False)
-EMAIL_USE_SSL =       env('OPTIMAP_EMAIL_USE_SSL', default=False)
-BASE_URL =            env("OPTIMAP_BASE_URL", default="http://localhost:8000")
-EMAIL_IMAP_SENT_FOLDER = env('OPTIMAP_EMAIL_IMAP_SENT_FOLDER', default='')
+EMAIL_BACKEND = env("OPTIMAP_EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
+EMAIL_HOST = env("OPTIMAP_EMAIL_HOST", default="optimap.dev")
+EMAIL_PORT = env("OPTIMAP_EMAIL_PORT_SMTP", default=587)
+EMAIL_HOST_IMAP = env("OPTIMAP_EMAIL_HOST_IMAP", default="optimap.imap")
+EMAIL_PORT_IMAP = env("OPTIMAP_EMAIL_PORT_IMAP", default=993)
+EMAIL_HOST_USER = env("OPTIMAP_EMAIL_HOST_USER", default="optimap@dev")
+EMAIL_HOST_PASSWORD = env("OPTIMAP_EMAIL_HOST_PASSWORD", default="")
+EMAIL_USE_TLS = env("OPTIMAP_EMAIL_USE_TLS", default=False)
+EMAIL_USE_SSL = env("OPTIMAP_EMAIL_USE_SSL", default=False)
+BASE_URL = env("OPTIMAP_BASE_URL", default="http://localhost:8000")
+EMAIL_IMAP_SENT_FOLDER = env("OPTIMAP_EMAIL_IMAP_SENT_FOLDER", default="")
 OPTIMAP_EMAIL_SEND_DELAY = env("OPTIMAP_EMAIL_SEND_DELAY", default=2)
 BASE_URL = env("BASE_URL", default="http://127.0.0.1:8000")
 EMAIL_SEND_DELAY = 2
 DATA_DUMP_INTERVAL_HOURS = 6
-INACTIVITY_WARNING_DAYS  = env.int("OPTIMAP_INACTIVITY_WARNING_DAYS",  default=365)
+INACTIVITY_WARNING_DAYS = env.int("OPTIMAP_INACTIVITY_WARNING_DAYS", default=365)
 INACTIVITY_DELETION_DAYS = env.int("OPTIMAP_INACTIVITY_DELETION_DAYS", default=396)
 
 # Contact email for API user agents (OpenAlex, Wikidata, etc.)
@@ -390,10 +393,7 @@ import optimap
 # reach us if there's a problem. Append a workflow qualifier at the call
 # site (e.g. `f"{settings.OPTIMAP_USER_AGENT} preview"`) when it's useful
 # for log diagnostics.
-OPTIMAP_USER_AGENT = (
-    f"OPTIMAP/{optimap.__version__} "
-    f"(+http://optimap.science; mailto:{CONTACT_EMAIL})"
-)
+OPTIMAP_USER_AGENT = f"OPTIMAP/{optimap.__version__} (+http://optimap.science; mailto:{CONTACT_EMAIL})"
 WIKIBASE_USER_AGENT = f"OPTIMAP/{optimap.__version__} (http://optimap.science; {CONTACT_EMAIL})"
 
 
@@ -435,7 +435,7 @@ GEOEXTENT_COPY_TTL_SECONDS = 5 * 60
 # Geometry upload limits — enforced client-side before the POST is sent.
 # GEOMETRY_WARN_SIZE_KB:  soft warning shown when a single polygon exceeds this.
 # GEOMETRY_MAX_UPLOAD_KB: hard block shown at submit time if total payload exceeds this.
-GEOMETRY_WARN_SIZE_KB  = int(os.getenv("OPTIMAP_GEOMETRY_WARN_SIZE_KB",  50))
+GEOMETRY_WARN_SIZE_KB = int(os.getenv("OPTIMAP_GEOMETRY_WARN_SIZE_KB", 50))
 GEOMETRY_MAX_UPLOAD_KB = int(os.getenv("OPTIMAP_GEOMETRY_MAX_UPLOAD_KB", 2048))
 
 # Seconds to sleep between geoextent calls in the GeoScienceWorld harvester.
@@ -460,9 +460,7 @@ BOK_CONCEPT_BASE_URL = os.getenv("OPTIMAP_BOK_CONCEPT_BASE_URL", "https://geospa
 # endpoint enforces the same rule with a 403. **Empty (default) = BoK
 # editor disabled site-wide** — opt-in by listing the collections you
 # want to enable. Read-only chips remain visible regardless.
-BOK_ENABLED_COLLECTIONS = [
-    s.strip() for s in os.getenv("OPTIMAP_BOK_ENABLED_COLLECTIONS", "").split(",") if s.strip()
-]
+BOK_ENABLED_COLLECTIONS = [s.strip() for s in os.getenv("OPTIMAP_BOK_ENABLED_COLLECTIONS", "").split(",") if s.strip()]
 
 # Browser Referrer-Policy. Django's SecurityMiddleware defaults this to
 # "same-origin", which strips the Referer on cross-origin requests — and the
@@ -484,50 +482,50 @@ SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 # stray second copy (and a duplicate UpdateCache/CommonMiddleware/
 # FetchFromCache trio above SessionMiddleware) — both removed.
 MIDDLEWARE = [
-    'django.middleware.cache.UpdateCacheMiddleware',
-    'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.cache.FetchFromCacheMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    "django.middleware.cache.UpdateCacheMiddleware",
+    "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.cache.FetchFromCacheMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django.contrib.sites.middleware.CurrentSiteMiddleware",
     "django_currentuser.middleware.ThreadLocalUserMiddleware",
     "django.middleware.gzip.GZipMiddleware",
 ]
 
-ROOT_URLCONF = 'optimap.urls'
+ROOT_URLCONF = "optimap.urls"
 
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': ['works/templates'],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.debug',
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
-                'optimap.urls.site',
-                'optimap.context_processors.get_version',
-                'optimap.context_processors.gazetteer_settings',
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": ["works/templates"],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+                "optimap.urls.site",
+                "optimap.context_processors.get_version",
+                "optimap.context_processors.gazetteer_settings",
             ],
         },
     },
 ]
 
-WSGI_APPLICATION = 'optimap.wsgi.application'
+WSGI_APPLICATION = "optimap.wsgi.application"
 
 # Internationalization
 # https://docs.djangoproject.com/en/4.0/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = "UTC"
 
 USE_I18N = True
 
@@ -537,9 +535,9 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.0/howto/static-files/
 # https://docs.djangoproject.com/en/4.1/ref/contrib/staticfiles/
-STATIC_ROOT = 'static/'
-STATIC_URL = '/static/'
-STATICFILES_DIRS = ['works/static']
+STATIC_ROOT = "static/"
+STATIC_URL = "/static/"
+STATICFILES_DIRS = ["works/static"]
 
 # serve static files with Django, not with a dedicated webserver: http://whitenoise.evans.io/en/stable/django.html
 STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
@@ -547,89 +545,87 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.0/ref/settings/#default-auto-field
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'verbose': {
-            'format': "%(levelname)-9s %(asctime)s | %(module)-12s | %(message)s",
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "%(levelname)-9s %(asctime)s | %(module)-12s | %(message)s",
         },
-        'simple': {
-            'format': '{levelname} {message}',
-            'style': '{',
-        },
-    },
-    'filters': {
-        'require_debug_false': {
-            '()': 'django.utils.log.RequireDebugFalse',
-        },
-        'require_debug_true': { # passes on records when DEBUG is True
-            '()': 'django.utils.log.RequireDebugTrue',
+        "simple": {
+            "format": "{levelname} {message}",
+            "style": "{",
         },
     },
-    'handlers': {
-        'console': {
-            'level': 'DEBUG',
-            'class': 'logging.StreamHandler',
-            'formatter': 'verbose'
+    "filters": {
+        "require_debug_false": {
+            "()": "django.utils.log.RequireDebugFalse",
         },
-        'mail_admins': {
-            'level': 'WARNING',
-            'filters': ['require_debug_false'],
-            'class': 'django.utils.log.AdminEmailHandler',
-            'include_html': True
+        "require_debug_true": {  # passes on records when DEBUG is True
+            "()": "django.utils.log.RequireDebugTrue",
         },
     },
-    'loggers': {
-        'django': {
-            'handlers': ['console', 'mail_admins'],
-            'level': env('DJANGO_LOGGING_LEVEL', default='INFO'),
+    "handlers": {
+        "console": {"level": "DEBUG", "class": "logging.StreamHandler", "formatter": "verbose"},
+        "mail_admins": {
+            "level": "WARNING",
+            "filters": ["require_debug_false"],
+            "class": "django.utils.log.AdminEmailHandler",
+            "include_html": True,
         },
-        'works': {
-            'handlers': ['console', 'mail_admins'],
-            'level': env('OPTIMAP_LOGGING_LEVEL', default='INFO'),
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console", "mail_admins"],
+            "level": env("DJANGO_LOGGING_LEVEL", default="INFO"),
         },
-        'django.request': {
-            'handlers': ['mail_admins'],
-            'level': 'WARNING',
-            'propagate': False,
+        "works": {
+            "handlers": ["console", "mail_admins"],
+            "level": env("OPTIMAP_LOGGING_LEVEL", default="INFO"),
         },
-    }
+        "django.request": {
+            "handlers": ["mail_admins"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+    },
 }
 
 IGNORABLE_404_URLS = (
     re.compile(r"\.(php|cgi|env)$"),
     re.compile(r"^/phpmyadmin/"),
-    re.compile(r'wp-login$'),
-    re.compile(r'(.*)/wp-includes/(.*)'),
+    re.compile(r"wp-login$"),
+    re.compile(r"(.*)/wp-includes/(.*)"),
     re.compile(r"^/(http|https)$"),
     re.compile(r"ads.txt$"),
     re.compile(r"^\.git"),
 )
 
-CSRF_TRUSTED_ORIGINS = [i.strip('[]') for i in env('CSRF_TRUSTED_ORIGINS', default='https://localhost:8000').split(',')]
+CSRF_TRUSTED_ORIGINS = [
+    i.strip("[]") for i in env("CSRF_TRUSTED_ORIGINS", default="https://localhost:8000").split(",")
+]
 
-ADMINS = [('OPTIMAP', 'login@optimap.science')]
+ADMINS = [("OPTIMAP", "login@optimap.science")]
 
 FEED_MAX_ITEMS = 100
 
 # Gazetteer / Geocoding Settings
 # Configures the location search (gazetteer) feature on the map
-GAZETTEER_PROVIDER = env('OPTIMAP_GAZETTEER_PROVIDER', default='nominatim')
-GAZETTEER_PLACEHOLDER = env('OPTIMAP_GAZETTEER_PLACEHOLDER', default='Search for a location...')
+GAZETTEER_PROVIDER = env("OPTIMAP_GAZETTEER_PROVIDER", default="nominatim")
+GAZETTEER_PLACEHOLDER = env("OPTIMAP_GAZETTEER_PLACEHOLDER", default="Search for a location...")
 # Optional API key for commercial providers (not required for Nominatim)
-GAZETTEER_API_KEY = env('OPTIMAP_GAZETTEER_API_KEY', default='')
+GAZETTEER_API_KEY = env("OPTIMAP_GAZETTEER_API_KEY", default="")
 
 # Default page size for paginated list views (works list, collection pages, etc.)
 # OPTIMAP_WORKS_PAGE_SIZE_DEFAULT is kept as a fallback for backward compatibility.
-PAGE_MAX_ITEMS = int(env('OPTIMAP_PAGE_MAX_ITEMS',
-                         default=env('OPTIMAP_WORKS_PAGE_SIZE_DEFAULT', default=50)))
+PAGE_MAX_ITEMS = int(env("OPTIMAP_PAGE_MAX_ITEMS", default=env("OPTIMAP_WORKS_PAGE_SIZE_DEFAULT", default=50)))
 # Works list pagination bounds (selectable range shown to users)
 WORKS_PAGE_SIZE_DEFAULT = PAGE_MAX_ITEMS
-WORKS_PAGE_SIZE_MIN = int(env('OPTIMAP_WORKS_PAGE_SIZE_MIN', default=10))
-WORKS_PAGE_SIZE_MAX = int(env('OPTIMAP_WORKS_PAGE_SIZE_MAX', default=200))
+WORKS_PAGE_SIZE_MIN = int(env("OPTIMAP_WORKS_PAGE_SIZE_MIN", default=10))
+WORKS_PAGE_SIZE_MAX = int(env("OPTIMAP_WORKS_PAGE_SIZE_MAX", default=200))
+
 
 # Calculate available page size options by doubling from MIN to MAX.
 # Always includes MIN, MAX, and the given default value.
@@ -645,33 +641,38 @@ def _calculate_page_size_options(min_size, max_size, default=None):
         options.append(default)
     return sorted(options)
 
-WORKS_PAGE_SIZE_OPTIONS = _calculate_page_size_options(WORKS_PAGE_SIZE_MIN, WORKS_PAGE_SIZE_MAX, default=PAGE_MAX_ITEMS)
+
+WORKS_PAGE_SIZE_OPTIONS = _calculate_page_size_options(
+    WORKS_PAGE_SIZE_MIN, WORKS_PAGE_SIZE_MAX, default=PAGE_MAX_ITEMS
+)
 
 # Number of works fetched per chunk when loading the main map.
-OPTIMAP_MAP_CHUNK_SIZE = int(env('OPTIMAP_MAP_CHUNK_SIZE', default=500))
+OPTIMAP_MAP_CHUNK_SIZE = int(env("OPTIMAP_MAP_CHUNK_SIZE", default=500))
 
 # OGC API - Features via pygeoapi (issue #19)
 # Served at /ogcapi/ when etc/pygeoapi-config.yml is present and the
 # etc/pygeoapi-openapi.yml has been generated (see manage.py generate_pygeoapi_openapi).
 PYGEOAPI_ENABLED = False
-_PYGEOAPI_CONFIG_PATH = Path(BASE_DIR) / 'etc' / 'pygeoapi-config.yml'
-_PYGEOAPI_OPENAPI_PATH = Path(BASE_DIR) / 'etc' / 'pygeoapi-openapi.yml'
+_PYGEOAPI_CONFIG_PATH = Path(BASE_DIR) / "etc" / "pygeoapi-config.yml"
+_PYGEOAPI_OPENAPI_PATH = Path(BASE_DIR) / "etc" / "pygeoapi-openapi.yml"
 if _PYGEOAPI_CONFIG_PATH.exists() and _PYGEOAPI_OPENAPI_PATH.exists():
-    os.environ.setdefault('PYGEOAPI_CONFIG', str(_PYGEOAPI_CONFIG_PATH))
-    os.environ.setdefault('PYGEOAPI_OPENAPI', str(_PYGEOAPI_OPENAPI_PATH))
+    os.environ.setdefault("PYGEOAPI_CONFIG", str(_PYGEOAPI_CONFIG_PATH))
+    os.environ.setdefault("PYGEOAPI_OPENAPI", str(_PYGEOAPI_OPENAPI_PATH))
     try:
         from pygeoapi.config import get_config as _get_pygeoapi_config
         from pygeoapi.openapi import load_openapi_document as _load_openapi_document
         from pygeoapi.util import get_api_rules as _get_api_rules
+
         PYGEOAPI_CONFIG = _get_pygeoapi_config()
         OPENAPI_DOCUMENT = _load_openapi_document()
         API_RULES = _get_api_rules(PYGEOAPI_CONFIG)
         # Inject absolute templates path so custom templates are found regardless of cwd
-        _pygeoapi_templates = Path(BASE_DIR) / 'etc' / 'pygeoapi-templates'
+        _pygeoapi_templates = Path(BASE_DIR) / "etc" / "pygeoapi-templates"
         if _pygeoapi_templates.is_dir():
-            PYGEOAPI_CONFIG.setdefault('server', {}).setdefault('templates', {})
-            PYGEOAPI_CONFIG['server'].setdefault('templates', {})['path'] = str(_pygeoapi_templates)
+            PYGEOAPI_CONFIG.setdefault("server", {}).setdefault("templates", {})
+            PYGEOAPI_CONFIG["server"].setdefault("templates", {})["path"] = str(_pygeoapi_templates)
         PYGEOAPI_ENABLED = True
     except Exception as _pygeoapi_exc:
         import logging as _logging
-        _logging.getLogger(__name__).warning('OGC API disabled: %s', _pygeoapi_exc)
+
+        _logging.getLogger(__name__).warning("OGC API disabled: %s", _pygeoapi_exc)

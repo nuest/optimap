@@ -19,8 +19,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
-from pathlib import Path
 from unittest import mock
 
 import django
@@ -28,10 +26,11 @@ from bs4 import BeautifulSoup
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'optimap.settings')
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "optimap.settings")
 django.setup()
 
-from django.contrib.gis.geos import GEOSGeometry, GeometryCollection
+from django.contrib.gis.geos import GeometryCollection, GEOSGeometry
+
 from works.models import Source, Work
 
 
@@ -155,13 +154,9 @@ class WorkLandingSEOTests(TestCase):
         # spatialCoverage uses schema.org's spec'd shapes (issue #222):
         # Polygon → GeoShape with `box` ("south west north east").
         self.assertEqual(article["spatialCoverage"]["@type"], "Place")
-        self.assertEqual(
-            article["spatialCoverage"]["geo"]["@type"], "GeoShape"
-        )
+        self.assertEqual(article["spatialCoverage"]["geo"]["@type"], "GeoShape")
         # Sulawesi extent: south=-5.7, west=119.0, north=1.7, east=125.0.
-        self.assertEqual(
-            article["spatialCoverage"]["geo"]["box"], "-5.7 119.0 1.7 125.0"
-        )
+        self.assertEqual(article["spatialCoverage"]["geo"]["box"], "-5.7 119.0 1.7 125.0")
         # temporalCoverage with open-start interval, matching ISO 8601 "../end".
         self.assertEqual(article["temporalCoverage"], "../2024-12-31")
         # publisher derived from work.source.
@@ -186,9 +181,7 @@ class WorkLandingSEOTests(TestCase):
                 f"missing citation_* tag: {name}",
             )
         # One citation_author per author, in order.
-        authors = [
-            t["content"] for t in soup.find_all("meta", attrs={"name": "citation_author"})
-        ]
+        authors = [t["content"] for t in soup.find_all("meta", attrs={"name": "citation_author"})]
         self.assertEqual(len(authors), 2)
         self.assertEqual(authors[0], "Mariana Sontag-Gonzalez")
 
@@ -220,13 +213,8 @@ class WorkLandingSEOTests(TestCase):
         self.assertEqual(_content("citation_pdf_url"), self.work.url)
 
         # Repeated citation_keywords, one per keyword and topic.
-        kw_tags = [
-            t["content"]
-            for t in soup.find_all("meta", attrs={"name": "citation_keywords"})
-        ]
-        self.assertEqual(
-            kw_tags, ["Earth Sciences", "Geomagnetism and Paleomagnetism Studies"]
-        )
+        kw_tags = [t["content"] for t in soup.find_all("meta", attrs={"name": "citation_keywords"})]
+        self.assertEqual(kw_tags, ["Earth Sciences", "Geomagnetism and Paleomagnetism Studies"])
 
     def test_citation_pdf_url_omitted_when_url_is_not_pdf(self):
         # work.url ends in .../article/1 — no .pdf, so no citation_pdf_url.
@@ -280,9 +268,7 @@ class WorkLandingSEOTests(TestCase):
         self.assertIn("rft.atitle=", title)
         self.assertIn("rft.au=", title)
         # DOI encoded as info:doi/<doi> — slashes and colons percent-encoded.
-        self.assertIn(
-            f"rft_id=info%3Adoi%2F{self.work.doi.replace('/', '%2F')}", title
-        )
+        self.assertIn(f"rft_id=info%3Adoi%2F{self.work.doi.replace('/', '%2F')}", title)
 
     def test_geo_meta_tags_present_for_geometry(self):
         # Issue #222: geo.position + ICBM emitted from the centroid, with the
@@ -346,6 +332,7 @@ class WorkLandingSEOTests(TestCase):
     def test_jsonld_geo_is_geocoordinates_for_single_point(self):
         # Single-point work → schema.org GeoCoordinates (latitude/longitude).
         from django.contrib.gis.geos import Point
+
         point_work = Work.objects.create(
             title="Single-point work",
             url="https://example.test/article/4",
@@ -385,7 +372,9 @@ class WorkLandingSEOTests(TestCase):
     def test_unpublished_work_returns_404(self):
         # Sanity: SEO context must not leak unpublished works to anonymous users.
         unpublished = Work.objects.create(
-            title="Draft", source=self.work.source, status="d",
+            title="Draft",
+            source=self.work.source,
+            status="d",
             geometry=GeometryCollection(),
         )
         resp = self.client.get(reverse("optimap:work-landing", args=[unpublished.get_identifier()]))
@@ -411,9 +400,7 @@ class WorkPreviewImageTests(TestCase):
     def setUp(self):
         self.client = Client()
         self.work = _make_published_work(doi="10.1234/test.seo.preview")
-        self.preview_url = reverse(
-            "optimap:work-preview", args=[self.work.get_identifier()]
-        )
+        self.preview_url = reverse("optimap:work-preview", args=[self.work.get_identifier()])
 
     @staticmethod
     def _fake_tile_image(*args, **kwargs):
@@ -424,6 +411,7 @@ class WorkPreviewImageTests(TestCase):
     def test_preview_endpoint_serves_png(self):
         # Patch staticmap so no network call is made.
         from PIL import Image as _Image
+
         with mock.patch("works.services.preview_image.StaticMap") as SM:
             instance = SM.return_value
             instance.render.return_value = _Image.new("RGB", (1200, 630), color=(200, 220, 240))
@@ -432,8 +420,10 @@ class WorkPreviewImageTests(TestCase):
         self.assertEqual(resp["Content-Type"], "image/png")
         self.assertIn("max-age=", resp.get("Cache-Control", ""))
         # Verify the body is actually a PNG with the expected dimensions.
-        from PIL import Image
         from io import BytesIO
+
+        from PIL import Image
+
         buf = BytesIO(b"".join(resp.streaming_content))
         img = Image.open(buf)
         self.assertEqual(img.size, (1200, 630))
@@ -451,7 +441,7 @@ class WorkPreviewImageTests(TestCase):
         self.assertEqual(resp.status_code, 404)
 
     def test_post_save_invalidates_cached_preview(self):
-        from works.services.preview_image import cache_path_for, invalidate_preview
+        from works.services.preview_image import cache_path_for
 
         path = cache_path_for(self.work)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -460,8 +450,7 @@ class WorkPreviewImageTests(TestCase):
         # Saving the work should fire the post_save signal and unlink the cache.
         self.work.title = self.work.title + " (edited)"
         self.work.save()
-        self.assertFalse(path.exists(),
-                         "post_save signal must invalidate the cached preview")
+        self.assertFalse(path.exists(), "post_save signal must invalidate the cached preview")
 
 
 class FeedPageSEOTests(TestCase):
@@ -474,12 +463,20 @@ class FeedPageSEOTests(TestCase):
         # The geometry is just a coarse bbox over Africa — good enough for
         # the route to resolve and the SEO context to assemble.
         from works.models import GlobalRegion
+
         africa_geojson = {
             "type": "MultiPolygon",
-            "coordinates": [[[
-                [-20.0, -36.0], [55.0, -36.0], [55.0, 38.0],
-                [-20.0, 38.0], [-20.0, -36.0],
-            ]]],
+            "coordinates": [
+                [
+                    [
+                        [-20.0, -36.0],
+                        [55.0, -36.0],
+                        [55.0, 38.0],
+                        [-20.0, 38.0],
+                        [-20.0, -36.0],
+                    ]
+                ]
+            ],
         }
         cls.africa = GlobalRegion.objects.create(
             name="Africa",
@@ -489,6 +486,7 @@ class FeedPageSEOTests(TestCase):
 
     def test_continent_feed_page_emits_collectionpage(self):
         from django.core.cache import cache
+
         cache.clear()  # the feed page caches by slug; flush so we don't read stale
         resp = self.client.get("/regions/continent/africa/")
         self.assertEqual(resp.status_code, 200)

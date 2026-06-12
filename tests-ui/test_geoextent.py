@@ -1,22 +1,13 @@
 # SPDX-FileCopyrightText: 2025 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import unittest
 import os
-from django.test import TestCase
+import unittest
+
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
+from django.test import TestCase
 from django.urls import reverse
-from helium import (
-    start_chrome,
-    click,
-    get_driver,
-    kill_browser,
-    write,
-    Text,
-    Button,
-    wait_until,
-    find_all
-)
+from helium import Button, Text, click, get_driver, kill_browser, start_chrome, wait_until
 
 
 class GeoextentPageTests(TestCase):
@@ -94,7 +85,7 @@ class GeoextentPageTests(TestCase):
         """Test that geoextent link exists in footer."""
         response = self.client.get("/")
         self.assertContains(response, 'href="/geoextent/"')
-        self.assertContains(response, 'Geoextent')
+        self.assertContains(response, "Geoextent")
 
 
 class GeoextentUIInteractionTests(StaticLiveServerTestCase):
@@ -104,13 +95,13 @@ class GeoextentUIInteractionTests(StaticLiveServerTestCase):
     def setUpClass(cls):
         """Set up test fixtures."""
         super().setUpClass()
-        cls.screenshot_dir = os.path.join(os.getcwd(), 'tests-ui', 'screenshots')
+        cls.screenshot_dir = os.path.join(os.getcwd(), "tests-ui", "screenshots")
         os.makedirs(cls.screenshot_dir, exist_ok=True)
 
     def test_geoextent_page_loads(self):
         """Test that the geoextent page loads correctly in browser."""
         try:
-            start_chrome(f'{self.live_server_url}/geoextent/', headless=True)
+            start_chrome(f"{self.live_server_url}/geoextent/", headless=True)
 
             # Check page title
             driver = get_driver()
@@ -120,16 +111,14 @@ class GeoextentUIInteractionTests(StaticLiveServerTestCase):
             self.assertTrue(Text("Geoextent extraction").exists())
 
             # Take screenshot
-            driver.save_screenshot(
-                os.path.join(self.screenshot_dir, 'geoextent_page.png')
-            )
+            driver.save_screenshot(os.path.join(self.screenshot_dir, "geoextent_page.png"))
         finally:
             kill_browser()
 
     def test_tab_navigation(self):
         """Test switching between Upload Files and Remote Resource tabs."""
         try:
-            start_chrome(f'{self.live_server_url}/geoextent/', headless=True)
+            start_chrome(f"{self.live_server_url}/geoextent/", headless=True)
 
             # Check default tab is Upload files
             self.assertTrue(Text("Browse files...").exists())
@@ -144,16 +133,14 @@ class GeoextentUIInteractionTests(StaticLiveServerTestCase):
             self.assertTrue(Text("File Limit").exists())
 
             # Take screenshot
-            get_driver().save_screenshot(
-                os.path.join(self.screenshot_dir, 'geoextent_remote_tab.png')
-            )
+            get_driver().save_screenshot(os.path.join(self.screenshot_dir, "geoextent_remote_tab.png"))
         finally:
             kill_browser()
 
     def test_browse_files_button_exists(self):
         """Test that browse files button exists and is clickable."""
         try:
-            start_chrome(f'{self.live_server_url}/geoextent/', headless=True)
+            start_chrome(f"{self.live_server_url}/geoextent/", headless=True)
 
             # Check browse button exists
             self.assertTrue(Button("Browse files...").exists())
@@ -169,7 +156,7 @@ class GeoextentUIInteractionTests(StaticLiveServerTestCase):
     def test_remote_form_validation(self):
         """Test that remote form shows validation when submitted empty."""
         try:
-            start_chrome(f'{self.live_server_url}/geoextent/', headless=True)
+            start_chrome(f"{self.live_server_url}/geoextent/", headless=True)
 
             # Switch to Remote resources tab
             click("Remote resources")
@@ -189,7 +176,7 @@ class GeoextentUIInteractionTests(StaticLiveServerTestCase):
     def test_extraction_options_visible(self):
         """Test that all extraction options are visible after clicking on the options link."""
         try:
-            start_chrome(f'{self.live_server_url}/geoextent/', headless=True)
+            start_chrome(f"{self.live_server_url}/geoextent/", headless=True)
 
             self.assertFalse(Text("Bounding box").exists())
             self.assertFalse(Text("Bounding box").exists())
@@ -210,16 +197,14 @@ class GeoextentUIInteractionTests(StaticLiveServerTestCase):
             self.assertTrue(Text("Gazetteer service").exists())
 
             # Take screenshot of options
-            get_driver().save_screenshot(
-                os.path.join(self.screenshot_dir, 'geoextent_options.png')
-            )
+            get_driver().save_screenshot(os.path.join(self.screenshot_dir, "geoextent_options.png"))
         finally:
             kill_browser()
 
     def test_documentation_section_visible(self):
         """Test that documentation section is visible and scrollable."""
         try:
-            start_chrome(f'{self.live_server_url}/geoextent/', headless=True)
+            start_chrome(f"{self.live_server_url}/geoextent/", headless=True)
 
             # Scroll to bottom to see documentation
             driver = get_driver()
@@ -231,16 +216,14 @@ class GeoextentUIInteractionTests(StaticLiveServerTestCase):
             self.assertTrue(Text("Supported repository providers").exists())
 
             # Take screenshot of documentation section
-            driver.save_screenshot(
-                os.path.join(self.screenshot_dir, 'geoextent_documentation.png')
-            )
+            driver.save_screenshot(os.path.join(self.screenshot_dir, "geoextent_documentation.png"))
         finally:
             kill_browser()
 
     def test_sitemap_link_navigates_to_geoextent(self):
         """Test that clicking geoextent link on the user sitemap navigates to the page."""
         try:
-            start_chrome(f'{self.live_server_url}/pages/', headless=True)
+            start_chrome(f"{self.live_server_url}/pages/", headless=True)
 
             # Click geoextent link in footer
             click("Geoextent")
@@ -256,5 +239,5 @@ class GeoextentUIInteractionTests(StaticLiveServerTestCase):
             kill_browser()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

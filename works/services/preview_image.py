@@ -16,15 +16,14 @@ import io
 import json
 import logging
 import tempfile
-from pathlib import Path
-
 from datetime import datetime, timezone
+from pathlib import Path
 
 import cairosvg
 from django.conf import settings
 from PIL import Image, ImageDraw, ImageFont
-from staticmap import StaticMap, Polygon, Line, CircleMarker
-from staticmap.staticmap import _lon_to_x, _lat_to_y
+from staticmap import CircleMarker, Line, Polygon, StaticMap
+from staticmap.staticmap import _lat_to_y, _lon_to_x
 
 logger = logging.getLogger(__name__)
 
@@ -39,14 +38,14 @@ USER_AGENT = f"{settings.OPTIMAP_USER_AGENT} preview"
 # outline + translucent fill so the basemap shows through.
 BRAND_TEAL = "#158F9B"
 EXTENT_FILL = (21, 143, 155, 102)  # 0.4 alpha — slightly stronger than the
-                                   # CSS 0.2 because the OSM background is
-                                   # busy and faint colours wash out.
+# CSS 0.2 because the OSM background is
+# busy and faint colours wash out.
 EXTENT_OUTLINE = BRAND_TEAL
 EXTENT_OUTLINE_WIDTH = 6  # px — "thick outline" per the request
 
 LOGO_PATH = Path(__file__).resolve().parent.parent / "static" / "optimap_logo.svg"
 LOGO_TARGET_HEIGHT = 60  # px on the 1200×630 canvas
-LOGO_MARGIN = 18         # px from the bottom-right corner
+LOGO_MARGIN = 18  # px from the bottom-right corner
 LOGO_URL_TEXT = "optimap.science"
 TIMESTAMP_FONT_SIZE = 11  # px — "very small font" per the request
 
@@ -190,8 +189,7 @@ def _draw_geom(smap, draw, geom):
 
 def _draw_point(draw, x, y):
     r = 11
-    draw.ellipse((x - r, y - r, x + r, y + r),
-                 fill=EXTENT_FILL, outline=BRAND_TEAL, width=EXTENT_OUTLINE_WIDTH // 2)
+    draw.ellipse((x - r, y - r, x + r, y + r), fill=EXTENT_FILL, outline=BRAND_TEAL, width=EXTENT_OUTLINE_WIDTH // 2)
 
 
 def _draw_ring(draw, pts):
@@ -215,7 +213,7 @@ def _add_logo(image: Image.Image) -> Image.Image:
     url_font = _load_font(13, bold=False)
     margin = LOGO_MARGIN
     pad_x, pad_y = 14, 8
-    gap = 4   # space between logo and URL text
+    gap = 4  # space between logo and URL text
 
     # Measure URL text against the loaded font.
     tmp_draw = ImageDraw.Draw(image)
@@ -229,8 +227,7 @@ def _add_logo(image: Image.Image) -> Image.Image:
 
     pill = Image.new("RGBA", (pill_w, pill_h), (255, 255, 255, 0))
     pill_draw = ImageDraw.Draw(pill)
-    pill_draw.rounded_rectangle((0, 0, pill_w - 1, pill_h - 1),
-                                radius=10, fill=(255, 255, 255, 230))
+    pill_draw.rounded_rectangle((0, 0, pill_w - 1, pill_h - 1), radius=10, fill=(255, 255, 255, 230))
     # Centre the logo + URL horizontally inside the pill.
     logo_x = pad_x + (content_w - logo_img.width) // 2
     url_x = pad_x + (content_w - url_w) // 2
@@ -281,8 +278,8 @@ def _load_font(size: int, bold: bool):
 def _text_size(draw, text, font):
     """Pillow ≥9 uses ``textbbox``; older versions use ``textsize``."""
     if hasattr(draw, "textbbox"):
-        l, t, r, b = draw.textbbox((0, 0), text, font=font)
-        return r - l, b - t
+        left, t, r, b = draw.textbbox((0, 0), text, font=font)
+        return r - left, b - t
     return draw.textsize(text, font=font)  # pragma: no cover — pre-9 Pillow
 
 
@@ -296,9 +293,6 @@ def _load_logo_png() -> Image.Image | None:
             output_height=LOGO_TARGET_HEIGHT,
         )
     except Exception as err:
-        logger.warning("OPTIMAP SVG logo render failed (%s) — preview "
-                       "skipping logo overlay", err)
+        logger.warning("OPTIMAP SVG logo render failed (%s) — preview skipping logo overlay", err)
         return None
     return Image.open(io.BytesIO(png_bytes)).convert("RGBA")
-
-

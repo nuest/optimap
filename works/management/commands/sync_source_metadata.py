@@ -4,21 +4,22 @@
 # publications/management/commands/sync_source_metadata.py
 
 import logging
-import time
 import socket
-import os
-from django.core.management.base import BaseCommand
-from django.contrib.gis.geos import Point
-from geopy.geocoders import Nominatim
-from geopy.exc import GeocoderServiceError
-from works.models import Source
-import requests
+import time
 
+import requests
+from django.contrib.gis.geos import Point
+from django.core.management.base import BaseCommand
+from geopy.exc import GeocoderServiceError
+from geopy.geocoders import Nominatim
 from pyalex import Sources  # optional, install pyalex for client support
+
+from works.models import Source
 
 logger = logging.getLogger(__name__)
 
 ISSN_ENDPOINT = "https://api.openalex.org/sources/issn:{issn}"
+
 
 class Command(BaseCommand):
     help = "Full sync: metadata + geolocation + works list from OpenAlex."
@@ -69,9 +70,9 @@ class Command(BaseCommand):
                 continue
 
             defaults = {
-                "openalex_id":    data.get("id"),
+                "openalex_id": data.get("id"),
                 "publisher_name": (data.get("host_organization") or {}).get("display_name")
-                                   or data.get("display_name"),
+                or data.get("display_name"),
             }
 
             # geolocation from OpenAlex

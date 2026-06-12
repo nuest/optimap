@@ -30,11 +30,11 @@ from django.utils import timezone
 
 from works.models import Work
 from works.services.geocoding import (
-    _cache_key,
     _CACHE_ALIAS,
+    _cache_key,
+    _common_address,
     _representative_points,
     _reverse_geocode_lookup,
-    _common_address,
 )
 
 
@@ -58,7 +58,7 @@ class Command(BaseCommand):
             type=float,
             default=1.1,
             help="Seconds to sleep between cache-miss requests (default: 1.1, "
-                 "respects Nominatim's 1 req/s courtesy rate limit).",
+            "respects Nominatim's 1 req/s courtesy rate limit).",
         )
         parser.add_argument(
             "--dry-run",
@@ -72,9 +72,7 @@ class Command(BaseCommand):
         sleep = opts["sleep"]
         dry_run = opts["dry_run"]
 
-        qs = Work.objects.filter(geometry__isnull=False).exclude(
-            geometry__isempty=True
-        )
+        qs = Work.objects.filter(geometry__isnull=False).exclude(geometry__isempty=True)
         if not force:
             qs = qs.filter(Q(placename__isnull=True) | Q(placename=""))
         qs = qs.order_by("id")
@@ -89,9 +87,7 @@ class Command(BaseCommand):
             try:
                 points = _representative_points(work.geometry)
             except Exception as err:
-                self.stderr.write(
-                    f"work {work.id}: representative points failed ({err}); skipping"
-                )
+                self.stderr.write(f"work {work.id}: representative points failed ({err}); skipping")
                 continue
 
             # Walk points by hand so we can sleep between Nominatim hits but
@@ -111,20 +107,21 @@ class Command(BaseCommand):
                     time.sleep(sleep)
                 if info and info.get("address"):
                     addresses.append(info["address"])
-                    matches.append({
-                        "lat": lat,
-                        "lon": lon,
-                        "osm_type": info.get("osm_type"),
-                        "osm_id": info.get("osm_id"),
-                        "place_id": info.get("place_id"),
-                        "osm_url": info.get("osm_url"),
-                        "display_name": info.get("display_name"),
-                    })
+                    matches.append(
+                        {
+                            "lat": lat,
+                            "lon": lon,
+                            "osm_type": info.get("osm_type"),
+                            "osm_id": info.get("osm_id"),
+                            "place_id": info.get("place_id"),
+                            "osm_url": info.get("osm_url"),
+                            "display_name": info.get("display_name"),
+                        }
+                    )
 
             placename, country_code = _common_address(addresses)
             self.stdout.write(
-                f"work {work.id}: {len(points)} point(s), {len(addresses)} geocoded "
-                f"→ {placename!r} / {country_code!r}"
+                f"work {work.id}: {len(points)} point(s), {len(addresses)} geocoded → {placename!r} / {country_code!r}"
             )
             if not addresses:
                 # All Nominatim calls failed — leave the work alone.
@@ -159,7 +156,8 @@ class Command(BaseCommand):
                 )
                 updated += 1
 
-        self.stdout.write(self.style.SUCCESS(
-            f"Processed {total} work(s); {updated} updated"
-            + (" (dry-run, no writes)" if dry_run else "")
-        ))
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Processed {total} work(s); {updated} updated" + (" (dry-run, no writes)" if dry_run else "")
+            )
+        )

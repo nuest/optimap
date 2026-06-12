@@ -16,14 +16,14 @@ from pathlib import Path
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "optimap.settings")
 import django
+
 django.setup()
 
 from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from works.models import Work, GlobalRegion
-
+from works.models import GlobalRegion, Work
 
 NSPS = {"atom": "http://www.w3.org/2005/Atom"}
 
@@ -39,25 +39,25 @@ FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures" / "global_regions"
 # (or by hand) whenever the fixture geometries or test_data_global_feeds change.
 EXPECTED_COUNTS = {
     # Continents
-    'africa': 12,
-    'antarctica': 1,
-    'asia': 22,
-    'australia': 7,
-    'europe': 18,
-    'north-america': 12,
-    'oceania': 2,
-    'south-america': 8,
+    "africa": 12,
+    "antarctica": 1,
+    "asia": 22,
+    "australia": 7,
+    "europe": 18,
+    "north-america": 12,
+    "oceania": 2,
+    "south-america": 8,
     # Oceans
-    'arctic-ocean': 9,
-    'baltic-sea': 5,
-    'indian-ocean': 18,
-    'mediterranean-region': 13,
-    'north-atlantic-ocean': 20,
-    'north-pacific-ocean': 18,
-    'south-atlantic-ocean': 13,
-    'south-china-and-easter-archipelagic-seas': 10,
-    'south-pacific-ocean': 9,
-    'southern-ocean': 6,
+    "arctic-ocean": 9,
+    "baltic-sea": 5,
+    "indian-ocean": 18,
+    "mediterranean-region": 13,
+    "north-atlantic-ocean": 20,
+    "north-pacific-ocean": 18,
+    "south-atlantic-ocean": 13,
+    "south-china-and-easter-archipelagic-seas": 10,
+    "south-pacific-ocean": 9,
+    "southern-ocean": 6,
 }
 
 
@@ -111,33 +111,27 @@ class GlobalFeedsAndLandingPageTests(TestCase):
         for region in GlobalRegion.objects.all():
             slug = self.slugify(region.name)
             # Use new API v1 endpoint based on region type
-            if region.region_type == 'continent':
+            if region.region_type == "continent":
                 url = reverse("optimap:api-continent-georss", kwargs={"continent_slug": slug})
             else:  # ocean
                 url = reverse("optimap:api-ocean-georss", kwargs={"ocean_slug": slug})
 
             resp = self.client.get(url)
-            self.assertEqual(resp.status_code, 200,
-                             f"{region.name} GeoRSS feed failed")
+            self.assertEqual(resp.status_code, 200, f"{region.name} GeoRSS feed failed")
 
             root = ET.fromstring(resp.content)
-            titles = [item.find("title").text
-                      for item in root.findall(".//item")]
+            titles = [item.find("title").text for item in root.findall(".//item")]
 
             expected_titles = list(
-                Work.objects
-                .filter(
-                    status="p",
-                    geometry__isnull=False,
-                    geometry__intersects=region.geom
-                )
+                Work.objects.filter(status="p", geometry__isnull=False, geometry__intersects=region.geom)
                 .order_by("-creationDate")
                 .values_list("title", flat=True)
             )
 
             self.assertCountEqual(
-                titles, expected_titles,
-                f"GeoRSS feed for {region.name} returned {titles!r}, expected {expected_titles!r}"
+                titles,
+                expected_titles,
+                f"GeoRSS feed for {region.name} returned {titles!r}, expected {expected_titles!r}",
             )
 
     def test_geoatom_feed_australia(self):
@@ -147,11 +141,16 @@ class GlobalFeedsAndLandingPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
 
         root = ET.fromstring(response.content)
-        titles = [entry.find("atom:title", namespaces=NSPS).text
-                    for entry in root.findall(".//atom:entry", namespaces=NSPS)]
+        titles = [
+            entry.find("atom:title", namespaces=NSPS).text for entry in root.findall(".//atom:entry", namespaces=NSPS)
+        ]
 
         self.assertEqual(len(titles), 7, "Atom feed for Australia should return 7 entries")
-        self.assertEqual(titles[0], "Marine Biology and Oceanography of the South China and Easter Archipelagic Seas", "Atom feed for Australia returned unexpected title")
+        self.assertEqual(
+            titles[0],
+            "Marine Biology and Oceanography of the South China and Easter Archipelagic Seas",
+            "Atom feed for Australia returned unexpected title",
+        )
 
     def test_georss_feed_south_atlantic(self):
         # Use new API v1 GeoRSS endpoint
@@ -160,13 +159,17 @@ class GlobalFeedsAndLandingPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
 
         root = ET.fromstring(response.content)
-        titles = [item.find("title").text
-                    for item in root.findall(".//item", namespaces=NSPS)]
+        titles = [item.find("title").text for item in root.findall(".//item", namespaces=NSPS)]
 
         self.assertEqual(len(titles), 13, "GeoRSS feed for South Atlantic Ocean should return 13 entries")
-        self.assertEqual(titles[0], "Pan-Pacific Study", "GeoRSS feed for South Atlantic Ocean returned unexpected first title")
-        self.assertEqual(titles[-1], "Seismic Survey: Mid-Atlantic Ridge", "GeoRSS feed for South Atlantic Ocean returned unexpected last title")
-
+        self.assertEqual(
+            titles[0], "Pan-Pacific Study", "GeoRSS feed for South Atlantic Ocean returned unexpected first title"
+        )
+        self.assertEqual(
+            titles[-1],
+            "Seismic Survey: Mid-Atlantic Ridge",
+            "GeoRSS feed for South Atlantic Ocean returned unexpected last title",
+        )
 
     def test_all_continent_pages_display_correct_work_counts(self):
         """Test that all continent feed pages display the correct number of works."""
@@ -177,40 +180,46 @@ class GlobalFeedsAndLandingPageTests(TestCase):
                 slug = self.slugify(region.name)
                 expected_count = EXPECTED_COUNTS.get(slug, 0)
 
-                url = reverse('optimap:feed-continent-page', kwargs={'continent_slug': slug})
+                url = reverse("optimap:feed-continent-page", kwargs={"continent_slug": slug})
                 response = self.client.get(url)
 
                 # Page should load successfully
-                self.assertEqual(response.status_code, 200,
-                                f"Continent page for {region.name} failed to load")
+                self.assertEqual(response.status_code, 200, f"Continent page for {region.name} failed to load")
 
                 # Check context variables
-                self.assertIn('works', response.context)
-                self.assertIn('region', response.context)
-                self.assertEqual(response.context['region'].id, region.id)
+                self.assertIn("works", response.context)
+                self.assertIn("region", response.context)
+                self.assertEqual(response.context["region"].id, region.id)
 
                 # Verify work count matches expected
-                actual_works = response.context['works']
-                self.assertEqual(len(actual_works), expected_count,
-                               f"Continent {region.name} ({slug}): expected {expected_count} works, got {len(actual_works)}")
+                actual_works = response.context["works"]
+                self.assertEqual(
+                    len(actual_works),
+                    expected_count,
+                    f"Continent {region.name} ({slug}): expected {expected_count} works, got {len(actual_works)}",
+                )
 
                 # Verify the count is shown in the HTML (template uses |pluralize)
                 if expected_count > 0:
-                    expected_phrase = f'{expected_count} research work{"" if expected_count == 1 else "s"}'
-                    self.assertContains(response, expected_phrase,
-                                       msg_prefix=f"Work count not displayed for {region.name}")
+                    expected_phrase = f"{expected_count} research work{'' if expected_count == 1 else 's'}"
+                    self.assertContains(
+                        response, expected_phrase, msg_prefix=f"Work count not displayed for {region.name}"
+                    )
 
                     # Verify at least the first work title appears
-                    self.assertContains(response, actual_works[0].title,
-                                       msg_prefix=f"First work title not found for {region.name}")
+                    self.assertContains(
+                        response, actual_works[0].title, msg_prefix=f"First work title not found for {region.name}"
+                    )
 
                     # Should NOT show empty message
-                    self.assertNotContains(response, 'No works found',
-                                         msg_prefix=f"{region.name} should not show empty message")
+                    self.assertNotContains(
+                        response, "No works found", msg_prefix=f"{region.name} should not show empty message"
+                    )
                 else:
                     # Should show empty message
-                    self.assertContains(response, 'No works found',
-                                       msg_prefix=f"{region.name} should show empty message")
+                    self.assertContains(
+                        response, "No works found", msg_prefix=f"{region.name} should show empty message"
+                    )
 
     def test_all_ocean_pages_display_correct_work_counts(self):
         """Test that all ocean feed pages display the correct number of works."""
@@ -221,46 +230,52 @@ class GlobalFeedsAndLandingPageTests(TestCase):
                 slug = self.slugify(region.name)
                 expected_count = EXPECTED_COUNTS.get(slug, 0)
 
-                url = reverse('optimap:feed-ocean-page', kwargs={'ocean_slug': slug})
+                url = reverse("optimap:feed-ocean-page", kwargs={"ocean_slug": slug})
                 response = self.client.get(url)
 
                 # Page should load successfully
-                self.assertEqual(response.status_code, 200,
-                                f"Ocean page for {region.name} failed to load")
+                self.assertEqual(response.status_code, 200, f"Ocean page for {region.name} failed to load")
 
                 # Check context variables
-                self.assertIn('works', response.context)
-                self.assertIn('region', response.context)
-                self.assertEqual(response.context['region'].id, region.id)
+                self.assertIn("works", response.context)
+                self.assertIn("region", response.context)
+                self.assertEqual(response.context["region"].id, region.id)
 
                 # Verify work count matches expected
-                actual_works = response.context['works']
-                self.assertEqual(len(actual_works), expected_count,
-                               f"Ocean {region.name} ({slug}): expected {expected_count} works, got {len(actual_works)}")
+                actual_works = response.context["works"]
+                self.assertEqual(
+                    len(actual_works),
+                    expected_count,
+                    f"Ocean {region.name} ({slug}): expected {expected_count} works, got {len(actual_works)}",
+                )
 
                 # Verify the count is shown in the HTML (template uses |pluralize)
                 if expected_count > 0:
-                    expected_phrase = f'{expected_count} research work{"" if expected_count == 1 else "s"}'
-                    self.assertContains(response, expected_phrase,
-                                       msg_prefix=f"Work count not displayed for {region.name}")
+                    expected_phrase = f"{expected_count} research work{'' if expected_count == 1 else 's'}"
+                    self.assertContains(
+                        response, expected_phrase, msg_prefix=f"Work count not displayed for {region.name}"
+                    )
 
                     # Verify at least the first work title appears
-                    self.assertContains(response, actual_works[0].title,
-                                       msg_prefix=f"First work title not found for {region.name}")
+                    self.assertContains(
+                        response, actual_works[0].title, msg_prefix=f"First work title not found for {region.name}"
+                    )
 
                     # Should NOT show empty message
-                    self.assertNotContains(response, 'No works found',
-                                         msg_prefix=f"{region.name} should not show empty message")
+                    self.assertNotContains(
+                        response, "No works found", msg_prefix=f"{region.name} should not show empty message"
+                    )
                 else:
                     # Should show empty message
-                    self.assertContains(response, 'No works found',
-                                       msg_prefix=f"{region.name} should show empty message")
+                    self.assertContains(
+                        response, "No works found", msg_prefix=f"{region.name} should show empty message"
+                    )
 
     def test_continent_page_shows_region_metadata(self):
         """Test that continent pages show correct region metadata."""
         region = GlobalRegion.objects.filter(region_type=GlobalRegion.CONTINENT).first()
         slug = self.slugify(region.name)
-        url = reverse('optimap:feed-continent-page', kwargs={'continent_slug': slug})
+        url = reverse("optimap:feed-continent-page", kwargs={"continent_slug": slug})
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
@@ -269,18 +284,18 @@ class GlobalFeedsAndLandingPageTests(TestCase):
         self.assertContains(response, region.name)
 
         # Check region type appears
-        self.assertContains(response, 'Continent')
+        self.assertContains(response, "Continent")
 
         # Check feed URLs are present
-        self.assertIn('feed_urls', response.context)
-        self.assertIn('georss', response.context['feed_urls'])
-        self.assertIn('atom', response.context['feed_urls'])
+        self.assertIn("feed_urls", response.context)
+        self.assertIn("georss", response.context["feed_urls"])
+        self.assertIn("atom", response.context["feed_urls"])
 
     def test_ocean_page_shows_region_metadata(self):
         """Test that ocean pages show correct region metadata."""
         region = GlobalRegion.objects.filter(region_type=GlobalRegion.OCEAN).first()
         slug = self.slugify(region.name)
-        url = reverse('optimap:feed-ocean-page', kwargs={'ocean_slug': slug})
+        url = reverse("optimap:feed-ocean-page", kwargs={"ocean_slug": slug})
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
@@ -289,18 +304,18 @@ class GlobalFeedsAndLandingPageTests(TestCase):
         self.assertContains(response, region.name)
 
         # Check region type appears
-        self.assertContains(response, 'Ocean')
+        self.assertContains(response, "Ocean")
 
         # Check feed URLs are present
-        self.assertIn('feed_urls', response.context)
-        self.assertIn('georss', response.context['feed_urls'])
-        self.assertIn('atom', response.context['feed_urls'])
+        self.assertIn("feed_urls", response.context)
+        self.assertIn("georss", response.context["feed_urls"])
+        self.assertIn("atom", response.context["feed_urls"])
 
     def test_feed_page_cache_refresh(self):
         """Test that ?now parameter forces cache refresh."""
         region = GlobalRegion.objects.filter(region_type=GlobalRegion.CONTINENT).first()
         slug = self.slugify(region.name)
-        url = reverse('optimap:feed-continent-page', kwargs={'continent_slug': slug})
+        url = reverse("optimap:feed-continent-page", kwargs={"continent_slug": slug})
 
         # First request (no cache)
         response1 = self.client.get(url)
@@ -311,17 +326,17 @@ class GlobalFeedsAndLandingPageTests(TestCase):
         self.assertEqual(response2.status_code, 200)
 
         # Third request with ?now (forces refresh)
-        response3 = self.client.get(url + '?now')
+        response3 = self.client.get(url + "?now")
         self.assertEqual(response3.status_code, 200)
 
     def test_invalid_continent_returns_404(self):
         """Test that invalid continent slug returns 404."""
-        url = reverse('optimap:feed-continent-page', kwargs={'continent_slug': 'invalid-continent'})
+        url = reverse("optimap:feed-continent-page", kwargs={"continent_slug": "invalid-continent"})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 404)
 
     def test_invalid_ocean_returns_404(self):
         """Test that invalid ocean slug returns 404."""
-        url = reverse('optimap:feed-ocean-page', kwargs={'ocean_slug': 'invalid-ocean'})
+        url = reverse("optimap:feed-ocean-page", kwargs={"ocean_slug": "invalid-ocean"})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 404)

@@ -21,11 +21,12 @@ from django.utils import timezone
 from works.bok import client as bok_client
 from works.models import Collection, Source, Work
 
-
 User = get_user_model()
 FIXTURE_PATH = os.path.join(
     os.path.dirname(os.path.dirname(__file__)),
-    "tests", "fixtures", "bok_sample.json",
+    "tests",
+    "fixtures",
+    "bok_sample.json",
 )
 
 
@@ -44,15 +45,15 @@ class BokLandingPageTests(TestCase):
     def setUp(self):
         _seed_cache()
         self.client = Client()
-        self.user = User.objects.create_user(
-            username="ui@example.com", email="ui@example.com", password="x"
-        )
+        self.user = User.objects.create_user(username="ui@example.com", email="ui@example.com", password="x")
         self.source = Source.objects.create(name="Src", url_field="https://e.example/oai")
         # Opt-in semantic: editor only shows when work is in an enabled
         # collection. Put the test work in one matching the class-level
         # override.
         self.collection = Collection.objects.create(
-            identifier="ui-test", name="UI Test", is_published=True,
+            identifier="ui-test",
+            name="UI Test",
+            is_published=True,
         )
         self.work = Work.objects.create(
             title="A harvested work",
@@ -137,6 +138,6 @@ class BokLandingPageTests(TestCase):
         self.client.login(username="ui@example.com", password="x")
         resp = self.client.get(f"/work/{self.work.id}/")
         body = resp.content.decode()
-        self.assertIn('Missing information', body)
+        self.assertIn("Missing information", body)
         self.assertIn('href="#bok-edit-card"', body)
-        self.assertIn('topics (EO4GEO BoK)', body)
+        self.assertIn("topics (EO4GEO BoK)", body)

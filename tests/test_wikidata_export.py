@@ -12,25 +12,24 @@ These tests mock the Wikibase API to verify:
 5. Work landing page display of Wikibase links
 """
 
-from django.test import TestCase, Client, override_settings
-from django.contrib.gis.geos import Point, GeometryCollection
-from django.utils.timezone import now
 from datetime import date
-from unittest.mock import patch, Mock
-import json
+from unittest.mock import Mock, patch
 
-from works.models import Work, Source, WikidataExportLog, CustomUser
+from django.contrib.gis.geos import GeometryCollection, Point
+from django.test import Client, TestCase, override_settings
+
 from works import wikidata
+from works.models import CustomUser, Source, WikidataExportLog, Work
 
 
 @override_settings(
-    WIKIBASE_API_URL='https://test.wikibase.example/w/api.php',
-    WIKIBASE_CONSUMER_TOKEN='test_consumer_token',
-    WIKIBASE_CONSUMER_SECRET='test_consumer_secret',
-    WIKIBASE_ACCESS_TOKEN='test_access_token',
-    WIKIBASE_ACCESS_SECRET='test_access_secret',
-    WIKIBASE_USER_AGENT='OPTIMAP-Test/1.0',
-    WIKIBASE_CREATE_PROPERTIES_IF_MISSING=True
+    WIKIBASE_API_URL="https://test.wikibase.example/w/api.php",
+    WIKIBASE_CONSUMER_TOKEN="test_consumer_token",
+    WIKIBASE_CONSUMER_SECRET="test_consumer_secret",
+    WIKIBASE_ACCESS_TOKEN="test_access_token",
+    WIKIBASE_ACCESS_SECRET="test_access_secret",
+    WIKIBASE_USER_AGENT="OPTIMAP-Test/1.0",
+    WIKIBASE_CREATE_PROPERTIES_IF_MISSING=True,
 )
 class WikidataExportTest(TestCase):
     """Test Wikidata/Wikibase export functionality with mocked API."""
@@ -41,9 +40,7 @@ class WikidataExportTest(TestCase):
 
         # Create test user
         self.user = CustomUser.objects.create_user(
-            username='testuser',
-            email='test@example.com',
-            password='testpass123'
+            username="testuser", email="test@example.com", password="testpass123"
         )
 
         # Create test source
@@ -51,7 +48,7 @@ class WikidataExportTest(TestCase):
             name="Test Journal",
             url_field="https://example.com/oai",
             homepage_url="https://example.com/journal",
-            issn_l="1234-5678"
+            issn_l="1234-5678",
         )
 
         # Create comprehensive test publication
@@ -68,7 +65,7 @@ class WikidataExportTest(TestCase):
             authors=["John Doe", "Jane Smith"],
             keywords=["climate", "sustainability"],
             openalex_id="https://openalex.org/W1234567890",
-            openalex_ids={"pmid": "12345678", "pmcid": "PMC9876543"}
+            openalex_ids={"pmid": "12345678", "pmcid": "PMC9876543"},
         )
 
         # Reset module-level caches between tests
@@ -90,29 +87,53 @@ class WikidataExportTest(TestCase):
     def _mock_wikidata_api_response(self, property_id):
         """Generate mock response for Wikidata property metadata fetch."""
         property_metadata = {
-            'P31': {'label': 'instance of', 'description': 'type to which this subject belongs', 'datatype': 'wikibase-item'},
-            'P1476': {'label': 'title', 'description': 'published name of a work', 'datatype': 'monolingualtext'},
-            'P577': {'label': 'publication date', 'description': 'date when this work was published', 'datatype': 'time'},
-            'P356': {'label': 'DOI', 'description': 'digital object identifier', 'datatype': 'external-id'},
-            'P856': {'label': 'official website', 'description': 'URL of the official website', 'datatype': 'url'},
-            'P1810': {'label': 'subject named as', 'description': 'name by which a subject is recorded', 'datatype': 'string'},
-            'P2093': {'label': 'author name string', 'description': 'name of an author as a string', 'datatype': 'string'},
-            'P625': {'label': 'coordinate location', 'description': 'geocoordinates of the location', 'datatype': 'globe-coordinate'},
-            'P921': {'label': 'main subject', 'description': 'primary topic of a work', 'datatype': 'string'},
-            'P1628': {'label': 'equivalent property', 'description': 'URL of property in another ontology', 'datatype': 'url'},
-            'P10283': {'label': 'OpenAlex ID', 'description': 'identifier in OpenAlex', 'datatype': 'external-id'},
-            'P698': {'label': 'PubMed ID', 'description': 'identifier in PubMed', 'datatype': 'external-id'},
-            'P932': {'label': 'PMC ID', 'description': 'identifier in PubMed Central', 'datatype': 'external-id'},
+            "P31": {
+                "label": "instance of",
+                "description": "type to which this subject belongs",
+                "datatype": "wikibase-item",
+            },
+            "P1476": {"label": "title", "description": "published name of a work", "datatype": "monolingualtext"},
+            "P577": {
+                "label": "publication date",
+                "description": "date when this work was published",
+                "datatype": "time",
+            },
+            "P356": {"label": "DOI", "description": "digital object identifier", "datatype": "external-id"},
+            "P856": {"label": "official website", "description": "URL of the official website", "datatype": "url"},
+            "P1810": {
+                "label": "subject named as",
+                "description": "name by which a subject is recorded",
+                "datatype": "string",
+            },
+            "P2093": {
+                "label": "author name string",
+                "description": "name of an author as a string",
+                "datatype": "string",
+            },
+            "P625": {
+                "label": "coordinate location",
+                "description": "geocoordinates of the location",
+                "datatype": "globe-coordinate",
+            },
+            "P921": {"label": "main subject", "description": "primary topic of a work", "datatype": "string"},
+            "P1628": {
+                "label": "equivalent property",
+                "description": "URL of property in another ontology",
+                "datatype": "url",
+            },
+            "P10283": {"label": "OpenAlex ID", "description": "identifier in OpenAlex", "datatype": "external-id"},
+            "P698": {"label": "PubMed ID", "description": "identifier in PubMed", "datatype": "external-id"},
+            "P932": {"label": "PMC ID", "description": "identifier in PubMed Central", "datatype": "external-id"},
         }
 
-        meta = property_metadata.get(property_id, {'label': property_id, 'description': '', 'datatype': 'string'})
+        meta = property_metadata.get(property_id, {"label": property_id, "description": "", "datatype": "string"})
 
         return {
-            'entities': {
+            "entities": {
                 property_id: {
-                    'labels': {'en': {'value': meta['label']}},
-                    'descriptions': {'en': {'value': meta['description']}},
-                    'datatype': meta['datatype']
+                    "labels": {"en": {"value": meta["label"]}},
+                    "descriptions": {"en": {"value": meta["description"]}},
+                    "datatype": meta["datatype"],
                 }
             }
         }
@@ -120,104 +141,68 @@ class WikidataExportTest(TestCase):
     def _mock_property_search_response(self, label, exists=False, property_id=None):
         """Generate mock response for property search."""
         if exists and property_id:
-            return {
-                'search': [{
-                    'id': property_id,
-                    'label': label,
-                    'description': 'Test property'
-                }]
-            }
-        return {'search': []}
+            return {"search": [{"id": property_id, "label": label, "description": "Test property"}]}
+        return {"search": []}
 
     def _mock_csrf_token_response(self):
         """Generate mock CSRF token response."""
-        return {
-            'query': {
-                'tokens': {
-                    'csrftoken': 'test_csrf_token_12345'
-                }
-            }
-        }
+        return {"query": {"tokens": {"csrftoken": "test_csrf_token_12345"}}}
 
     def _mock_property_creation_response(self, property_id):
         """Generate mock response for property creation."""
-        return {
-            'success': 1,
-            'entity': {
-                'id': property_id,
-                'labels': {'en': {'value': 'test'}},
-                'type': 'property'
-            }
-        }
+        return {"success": 1, "entity": {"id": property_id, "labels": {"en": {"value": "test"}}, "type": "property"}}
 
-    def _mock_item_creation_response(self, qid='Q123'):
+    def _mock_item_creation_response(self, qid="Q123"):
         """Generate mock response for item creation."""
-        return {
-            'success': 1,
-            'entity': {
-                'id': qid,
-                'labels': {'en': {'value': 'Test Publication'}},
-                'type': 'item'
-            }
-        }
+        return {"success": 1, "entity": {"id": qid, "labels": {"en": {"value": "Test Publication"}}, "type": "item"}}
 
-    @patch('works.wikidata.requests.get')
+    @patch("works.wikidata.requests.get")
     def test_property_mapping_build(self, mock_requests_get):
         """Test that property ID mapping is built correctly."""
+
         # Mock requests.get to return different responses based on params
         def requests_get_side_effect(*args, **kwargs):
-            params = kwargs.get('params', {})
-            action = params.get('action')
+            params = kwargs.get("params", {})
+            action = params.get("action")
 
-            if action == 'wbsearchentities':
-                search_term = params.get('search', '')
-                if search_term == 'equivalent property':
-                    return Mock(json=lambda: {
-                        'search': [{
-                            'id': 'P63',
-                            'label': 'equivalent property'
-                        }]
-                    })
-                elif search_term == '':
+            if action == "wbsearchentities":
+                search_term = params.get("search", "")
+                if search_term == "equivalent property":
+                    return Mock(json=lambda: {"search": [{"id": "P63", "label": "equivalent property"}]})
+                elif search_term == "":
                     # Return list of all properties
-                    return Mock(json=lambda: {
-                        'search': [
-                            {'id': 'P1', 'label': 'instance of'},
-                            {'id': 'P2', 'label': 'title'},
-                            {'id': 'P3', 'label': 'publication date'},
-                            {'id': 'P63', 'label': 'equivalent property'}
-                        ]
-                    })
+                    return Mock(
+                        json=lambda: {
+                            "search": [
+                                {"id": "P1", "label": "instance of"},
+                                {"id": "P2", "label": "title"},
+                                {"id": "P3", "label": "publication date"},
+                                {"id": "P63", "label": "equivalent property"},
+                            ]
+                        }
+                    )
 
-            elif action == 'wbgetentities':
-                ids = params.get('ids', '').split('|')
+            elif action == "wbgetentities":
+                ids = params.get("ids", "").split("|")
                 entities = {}
                 # Map properties with equivalent property claims
                 mappings = {
-                    'P1': 'https://www.wikidata.org/entity/P31',
-                    'P2': 'https://www.wikidata.org/entity/P1476',
-                    'P3': 'https://www.wikidata.org/entity/P577'
+                    "P1": "https://www.wikidata.org/entity/P31",
+                    "P2": "https://www.wikidata.org/entity/P1476",
+                    "P3": "https://www.wikidata.org/entity/P577",
                 }
 
                 for prop_id in ids:
-                    entity = {
-                        'labels': {'en': {'value': f'Label {prop_id}'}},
-                        'claims': {}
-                    }
+                    entity = {"labels": {"en": {"value": f"Label {prop_id}"}}, "claims": {}}
 
                     if prop_id in mappings:
-                        entity['claims']['P63'] = [{
-                            'mainsnak': {
-                                'datavalue': {
-                                    'type': 'string',
-                                    'value': mappings[prop_id]
-                                }
-                            }
-                        }]
+                        entity["claims"]["P63"] = [
+                            {"mainsnak": {"datavalue": {"type": "string", "value": mappings[prop_id]}}}
+                        ]
 
                     entities[prop_id] = entity
 
-                return Mock(json=lambda: {'entities': entities})
+                return Mock(json=lambda: {"entities": entities})
 
             return Mock(json=lambda: {})
 
@@ -227,43 +212,39 @@ class WikidataExportTest(TestCase):
         mapping = wikidata.build_property_id_mapping()
 
         # Verify mappings
-        self.assertIn('P1628', mapping)  # equivalent property itself
-        self.assertEqual(mapping['P1628'], 'P63')
-        self.assertIn('P31', mapping)  # instance of
-        self.assertEqual(mapping['P31'], 'P1')
-        self.assertIn('P1476', mapping)  # title
-        self.assertEqual(mapping['P1476'], 'P2')
-        self.assertIn('P577', mapping)  # publication date
-        self.assertEqual(mapping['P577'], 'P3')
+        self.assertIn("P1628", mapping)  # equivalent property itself
+        self.assertEqual(mapping["P1628"], "P63")
+        self.assertIn("P31", mapping)  # instance of
+        self.assertEqual(mapping["P31"], "P1")
+        self.assertIn("P1476", mapping)  # title
+        self.assertEqual(mapping["P1476"], "P2")
+        self.assertIn("P577", mapping)  # publication date
+        self.assertEqual(mapping["P577"], "P3")
 
-    @patch('works.wikidata.requests.get')
+    @patch("works.wikidata.requests.get")
     def test_fetch_property_metadata_from_wikidata(self, mock_requests_get):
         """Test fetching property metadata from Wikidata.org."""
         # Mock Wikidata API response
-        mock_requests_get.return_value = Mock(
-            json=lambda: self._mock_wikidata_api_response('P31')
-        )
+        mock_requests_get.return_value = Mock(json=lambda: self._mock_wikidata_api_response("P31"))
 
-        metadata = wikidata.fetch_property_metadata_from_wikidata('P31')
+        metadata = wikidata.fetch_property_metadata_from_wikidata("P31")
 
         self.assertIsNotNone(metadata)
-        self.assertEqual(metadata['label'], 'instance of')
-        self.assertEqual(metadata['datatype'], 'wikibase-item')
-        self.assertIn('type to which', metadata['description'])
+        self.assertEqual(metadata["label"], "instance of")
+        self.assertEqual(metadata["datatype"], "wikibase-item")
+        self.assertIn("type to which", metadata["description"])
 
         # Verify API was called correctly
         mock_requests_get.assert_called_once()
         call_args = mock_requests_get.call_args
-        self.assertIn('wikidata.org', call_args[0][0])
+        self.assertIn("wikidata.org", call_args[0][0])
 
-    @patch('requests_oauthlib.OAuth1Session')
-    @patch('works.wikidata.requests.get')
+    @patch("requests_oauthlib.OAuth1Session")
+    @patch("works.wikidata.requests.get")
     def test_create_property_checks_duplicates(self, mock_requests_get, mock_oauth_session):
         """Test that property creation checks for duplicates first."""
         # Mock Wikidata metadata fetch
-        mock_requests_get.return_value = Mock(
-            json=lambda: self._mock_wikidata_api_response('P31')
-        )
+        mock_requests_get.return_value = Mock(json=lambda: self._mock_wikidata_api_response("P31"))
 
         # Mock OAuth session
         mock_oauth_instance = Mock()
@@ -271,33 +252,26 @@ class WikidataExportTest(TestCase):
 
         # Mock duplicate check - property with same label exists
         mock_oauth_instance.get.return_value = Mock(
-            json=lambda: {
-                'search': [{
-                    'id': 'P1',
-                    'label': 'instance of',
-                    'description': 'existing property'
-                }]
-            }
+            json=lambda: {"search": [{"id": "P1", "label": "instance of", "description": "existing property"}]}
         )
 
         # Attempt to create property
-        result = wikidata.create_property_in_wikibase('P31')
+        result = wikidata.create_property_in_wikibase("P31")
 
         # Should return existing property ID without creating new one
-        self.assertEqual(result, 'P1')
+        self.assertEqual(result, "P1")
 
         # Verify no POST was called (no creation attempt)
         mock_oauth_instance.post.assert_not_called()
 
-    @patch('works.wikidata.WikibaseIntegrator')
-    @patch('works.wikidata.get_wikibase_login')
-    @patch('works.wikidata.build_property_id_mapping')
-    @patch('works.wikidata.check_property_exists')
-    @patch('works.wikidata.check_item_exists')
-    @patch('works.wikidata.find_local_item_by_doi')
+    @patch("works.wikidata.WikibaseIntegrator")
+    @patch("works.wikidata.get_wikibase_login")
+    @patch("works.wikidata.build_property_id_mapping")
+    @patch("works.wikidata.check_property_exists")
+    @patch("works.wikidata.check_item_exists")
+    @patch("works.wikidata.find_local_item_by_doi")
     def test_work_export_creates_correct_statements(
-        self, mock_find_doi, mock_check_item, mock_check_prop,
-        mock_build_mapping, mock_get_login, mock_wbi
+        self, mock_find_doi, mock_check_item, mock_check_prop, mock_build_mapping, mock_get_login, mock_wbi
     ):
         """Test that work export creates statements with correct field values."""
         # Setup mocks
@@ -307,23 +281,23 @@ class WikidataExportTest(TestCase):
 
         # Mock property mapping
         mock_build_mapping.return_value = {
-            'P31': 'P1',  # instance of
-            'P1476': 'P2',  # title
-            'P577': 'P3',  # publication date
-            'P356': 'P4',  # DOI
-            'P856': 'P5',  # URL
-            'P1810': 'P6',  # abstract
-            'P2093': 'P7',  # author name string
-            'P625': 'P8',  # coordinate location
-            'P921': 'P9',  # main subject
-            'P10283': 'P10',  # OpenAlex ID
-            'P698': 'P11',  # PubMed ID
-            'P932': 'P12',  # PMC ID
+            "P31": "P1",  # instance of
+            "P1476": "P2",  # title
+            "P577": "P3",  # publication date
+            "P356": "P4",  # DOI
+            "P856": "P5",  # URL
+            "P1810": "P6",  # abstract
+            "P2093": "P7",  # author name string
+            "P625": "P8",  # coordinate location
+            "P921": "P9",  # main subject
+            "P10283": "P10",  # OpenAlex ID
+            "P698": "P11",  # PubMed ID
+            "P932": "P12",  # PMC ID
         }
 
         # Mock WBI
         mock_item = Mock()
-        mock_item.write.return_value = Mock(id='Q123')
+        mock_item.write.return_value = Mock(id="Q123")
         mock_wbi_instance = Mock()
         mock_wbi_instance.item.new.return_value = mock_item
         mock_wbi.return_value = mock_wbi_instance
@@ -333,8 +307,8 @@ class WikidataExportTest(TestCase):
         stats = wikidata.export_works_to_wikidata([self.work])
 
         # Verify item was created
-        self.assertEqual(stats['created'], 1)
-        self.assertEqual(stats['errors'], 0)
+        self.assertEqual(stats["created"], 1)
+        self.assertEqual(stats["errors"], 0)
 
         # Verify item.write was called
         mock_item.write.assert_called_once()
@@ -350,30 +324,29 @@ class WikidataExportTest(TestCase):
             statement_data[prop_nr] = stmt
 
         # Check title
-        self.assertIn('P2', statement_data)
+        self.assertIn("P2", statement_data)
         # Check publication date
-        self.assertIn('P3', statement_data)
+        self.assertIn("P3", statement_data)
         # Check DOI
-        self.assertIn('P4', statement_data)
+        self.assertIn("P4", statement_data)
 
         # Verify export log was created
         log_entry = WikidataExportLog.objects.filter(work=self.work).first()
         self.assertIsNotNone(log_entry)
-        self.assertEqual(log_entry.action, 'created')
-        self.assertEqual(log_entry.wikidata_qid, 'Q123')
-        self.assertIn('title', log_entry.exported_fields)
-        self.assertIn('doi', log_entry.exported_fields)
-        self.assertIn('publication_date', log_entry.exported_fields)
+        self.assertEqual(log_entry.action, "created")
+        self.assertEqual(log_entry.wikidata_qid, "Q123")
+        self.assertIn("title", log_entry.exported_fields)
+        self.assertIn("doi", log_entry.exported_fields)
+        self.assertIn("publication_date", log_entry.exported_fields)
 
-    @patch('works.wikidata.WikibaseIntegrator')
-    @patch('works.wikidata.get_wikibase_login')
-    @patch('works.wikidata.build_property_id_mapping')
-    @patch('works.wikidata.check_property_exists')
-    @patch('works.wikidata.check_item_exists')
-    @patch('works.wikidata.find_local_item_by_doi')
+    @patch("works.wikidata.WikibaseIntegrator")
+    @patch("works.wikidata.get_wikibase_login")
+    @patch("works.wikidata.build_property_id_mapping")
+    @patch("works.wikidata.check_property_exists")
+    @patch("works.wikidata.check_item_exists")
+    @patch("works.wikidata.find_local_item_by_doi")
     def test_export_log_and_landing_page(
-        self, mock_find_doi, mock_check_item, mock_check_prop,
-        mock_build_mapping, mock_get_login, mock_wbi
+        self, mock_find_doi, mock_check_item, mock_check_prop, mock_build_mapping, mock_get_login, mock_wbi
     ):
         """Test that export creates log entry and displays correctly on landing page."""
         # Setup mocks
@@ -382,56 +355,57 @@ class WikidataExportTest(TestCase):
         mock_find_doi.return_value = None
 
         mock_build_mapping.return_value = {
-            'P31': 'P1',
-            'P1476': 'P2',
-            'P577': 'P3',
-            'P356': 'P4',
+            "P31": "P1",
+            "P1476": "P2",
+            "P577": "P3",
+            "P356": "P4",
         }
 
         # Mock WBI to return specific QID
         mock_item = Mock()
-        mock_item.write.return_value = Mock(id='Q456')
+        mock_item.write.return_value = Mock(id="Q456")
         mock_wbi_instance = Mock()
         mock_wbi_instance.item.new.return_value = mock_item
         mock_wbi.return_value = mock_wbi_instance
         mock_get_login.return_value = Mock()
 
         # Perform export
-        stats = wikidata.export_works_to_wikidata([self.work])
+        wikidata.export_works_to_wikidata([self.work])
 
         # Verify export log entry
         log_entry = WikidataExportLog.objects.filter(work=self.work).first()
         self.assertIsNotNone(log_entry)
-        self.assertEqual(log_entry.wikidata_qid, 'Q456')
-        self.assertEqual(log_entry.action, 'created')
+        self.assertEqual(log_entry.wikidata_qid, "Q456")
+        self.assertEqual(log_entry.action, "created")
         # URL is built from module-level constant, so just check QID is present
-        self.assertIn('Q456', log_entry.wikidata_url)
+        self.assertIn("Q456", log_entry.wikidata_url)
         self.assertIsNotNone(log_entry.wikidata_url)
-        self.assertEqual(log_entry.wikibase_endpoint, 'https://test.wikibase.example/w/api.php')
+        self.assertEqual(log_entry.wikibase_endpoint, "https://test.wikibase.example/w/api.php")
 
         # Access work landing page (accessed by DOI)
         response = self.client.get(f"/work/{self.work.doi}/")
         self.assertEqual(response.status_code, 200)
 
         # Verify Wikibase link appears on page (QID at minimum)
-        content = response.content.decode('utf-8')
-        self.assertIn('Q456', content)
+        content = response.content.decode("utf-8")
+        self.assertIn("Q456", content)
 
-    @patch('works.wikidata.WikibaseIntegrator')
-    @patch('works.wikidata.get_wikibase_login')
-    @patch('works.wikidata.build_property_id_mapping')
-    @patch('works.wikidata.check_property_exists')
+    @patch("works.wikidata.WikibaseIntegrator")
+    @patch("works.wikidata.get_wikibase_login")
+    @patch("works.wikidata.build_property_id_mapping")
+    @patch("works.wikidata.check_property_exists")
     def test_export_aborts_when_required_properties_missing(
         self, mock_check_prop, mock_build_mapping, mock_get_login, mock_wbi
     ):
         """Test that export aborts when required properties cannot be created."""
+
         # Setup mocks
         def check_prop_side_effect(prop_id):
             # P31 exists, but P1476 and P577 don't
-            return prop_id == 'P31'
+            return prop_id == "P31"
 
         mock_check_prop.side_effect = check_prop_side_effect
-        mock_build_mapping.return_value = {'P31': 'P1'}
+        mock_build_mapping.return_value = {"P31": "P1"}
         mock_get_login.return_value = Mock()
 
         mock_wbi_instance = Mock()
@@ -441,8 +415,8 @@ class WikidataExportTest(TestCase):
         stats = wikidata.export_works_to_wikidata([self.work])
 
         # Verify export failed
-        self.assertEqual(stats['errors'], 1)
-        self.assertEqual(stats['created'], 0)
+        self.assertEqual(stats["errors"], 1)
+        self.assertEqual(stats["created"], 0)
 
         # Verify no item was created
         mock_wbi_instance.item.new.assert_not_called()
@@ -450,20 +424,19 @@ class WikidataExportTest(TestCase):
         # Verify error log entry
         log_entry = WikidataExportLog.objects.filter(work=self.work).first()
         self.assertIsNotNone(log_entry)
-        self.assertEqual(log_entry.action, 'error')
-        self.assertIn('Required properties missing', log_entry.error_message)
-        self.assertIn('P1476', log_entry.error_message)  # title
-        self.assertIn('P577', log_entry.error_message)  # publication date
+        self.assertEqual(log_entry.action, "error")
+        self.assertIn("Required properties missing", log_entry.error_message)
+        self.assertIn("P1476", log_entry.error_message)  # title
+        self.assertIn("P577", log_entry.error_message)  # publication date
 
-    @patch('works.wikidata.WikibaseIntegrator')
-    @patch('works.wikidata.get_wikibase_login')
-    @patch('works.wikidata.build_property_id_mapping')
-    @patch('works.wikidata.check_property_exists')
-    @patch('works.wikidata.check_item_exists')
-    @patch('works.wikidata.find_local_item_by_doi')
+    @patch("works.wikidata.WikibaseIntegrator")
+    @patch("works.wikidata.get_wikibase_login")
+    @patch("works.wikidata.build_property_id_mapping")
+    @patch("works.wikidata.check_property_exists")
+    @patch("works.wikidata.check_item_exists")
+    @patch("works.wikidata.find_local_item_by_doi")
     def test_dryrun_mode(
-        self, mock_find_doi, mock_check_item, mock_check_prop,
-        mock_build_mapping, mock_get_login, mock_wbi
+        self, mock_find_doi, mock_check_item, mock_check_prop, mock_build_mapping, mock_get_login, mock_wbi
     ):
         """Test that dry-run mode simulates export without writing."""
         # Setup mocks
@@ -472,10 +445,10 @@ class WikidataExportTest(TestCase):
         mock_find_doi.return_value = None
 
         mock_build_mapping.return_value = {
-            'P31': 'P1',
-            'P1476': 'P2',
-            'P577': 'P3',
-            'P356': 'P4',
+            "P31": "P1",
+            "P1476": "P2",
+            "P577": "P3",
+            "P356": "P4",
         }
 
         mock_get_login.return_value = Mock()
@@ -486,8 +459,8 @@ class WikidataExportTest(TestCase):
         stats = wikidata.export_works_to_wikidata_dryrun([self.work])
 
         # Verify stats show what would happen
-        self.assertEqual(stats['created'], 1)
-        self.assertEqual(stats['errors'], 0)
+        self.assertEqual(stats["created"], 1)
+        self.assertEqual(stats["errors"], 0)
 
         # Verify no item was actually created
         mock_wbi_instance.item.new.assert_not_called()
@@ -496,35 +469,34 @@ class WikidataExportTest(TestCase):
         log_count = WikidataExportLog.objects.filter(work=self.work).count()
         self.assertEqual(log_count, 0)
 
-    @patch('works.wikidata.WikibaseIntegrator')
-    @patch('works.wikidata.get_wikibase_login')
-    @patch('works.wikidata.build_property_id_mapping')
-    @patch('works.wikidata.check_property_exists')
-    @patch('works.wikidata.check_item_exists')
-    @patch('works.wikidata.find_local_item_by_doi')
+    @patch("works.wikidata.WikibaseIntegrator")
+    @patch("works.wikidata.get_wikibase_login")
+    @patch("works.wikidata.build_property_id_mapping")
+    @patch("works.wikidata.check_property_exists")
+    @patch("works.wikidata.check_item_exists")
+    @patch("works.wikidata.find_local_item_by_doi")
     def test_export_updates_existing_item(
-        self, mock_find_doi, mock_check_item, mock_check_prop,
-        mock_build_mapping, mock_get_login, mock_wbi
+        self, mock_find_doi, mock_check_item, mock_check_prop, mock_build_mapping, mock_get_login, mock_wbi
     ):
         """Test that export updates existing item when DOI match found."""
         # Setup mocks
         mock_check_prop.return_value = True
         mock_check_item.return_value = True
-        mock_find_doi.return_value = 'Q789'  # Existing item found
+        mock_find_doi.return_value = "Q789"  # Existing item found
 
         mock_build_mapping.return_value = {
-            'P31': 'P1',
-            'P1476': 'P2',
-            'P577': 'P3',
-            'P356': 'P4',
+            "P31": "P1",
+            "P1476": "P2",
+            "P577": "P3",
+            "P356": "P4",
         }
 
         # Mock WBI for update - item has some existing properties
         mock_claims = Mock()
-        mock_claims.keys.return_value = ['P1', 'P2']  # Already has instance_of and title
+        mock_claims.keys.return_value = ["P1", "P2"]  # Already has instance_of and title
         mock_item = Mock()
         mock_item.claims = mock_claims
-        mock_item.write.return_value = Mock(id='Q789')
+        mock_item.write.return_value = Mock(id="Q789")
         mock_wbi_instance = Mock()
         mock_wbi_instance.item.get.return_value = mock_item
         mock_wbi.return_value = mock_wbi_instance
@@ -534,12 +506,12 @@ class WikidataExportTest(TestCase):
         stats = wikidata.export_works_to_wikidata([self.work])
 
         # Verify item was updated, not created
-        self.assertEqual(stats['updated'], 1)
-        self.assertEqual(stats['created'], 0)
-        self.assertEqual(stats['errors'], 0)
+        self.assertEqual(stats["updated"], 1)
+        self.assertEqual(stats["created"], 0)
+        self.assertEqual(stats["errors"], 0)
 
         # Verify get was called with existing QID
-        mock_wbi_instance.item.get.assert_called_once_with(entity_id='Q789')
+        mock_wbi_instance.item.get.assert_called_once_with(entity_id="Q789")
 
         # Verify claims.add was called (only with new properties)
         mock_item.claims.add.assert_called_once()
@@ -547,53 +519,52 @@ class WikidataExportTest(TestCase):
         # Verify write was called with clear=False to avoid label conflicts
         mock_item.write.assert_called_once()
         call_kwargs = mock_item.write.call_args[1]
-        self.assertEqual(call_kwargs.get('clear'), False)
+        self.assertEqual(call_kwargs.get("clear"), False)
 
         # Verify export log shows update
         log_entry = WikidataExportLog.objects.filter(work=self.work).first()
         self.assertIsNotNone(log_entry)
-        self.assertEqual(log_entry.action, 'updated')
-        self.assertEqual(log_entry.wikidata_qid, 'Q789')
+        self.assertEqual(log_entry.action, "updated")
+        self.assertEqual(log_entry.wikidata_qid, "Q789")
         # Log should mention which properties were added
-        self.assertIn('Added', log_entry.export_summary)
+        self.assertIn("Added", log_entry.export_summary)
 
-    @patch('works.wikidata.WikibaseIntegrator')
-    @patch('works.wikidata.get_wikibase_login')
-    @patch('works.wikidata.build_property_id_mapping')
-    @patch('works.wikidata.check_property_exists')
-    @patch('works.wikidata.check_item_exists')
-    @patch('works.wikidata.find_local_item_by_doi')
+    @patch("works.wikidata.WikibaseIntegrator")
+    @patch("works.wikidata.get_wikibase_login")
+    @patch("works.wikidata.build_property_id_mapping")
+    @patch("works.wikidata.check_property_exists")
+    @patch("works.wikidata.check_item_exists")
+    @patch("works.wikidata.find_local_item_by_doi")
     def test_export_skips_existing_properties(
-        self, mock_find_doi, mock_check_item, mock_check_prop,
-        mock_build_mapping, mock_get_login, mock_wbi
+        self, mock_find_doi, mock_check_item, mock_check_prop, mock_build_mapping, mock_get_login, mock_wbi
     ):
         """Test that export only adds missing properties to existing items."""
         # Setup mocks
         mock_check_prop.return_value = True
         mock_check_item.return_value = True
-        mock_find_doi.return_value = 'Q999'  # Existing item found
+        mock_find_doi.return_value = "Q999"  # Existing item found
 
         mock_build_mapping.return_value = {
-            'P31': 'P1',
-            'P1476': 'P2',
-            'P577': 'P3',
-            'P356': 'P4',
-            'P856': 'P5',
-            'P1810': 'P6',
-            'P2093': 'P7',
-            'P625': 'P8',
-            'P921': 'P9',
-            'P10283': 'P10',
-            'P698': 'P11',
-            'P932': 'P12'
+            "P31": "P1",
+            "P1476": "P2",
+            "P577": "P3",
+            "P356": "P4",
+            "P856": "P5",
+            "P1810": "P6",
+            "P2093": "P7",
+            "P625": "P8",
+            "P921": "P9",
+            "P10283": "P10",
+            "P698": "P11",
+            "P932": "P12",
         }
 
         # Mock WBI for update - item already has most properties, only missing P10, P11, P12
         mock_claims = Mock()
-        mock_claims.keys.return_value = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9']
+        mock_claims.keys.return_value = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9"]
         mock_item = Mock()
         mock_item.claims = mock_claims
-        mock_item.write.return_value = Mock(id='Q999')
+        mock_item.write.return_value = Mock(id="Q999")
         mock_wbi_instance = Mock()
         mock_wbi_instance.item.get.return_value = mock_item
         mock_wbi.return_value = mock_wbi_instance
@@ -603,9 +574,9 @@ class WikidataExportTest(TestCase):
         stats = wikidata.export_works_to_wikidata([self.work])
 
         # Verify item was updated
-        self.assertEqual(stats['updated'], 1)
-        self.assertEqual(stats['created'], 0)
-        self.assertEqual(stats['errors'], 0)
+        self.assertEqual(stats["updated"], 1)
+        self.assertEqual(stats["created"], 0)
+        self.assertEqual(stats["errors"], 0)
 
         # Verify claims.add was called with only the missing properties
         mock_item.claims.add.assert_called_once()
@@ -621,39 +592,38 @@ class WikidataExportTest(TestCase):
         # Verify export log mentions which properties were added and which were skipped
         log_entry = WikidataExportLog.objects.filter(work=self.work).first()
         self.assertIsNotNone(log_entry)
-        self.assertEqual(log_entry.action, 'updated')
-        self.assertIn('Added', log_entry.export_summary)
-        self.assertIn('skipped', log_entry.export_summary)
+        self.assertEqual(log_entry.action, "updated")
+        self.assertIn("Added", log_entry.export_summary)
+        self.assertIn("skipped", log_entry.export_summary)
 
-    @patch('works.wikidata.WikibaseIntegrator')
-    @patch('works.wikidata.get_wikibase_login')
-    @patch('works.wikidata.build_property_id_mapping')
-    @patch('works.wikidata.check_property_exists')
-    @patch('works.wikidata.check_item_exists')
-    @patch('works.wikidata.find_local_item_by_doi')
+    @patch("works.wikidata.WikibaseIntegrator")
+    @patch("works.wikidata.get_wikibase_login")
+    @patch("works.wikidata.build_property_id_mapping")
+    @patch("works.wikidata.check_property_exists")
+    @patch("works.wikidata.check_item_exists")
+    @patch("works.wikidata.find_local_item_by_doi")
     def test_export_no_update_when_all_properties_exist(
-        self, mock_find_doi, mock_check_item, mock_check_prop,
-        mock_build_mapping, mock_get_login, mock_wbi
+        self, mock_find_doi, mock_check_item, mock_check_prop, mock_build_mapping, mock_get_login, mock_wbi
     ):
         """Test that export doesn't write when all properties already exist."""
         # Setup mocks
         mock_check_prop.return_value = True
         mock_check_item.return_value = True
-        mock_find_doi.return_value = 'Q888'  # Existing item found
+        mock_find_doi.return_value = "Q888"  # Existing item found
 
         mock_build_mapping.return_value = {
-            'P31': 'P1',
-            'P1476': 'P2',
-            'P577': 'P3',
-            'P356': 'P4',
-            'P856': 'P5',
-            'P1810': 'P6',
-            'P2093': 'P7',
-            'P625': 'P8',
-            'P921': 'P9',
-            'P10283': 'P10',
-            'P698': 'P11',
-            'P932': 'P12'
+            "P31": "P1",
+            "P1476": "P2",
+            "P577": "P3",
+            "P356": "P4",
+            "P856": "P5",
+            "P1810": "P6",
+            "P2093": "P7",
+            "P625": "P8",
+            "P921": "P9",
+            "P10283": "P10",
+            "P698": "P11",
+            "P932": "P12",
         }
 
         # Mock WBI for update - item already has ALL properties
@@ -661,10 +631,10 @@ class WikidataExportTest(TestCase):
         # (P7/P9 can have multiple values for authors/keywords)
         # The deduplication happens at the property ID level, not statement level
         mock_claims = Mock()
-        mock_claims.keys.return_value = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10', 'P11', 'P12']
+        mock_claims.keys.return_value = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12"]
         mock_item = Mock()
         mock_item.claims = mock_claims
-        mock_item.write.return_value = Mock(id='Q888')
+        mock_item.write.return_value = Mock(id="Q888")
         mock_wbi_instance = Mock()
         mock_wbi_instance.item.get.return_value = mock_item
         mock_wbi.return_value = mock_wbi_instance
@@ -674,9 +644,9 @@ class WikidataExportTest(TestCase):
         stats = wikidata.export_works_to_wikidata([self.work])
 
         # Verify item was still counted as updated
-        self.assertEqual(stats['updated'], 1)
-        self.assertEqual(stats['created'], 0)
-        self.assertEqual(stats['errors'], 0)
+        self.assertEqual(stats["updated"], 1)
+        self.assertEqual(stats["created"], 0)
+        self.assertEqual(stats["errors"], 0)
 
         # The current implementation checks property-level existence, not value-level
         # So if P7 exists with one author, it won't add a second author with P7
@@ -696,37 +666,50 @@ class WikidataExportTest(TestCase):
         # Verify export log exists
         log_entry = WikidataExportLog.objects.filter(work=self.work).first()
         self.assertIsNotNone(log_entry)
-        self.assertEqual(log_entry.action, 'updated')
+        self.assertEqual(log_entry.action, "updated")
 
     def test_build_statements_includes_all_fields(self):
         """Test that build_statements includes all publication fields."""
-        with patch('works.wikidata.check_property_exists', return_value=True), \
-             patch('works.wikidata.check_item_exists', return_value=True), \
-             patch('works.wikidata.build_property_id_mapping', return_value={
-                 'P31': 'P1', 'P1476': 'P2', 'P577': 'P3', 'P356': 'P4',
-                 'P856': 'P5', 'P1810': 'P6', 'P2093': 'P7', 'P625': 'P8',
-                 'P921': 'P9', 'P10283': 'P10', 'P698': 'P11', 'P932': 'P12'
-             }):
-
+        with (
+            patch("works.wikidata.check_property_exists", return_value=True),
+            patch("works.wikidata.check_item_exists", return_value=True),
+            patch(
+                "works.wikidata.build_property_id_mapping",
+                return_value={
+                    "P31": "P1",
+                    "P1476": "P2",
+                    "P577": "P3",
+                    "P356": "P4",
+                    "P856": "P5",
+                    "P1810": "P6",
+                    "P2093": "P7",
+                    "P625": "P8",
+                    "P921": "P9",
+                    "P10283": "P10",
+                    "P698": "P11",
+                    "P932": "P12",
+                },
+            ),
+        ):
             statements, exported_fields = wikidata.build_statements(self.work)
 
             # Verify expected fields were exported
-            self.assertIn('title', exported_fields)
-            self.assertIn('publication_date', exported_fields)
-            self.assertIn('doi', exported_fields)
-            self.assertIn('url', exported_fields)
-            self.assertIn('abstract', exported_fields)
-            self.assertIn('authors', exported_fields)
-            self.assertIn('keywords', exported_fields)
+            self.assertIn("title", exported_fields)
+            self.assertIn("publication_date", exported_fields)
+            self.assertIn("doi", exported_fields)
+            self.assertIn("url", exported_fields)
+            self.assertIn("abstract", exported_fields)
+            self.assertIn("authors", exported_fields)
+            self.assertIn("keywords", exported_fields)
             # Geometry is now exported as multiple fields
-            self.assertIn('geometry_center', exported_fields)
-            self.assertIn('geometry_north', exported_fields)
-            self.assertIn('geometry_south', exported_fields)
-            self.assertIn('geometry_east', exported_fields)
-            self.assertIn('geometry_west', exported_fields)
-            self.assertIn('openalex_id', exported_fields)
-            self.assertIn('pmid', exported_fields)
-            self.assertIn('pmcid', exported_fields)
+            self.assertIn("geometry_center", exported_fields)
+            self.assertIn("geometry_north", exported_fields)
+            self.assertIn("geometry_south", exported_fields)
+            self.assertIn("geometry_east", exported_fields)
+            self.assertIn("geometry_west", exported_fields)
+            self.assertIn("openalex_id", exported_fields)
+            self.assertIn("pmid", exported_fields)
+            self.assertIn("pmcid", exported_fields)
 
             # Verify correct number of statements
             self.assertGreater(len(statements), 10)

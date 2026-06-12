@@ -67,26 +67,28 @@ class InsertSourcesTest(TestCase):
             )
 
     def test_insert_sources_reconciles_wrong_source_type_on_existing_row(self):
-        cfg = SOURCE_CONFIG['mountain-wetlands']
+        cfg = SOURCE_CONFIG["mountain-wetlands"]
         broken = Source.objects.create(
-            name=cfg['name'], url_field=cfg['url'],
-            source_type='oai-pmh',
+            name=cfg["name"],
+            url_field=cfg["url"],
+            source_type="oai-pmh",
         )
-        self.assertEqual(broken.source_type, 'oai-pmh')
+        self.assertEqual(broken.source_type, "oai-pmh")
 
         out = StringIO()
         call_command("harvest_sources", "--insert-sources", stdout=out)
 
         broken.refresh_from_db()
-        self.assertEqual(broken.source_type, 'mountain-wetlands')
-        self.assertIn('Reconciled source_type', out.getvalue())
+        self.assertEqual(broken.source_type, "mountain-wetlands")
+        self.assertIn("Reconciled source_type", out.getvalue())
 
     def test_insert_sources_does_not_clobber_admin_set_homepage_url(self):
-        cfg = SOURCE_CONFIG['mountain-wetlands']
-        admin_chosen_url = 'https://admin-edited.example.org/'
+        cfg = SOURCE_CONFIG["mountain-wetlands"]
+        admin_chosen_url = "https://admin-edited.example.org/"
         existing = Source.objects.create(
-            name=cfg['name'], url_field=cfg['url'],
-            source_type='mountain-wetlands',
+            name=cfg["name"],
+            url_field=cfg["url"],
+            source_type="mountain-wetlands",
             homepage_url=admin_chosen_url,
         )
 
@@ -96,10 +98,11 @@ class InsertSourcesTest(TestCase):
         self.assertEqual(existing.homepage_url, admin_chosen_url)
 
     def test_insert_sources_fills_blank_collection_on_existing_row(self):
-        cfg = SOURCE_CONFIG['mountain-wetlands']
+        cfg = SOURCE_CONFIG["mountain-wetlands"]
         existing = Source.objects.create(
-            name=cfg['name'], url_field=cfg['url'],
-            source_type='mountain-wetlands',
+            name=cfg["name"],
+            url_field=cfg["url"],
+            source_type="mountain-wetlands",
             collection=None,
         )
         self.assertIsNone(existing.collection)
@@ -108,7 +111,7 @@ class InsertSourcesTest(TestCase):
 
         existing.refresh_from_db()
         self.assertIsNotNone(existing.collection)
-        self.assertEqual(existing.collection.name, cfg['collection_name'])
+        self.assertEqual(existing.collection.name, cfg["collection_name"])
 
     def test_insert_sources_warns_about_non_oai_feeds(self):
         # SOURCE_CONFIG includes RSS (scientific-data) and crossref-prefix (copernicus);
@@ -123,10 +126,7 @@ class InsertSourcesTest(TestCase):
         output = out.getvalue()
         self.assertIn("non-OAI source types", output)
         # At least one of the non-OAI keys must appear in the warning block.
-        non_oai_keys = [
-            k for k, c in SOURCE_CONFIG.items()
-            if c.get("source_type", "oai-pmh") != "oai-pmh"
-        ]
+        non_oai_keys = [k for k, c in SOURCE_CONFIG.items() if c.get("source_type", "oai-pmh") != "oai-pmh"]
         self.assertTrue(non_oai_keys, "fixture sanity: SOURCE_CONFIG must have a non-OAI entry")
         self.assertTrue(
             any(k in output for k in non_oai_keys),

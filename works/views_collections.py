@@ -10,24 +10,22 @@ controls render on the index and detail pages for staff users; they POST to
 the small mutation endpoints below (publish/unpublish, add/remove a work).
 """
 
-import json
 import logging
 
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Count
-from django.http import Http404, HttpResponse, JsonResponse, HttpResponseRedirect
-from django.shortcuts import get_object_or_404, redirect, render
+from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
+from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils.cache import add_never_cache_headers
 from django.utils.html import strip_tags
 from django.views.decorators.http import require_POST
 
-from django.contrib.auth import get_user_model
-
-from .models import Collection, STATUS_CHOICES, Work
+from .models import STATUS_CHOICES, Collection, Work
 
 User = get_user_model()
 from .seo import coins_title
@@ -38,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 def _visible_collections(request):
     """Anonymous users see only published collections; staff see everything."""
-    qs = Collection.objects.all().prefetch_related('curators').select_related()
+    qs = Collection.objects.all().prefetch_related("curators").select_related()
     if not (request.user.is_authenticated and request.user.is_staff):
         qs = qs.filter(is_published=True)
     return qs
@@ -61,33 +59,28 @@ def collections_index(request):
     is_admin = request.user.is_authenticated and request.user.is_staff
     collections = list(_visible_collections(request))
     if request.user.is_authenticated:
-        curated_ids = set(
-            request.user.curated_collections.values_list('id', flat=True)
-        )
+        curated_ids = set(request.user.curated_collections.values_list("id", flat=True))
     else:
         curated_ids = set()
     status_label = dict(STATUS_CHOICES)
-    breakdown_order = ['p', 'h', 'c', 'd', 't', 'w']
+    breakdown_order = ["p", "h", "c", "d", "t", "w"]
     for c in collections:
         c.show_breakdown = is_admin or c.id in curated_ids
-        counts = {
-            row['status']: row['n']
-            for row in c.works.values('status').annotate(n=Count('id'))
-        }
-        c.published_count = counts.get('p', 0)
+        counts = {row["status"]: row["n"] for row in c.works.values("status").annotate(n=Count("id"))}
+        c.published_count = counts.get("p", 0)
         if c.show_breakdown:
             c.status_breakdown = [
-                {'status': s, 'label': status_label[s], 'count': counts[s]}
+                {"status": s, "label": status_label[s], "count": counts[s]}
                 for s in breakdown_order
                 if counts.get(s, 0) > 0
             ]
         else:
             c.status_breakdown = []
     context = {
-        'collections': collections,
-        'is_admin': is_admin,
+        "collections": collections,
+        "is_admin": is_admin,
     }
-    response = render(request, 'collections.html', context)
+    response = render(request, "collections.html", context)
     if is_admin:
         # Site-wide UpdateCacheMiddleware would otherwise cache this response
         # (keyed by session cookie) for CACHE_MIDDLEWARE_SECONDS, so the
@@ -101,21 +94,18 @@ def collection_page(request, collection_slug):
     """Detail page for one collection — map + work list + (for curators/admins) inline controls."""
     collection = _collection_for_request(request, collection_slug)
     is_admin = request.user.is_authenticated and request.user.is_staff
-    is_curator = (
-        request.user.is_authenticated
-        and collection.curators.filter(pk=request.user.pk).exists()
-    )
+    is_curator = request.user.is_authenticated and collection.curators.filter(pk=request.user.pk).exists()
 
     # Visibility rule: anonymous / non-curators see only published works;
     # admins and curators of the collection see every work in the collection
     # so they can identify which ones still need review or publishing.
     can_curate = is_admin or is_curator
-    works_qs = Work.objects.filter(collections=collection).select_related('source')
+    works_qs = Work.objects.filter(collections=collection).select_related("source")
     if not can_curate:
-        works_qs = works_qs.filter(status='p')
-    works_qs = works_qs.order_by('-creationDate', '-id')
+        works_qs = works_qs.filter(status="p")
+    works_qs = works_qs.order_by("-creationDate", "-id")
 
-    page_size = request.GET.get('size', settings.PAGE_MAX_ITEMS)
+    page_size = request.GET.get("size", settings.PAGE_MAX_ITEMS)
     try:
         page_size = int(page_size)
         page_size = max(settings.WORKS_PAGE_SIZE_MIN, min(page_size, settings.WORKS_PAGE_SIZE_MAX))
@@ -124,7 +114,7 @@ def collection_page(request, collection_slug):
 
     paginator = Paginator(works_qs, page_size)
     try:
-        page_obj = paginator.page(request.GET.get('page', 1))
+        page_obj = paginator.page(request.GET.get("page", 1))
     except PageNotAnInteger:
         page_obj = paginator.page(1)
     except EmptyPage:
@@ -133,48 +123,45 @@ def collection_page(request, collection_slug):
     for w in page_obj.object_list:
         w.coins_ctx = coins_title(w)
         w.has_geo = bool(w.geometry and not w.geometry.empty)
-        w.has_temporal = (
-            any(d is not None for d in (w.timeperiod_startdate or []))
-            or any(d is not None for d in (w.timeperiod_enddate or []))
+        w.has_temporal = any(d is not None for d in (w.timeperiod_startdate or [])) or any(
+            d is not None for d in (w.timeperiod_enddate or [])
         )
 
     # Count of works that the bulk "Publish all" admin button would publish:
     # only Harvested ('h') and Contributed ('c') — Draft / Testing / Withdrawn
     # are deliberate admin states and never auto-published.
-    publishable_count = (
-        Work.objects.filter(collections=collection, status__in=['h', 'c']).count()
-        if is_admin else 0
-    )
+    publishable_count = Work.objects.filter(collections=collection, status__in=["h", "c"]).count() if is_admin else 0
     # Count of the above that also have at least one real geometry or temporal value.
     publishable_geo_count = 0
     if is_admin:
-        candidate_qs = Work.objects.filter(
-            collections=collection, status__in=['h', 'c']
-        ).only('geometry', 'timeperiod_startdate', 'timeperiod_enddate')
+        candidate_qs = Work.objects.filter(collections=collection, status__in=["h", "c"]).only(
+            "geometry", "timeperiod_startdate", "timeperiod_enddate"
+        )
         publishable_geo_count = sum(
-            1 for w in candidate_qs
+            1
+            for w in candidate_qs
             if (w.geometry and not w.geometry.empty)
             or any(d is not None for d in (w.timeperiod_startdate or []))
             or any(d is not None for d in (w.timeperiod_enddate or []))
         )
 
     context = {
-        'collection': collection,
-        'page_obj': page_obj,
-        'page_size': page_size,
-        'page_size_options': settings.WORKS_PAGE_SIZE_OPTIONS,
-        'publications_geojson': publications_to_geojson(list(page_obj.object_list)),
-        'collection_geojson_url': reverse('optimap:collection-geojson', args=[collection.identifier]),
-        'is_admin': is_admin,
-        'is_curator': is_curator,
-        'can_curate': can_curate,
-        'can_edit_description': is_admin or is_curator,
-        'publishable_count': publishable_count,
-        'publishable_geo_count': publishable_geo_count,
-        'canonical_url': request.build_absolute_uri(collection.get_absolute_url()),
-        'curators': list(collection.curators.all()),
+        "collection": collection,
+        "page_obj": page_obj,
+        "page_size": page_size,
+        "page_size_options": settings.WORKS_PAGE_SIZE_OPTIONS,
+        "publications_geojson": publications_to_geojson(list(page_obj.object_list)),
+        "collection_geojson_url": reverse("optimap:collection-geojson", args=[collection.identifier]),
+        "is_admin": is_admin,
+        "is_curator": is_curator,
+        "can_curate": can_curate,
+        "can_edit_description": is_admin or is_curator,
+        "publishable_count": publishable_count,
+        "publishable_geo_count": publishable_geo_count,
+        "canonical_url": request.build_absolute_uri(collection.get_absolute_url()),
+        "curators": list(collection.curators.all()),
     }
-    response = render(request, 'collection_page.html', context)
+    response = render(request, "collection_page.html", context)
     if can_curate:
         # Curators/admins see unpublished works and inline mutation controls
         # whose state must stay live; bypass the site-wide cache middleware.
@@ -185,8 +172,8 @@ def collection_page(request, collection_slug):
 def collection_geojson(request, collection_slug):
     """GeoJSON of all published works in a collection — used by the map 'show all' toggle."""
     collection = _collection_for_request(request, collection_slug)
-    works_qs = Work.objects.filter(collections=collection, status='p').select_related('source')
-    return HttpResponse(publications_to_geojson(list(works_qs)), content_type='application/geo+json')
+    works_qs = Work.objects.filter(collections=collection, status="p").select_related("source")
+    return HttpResponse(publications_to_geojson(list(works_qs)), content_type="application/geo+json")
 
 
 def collection_short_redirect(request, short_slug):
@@ -219,13 +206,14 @@ def collection_by_id_redirect(request, collection_id):
 
 # --- Mutation endpoints ----------------------------------------------------
 
+
 @staff_member_required
 @require_POST
 def publish_collection(request, collection_id):
     collection = get_object_or_404(Collection, pk=collection_id)
     collection.is_published = True
-    collection.save(update_fields=['is_published', 'updated_at'])
-    return JsonResponse({'success': True, 'is_published': True})
+    collection.save(update_fields=["is_published", "updated_at"])
+    return JsonResponse({"success": True, "is_published": True})
 
 
 @staff_member_required
@@ -233,8 +221,8 @@ def publish_collection(request, collection_id):
 def unpublish_collection(request, collection_id):
     collection = get_object_or_404(Collection, pk=collection_id)
     collection.is_published = False
-    collection.save(update_fields=['is_published', 'updated_at'])
-    return JsonResponse({'success': True, 'is_published': False})
+    collection.save(update_fields=["is_published", "updated_at"])
+    return JsonResponse({"success": True, "is_published": False})
 
 
 @staff_member_required
@@ -250,20 +238,21 @@ def publish_collection_works(request, collection_id):
     admin-managed states and are deliberately left untouched.
     """
     collection = get_object_or_404(Collection, pk=collection_id)
-    if request.POST.get('extent_only') == '1':
-        qs = Work.objects.filter(
-            collections=collection, status__in=['h', 'c']
-        ).only('geometry', 'timeperiod_startdate', 'timeperiod_enddate')
+    if request.POST.get("extent_only") == "1":
+        qs = Work.objects.filter(collections=collection, status__in=["h", "c"]).only(
+            "geometry", "timeperiod_startdate", "timeperiod_enddate"
+        )
         qualifying_ids = [
-            w.pk for w in qs
+            w.pk
+            for w in qs
             if (w.geometry and not w.geometry.empty)
             or any(d is not None for d in (w.timeperiod_startdate or []))
             or any(d is not None for d in (w.timeperiod_enddate or []))
         ]
-        count = Work.objects.filter(pk__in=qualifying_ids).update(status='p')
+        count = Work.objects.filter(pk__in=qualifying_ids).update(status="p")
     else:
-        count = Work.objects.filter(collections=collection, status__in=['h', 'c']).update(status='p')
-    return JsonResponse({'success': True, 'published_count': count})
+        count = Work.objects.filter(collections=collection, status__in=["h", "c"]).update(status="p")
+    return JsonResponse({"success": True, "published_count": count})
 
 
 def _user_can_curate(user, collection):
@@ -287,12 +276,12 @@ def update_collection_description(request, collection_id):
     """
     collection = get_object_or_404(Collection, pk=collection_id)
     if not _user_can_curate(request.user, collection):
-        return JsonResponse({'error': 'Not a curator of this collection.'}, status=403)
-    raw = request.POST.get('description', '')
+        return JsonResponse({"error": "Not a curator of this collection."}, status=403)
+    raw = request.POST.get("description", "")
     cleaned = strip_tags(raw).strip()
     collection.description = cleaned
-    collection.save(update_fields=['description', 'updated_at'])
-    return JsonResponse({'success': True, 'description': cleaned})
+    collection.save(update_fields=["description", "updated_at"])
+    return JsonResponse({"success": True, "description": cleaned})
 
 
 @login_required
@@ -304,14 +293,16 @@ def add_work_to_collection(request, work_id, collection_id):
     work = get_object_or_404(Work, pk=work_id)
     collection = get_object_or_404(Collection, pk=collection_id)
     if not _user_can_curate(request.user, collection):
-        return JsonResponse({'error': 'Not a curator of this collection.'}, status=403)
+        return JsonResponse({"error": "Not a curator of this collection."}, status=403)
     work.collections.add(collection)
-    return JsonResponse({
-        'success': True,
-        'work_id': work.id,
-        'collection_id': collection.id,
-        'collection_name': collection.name,
-    })
+    return JsonResponse(
+        {
+            "success": True,
+            "work_id": work.id,
+            "collection_id": collection.id,
+            "collection_name": collection.name,
+        }
+    )
 
 
 @login_required
@@ -320,11 +311,11 @@ def remove_work_from_collection(request, work_id, collection_id):
     work = get_object_or_404(Work, pk=work_id)
     collection = get_object_or_404(Collection, pk=collection_id)
     if not _user_can_curate(request.user, collection):
-        return JsonResponse({'error': 'Not a curator of this collection.'}, status=403)
+        return JsonResponse({"error": "Not a curator of this collection."}, status=403)
     if not work.collections.filter(pk=collection.pk).exists():
-        return JsonResponse({'error': 'Work is not in this collection.'}, status=400)
+        return JsonResponse({"error": "Work is not in this collection."}, status=400)
     work.collections.remove(collection)
-    return JsonResponse({'success': True, 'work_id': work.id})
+    return JsonResponse({"success": True, "work_id": work.id})
 
 
 @login_required
@@ -335,29 +326,32 @@ def add_curator(request, collection_id):
 
     collection = get_object_or_404(Collection, pk=collection_id)
     if not _user_can_curate(request.user, collection):
-        return JsonResponse({'error': 'Not a curator of this collection.'}, status=403)
+        return JsonResponse({"error": "Not a curator of this collection."}, status=403)
 
-    email = request.POST.get('email', '').strip()
+    email = request.POST.get("email", "").strip()
     if not email:
-        return JsonResponse({'error': 'Email address is required.'}, status=400)
+        return JsonResponse({"error": "Email address is required."}, status=400)
 
     try:
         new_curator = User.objects.get(email=email)
     except User.DoesNotExist:
-        return JsonResponse({'error': f'No user found with email: {email}'}, status=404)
+        return JsonResponse({"error": f"No user found with email: {email}"}, status=404)
 
     if collection.curators.filter(pk=new_curator.pk).exists():
-        return JsonResponse({'success': True, 'already_curator': True,
-                             'user_id': new_curator.pk, 'email': new_curator.email})
+        return JsonResponse(
+            {"success": True, "already_curator": True, "user_id": new_curator.pk, "email": new_curator.email}
+        )
 
     collection.curators.add(new_curator)
-    notify_curator_change(collection, new_curator, 'added', actor=request.user)
-    return JsonResponse({
-        'success': True,
-        'user_id': new_curator.pk,
-        'email': new_curator.email,
-        'display_name': new_curator.get_full_name() or new_curator.email,
-    })
+    notify_curator_change(collection, new_curator, "added", actor=request.user)
+    return JsonResponse(
+        {
+            "success": True,
+            "user_id": new_curator.pk,
+            "email": new_curator.email,
+            "display_name": new_curator.get_full_name() or new_curator.email,
+        }
+    )
 
 
 @login_required
@@ -368,12 +362,12 @@ def remove_curator(request, collection_id, user_id):
 
     collection = get_object_or_404(Collection, pk=collection_id)
     if not _user_can_curate(request.user, collection):
-        return JsonResponse({'error': 'Not a curator of this collection.'}, status=403)
+        return JsonResponse({"error": "Not a curator of this collection."}, status=403)
 
     curator_to_remove = get_object_or_404(User, pk=user_id)
     if not collection.curators.filter(pk=curator_to_remove.pk).exists():
-        return JsonResponse({'error': 'User is not a curator of this collection.'}, status=400)
+        return JsonResponse({"error": "User is not a curator of this collection."}, status=400)
 
     collection.curators.remove(curator_to_remove)
-    notify_curator_change(collection, curator_to_remove, 'removed', actor=request.user)
-    return JsonResponse({'success': True, 'user_id': curator_to_remove.pk})
+    notify_curator_change(collection, curator_to_remove, "removed", actor=request.user)
+    return JsonResponse({"success": True, "user_id": curator_to_remove.pk})

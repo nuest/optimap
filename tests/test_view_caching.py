@@ -25,19 +25,19 @@ import os
 from unittest import mock
 
 import django
-from django.contrib.gis.geos import GEOSGeometry, GeometryCollection, Point
+from django.contrib.gis.geos import GeometryCollection, GEOSGeometry
 from django.core.cache import caches
 from django.test import Client, TestCase
 from django.urls import reverse
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'optimap.settings')
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "optimap.settings")
 django.setup()
 
-from works.models import GlobalRegion, Source, Work
+from works.models import Source, Work
 
-
-User = django.contrib.auth.get_user_model() if hasattr(django.contrib, 'auth') else None
+User = django.contrib.auth.get_user_model() if hasattr(django.contrib, "auth") else None
 from django.contrib.auth import get_user_model
+
 User = get_user_model()
 
 
@@ -75,12 +75,14 @@ class StaticPageCacheTests(TestCase):
 
     def setUp(self):
         self.client = Client()
-        caches['memory'].clear()
+        caches["memory"].clear()
 
     def _hits_cache_on_second_request(self, url: str):
         """Second GET reuses the cached response (renders identical bytes
         without re-running the view body)."""
-        with mock.patch('django.shortcuts.render', wraps=__import__('django.shortcuts', fromlist=['render']).render) as spy:
+        with mock.patch(
+            "django.shortcuts.render", wraps=__import__("django.shortcuts", fromlist=["render"]).render
+        ) as _:
             r1 = self.client.get(url)
             self.assertEqual(r1.status_code, 200)
             r2 = self.client.get(url)
@@ -88,24 +90,24 @@ class StaticPageCacheTests(TestCase):
             self.assertEqual(r1.content, r2.content)
 
     def test_privacy_uses_cache_page(self):
-        url = reverse('optimap:privacy')
+        url = reverse("optimap:privacy")
         self._hits_cache_on_second_request(url)
 
     def test_about_uses_cache_page(self):
-        url = reverse('optimap:about')
+        url = reverse("optimap:about")
         self._hits_cache_on_second_request(url)
 
     def test_accessibility_uses_cache_page(self):
-        url = reverse('optimap:accessibility')
+        url = reverse("optimap:accessibility")
         self._hits_cache_on_second_request(url)
 
     def test_feeds_list_uses_cache_page(self):
         # feeds_list reads GlobalRegion. Empty fixture is fine — page renders.
-        url = reverse('optimap:feeds')
+        url = reverse("optimap:feeds")
         self._hits_cache_on_second_request(url)
 
     def test_robots_uses_cache_page(self):
-        url = '/robots.txt'
+        url = "/robots.txt"
         # robots.txt builds region lists; should still cache.
         self._hits_cache_on_second_request(url)
 
@@ -115,17 +117,17 @@ class WorkLandingCacheTests(TestCase):
 
     def setUp(self):
         self.client = Client()
-        caches['memory'].clear()
+        caches["memory"].clear()
         self.work = _make_published_work()
-        self.url = reverse('optimap:work-landing', args=[self.work.get_identifier()])
+        self.url = reverse("optimap:work-landing", args=[self.work.get_identifier()])
 
     def _cache_keys_for_work(self, work):
         # LocMemCache stores under cache.LocMemCache._cache as
         # {make_key(key): (expiry, value)}. We just look for any key
         # mentioning our work's pk + the current host.
-        backend = caches['memory']
-        store = getattr(backend, '_cache', {})
-        prefix = f"work_landing:ctx:"
+        backend = caches["memory"]
+        store = getattr(backend, "_cache", {})
+        prefix = "work_landing:ctx:"
         return [k for k in store.keys() if prefix in k and f":{work.id}:" in k]
 
     def test_cache_miss_then_hit(self):
@@ -159,15 +161,16 @@ class WorkLandingCacheTests(TestCase):
         # Old key still present (TTL-bound), new key added — same work,
         # different lastUpdate value.
         self.assertGreaterEqual(len(keys_after), len(keys_before))
-        self.assertNotEqual(keys_after - keys_before, set(),
-                            "saving the work should produce a new cache key")
+        self.assertNotEqual(keys_after - keys_before, set(), "saving the work should produce a new cache key")
         # The response uses the new title.
         self.assertContains(r, "New title")
 
     def test_admin_request_bypasses_cache(self):
         admin = User.objects.create_user(
-            username='cacheadmin', email='cacheadmin@example.test',
-            password='x', is_staff=True,
+            username="cacheadmin",
+            email="cacheadmin@example.test",
+            password="x",
+            is_staff=True,
         )
         self.client.force_login(admin)
         self.client.get(self.url)
@@ -175,8 +178,10 @@ class WorkLandingCacheTests(TestCase):
         self.assertEqual(self._cache_keys_for_work(self.work), [])
 
     def test_anonymous_user_with_unpublished_work_404(self):
-        unpublished = _make_published_work(status='d', doi='10.1234/cache.test.draft', url='https://example.test/article/draft')
-        url = reverse('optimap:work-landing', args=[unpublished.get_identifier()])
+        unpublished = _make_published_work(
+            status="d", doi="10.1234/cache.test.draft", url="https://example.test/article/draft"
+        )
+        url = reverse("optimap:work-landing", args=[unpublished.get_identifier()])
         r = self.client.get(url)
         self.assertEqual(r.status_code, 404)
         # And no cache entry created for an unauthorised request.
@@ -206,7 +211,7 @@ class CacheControlHeaderTests(TestCase):
 
     def setUp(self):
         self.client = Client()
-        caches['memory'].clear()
+        caches["memory"].clear()
 
     def _assert_max_age_and_expires(self, response, expected_max_age: int):
         cache_control = response.get("Cache-Control", "")
@@ -216,48 +221,49 @@ class CacheControlHeaderTests(TestCase):
             f"Cache-Control header missing max-age: {cache_control!r}",
         )
         self.assertEqual(
-            max_age, expected_max_age,
-            f"Cache-Control max-age mismatch: got {max_age}, want {expected_max_age} "
-            f"(full header: {cache_control!r})",
+            max_age,
+            expected_max_age,
+            f"Cache-Control max-age mismatch: got {max_age}, want {expected_max_age} (full header: {cache_control!r})",
         )
         self.assertIn(
-            "Expires", response,
+            "Expires",
+            response,
             "Expires header not set — Django's patch_response_headers should add it",
         )
 
     def test_privacy_advertises_24h_max_age(self):
-        r = self.client.get(reverse('optimap:privacy'))
+        r = self.client.get(reverse("optimap:privacy"))
         self.assertEqual(r.status_code, 200)
         self._assert_max_age_and_expires(r, 24 * 3600)
 
     def test_about_advertises_24h_max_age(self):
-        r = self.client.get(reverse('optimap:about'))
+        r = self.client.get(reverse("optimap:about"))
         self.assertEqual(r.status_code, 200)
         self._assert_max_age_and_expires(r, 24 * 3600)
 
     def test_accessibility_advertises_24h_max_age(self):
-        r = self.client.get(reverse('optimap:accessibility'))
+        r = self.client.get(reverse("optimap:accessibility"))
         self.assertEqual(r.status_code, 200)
         self._assert_max_age_and_expires(r, 24 * 3600)
 
     def test_feeds_list_advertises_1h_max_age(self):
-        r = self.client.get(reverse('optimap:feeds'))
+        r = self.client.get(reverse("optimap:feeds"))
         self.assertEqual(r.status_code, 200)
         self._assert_max_age_and_expires(r, 3600)
 
     def test_sitemap_page_advertises_1h_max_age(self):
-        r = self.client.get(reverse('optimap:sitemap-page'))
+        r = self.client.get(reverse("optimap:sitemap-page"))
         self.assertEqual(r.status_code, 200)
         self._assert_max_age_and_expires(r, 3600)
 
     def test_robots_advertises_1h_max_age(self):
-        r = self.client.get('/robots.txt')
+        r = self.client.get("/robots.txt")
         self.assertEqual(r.status_code, 200)
         self._assert_max_age_and_expires(r, 3600)
 
     def test_anonymous_work_landing_advertises_24h_max_age(self):
-        work = _make_published_work(doi='10.1234/cache.headers.1', url='https://example.test/headers/1')
-        url = reverse('optimap:work-landing', args=[work.get_identifier()])
+        work = _make_published_work(doi="10.1234/cache.headers.1", url="https://example.test/headers/1")
+        url = reverse("optimap:work-landing", args=[work.get_identifier()])
         r = self.client.get(url)
         self.assertEqual(r.status_code, 200)
         self._assert_max_age_and_expires(r, 24 * 3600)
@@ -268,17 +274,19 @@ class CacheControlHeaderTests(TestCase):
         ``Vary: Cookie`` so shared caches keep authenticated responses
         separate from the anonymous shared entry."""
         admin = User.objects.create_user(
-            username='cacheadmin2', email='cacheadmin2@example.test',
-            password='x', is_staff=True,
+            username="cacheadmin2",
+            email="cacheadmin2@example.test",
+            password="x",
+            is_staff=True,
         )
         self.client.force_login(admin)
-        work = _make_published_work(doi='10.1234/cache.headers.admin', url='https://example.test/headers/admin')
-        url = reverse('optimap:work-landing', args=[work.get_identifier()])
+        work = _make_published_work(doi="10.1234/cache.headers.admin", url="https://example.test/headers/admin")
+        url = reverse("optimap:work-landing", args=[work.get_identifier()])
         r = self.client.get(url)
         self.assertEqual(r.status_code, 200)
-        vary = r.get('Vary', '')
+        vary = r.get("Vary", "")
         self.assertIn(
-            'Cookie', vary,
-            f"Admin response should Vary on Cookie so shared caches don't "
-            f"conflate sessions, got Vary: {vary!r}",
+            "Cookie",
+            vary,
+            f"Admin response should Vary on Cookie so shared caches don't conflate sessions, got Vary: {vary!r}",
         )

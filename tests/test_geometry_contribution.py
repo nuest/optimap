@@ -2,12 +2,15 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 """Tests for geometry contribution and publication workflow."""
+
 import json
-from django.test import TestCase, Client
-from django.contrib.gis.geos import Point, GeometryCollection
-from django.utils import timezone
-from works.models import Work, Source
+
 from django.contrib.auth import get_user_model
+from django.contrib.gis.geos import GeometryCollection, Point
+from django.test import Client, TestCase
+from django.utils import timezone
+
+from works.models import Source, Work
 
 User = get_user_model()
 
@@ -21,24 +24,20 @@ class GeometryContributionTests(TestCase):
 
         # Create users
         self.regular_user = User.objects.create_user(
-            username='contributor@example.com',
-            email='contributor@example.com',
-            password='testpass123'
+            username="contributor@example.com", email="contributor@example.com", password="testpass123"
         )
 
         self.admin_user = User.objects.create_user(
-            username='admin@example.com',
-            email='admin@example.com',
-            password='adminpass123',
+            username="admin@example.com",
+            email="admin@example.com",
+            password="adminpass123",
             is_staff=True,
-            is_superuser=True
+            is_superuser=True,
         )
 
         # Create source
         self.source = Source.objects.create(
-            name="Test Journal",
-            url_field="https://example.com/oai",
-            homepage_url="https://example.com/journal"
+            name="Test Journal", url_field="https://example.com/oai", homepage_url="https://example.com/journal"
         )
 
         # Create harvested publication without geometry
@@ -51,7 +50,7 @@ class GeometryContributionTests(TestCase):
             publicationDate=timezone.now().date(),
             geometry=GeometryCollection(),  # Empty geometry
             source=self.source,
-            provenance={}
+            provenance={},
         )
 
         # Create harvested publication with existing geometry
@@ -63,7 +62,7 @@ class GeometryContributionTests(TestCase):
             status="h",
             publicationDate=timezone.now().date(),
             geometry=GeometryCollection(Point(12.4924, 41.8902)),
-            source=self.source
+            source=self.source,
         )
 
         # Create published publication
@@ -75,178 +74,154 @@ class GeometryContributionTests(TestCase):
             status="p",  # Published
             publicationDate=timezone.now().date(),
             geometry=GeometryCollection(),
-            source=self.source
+            source=self.source,
         )
 
         # Sample geometry for contributions
         self.test_geometry = {
             "type": "GeometryCollection",
-            "geometries": [
-                {
-                    "type": "Point",
-                    "coordinates": [13.4050, 52.5200]
-                }
-            ]
+            "geometries": [{"type": "Point", "coordinates": [13.4050, 52.5200]}],
         }
 
     def test_contribute_geometry_requires_authentication(self):
         """Test that contribution requires authentication."""
-        url = f'/work/{self.pub_harvested.doi}/contribute-geometry/'
+        url = f"/work/{self.pub_harvested.doi}/contribute-geometry/"
         response = self.client.post(
-            url,
-            data=json.dumps({'geometry': self.test_geometry}),
-            content_type='application/json'
+            url, data=json.dumps({"geometry": self.test_geometry}), content_type="application/json"
         )
         self.assertEqual(response.status_code, 401)
         data = response.json()
-        self.assertEqual(data['error'], 'Authentication required')
+        self.assertEqual(data["error"], "Authentication required")
 
     def test_contribute_geometry_success(self):
         """Test successful geometry contribution."""
-        self.client.login(username='contributor@example.com', password='testpass123')
+        self.client.login(username="contributor@example.com", password="testpass123")
 
-        url = f'/work/{self.pub_harvested.doi}/contribute-geometry/'
+        url = f"/work/{self.pub_harvested.doi}/contribute-geometry/"
         response = self.client.post(
-            url,
-            data=json.dumps({'geometry': self.test_geometry}),
-            content_type='application/json'
+            url, data=json.dumps({"geometry": self.test_geometry}), content_type="application/json"
         )
 
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertTrue(data['success'])
-        self.assertIn('Thank you for your contribution', data['message'])
+        self.assertTrue(data["success"])
+        self.assertIn("Thank you for your contribution", data["message"])
 
         # Verify database changes
         self.pub_harvested.refresh_from_db()
-        self.assertEqual(self.pub_harvested.status, 'c')  # Contributed
+        self.assertEqual(self.pub_harvested.status, "c")  # Contributed
         self.assertFalse(self.pub_harvested.geometry.empty)
 
         # Verify provenance event was appended (structured JSON since 0.13.0)
-        events = self.pub_harvested.provenance.get('events', [])
-        self.assertTrue(any(
-            ev.get('type') == 'contribution'
-            and ev.get('user_email') == 'contributor@example.com'
-            and ev.get('status_from') == 'h' and ev.get('status_to') == 'c'
-            for ev in events
-        ), f"contribution event not found in {events!r}")
+        events = self.pub_harvested.provenance.get("events", [])
+        self.assertTrue(
+            any(
+                ev.get("type") == "contribution"
+                and ev.get("user_email") == "contributor@example.com"
+                and ev.get("status_from") == "h"
+                and ev.get("status_to") == "c"
+                for ev in events
+            ),
+            f"contribution event not found in {events!r}",
+        )
 
     def test_contribute_geometry_publication_not_found(self):
         """Test contribution to non-existent publication."""
-        self.client.login(username='contributor@example.com', password='testpass123')
+        self.client.login(username="contributor@example.com", password="testpass123")
 
-        url = '/work/10.1234/nonexistent/contribute-geometry/'
+        url = "/work/10.1234/nonexistent/contribute-geometry/"
         response = self.client.post(
-            url,
-            data=json.dumps({'geometry': self.test_geometry}),
-            content_type='application/json'
+            url, data=json.dumps({"geometry": self.test_geometry}), content_type="application/json"
         )
 
         self.assertEqual(response.status_code, 404)
         data = response.json()
-        self.assertEqual(data['error'], 'Work not found')
+        self.assertEqual(data["error"], "Work not found")
 
     def test_contribute_geometry_wrong_status(self):
         """Published / draft / withdrawn works don't accept contributions."""
-        self.client.login(username='contributor@example.com', password='testpass123')
+        self.client.login(username="contributor@example.com", password="testpass123")
 
-        url = f'/work/{self.pub_published.doi}/contribute-geometry/'
+        url = f"/work/{self.pub_published.doi}/contribute-geometry/"
         response = self.client.post(
-            url,
-            data=json.dumps({'geometry': self.test_geometry}),
-            content_type='application/json'
+            url, data=json.dumps({"geometry": self.test_geometry}), content_type="application/json"
         )
 
         self.assertEqual(response.status_code, 400)
         data = response.json()
-        self.assertEqual(data['error'], 'Can only contribute to harvested or contributed publications')
+        self.assertEqual(data["error"], "Can only contribute to harvested or contributed publications")
 
     def test_contribute_geometry_already_has_geometry(self):
         """Re-editing an existing geometry is allowed; the provenance log
         carries attribution so user A may replace user B's geometry."""
-        self.client.login(username='contributor@example.com', password='testpass123')
+        self.client.login(username="contributor@example.com", password="testpass123")
 
-        url = f'/work/{self.pub_with_geometry.doi}/contribute-geometry/'
+        url = f"/work/{self.pub_with_geometry.doi}/contribute-geometry/"
         response = self.client.post(
-            url,
-            data=json.dumps({'geometry': self.test_geometry}),
-            content_type='application/json'
+            url, data=json.dumps({"geometry": self.test_geometry}), content_type="application/json"
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.json()['success'])
+        self.assertTrue(response.json()["success"])
         self.pub_with_geometry.refresh_from_db()
-        events = (self.pub_with_geometry.provenance or {}).get('events', [])
+        events = (self.pub_with_geometry.provenance or {}).get("events", [])
         # Most recent event should describe a geometry replacement.
-        self.assertTrue(any(
-            "Replaced geometry" in change
-            for evt in events if evt.get("type") == "contribution"
-            for change in (evt.get("changes") or [])
-        ))
+        self.assertTrue(
+            any(
+                "Replaced geometry" in change
+                for evt in events
+                if evt.get("type") == "contribution"
+                for change in (evt.get("changes") or [])
+            )
+        )
 
     def test_contribute_geometry_no_geometry_provided(self):
         """Test error when no geometry is provided."""
-        self.client.login(username='contributor@example.com', password='testpass123')
+        self.client.login(username="contributor@example.com", password="testpass123")
 
-        url = f'/work/{self.pub_harvested.doi}/contribute-geometry/'
-        response = self.client.post(
-            url,
-            data=json.dumps({}),
-            content_type='application/json'
-        )
+        url = f"/work/{self.pub_harvested.doi}/contribute-geometry/"
+        response = self.client.post(url, data=json.dumps({}), content_type="application/json")
 
         self.assertEqual(response.status_code, 400)
         data = response.json()
-        self.assertEqual(data['error'], 'No geometry or temporal extent provided')
+        self.assertEqual(data["error"], "No geometry or temporal extent provided")
 
     def test_contribute_geometry_invalid_json(self):
         """Test error when invalid JSON is sent."""
-        self.client.login(username='contributor@example.com', password='testpass123')
+        self.client.login(username="contributor@example.com", password="testpass123")
 
-        url = f'/work/{self.pub_harvested.doi}/contribute-geometry/'
-        response = self.client.post(
-            url,
-            data='invalid json',
-            content_type='application/json'
-        )
+        url = f"/work/{self.pub_harvested.doi}/contribute-geometry/"
+        response = self.client.post(url, data="invalid json", content_type="application/json")
 
         self.assertEqual(response.status_code, 400)
         data = response.json()
-        self.assertEqual(data['error'], 'Invalid JSON')
+        self.assertEqual(data["error"], "Invalid JSON")
 
     def test_contribute_geometry_polygon(self):
         """Test contribution with polygon geometry."""
-        self.client.login(username='contributor@example.com', password='testpass123')
+        self.client.login(username="contributor@example.com", password="testpass123")
 
         polygon_geometry = {
             "type": "GeometryCollection",
             "geometries": [
                 {
                     "type": "Polygon",
-                    "coordinates": [[
-                        [13.0, 52.0],
-                        [14.0, 52.0],
-                        [14.0, 53.0],
-                        [13.0, 53.0],
-                        [13.0, 52.0]
-                    ]]
+                    "coordinates": [[[13.0, 52.0], [14.0, 52.0], [14.0, 53.0], [13.0, 53.0], [13.0, 52.0]]],
                 }
-            ]
+            ],
         }
 
-        url = f'/work/{self.pub_harvested.doi}/contribute-geometry/'
+        url = f"/work/{self.pub_harvested.doi}/contribute-geometry/"
         response = self.client.post(
-            url,
-            data=json.dumps({'geometry': polygon_geometry}),
-            content_type='application/json'
+            url, data=json.dumps({"geometry": polygon_geometry}), content_type="application/json"
         )
 
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertTrue(data['success'])
+        self.assertTrue(data["success"])
 
         self.pub_harvested.refresh_from_db()
-        self.assertEqual(self.pub_harvested.status, 'c')
+        self.assertEqual(self.pub_harvested.status, "c")
         self.assertFalse(self.pub_harvested.geometry.empty)
 
     def test_contribute_geometry_works_on_contributed_status(self):
@@ -254,36 +229,38 @@ class GeometryContributionTests(TestCase):
         (different users may add different things)."""
         from works.models import Contribution
 
-        self.client.login(username='contributor@example.com', password='testpass123')
+        self.client.login(username="contributor@example.com", password="testpass123")
 
         # Promote to 'c' first by contributing a temporal extent.
-        url = f'/work/{self.pub_harvested.doi}/contribute-geometry/'
+        url = f"/work/{self.pub_harvested.doi}/contribute-geometry/"
         self.client.post(
             url,
-            data=json.dumps({'temporal_extent': {'start_date': '2020-01-01'}}),
-            content_type='application/json',
+            data=json.dumps({"temporal_extent": {"start_date": "2020-01-01"}}),
+            content_type="application/json",
         )
         self.pub_harvested.refresh_from_db()
-        self.assertEqual(self.pub_harvested.status, 'c')
+        self.assertEqual(self.pub_harvested.status, "c")
 
         # Now a *different* user contributes geometry on the contributed work.
         other = User.objects.create_user(
-            username='other@example.com',
-            email='other@example.com',
-            password='testpass123',
+            username="other@example.com",
+            email="other@example.com",
+            password="testpass123",
         )
-        self.client.login(username='other@example.com', password='testpass123')
+        self.client.login(username="other@example.com", password="testpass123")
         response = self.client.post(
             url,
-            data=json.dumps({'geometry': self.test_geometry}),
-            content_type='application/json',
+            data=json.dumps({"geometry": self.test_geometry}),
+            content_type="application/json",
         )
         self.assertEqual(response.status_code, 200)
         self.pub_harvested.refresh_from_db()
-        self.assertEqual(self.pub_harvested.status, 'c')
+        self.assertEqual(self.pub_harvested.status, "c")
         # Recognition: regular_user got 1 temporal row; other got 1 spatial row.
         self.assertEqual(
-            Contribution.objects.filter(user=self.regular_user, work=self.pub_harvested, kind=Contribution.TEMPORAL).count(),
+            Contribution.objects.filter(
+                user=self.regular_user, work=self.pub_harvested, kind=Contribution.TEMPORAL
+            ).count(),
             1,
         )
         self.assertEqual(
@@ -295,14 +272,14 @@ class GeometryContributionTests(TestCase):
         """The same user editing the same property twice yields one row."""
         from works.models import Contribution
 
-        self.client.login(username='contributor@example.com', password='testpass123')
-        url = f'/work/{self.pub_harvested.doi}/contribute-geometry/'
+        self.client.login(username="contributor@example.com", password="testpass123")
+        url = f"/work/{self.pub_harvested.doi}/contribute-geometry/"
 
         # First contribution — counts.
         self.client.post(
             url,
-            data=json.dumps({'geometry': self.test_geometry}),
-            content_type='application/json',
+            data=json.dumps({"geometry": self.test_geometry}),
+            content_type="application/json",
         )
         # Second contribution (replacement) — provenance records it,
         # Recognition Board does not double-count.
@@ -312,18 +289,21 @@ class GeometryContributionTests(TestCase):
         }
         self.client.post(
             url,
-            data=json.dumps({'geometry': other_geom}),
-            content_type='application/json',
+            data=json.dumps({"geometry": other_geom}),
+            content_type="application/json",
         )
         rows = Contribution.objects.filter(
-            user=self.regular_user, work=self.pub_harvested, kind=Contribution.SPATIAL,
+            user=self.regular_user,
+            work=self.pub_harvested,
+            kind=Contribution.SPATIAL,
         )
         self.assertEqual(rows.count(), 1)
 
         # And the provenance log carries both events.
         self.pub_harvested.refresh_from_db()
-        events = [e for e in (self.pub_harvested.provenance or {}).get("events", [])
-                  if e.get("type") == "contribution"]
+        events = [
+            e for e in (self.pub_harvested.provenance or {}).get("events", []) if e.get("type") == "contribution"
+        ]
         self.assertGreaterEqual(len(events), 2)
 
 
@@ -336,24 +316,19 @@ class PublishWorkTests(TestCase):
 
         # Create users
         self.regular_user = User.objects.create_user(
-            username='user@example.com',
-            email='user@example.com',
-            password='testpass123'
+            username="user@example.com", email="user@example.com", password="testpass123"
         )
 
         self.admin_user = User.objects.create_user(
-            username='admin@example.com',
-            email='admin@example.com',
-            password='adminpass123',
+            username="admin@example.com",
+            email="admin@example.com",
+            password="adminpass123",
             is_staff=True,
-            is_superuser=True
+            is_superuser=True,
         )
 
         # Create source
-        self.source = Source.objects.create(
-            name="Test Journal",
-            url_field="https://example.com/oai"
-        )
+        self.source = Source.objects.create(name="Test Journal", url_field="https://example.com/oai")
 
         # Create contributed publication
         self.pub_contributed = Work.objects.create(
@@ -365,7 +340,7 @@ class PublishWorkTests(TestCase):
             publicationDate=timezone.now().date(),
             geometry=GeometryCollection(Point(13.4050, 52.5200)),
             source=self.source,
-            provenance={}
+            provenance={},
         )
 
         # Create harvested publication
@@ -377,95 +352,107 @@ class PublishWorkTests(TestCase):
             status="h",  # Harvested
             publicationDate=timezone.now().date(),
             geometry=GeometryCollection(),
-            source=self.source
+            source=self.source,
         )
 
     def test_publish_requires_admin(self):
         """Test that publishing requires admin privileges."""
-        self.client.login(username='user@example.com', password='testpass123')
+        self.client.login(username="user@example.com", password="testpass123")
 
-        url = f'/work/{self.pub_contributed.doi}/publish/'
-        response = self.client.post(url, content_type='application/json')
+        url = f"/work/{self.pub_contributed.doi}/publish/"
+        response = self.client.post(url, content_type="application/json")
 
         # staff_member_required redirects non-staff users
         self.assertEqual(response.status_code, 302)
 
     def test_publish_success(self):
         """Test successful publication."""
-        self.client.login(username='admin@example.com', password='adminpass123')
+        self.client.login(username="admin@example.com", password="adminpass123")
 
-        url = f'/work/{self.pub_contributed.doi}/publish/'
-        response = self.client.post(url, content_type='application/json')
+        url = f"/work/{self.pub_contributed.doi}/publish/"
+        response = self.client.post(url, content_type="application/json")
 
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertTrue(data['success'])
-        self.assertIn('Work is now public', data['message'])
+        self.assertTrue(data["success"])
+        self.assertIn("Work is now public", data["message"])
 
         # Verify database changes
         self.pub_contributed.refresh_from_db()
-        self.assertEqual(self.pub_contributed.status, 'p')  # Published
+        self.assertEqual(self.pub_contributed.status, "p")  # Published
 
         # Verify provenance event was appended (structured JSON since 0.13.0)
-        events = self.pub_contributed.provenance.get('events', [])
-        self.assertTrue(any(
-            ev.get('type') == 'publish'
-            and ev.get('user_email') == 'admin@example.com'
-            and ev.get('status_from') == 'c' and ev.get('status_to') == 'p'
-            for ev in events
-        ), f"publish event not found in {events!r}")
+        events = self.pub_contributed.provenance.get("events", [])
+        self.assertTrue(
+            any(
+                ev.get("type") == "publish"
+                and ev.get("user_email") == "admin@example.com"
+                and ev.get("status_from") == "c"
+                and ev.get("status_to") == "p"
+                for ev in events
+            ),
+            f"publish event not found in {events!r}",
+        )
 
     def test_publish_publication_not_found(self):
         """Test publishing non-existent publication."""
-        self.client.login(username='admin@example.com', password='adminpass123')
+        self.client.login(username="admin@example.com", password="adminpass123")
 
-        url = '/work/10.1234/nonexistent/publish/'
-        response = self.client.post(url, content_type='application/json')
+        url = "/work/10.1234/nonexistent/publish/"
+        response = self.client.post(url, content_type="application/json")
 
         self.assertEqual(response.status_code, 404)
         data = response.json()
-        self.assertEqual(data['error'], 'Work not found')
+        self.assertEqual(data["error"], "Work not found")
 
     def test_publish_wrong_status(self):
         """Test that harvested publications without geometry cannot be published."""
-        self.client.login(username='admin@example.com', password='adminpass123')
+        self.client.login(username="admin@example.com", password="adminpass123")
 
-        url = f'/work/{self.pub_harvested.doi}/publish/'
-        response = self.client.post(url, content_type='application/json')
+        url = f"/work/{self.pub_harvested.doi}/publish/"
+        response = self.client.post(url, content_type="application/json")
 
         self.assertEqual(response.status_code, 400)
         data = response.json()
-        self.assertEqual(data['error'], 'Cannot publish harvested work without spatial or temporal extent')
+        self.assertEqual(data["error"], "Cannot publish harvested work without spatial or temporal extent")
 
     def test_publish_harvested_with_geometry(self):
         """Test that harvested publications with geometry can be published."""
         # Create a harvested publication with geometry
-        from django.contrib.gis.geos import Point, GeometryCollection
+        from django.contrib.gis.geos import GeometryCollection, Point
+
         pub_harvested_with_geo = Work.objects.create(
-            title='Harvested with Geometry',
-            status='h',
-            doi='10.1234/harvested-geo',
+            title="Harvested with Geometry",
+            status="h",
+            doi="10.1234/harvested-geo",
             geometry=GeometryCollection(Point(13.405, 52.52)),
-            source=self.source
+            source=self.source,
         )
 
-        self.client.login(username='admin@example.com', password='adminpass123')
+        self.client.login(username="admin@example.com", password="adminpass123")
 
-        url = f'/work/{pub_harvested_with_geo.doi}/publish/'
-        response = self.client.post(url, content_type='application/json')
+        url = f"/work/{pub_harvested_with_geo.doi}/publish/"
+        response = self.client.post(url, content_type="application/json")
 
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertTrue(data['success'])
+        self.assertTrue(data["success"])
 
         # Verify database changes
         pub_harvested_with_geo.refresh_from_db()
-        self.assertEqual(pub_harvested_with_geo.status, 'p')  # Published
-        events = pub_harvested_with_geo.provenance.get('events', []) if isinstance(pub_harvested_with_geo.provenance, dict) else []
-        self.assertTrue(any(
-            ev.get('type') == 'publish' and ev.get('status_from') == 'h' and ev.get('status_to') == 'p'
-            for ev in events
-        ), f"publish event not found in {events!r}")
+        self.assertEqual(pub_harvested_with_geo.status, "p")  # Published
+        events = (
+            pub_harvested_with_geo.provenance.get("events", [])
+            if isinstance(pub_harvested_with_geo.provenance, dict)
+            else []
+        )
+        self.assertTrue(
+            any(
+                ev.get("type") == "publish" and ev.get("status_from") == "h" and ev.get("status_to") == "p"
+                for ev in events
+            ),
+            f"publish event not found in {events!r}",
+        )
 
 
 class WorkflowIntegrationTests(TestCase):
@@ -477,24 +464,19 @@ class WorkflowIntegrationTests(TestCase):
 
         # Create users
         self.contributor = User.objects.create_user(
-            username='contributor@example.com',
-            email='contributor@example.com',
-            password='testpass123'
+            username="contributor@example.com", email="contributor@example.com", password="testpass123"
         )
 
         self.admin = User.objects.create_user(
-            username='admin@example.com',
-            email='admin@example.com',
-            password='adminpass123',
+            username="admin@example.com",
+            email="admin@example.com",
+            password="adminpass123",
             is_staff=True,
-            is_superuser=True
+            is_superuser=True,
         )
 
         # Create source
-        self.source = Source.objects.create(
-            name="Test Journal",
-            url_field="https://example.com/oai"
-        )
+        self.source = Source.objects.create(name="Test Journal", url_field="https://example.com/oai")
 
         # Create harvested publication
         self.work = Work.objects.create(
@@ -506,63 +488,62 @@ class WorkflowIntegrationTests(TestCase):
             publicationDate=timezone.now().date(),
             geometry=GeometryCollection(),
             source=self.source,
-            provenance={}
+            provenance={},
         )
 
         self.test_geometry = {
             "type": "GeometryCollection",
-            "geometries": [
-                {
-                    "type": "Point",
-                    "coordinates": [13.4050, 52.5200]
-                }
-            ]
+            "geometries": [{"type": "Point", "coordinates": [13.4050, 52.5200]}],
         }
 
     def test_complete_workflow(self):
         """Test complete workflow: harvest -> contribute -> publish."""
         # Step 1: Verify initial state
-        self.assertEqual(self.work.status, 'h')
+        self.assertEqual(self.work.status, "h")
         self.assertTrue(self.work.geometry.empty)
 
         # Step 2: User contributes geometry
-        self.client.login(username='contributor@example.com', password='testpass123')
-        contribute_url = f'/work/{self.work.doi}/contribute-geometry/'
+        self.client.login(username="contributor@example.com", password="testpass123")
+        contribute_url = f"/work/{self.work.doi}/contribute-geometry/"
         response = self.client.post(
-            contribute_url,
-            data=json.dumps({'geometry': self.test_geometry}),
-            content_type='application/json'
+            contribute_url, data=json.dumps({"geometry": self.test_geometry}), content_type="application/json"
         )
         self.assertEqual(response.status_code, 200)
 
         # Verify contribution
         self.work.refresh_from_db()
-        self.assertEqual(self.work.status, 'c')  # Contributed
+        self.assertEqual(self.work.status, "c")  # Contributed
         self.assertFalse(self.work.geometry.empty)
-        events_after_contribute = self.work.provenance.get('events', [])
-        self.assertTrue(any(
-            ev.get('type') == 'contribution' and ev.get('user_email') == 'contributor@example.com'
-            for ev in events_after_contribute
-        ))
+        events_after_contribute = self.work.provenance.get("events", [])
+        self.assertTrue(
+            any(
+                ev.get("type") == "contribution" and ev.get("user_email") == "contributor@example.com"
+                for ev in events_after_contribute
+            )
+        )
 
         # Step 3: Admin publishes the contribution
-        self.client.login(username='admin@example.com', password='adminpass123')
-        publish_url = f'/work/{self.work.doi}/publish/'
-        response = self.client.post(publish_url, content_type='application/json')
+        self.client.login(username="admin@example.com", password="adminpass123")
+        publish_url = f"/work/{self.work.doi}/publish/"
+        response = self.client.post(publish_url, content_type="application/json")
         self.assertEqual(response.status_code, 200)
 
         # Verify publication
         self.work.refresh_from_db()
-        self.assertEqual(self.work.status, 'p')  # Published
+        self.assertEqual(self.work.status, "p")  # Published
 
         # Verify complete provenance trail (legacy text seed + 2 structured events)
-        events = self.work.provenance.get('events', [])
-        self.assertTrue(any(ev.get('type') == 'contribution' for ev in events))
-        self.assertTrue(any(
-            ev.get('type') == 'publish' and ev.get('user_email') == 'admin@example.com'
-            and ev.get('status_from') == 'c' and ev.get('status_to') == 'p'
-            for ev in events
-        ))
+        events = self.work.provenance.get("events", [])
+        self.assertTrue(any(ev.get("type") == "contribution" for ev in events))
+        self.assertTrue(
+            any(
+                ev.get("type") == "publish"
+                and ev.get("user_email") == "admin@example.com"
+                and ev.get("status_from") == "c"
+                and ev.get("status_to") == "p"
+                for ev in events
+            )
+        )
 
 
 class UnpublishWorkTests(TestCase):
@@ -573,98 +554,96 @@ class UnpublishWorkTests(TestCase):
         self.client = Client()
 
         # Create source
-        self.source = Source.objects.create(
-            name='Test Source',
-            is_oa=True,
-            is_preprint=False
-        )
+        self.source = Source.objects.create(name="Test Source", is_oa=True, is_preprint=False)
 
         # Create users
         self.regular_user = User.objects.create_user(
-            username='user@example.com',
-            email='user@example.com',
-            password='testpass123'
+            username="user@example.com", email="user@example.com", password="testpass123"
         )
 
         self.admin_user = User.objects.create_user(
-            username='admin@example.com',
-            email='admin@example.com',
-            password='adminpass123',
+            username="admin@example.com",
+            email="admin@example.com",
+            password="adminpass123",
             is_staff=True,
-            is_superuser=True
+            is_superuser=True,
         )
 
         # Create published publication
         self.pub_published = Work.objects.create(
-            title='Published Publication',
-            status='p',  # Published
-            doi='10.1234/published',
+            title="Published Publication",
+            status="p",  # Published
+            doi="10.1234/published",
             geometry=GeometryCollection(Point(13.405, 52.52)),
-            source=self.source
+            source=self.source,
         )
 
         # Create contributed publication (not yet published)
         self.pub_contributed = Work.objects.create(
-            title='Contributed Publication',
-            status='c',  # Contributed
-            doi='10.1234/contributed',
+            title="Contributed Publication",
+            status="c",  # Contributed
+            doi="10.1234/contributed",
             geometry=GeometryCollection(Point(13.405, 52.52)),
-            source=self.source
+            source=self.source,
         )
 
     def test_unpublish_requires_admin(self):
         """Test that unpublishing requires admin privileges."""
-        self.client.login(username='user@example.com', password='testpass123')
+        self.client.login(username="user@example.com", password="testpass123")
 
-        url = f'/work/{self.pub_published.doi}/unpublish/'
-        response = self.client.post(url, content_type='application/json')
+        url = f"/work/{self.pub_published.doi}/unpublish/"
+        response = self.client.post(url, content_type="application/json")
 
         # staff_member_required redirects non-staff users
         self.assertEqual(response.status_code, 302)
 
     def test_unpublish_success(self):
         """Test successful unpublishing."""
-        self.client.login(username='admin@example.com', password='adminpass123')
+        self.client.login(username="admin@example.com", password="adminpass123")
 
-        url = f'/work/{self.pub_published.doi}/unpublish/'
-        response = self.client.post(url, content_type='application/json')
+        url = f"/work/{self.pub_published.doi}/unpublish/"
+        response = self.client.post(url, content_type="application/json")
 
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertTrue(data['success'])
-        self.assertIn('unpublished', data['message'].lower())
+        self.assertTrue(data["success"])
+        self.assertIn("unpublished", data["message"].lower())
 
         # Verify database changes
         self.pub_published.refresh_from_db()
-        self.assertEqual(self.pub_published.status, 'd')  # Draft
+        self.assertEqual(self.pub_published.status, "d")  # Draft
 
         # Verify provenance event was appended (structured JSON since 0.13.0)
-        events = self.pub_published.provenance.get('events', [])
-        self.assertTrue(any(
-            ev.get('type') == 'unpublish'
-            and ev.get('user_email') == 'admin@example.com'
-            and ev.get('status_from') == 'p' and ev.get('status_to') == 'd'
-            for ev in events
-        ), f"unpublish event not found in {events!r}")
+        events = self.pub_published.provenance.get("events", [])
+        self.assertTrue(
+            any(
+                ev.get("type") == "unpublish"
+                and ev.get("user_email") == "admin@example.com"
+                and ev.get("status_from") == "p"
+                and ev.get("status_to") == "d"
+                for ev in events
+            ),
+            f"unpublish event not found in {events!r}",
+        )
 
     def test_unpublish_wrong_status(self):
         """Test that only published publications can be unpublished."""
-        self.client.login(username='admin@example.com', password='adminpass123')
+        self.client.login(username="admin@example.com", password="adminpass123")
 
-        url = f'/work/{self.pub_contributed.doi}/unpublish/'
-        response = self.client.post(url, content_type='application/json')
+        url = f"/work/{self.pub_contributed.doi}/unpublish/"
+        response = self.client.post(url, content_type="application/json")
 
         self.assertEqual(response.status_code, 400)
         data = response.json()
-        self.assertEqual(data['error'], 'Can only unpublish published works')
+        self.assertEqual(data["error"], "Can only unpublish published works")
 
     def test_unpublish_publication_not_found(self):
         """Test unpublishing non-existent publication."""
-        self.client.login(username='admin@example.com', password='adminpass123')
+        self.client.login(username="admin@example.com", password="adminpass123")
 
-        url = '/work/10.1234/nonexistent/unpublish/'
-        response = self.client.post(url, content_type='application/json')
+        url = "/work/10.1234/nonexistent/unpublish/"
+        response = self.client.post(url, content_type="application/json")
 
         self.assertEqual(response.status_code, 404)
         data = response.json()
-        self.assertEqual(data['error'], 'Work not found')
+        self.assertEqual(data["error"], "Work not found")

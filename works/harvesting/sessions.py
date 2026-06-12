@@ -8,7 +8,6 @@ from django.conf import settings
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-
 # OAI-PMH ---------------------------------------------------------------------
 
 OAI_HTTP_TIMEOUT = 30  # seconds; per-request, applies to both connect and read
@@ -35,10 +34,12 @@ def _oai_session() -> requests.Session:
     adapter = HTTPAdapter(max_retries=retry)
     session.mount("http://", adapter)
     session.mount("https://", adapter)
-    session.headers.update({
-        "User-Agent": OAI_USER_AGENT,
-        "Accept": "text/xml, application/xml, */*",
-    })
+    session.headers.update(
+        {
+            "User-Agent": OAI_USER_AGENT,
+            "Accept": "text/xml, application/xml, */*",
+        }
+    )
     return session
 
 
@@ -82,10 +83,12 @@ def _crossref_session():
         allowed_methods=frozenset(["GET"]),
     )
     session.mount("https://", HTTPAdapter(max_retries=retry))
-    session.headers.update({
-        "User-Agent": CROSSREF_USER_AGENT,
-        "Accept": "application/json",
-    })
+    session.headers.update(
+        {
+            "User-Agent": CROSSREF_USER_AGENT,
+            "Accept": "application/json",
+        }
+    )
     return session
 
 
@@ -113,10 +116,12 @@ def _openalex_session():
         allowed_methods=frozenset(["GET"]),
     )
     session.mount("https://", HTTPAdapter(max_retries=retry))
-    session.headers.update({
-        "User-Agent": OPENALEX_USER_AGENT,
-        "Accept": "application/json",
-    })
+    session.headers.update(
+        {
+            "User-Agent": OPENALEX_USER_AGENT,
+            "Accept": "application/json",
+        }
+    )
     return session
 
 
@@ -129,7 +134,9 @@ MWR_HTTP_TIMEOUT = 60  # seconds; MaRESS responses can be hefty (study_sites emb
 def _mwr_session() -> requests.Session:
     session = requests.Session()
     retry = Retry(
-        total=3, connect=3, read=3,
+        total=3,
+        connect=3,
+        read=3,
         backoff_factor=1.5,
         status_forcelist=(429, 500, 502, 503, 504),
         allowed_methods=frozenset(["GET"]),

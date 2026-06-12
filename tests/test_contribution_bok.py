@@ -15,7 +15,6 @@ from django.utils import timezone
 from works.bok import client as bok_client
 from works.models import Collection, Contribution, Source, Work
 
-
 User = get_user_model()
 FIXTURE_PATH = os.path.join(os.path.dirname(__file__), "fixtures", "bok_sample.json")
 
@@ -107,7 +106,9 @@ class ContributeBokTests(TestCase):
         self._post({"add": ["CV"]})
         self._post({"add": ["AM10"]})
         rows = Contribution.objects.filter(
-            user=self.user, work=self.work, kind=Contribution.ONTOLOGY,
+            user=self.user,
+            work=self.work,
+            kind=Contribution.ONTOLOGY,
         )
         self.assertEqual(rows.count(), 1)
 
@@ -185,7 +186,9 @@ class ContributeBokTests(TestCase):
     @override_settings(BOK_ENABLED_COLLECTIONS=["alpha"])
     def test_collection_gate_allows_work_in_enabled_collection(self):
         alpha = Collection.objects.create(
-            identifier="alpha", name="Alpha", is_published=True,
+            identifier="alpha",
+            name="Alpha",
+            is_published=True,
         )
         self.work.collections.add(alpha)
         resp = self._post({"add": ["CV"]})

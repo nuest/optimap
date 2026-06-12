@@ -25,31 +25,51 @@ _profanity.load_censor_words()
 
 @dataclass(frozen=True)
 class Tier:
-    level: int                # 1 (lowest) to 5 (highest)
-    min_total: int            # inclusive lower bound on total contributions
-    name: str                 # explorer name shown as tier title
-    description: str          # short tagline for the recognition board page
-    wikipedia_url: str        # link to the explorer's Wikipedia article
+    level: int  # 1 (lowest) to 5 (highest)
+    min_total: int  # inclusive lower bound on total contributions
+    name: str  # explorer name shown as tier title
+    description: str  # short tagline for the recognition board page
+    wikipedia_url: str  # link to the explorer's Wikipedia article
 
 
 # Tiers ordered from highest threshold to lowest. Names taken from
 # https://www.historyhit.com/most-important-explorers-of-the-world/ .
 RECOGNITION_TIERS: List[Tier] = [
-    Tier(level=5, min_total=10000, name="Roald Amundsen",
-         description="Reached the South Pole — 10000+ contributions.",
-         wikipedia_url="https://en.wikipedia.org/wiki/Roald_Amundsen"),
-    Tier(level=4, min_total=1000, name="James Cook",
-         description="Charted the Pacific — 1000+ contributions.",
-         wikipedia_url="https://en.wikipedia.org/wiki/James_Cook"),
-    Tier(level=3, min_total=100, name="Ferdinand Magellan",
-         description="First circumnavigation — 100+ contributions.",
-         wikipedia_url="https://en.wikipedia.org/wiki/Ferdinand_Magellan"),
-    Tier(level=2, min_total=10, name="Vasco da Gama",
-         description="Sea route to India — 10+ contributions.",
-         wikipedia_url="https://en.wikipedia.org/wiki/Vasco_da_Gama"),
-    Tier(level=1, min_total=1, name="Marco Polo",
-         description="First steps along the Silk Road — your first contribution.",
-         wikipedia_url="https://en.wikipedia.org/wiki/Marco_Polo"),
+    Tier(
+        level=5,
+        min_total=10000,
+        name="Roald Amundsen",
+        description="Reached the South Pole — 10000+ contributions.",
+        wikipedia_url="https://en.wikipedia.org/wiki/Roald_Amundsen",
+    ),
+    Tier(
+        level=4,
+        min_total=1000,
+        name="James Cook",
+        description="Charted the Pacific — 1000+ contributions.",
+        wikipedia_url="https://en.wikipedia.org/wiki/James_Cook",
+    ),
+    Tier(
+        level=3,
+        min_total=100,
+        name="Ferdinand Magellan",
+        description="First circumnavigation — 100+ contributions.",
+        wikipedia_url="https://en.wikipedia.org/wiki/Ferdinand_Magellan",
+    ),
+    Tier(
+        level=2,
+        min_total=10,
+        name="Vasco da Gama",
+        description="Sea route to India — 10+ contributions.",
+        wikipedia_url="https://en.wikipedia.org/wiki/Vasco_da_Gama",
+    ),
+    Tier(
+        level=1,
+        min_total=1,
+        name="Marco Polo",
+        description="First steps along the Silk Road — your first contribution.",
+        wikipedia_url="https://en.wikipedia.org/wiki/Marco_Polo",
+    ),
 ]
 
 
@@ -105,14 +125,11 @@ def generate_random_username(max_attempts: int = 5) -> str:
     in `UserProfile.recognition_username`.
     """
     taken = set(
-        UserProfile.objects.exclude(recognition_username__isnull=True)
-        .values_list("recognition_username", flat=True)
+        UserProfile.objects.exclude(recognition_username__isnull=True).values_list("recognition_username", flat=True)
     )
     for _ in range(max_attempts):
         candidate = generate_slug(2)
-        if (candidate not in taken
-                and len(candidate) <= 64
-                and not is_offensive(candidate)):
+        if candidate not in taken and len(candidate) <= 64 and not is_offensive(candidate):
             return candidate
     # Last-resort fallback: tack on a 4-digit suffix.
     base = generate_slug(2)[:59]

@@ -20,8 +20,13 @@ logger = logging.getLogger(__name__)
 
 
 _GEOJSON_TYPES = {
-    "Point", "MultiPoint", "LineString", "MultiLineString",
-    "Polygon", "MultiPolygon", "GeometryCollection",
+    "Point",
+    "MultiPoint",
+    "LineString",
+    "MultiLineString",
+    "Polygon",
+    "MultiPolygon",
+    "GeometryCollection",
 }
 
 
@@ -31,16 +36,23 @@ def _wrap_in_collection(geom: GEOSGeometry) -> GEOSGeometry:
     # directly so we always end up with a real GEOMETRYCOLLECTION.
     if geom.geom_type == "GeometryCollection":
         return geom
-    return GEOSGeometry(json.dumps({
-        "type": "GeometryCollection",
-        "geometries": [json.loads(geom.geojson)],
-    }))
+    return GEOSGeometry(
+        json.dumps(
+            {
+                "type": "GeometryCollection",
+                "geometries": [json.loads(geom.geojson)],
+            }
+        )
+    )
 
 
 def _polygon_from_bbox(west, south, east, north) -> Polygon:
     coords = (
-        (west, south), (east, south), (east, north),
-        (west, north), (west, south),
+        (west, south),
+        (east, south),
+        (east, north),
+        (west, north),
+        (west, south),
     )
     poly = Polygon(coords)
     poly.srid = 4326

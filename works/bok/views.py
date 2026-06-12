@@ -42,11 +42,17 @@ _BOK_ERROR = inline_serializer(
     tags=["Body of Knowledge"],
     parameters=[
         OpenApiParameter(
-            "q", str, OpenApiParameter.QUERY, required=True,
+            "q",
+            str,
+            OpenApiParameter.QUERY,
+            required=True,
             description="Free-text query (≥ 3 characters).",
         ),
         OpenApiParameter(
-            "limit", int, OpenApiParameter.QUERY, required=False,
+            "limit",
+            int,
+            OpenApiParameter.QUERY,
+            required=False,
             description="Maximum number of results (default 10, max 50).",
         ),
     ],
@@ -73,9 +79,11 @@ def bok_search(request):
             status=502,
         )
 
-    return JsonResponse({
-        "query": query,
-        "min_query_length": bok_client.MIN_QUERY_LENGTH,
-        "count": len(results),
-        "results": results,
-    })
+    return JsonResponse(
+        {
+            "query": query,
+            "min_query_length": bok_client.MIN_QUERY_LENGTH,
+            "count": len(results),
+            "results": results,
+        }
+    )

@@ -27,153 +27,183 @@ def render_provenance(provenance):
     bottom so curators can still see it.
     """
     if not provenance:
-        return ''
+        return ""
     if not isinstance(provenance, dict):
         # Tolerate legacy text that escaped the migration.
         return format_html('<pre class="provenance-pre">{}</pre>', provenance)
 
     sections = []
-    harvest = provenance.get('harvest')
+    harvest = provenance.get("harvest")
     if isinstance(harvest, dict):
         rows = []
         for label, key in (
-            ('Harvester', 'harvester'),
-            ('Source name', 'source_name'),
-            ('Source type', 'source_type'),
-            ('Source URL', 'source_url'),
-            ('Harvested at', 'harvested_at'),
-            ('Event ID', 'harvesting_event_id'),
-            ('DOI', 'doi'),
+            ("Harvester", "harvester"),
+            ("Source name", "source_name"),
+            ("Source type", "source_type"),
+            ("Source URL", "source_url"),
+            ("Harvested at", "harvested_at"),
+            ("Event ID", "harvesting_event_id"),
+            ("DOI", "doi"),
         ):
             v = harvest.get(key)
-            if v is None or v == '':
+            if v is None or v == "":
                 continue
             rows.append((label, str(v)))
         if rows:
-            sections.append(format_html(
-                '<h6 class="mt-2 mb-1">Harvest</h6><dl class="row mb-2 small">{}</dl>',
-                format_html_join('', '<dt class="col-sm-3 text-muted">{}</dt><dd class="col-sm-9">{}</dd>', rows),
-            ))
-        if isinstance(harvest.get('original_record'), (dict, list)):
-            sections.append(format_html(
-                '<details class="small mb-2"><summary>Original record</summary>'
-                '<pre class="provenance-pre">{}</pre></details>',
-                json.dumps(harvest['original_record'], indent=2, sort_keys=True),
-            ))
+            sections.append(
+                format_html(
+                    '<h6 class="mt-2 mb-1">Harvest</h6><dl class="row mb-2 small">{}</dl>',
+                    format_html_join("", '<dt class="col-sm-3 text-muted">{}</dt><dd class="col-sm-9">{}</dd>', rows),
+                )
+            )
+        if isinstance(harvest.get("original_record"), (dict, list)):
+            sections.append(
+                format_html(
+                    '<details class="small mb-2"><summary>Original record</summary>'
+                    '<pre class="provenance-pre">{}</pre></details>',
+                    json.dumps(harvest["original_record"], indent=2, sort_keys=True),
+                )
+            )
 
-    metadata_sources = provenance.get('metadata_sources')
+    metadata_sources = provenance.get("metadata_sources")
     if isinstance(metadata_sources, dict) and metadata_sources:
         rows = [(k, v) for k, v in sorted(metadata_sources.items())]
-        sections.append(format_html(
-            '<h6 class="mt-2 mb-1">Metadata sources</h6><dl class="row mb-2 small">{}</dl>',
-            format_html_join('', '<dt class="col-sm-3 text-muted">{}</dt><dd class="col-sm-9">{}</dd>', rows),
-        ))
+        sections.append(
+            format_html(
+                '<h6 class="mt-2 mb-1">Metadata sources</h6><dl class="row mb-2 small">{}</dl>',
+                format_html_join("", '<dt class="col-sm-3 text-muted">{}</dt><dd class="col-sm-9">{}</dd>', rows),
+            )
+        )
 
-    openalex_match = provenance.get('openalex_match')
+    openalex_match = provenance.get("openalex_match")
     if isinstance(openalex_match, dict) and openalex_match:
-        rows = [(k, json.dumps(v) if not isinstance(v, str) else v)
-                for k, v in openalex_match.items() if k != 'top_candidate']
+        rows = [
+            (k, json.dumps(v) if not isinstance(v, str) else v)
+            for k, v in openalex_match.items()
+            if k != "top_candidate"
+        ]
         block = format_html(
             '<h6 class="mt-2 mb-1">OpenAlex match</h6><dl class="row mb-2 small">{}</dl>',
-            format_html_join('', '<dt class="col-sm-3 text-muted">{}</dt><dd class="col-sm-9">{}</dd>', rows),
+            format_html_join("", '<dt class="col-sm-3 text-muted">{}</dt><dd class="col-sm-9">{}</dd>', rows),
         )
-        if openalex_match.get('top_candidate'):
+        if openalex_match.get("top_candidate"):
             block = format_html(
                 '{}<details class="small mb-2"><summary>Top candidate</summary>'
                 '<pre class="provenance-pre">{}</pre></details>',
                 block,
-                json.dumps(openalex_match['top_candidate'], indent=2, sort_keys=True),
+                json.dumps(openalex_match["top_candidate"], indent=2, sort_keys=True),
             )
         sections.append(block)
 
-    geocoding = provenance.get('geocoding')
+    geocoding = provenance.get("geocoding")
     if isinstance(geocoding, dict) and geocoding:
         rows = []
         for label, key in (
-            ('Gazetteer', 'gazetteer'),
-            ('Gazetteer URL', 'gazetteer_url'),
-            ('Placename', 'placename'),
-            ('Country code', 'country_code'),
-            ('Points geocoded', 'n_geocoded'),
-            ('Geocoded at', 'geocoded_at'),
+            ("Gazetteer", "gazetteer"),
+            ("Gazetteer URL", "gazetteer_url"),
+            ("Placename", "placename"),
+            ("Country code", "country_code"),
+            ("Points geocoded", "n_geocoded"),
+            ("Geocoded at", "geocoded_at"),
         ):
             v = geocoding.get(key)
-            if v is None or v == '':
+            if v is None or v == "":
                 continue
             rows.append((label, str(v)))
-        block = format_html(
-            '<h6 class="mt-2 mb-1">Reverse geocoding</h6>'
-            '<p class="small text-muted mb-1">Placename and country code derived from the work\'s geometries via the Nominatim gazetteer.</p>'
-            '<dl class="row mb-2 small">{}</dl>',
-            format_html_join('', '<dt class="col-sm-3 text-muted">{}</dt><dd class="col-sm-9">{}</dd>', rows),
-        ) if rows else ''
+        block = (
+            format_html(
+                '<h6 class="mt-2 mb-1">Reverse geocoding</h6>'
+                '<p class="small text-muted mb-1">Placename and country code derived from the work\'s geometries via the Nominatim gazetteer.</p>'
+                '<dl class="row mb-2 small">{}</dl>',
+                format_html_join("", '<dt class="col-sm-3 text-muted">{}</dt><dd class="col-sm-9">{}</dd>', rows),
+            )
+            if rows
+            else ""
+        )
 
-        matches = geocoding.get('matches')
+        matches = geocoding.get("matches")
         if isinstance(matches, list) and matches:
             match_items = []
             for m in matches:
                 if not isinstance(m, dict):
                     continue
-                display = m.get('display_name') or '(no display name)'
-                osm_url = m.get('osm_url')
-                osm_type = m.get('osm_type')
-                osm_id = m.get('osm_id')
-                lat = m.get('lat')
-                lon = m.get('lon')
+                display = m.get("display_name") or "(no display name)"
+                osm_url = m.get("osm_url")
+                osm_type = m.get("osm_type")
+                osm_id = m.get("osm_id")
+                lat = m.get("lat")
+                lon = m.get("lon")
                 # Format: "(lat, lon) → display name [OSM relation/51477]"
                 if osm_url and osm_type and osm_id:
                     osm_link = format_html(
                         ' <a href="{}" target="_blank" rel="noopener">OSM {}/{}</a>',
-                        osm_url, osm_type, osm_id,
+                        osm_url,
+                        osm_type,
+                        osm_id,
                     )
                 else:
-                    osm_link = ''
-                match_items.append(format_html(
-                    '<li><code>({}, {})</code> → {}{}</li>',
-                    lat, lon, display, osm_link,
-                ))
+                    osm_link = ""
+                match_items.append(
+                    format_html(
+                        "<li><code>({}, {})</code> → {}{}</li>",
+                        lat,
+                        lon,
+                        display,
+                        osm_link,
+                    )
+                )
             if match_items:
                 block = format_html(
                     '{}<details class="small mb-2"><summary>Per-point Nominatim matches ({})</summary>'
                     '<ul class="small">{}</ul></details>',
-                    block, len(match_items), mark_safe(''.join(match_items)),
+                    block,
+                    len(match_items),
+                    mark_safe("".join(match_items)),
                 )
 
         if block:
             sections.append(block)
 
-    events = provenance.get('events')
+    events = provenance.get("events")
     if isinstance(events, list) and events:
         rows = []
         for ev in events:
             if not isinstance(ev, dict):
                 continue
-            kind = escape(ev.get('type', '?'))
-            at = escape(ev.get('at', ''))
-            details = {k: v for k, v in ev.items() if k not in ('type', 'at')}
+            kind = escape(ev.get("type", "?"))
+            at = escape(ev.get("at", ""))
+            details = {k: v for k, v in ev.items() if k not in ("type", "at")}
             details_html = format_html_join(
-                ' ', '<span class="text-muted">{}</span>=<code>{}</code>',
+                " ",
+                '<span class="text-muted">{}</span>=<code>{}</code>',
                 ((k, json.dumps(v) if not isinstance(v, str) else v) for k, v in details.items()),
             )
-            rows.append(format_html(
-                '<li class="mb-1"><strong>{}</strong> <small class="text-muted">{}</small> {}</li>',
-                kind, at, details_html,
-            ))
-        sections.append(format_html(
-            '<h6 class="mt-2 mb-1">Events</h6><ul class="list-unstyled small">{}</ul>',
-            mark_safe(''.join(rows)),
-        ))
+            rows.append(
+                format_html(
+                    '<li class="mb-1"><strong>{}</strong> <small class="text-muted">{}</small> {}</li>',
+                    kind,
+                    at,
+                    details_html,
+                )
+            )
+        sections.append(
+            format_html(
+                '<h6 class="mt-2 mb-1">Events</h6><ul class="list-unstyled small">{}</ul>',
+                mark_safe("".join(rows)),
+            )
+        )
 
     # Anything else — show raw JSON so nothing is hidden.
-    known = {'harvest', 'metadata_sources', 'openalex_match', 'geocoding', 'events'}
+    known = {"harvest", "metadata_sources", "openalex_match", "geocoding", "events"}
     leftover = {k: v for k, v in provenance.items() if k not in known}
     if leftover:
-        sections.append(format_html(
-            '<details class="small"><summary>Other</summary>'
-            '<pre class="provenance-pre">{}</pre></details>',
-            json.dumps(leftover, indent=2, sort_keys=True),
-        ))
+        sections.append(
+            format_html(
+                '<details class="small"><summary>Other</summary><pre class="provenance-pre">{}</pre></details>',
+                json.dumps(leftover, indent=2, sort_keys=True),
+            )
+        )
 
     if not sections:
-        return ''
-    return mark_safe('<div class="provenance-rendered">' + ''.join(sections) + '</div>')
+        return ""
+    return mark_safe('<div class="provenance-rendered">' + "".join(sections) + "</div>")

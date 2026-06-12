@@ -2,135 +2,110 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import os
-import unittest
-import django
 import time
-import responses
+import unittest
 from pathlib import Path
+
+import django
+import responses
 from django.test import Client, TestCase, tag
 
 # bootstrap Django
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'optimap.settings')
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "optimap.settings")
 django.setup()
 
-from works.models import Work, Source, HarvestingEvent, Schedule
-from works.tasks import (
-    parse_oai_xml_and_save_works,
-    harvest_oai_endpoint,
-    parse_rss_feed_and_save_publications,
-    harvest_rss_endpoint,
-    extract_geometry_from_html,
-    extract_timeperiod_from_html,
-)
 from bs4 import BeautifulSoup
 from django.contrib.auth import get_user_model
+
+from works.models import HarvestingEvent, Schedule, Source, Work
+from works.tasks import (
+    extract_geometry_from_html,
+    extract_timeperiod_from_html,
+    harvest_oai_endpoint,
+    harvest_rss_endpoint,
+    parse_oai_xml_and_save_works,
+    parse_rss_feed_and_save_publications,
+)
 
 User = get_user_model()
 BASE_TEST_DIR = Path(__file__).resolve().parent
 
-class SimpleTest(TestCase):
 
+class SimpleTest(TestCase):
     @responses.activate
     def setUp(self):
         super().setUp()
 
         Work.objects.all().delete()
 
-        article01_path = BASE_TEST_DIR / 'harvesting' / 'source_1' / 'article_01.html'
-        article02_path = BASE_TEST_DIR / 'harvesting' / 'source_1' / 'article_02.html'
+        article01_path = BASE_TEST_DIR / "harvesting" / "source_1" / "article_01.html"
+        article02_path = BASE_TEST_DIR / "harvesting" / "source_1" / "article_02.html"
         with open(article01_path) as f1, open(article02_path) as f2:
-            responses.add(
-                responses.GET,
-                'http://localhost:8330/index.php/opti-geo/article/view/1',
-                body=f1.read()
-            )
-            responses.add(
-                responses.GET,
-                'http://localhost:8330/index.php/opti-geo/article/view/2',
-                body=f2.read()
-            )
+            responses.add(responses.GET, "http://localhost:8330/index.php/opti-geo/article/view/1", body=f1.read())
+            responses.add(responses.GET, "http://localhost:8330/index.php/opti-geo/article/view/2", body=f2.read())
 
-        src = Source.objects.create(
-            url_field="http://example.org/oai",
-            harvest_interval_minutes=60
-        )
+        src = Source.objects.create(url_field="http://example.org/oai", harvest_interval_minutes=60)
         event = HarvestingEvent.objects.create(source=src, status="in_progress")
 
-        oai_path = BASE_TEST_DIR / 'harvesting' / 'source_1' / 'oai_dc.xml'
+        oai_path = BASE_TEST_DIR / "harvesting" / "source_1" / "oai_dc.xml"
         xml_bytes = oai_path.read_bytes()
         parse_oai_xml_and_save_works(xml_bytes, event)
 
         Work.objects.all().update(status="p")
 
-        self.user = User.objects.create_user(
-            username="testuser",
-            email="testuser@example.com",
-            password="password123"
-        )
+        self.user = User.objects.create_user(username="testuser", email="testuser@example.com", password="password123")
         self.client = Client()
 
-        results = self.client.get('/api/v1/works/').json()['results']
-        features = results.get('features', [])
+        results = self.client.get("/api/v1/works/").json()["results"]
+        features = results.get("features", [])
         if len(features) >= 2:
-            self.id1, self.id2 = features[1]['id'], features[0]['id']
+            self.id1, self.id2 = features[1]["id"], features[0]["id"]
         elif len(features) == 1:
-            self.id1 = self.id2 = features[0]['id']
+            self.id1 = self.id2 = features[0]["id"]
         else:
             self.id1 = self.id2 = None
 
     def test_api_root(self):
-        response = self.client.get('/api/v1/works/')
+        response = self.client.get("/api/v1/works/")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.get('Content-Type'), 'application/json')
-        results = response.json()['results']
-        self.assertEqual(results['type'], 'FeatureCollection')
-        self.assertEqual(len(results['features']), 2)
+        self.assertEqual(response.get("Content-Type"), "application/json")
+        results = response.json()["results"]
+        self.assertEqual(results["type"], "FeatureCollection")
+        self.assertEqual(len(results["features"]), 2)
 
     def test_api_publication_1(self):
-        response = self.client.get(f'/api/v1/works/{self.id1}.json')
+        response = self.client.get(f"/api/v1/works/{self.id1}.json")
         self.assertEqual(response.status_code, 200)
         body = response.json()
-        self.assertEqual(body['type'], 'Feature')
-        self.assertEqual(body['geometry']['type'], 'GeometryCollection')
-        self.assertEqual(body['geometry']['geometries'][0]['type'], 'LineString')
-        self.assertEqual(body['properties']['title'], 'Test 1: One')
-        self.assertEqual(body['properties']['publicationDate'], '2022-07-01')
-        self.assertEqual(body['properties']['timeperiod_startdate'], ['2022-06-01'])
-        self.assertEqual(
-            body['properties']['url'],
-            'http://localhost:8330/index.php/opti-geo/article/view/1'
-        )
+        self.assertEqual(body["type"], "Feature")
+        self.assertEqual(body["geometry"]["type"], "GeometryCollection")
+        self.assertEqual(body["geometry"]["geometries"][0]["type"], "LineString")
+        self.assertEqual(body["properties"]["title"], "Test 1: One")
+        self.assertEqual(body["properties"]["publicationDate"], "2022-07-01")
+        self.assertEqual(body["properties"]["timeperiod_startdate"], ["2022-06-01"])
+        self.assertEqual(body["properties"]["url"], "http://localhost:8330/index.php/opti-geo/article/view/1")
 
     def test_api_publication_2(self):
-        response = self.client.get(f'/api/v1/works/{self.id2}.json')
+        response = self.client.get(f"/api/v1/works/{self.id2}.json")
         self.assertEqual(response.status_code, 200)
         body = response.json()
-        self.assertEqual(body['type'], 'Feature')
-        self.assertEqual(body['geometry']['type'], 'GeometryCollection')
-        self.assertEqual(body['geometry']['geometries'][0]['type'], 'Polygon')
-        self.assertEqual(body['properties']['title'], 'Test 2: Two')
-        self.assertIsNone(body['properties']['doi'])
-        self.assertEqual(body['properties']['timeperiod_enddate'], ['2022-03-31'])
-        self.assertEqual(
-            body['properties']['url'],
-            'http://localhost:8330/index.php/opti-geo/article/view/2'
-        )
+        self.assertEqual(body["type"], "Feature")
+        self.assertEqual(body["geometry"]["type"], "GeometryCollection")
+        self.assertEqual(body["geometry"]["geometries"][0]["type"], "Polygon")
+        self.assertEqual(body["properties"]["title"], "Test 2: Two")
+        self.assertIsNone(body["properties"]["doi"])
+        self.assertEqual(body["properties"]["timeperiod_enddate"], ["2022-03-31"])
+        self.assertEqual(body["properties"]["url"], "http://localhost:8330/index.php/opti-geo/article/view/2")
 
-        props = body['properties']
-        self.assertEqual(props['title'], 'Test 2: Two')
-        self.assertIsNone(props['doi'])
-        self.assertEqual(props['timeperiod_enddate'], ['2022-03-31'])
-        self.assertEqual(
-            props['url'],
-            'http://localhost:8330/index.php/opti-geo/article/view/2'
-        )
+        props = body["properties"]
+        self.assertEqual(props["title"], "Test 2: Two")
+        self.assertIsNone(props["doi"])
+        self.assertEqual(props["timeperiod_enddate"], ["2022-03-31"])
+        self.assertEqual(props["url"], "http://localhost:8330/index.php/opti-geo/article/view/2")
 
     def test_task_scheduling(self):
         oai_file_path = BASE_TEST_DIR / "harvesting" / "journal_1" / "oai_dc.xml"
-        new_src = Source.objects.create(
-            url_field=f"file://{oai_file_path}",
-            harvest_interval_minutes=60
-        )
+        new_src = Source.objects.create(url_field=f"file://{oai_file_path}", harvest_interval_minutes=60)
         time.sleep(2)
         schedule_q = Schedule.objects.filter(name=f"Harvest Source {new_src.id}")
         self.assertTrue(schedule_q.exists(), "Django-Q task not scheduled for source.")
@@ -142,13 +117,10 @@ class SimpleTest(TestCase):
         self.assertEqual(len(titles), len(set(titles)), "Duplicate titles found")
 
     def test_invalid_xml_input(self):
-        src = Source.objects.create(
-            url_field="http://example.org/invalid",
-            harvest_interval_minutes=60
-        )
+        src = Source.objects.create(url_field="http://example.org/invalid", harvest_interval_minutes=60)
         event = HarvestingEvent.objects.create(source=src, status="in_progress")
 
-        invalid_xml = b'<invalid>malformed xml without proper closing'
+        invalid_xml = b"<invalid>malformed xml without proper closing"
         initial_count = Work.objects.count()
 
         parse_oai_xml_and_save_works(invalid_xml, event)
@@ -157,13 +129,10 @@ class SimpleTest(TestCase):
 
     def test_empty_xml_input(self):
         """Test harvesting with empty XML input"""
-        src = Source.objects.create(
-            url_field="http://example.org/empty",
-            harvest_interval_minutes=60
-        )
+        src = Source.objects.create(url_field="http://example.org/empty", harvest_interval_minutes=60)
         event = HarvestingEvent.objects.create(source=src, status="in_progress")
 
-        empty_xml = b''
+        empty_xml = b""
         initial_count = Work.objects.count()
 
         parse_oai_xml_and_save_works(empty_xml, event)
@@ -172,20 +141,17 @@ class SimpleTest(TestCase):
 
     def test_xml_with_no_records(self):
         """Test harvesting with valid XML but no record elements"""
-        src = Source.objects.create(
-            url_field="http://example.org/norecords",
-            harvest_interval_minutes=60
-        )
+        src = Source.objects.create(url_field="http://example.org/norecords", harvest_interval_minutes=60)
         event = HarvestingEvent.objects.create(source=src, status="in_progress")
 
-        no_records_xml = b'''<?xml version="1.0" encoding="UTF-8"?>
+        no_records_xml = b"""<?xml version="1.0" encoding="UTF-8"?>
         <OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/">
             <responseDate>2024-01-01T00:00:00Z</responseDate>
             <request verb="ListRecords">http://example.org/oai</request>
             <ListRecords>
                 <!-- No record elements -->
             </ListRecords>
-        </OAI-PMH>'''
+        </OAI-PMH>"""
 
         initial_count = Work.objects.count()
 
@@ -194,14 +160,11 @@ class SimpleTest(TestCase):
         self.assertEqual(Work.objects.count(), initial_count)
 
     def test_xml_with_invalid_record_data(self):
-        src = Source.objects.create(
-            url_field="http://example.org/invaliddata",
-            harvest_interval_minutes=60
-        )
+        src = Source.objects.create(url_field="http://example.org/invaliddata", harvest_interval_minutes=60)
         event = HarvestingEvent.objects.create(source=src, status="in_progress")
 
         # XML with record but missing required fields
-        invalid_data_xml = b'''<?xml version="1.0" encoding="UTF-8"?>
+        invalid_data_xml = b"""<?xml version="1.0" encoding="UTF-8"?>
         <OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/">
             <responseDate>2024-01-01T00:00:00Z</responseDate>
             <request verb="ListRecords">http://example.org/oai</request>
@@ -220,7 +183,7 @@ class SimpleTest(TestCase):
                     </metadata>
                 </record>
             </ListRecords>
-        </OAI-PMH>'''
+        </OAI-PMH>"""
 
         initial_count = Work.objects.count()
 
@@ -231,6 +194,7 @@ class SimpleTest(TestCase):
     @staticmethod
     def _skip_if_oai_unreachable(url, expect_ok=True):
         import requests as _requests
+
         try:
             r = _requests.head(url, timeout=8, allow_redirects=True)
         except _requests.RequestException as e:
@@ -243,11 +207,10 @@ class SimpleTest(TestCase):
                 raise unittest.SkipTest(f"endpoint unreachable: {url}: {e}")
         if expect_ok and not r.ok:
             raise unittest.SkipTest(
-                f"endpoint returned HTTP {r.status_code} for {url} — "
-                f"upstream is down/moved, skipping live test"
+                f"endpoint returned HTTP {r.status_code} for {url} — upstream is down/moved, skipping live test"
             )
 
-    @tag('online')
+    @tag("online")
     def test_real_journal_harvesting_essd(self):
         """Test harvesting from actual ESSD Copernicus endpoint"""
         from works.tasks import harvest_oai_endpoint
@@ -258,11 +221,7 @@ class SimpleTest(TestCase):
         # Clear existing publications for clean test
         Work.objects.all().delete()
 
-        src = Source.objects.create(
-            url_field=url,
-            harvest_interval_minutes=1440,
-            name="ESSD Copernicus"
-        )
+        src = Source.objects.create(url_field=url, harvest_interval_minutes=1440, name="ESSD Copernicus")
 
         initial_count = Work.objects.count()
 
@@ -283,7 +242,7 @@ class SimpleTest(TestCase):
             if pub.doi:
                 self.assertIn("10.5194", pub.doi, "ESSD DOIs should contain Copernicus prefix")
 
-    @tag('online')
+    @tag("online")
     def test_real_journal_harvesting_geo_leo(self):
         """Test harvesting from actual GEO-LEO e-docs endpoint"""
         from works.tasks import harvest_oai_endpoint
@@ -294,11 +253,7 @@ class SimpleTest(TestCase):
         # Clear existing publications for clean test
         Work.objects.all().delete()
 
-        src = Source.objects.create(
-            url_field=url,
-            harvest_interval_minutes=1440,
-            name="GEO-LEO e-docs"
-        )
+        src = Source.objects.create(url_field=url, harvest_interval_minutes=1440, name="GEO-LEO e-docs")
 
         initial_count = Work.objects.count()
 
@@ -316,7 +271,7 @@ class SimpleTest(TestCase):
             self.assertIsNotNone(pub.title, f"Publication {pub.id} missing title")
             self.assertIsNotNone(pub.url, f"Publication {pub.id} missing URL")
 
-    @tag('online')
+    @tag("online")
     def test_real_journal_harvesting_agile_giss(self):
         """Test harvesting from actual AGILE-GISS endpoint"""
         from works.tasks import harvest_oai_endpoint
@@ -325,9 +280,7 @@ class SimpleTest(TestCase):
         Work.objects.all().delete()
 
         src = Source.objects.create(
-            url_field="https://www.agile-giscience-series.net",
-            harvest_interval_minutes=1440,
-            name="AGILE-GISS"
+            url_field="https://www.agile-giscience-series.net", harvest_interval_minutes=1440, name="AGILE-GISS"
         )
 
         initial_count = Work.objects.count()
@@ -367,19 +320,14 @@ class HarvestingErrorTests(TestCase):
         """Set up test sources and events."""
         Work.objects.all().delete()
         self.source = Source.objects.create(
-            url_field="http://example.com/oai",
-            harvest_interval_minutes=60,
-            name="Error Test Source"
+            url_field="http://example.com/oai", harvest_interval_minutes=60, name="Error Test Source"
         )
 
     def test_malformed_xml(self):
         """Test that malformed XML is handled gracefully."""
-        event = HarvestingEvent.objects.create(
-            source=self.source,
-            status="in_progress"
-        )
+        event = HarvestingEvent.objects.create(source=self.source, status="in_progress")
 
-        malformed_xml_path = BASE_TEST_DIR / 'harvesting' / 'error_cases' / 'malformed_xml.xml'
+        malformed_xml_path = BASE_TEST_DIR / "harvesting" / "error_cases" / "malformed_xml.xml"
         xml_bytes = malformed_xml_path.read_bytes()
 
         # Should not raise exception, but should log error
@@ -391,12 +339,9 @@ class HarvestingErrorTests(TestCase):
 
     def test_empty_response(self):
         """Test that empty OAI-PMH response (no records) is handled."""
-        event = HarvestingEvent.objects.create(
-            source=self.source,
-            status="in_progress"
-        )
+        event = HarvestingEvent.objects.create(source=self.source, status="in_progress")
 
-        empty_xml_path = BASE_TEST_DIR / 'harvesting' / 'error_cases' / 'empty_response.xml'
+        empty_xml_path = BASE_TEST_DIR / "harvesting" / "error_cases" / "empty_response.xml"
         xml_bytes = empty_xml_path.read_bytes()
 
         # Should not raise exception
@@ -408,12 +353,9 @@ class HarvestingErrorTests(TestCase):
 
     def test_invalid_xml_structure(self):
         """Test that non-OAI-PMH XML structure is handled."""
-        event = HarvestingEvent.objects.create(
-            source=self.source,
-            status="in_progress"
-        )
+        event = HarvestingEvent.objects.create(source=self.source, status="in_progress")
 
-        invalid_xml_path = BASE_TEST_DIR / 'harvesting' / 'error_cases' / 'invalid_xml_structure.xml'
+        invalid_xml_path = BASE_TEST_DIR / "harvesting" / "error_cases" / "invalid_xml_structure.xml"
         xml_bytes = invalid_xml_path.read_bytes()
 
         # Should not raise exception
@@ -425,12 +367,9 @@ class HarvestingErrorTests(TestCase):
 
     def test_missing_required_metadata(self):
         """Test that records with missing required fields are handled."""
-        event = HarvestingEvent.objects.create(
-            source=self.source,
-            status="in_progress"
-        )
+        event = HarvestingEvent.objects.create(source=self.source, status="in_progress")
 
-        missing_metadata_path = BASE_TEST_DIR / 'harvesting' / 'error_cases' / 'missing_metadata.xml'
+        missing_metadata_path = BASE_TEST_DIR / "harvesting" / "error_cases" / "missing_metadata.xml"
         xml_bytes = missing_metadata_path.read_bytes()
 
         # Should not raise exception - may create some publications
@@ -450,10 +389,7 @@ class HarvestingErrorTests(TestCase):
 
     def test_empty_content(self):
         """Test that empty/None content is handled."""
-        event = HarvestingEvent.objects.create(
-            source=self.source,
-            status="in_progress"
-        )
+        event = HarvestingEvent.objects.create(source=self.source, status="in_progress")
 
         # Test with empty bytes
         parse_oai_xml_and_save_works(b"", event)
@@ -469,47 +405,31 @@ class HarvestingErrorTests(TestCase):
     def test_http_404_error(self):
         """Test that HTTP 404 errors are handled properly."""
         # Mock a 404 response
-        responses.add(
-            responses.GET,
-            'http://example.com/oai-404',
-            status=404,
-            body='Not Found'
-        )
+        responses.add(responses.GET, "http://example.com/oai-404", status=404, body="Not Found")
 
-        source = Source.objects.create(
-            url_field="http://example.com/oai-404",
-            harvest_interval_minutes=60
-        )
+        source = Source.objects.create(url_field="http://example.com/oai-404", harvest_interval_minutes=60)
 
         # harvest_oai_endpoint should handle the error
         harvest_oai_endpoint(source.id)
 
         # Check that event was marked as failed
-        event = HarvestingEvent.objects.filter(source=source).latest('started_at')
-        self.assertEqual(event.status, 'failed', "Event should be marked as failed for 404 error")
+        event = HarvestingEvent.objects.filter(source=source).latest("started_at")
+        self.assertEqual(event.status, "failed", "Event should be marked as failed for 404 error")
 
     @responses.activate
     def test_http_500_error(self):
         """Test that HTTP 500 errors are handled properly."""
         # Mock a 500 response
-        responses.add(
-            responses.GET,
-            'http://example.com/oai-500',
-            status=500,
-            body='Internal Server Error'
-        )
+        responses.add(responses.GET, "http://example.com/oai-500", status=500, body="Internal Server Error")
 
-        source = Source.objects.create(
-            url_field="http://example.com/oai-500",
-            harvest_interval_minutes=60
-        )
+        source = Source.objects.create(url_field="http://example.com/oai-500", harvest_interval_minutes=60)
 
         # harvest_oai_endpoint should handle the error
         harvest_oai_endpoint(source.id)
 
         # Check that event was marked as failed
-        event = HarvestingEvent.objects.filter(source=source).latest('started_at')
-        self.assertEqual(event.status, 'failed', "Event should be marked as failed for 500 error")
+        event = HarvestingEvent.objects.filter(source=source).latest("started_at")
+        self.assertEqual(event.status, "failed", "Event should be marked as failed for 500 error")
 
     @responses.activate
     def test_network_timeout(self):
@@ -517,23 +437,16 @@ class HarvestingErrorTests(TestCase):
         from requests.exceptions import Timeout
 
         # Mock a timeout
-        responses.add(
-            responses.GET,
-            'http://example.com/oai-timeout',
-            body=Timeout('Connection timeout')
-        )
+        responses.add(responses.GET, "http://example.com/oai-timeout", body=Timeout("Connection timeout"))
 
-        source = Source.objects.create(
-            url_field="http://example.com/oai-timeout",
-            harvest_interval_minutes=60
-        )
+        source = Source.objects.create(url_field="http://example.com/oai-timeout", harvest_interval_minutes=60)
 
         # harvest_oai_endpoint should handle the timeout
         harvest_oai_endpoint(source.id)
 
         # Check that event was marked as failed
-        event = HarvestingEvent.objects.filter(source=source).latest('started_at')
-        self.assertEqual(event.status, 'failed', "Event should be marked as failed for timeout")
+        event = HarvestingEvent.objects.filter(source=source).latest("started_at")
+        self.assertEqual(event.status, "failed", "Event should be marked as failed for timeout")
 
     @responses.activate
     def test_invalid_xml_in_http_response(self):
@@ -545,34 +458,26 @@ class HarvestingErrorTests(TestCase):
         """
         responses.add(
             responses.GET,
-            'http://example.com/oai-invalid',
+            "http://example.com/oai-invalid",
             status=200,
-            body='This is not XML at all',
-            content_type='text/xml',
+            body="This is not XML at all",
+            content_type="text/xml",
         )
 
-        source = Source.objects.create(
-            url_field="http://example.com/oai-invalid",
-            harvest_interval_minutes=60
-        )
+        source = Source.objects.create(url_field="http://example.com/oai-invalid", harvest_interval_minutes=60)
 
         harvest_oai_endpoint(source.id)
 
-        event = HarvestingEvent.objects.filter(source=source).latest('started_at')
-        self.assertEqual(event.status, 'failed',
-                         "Non-XML body should now mark the event failed")
-        self.assertEqual(Work.objects.filter(job=event).count(), 0,
-                         "Invalid XML should create zero publications")
+        event = HarvestingEvent.objects.filter(source=source).latest("started_at")
+        self.assertEqual(event.status, "failed", "Non-XML body should now mark the event failed")
+        self.assertEqual(Work.objects.filter(job=event).count(), 0, "Invalid XML should create zero publications")
 
     def test_max_records_limit_with_errors(self):
         """Test that max_records works even when some records cause errors."""
-        event = HarvestingEvent.objects.create(
-            source=self.source,
-            status="in_progress"
-        )
+        event = HarvestingEvent.objects.create(source=self.source, status="in_progress")
 
         # Use the missing metadata file which has 2 records, one problematic
-        missing_metadata_path = BASE_TEST_DIR / 'harvesting' / 'error_cases' / 'missing_metadata.xml'
+        missing_metadata_path = BASE_TEST_DIR / "harvesting" / "error_cases" / "missing_metadata.xml"
         xml_bytes = missing_metadata_path.read_bytes()
 
         # Limit to 1 record
@@ -597,18 +502,18 @@ class HarvestingHttpHardeningTests(TestCase):
         # operator had no quick clue what the upstream actually returned.
         responses.add(
             responses.GET,
-            'http://example.com/oai-html-404',
+            "http://example.com/oai-html-404",
             status=404,
-            content_type='text/html',
-            body='<!DOCTYPE HTML><html><body><h1>Not Found</h1></body></html>',
+            content_type="text/html",
+            body="<!DOCTYPE HTML><html><body><h1>Not Found</h1></body></html>",
         )
         src = Source.objects.create(
-            url_field='http://example.com/oai-html-404',
+            url_field="http://example.com/oai-html-404",
             harvest_interval_minutes=60,
         )
         harvest_oai_endpoint(src.id)
-        event = HarvestingEvent.objects.filter(source=src).latest('started_at')
-        self.assertEqual(event.status, 'failed')
+        event = HarvestingEvent.objects.filter(source=src).latest("started_at")
+        self.assertEqual(event.status, "failed")
 
     @responses.activate
     def test_html_200_error_page_is_rejected_before_xml_parse(self):
@@ -617,19 +522,18 @@ class HarvestingHttpHardeningTests(TestCase):
         # rather than handing HTML to the XML parser.
         responses.add(
             responses.GET,
-            'http://example.com/oai-html-200',
+            "http://example.com/oai-html-200",
             status=200,
-            content_type='text/html',
-            body='<!DOCTYPE HTML><html><body>Maintenance window</body></html>',
+            content_type="text/html",
+            body="<!DOCTYPE HTML><html><body>Maintenance window</body></html>",
         )
         src = Source.objects.create(
-            url_field='http://example.com/oai-html-200',
+            url_field="http://example.com/oai-html-200",
             harvest_interval_minutes=60,
         )
         harvest_oai_endpoint(src.id)
-        event = HarvestingEvent.objects.filter(source=src).latest('started_at')
-        self.assertEqual(event.status, 'failed',
-                         'Non-XML 200 response must mark the event failed')
+        event = HarvestingEvent.objects.filter(source=src).latest("started_at")
+        self.assertEqual(event.status, "failed", "Non-XML 200 response must mark the event failed")
         # And no Works should have been created from the HTML body.
         self.assertEqual(Work.objects.filter(job=event).count(), 0)
 
@@ -641,46 +545,45 @@ class HarvestingHttpHardeningTests(TestCase):
         for _ in range(2):
             responses.add(
                 responses.GET,
-                'http://example.com/oai-flaky',
+                "http://example.com/oai-flaky",
                 status=503,
-                body='Service Unavailable',
+                body="Service Unavailable",
             )
-        oai_path = BASE_TEST_DIR / 'harvesting' / 'source_1' / 'oai_dc.xml'
+        oai_path = BASE_TEST_DIR / "harvesting" / "source_1" / "oai_dc.xml"
         responses.add(
             responses.GET,
-            'http://example.com/oai-flaky',
+            "http://example.com/oai-flaky",
             status=200,
-            content_type='text/xml',
+            content_type="text/xml",
             body=oai_path.read_bytes(),
         )
         src = Source.objects.create(
-            url_field='http://example.com/oai-flaky',
+            url_field="http://example.com/oai-flaky",
             harvest_interval_minutes=60,
         )
         harvest_oai_endpoint(src.id)
-        event = HarvestingEvent.objects.filter(source=src).latest('started_at')
-        self.assertEqual(event.status, 'completed',
-                         'Transient 503s must be retried until success')
+        event = HarvestingEvent.objects.filter(source=src).latest("started_at")
+        self.assertEqual(event.status, "completed", "Transient 503s must be retried until success")
 
     @responses.activate
     def test_user_agent_header_is_set(self):
         # Identifies our harvester traffic to upstream operators (so e.g.
         # Copernicus can contact us if we hammer them).
-        oai_path = BASE_TEST_DIR / 'harvesting' / 'source_1' / 'oai_dc.xml'
+        oai_path = BASE_TEST_DIR / "harvesting" / "source_1" / "oai_dc.xml"
         responses.add(
             responses.GET,
-            'http://example.com/oai-ua',
+            "http://example.com/oai-ua",
             status=200,
-            content_type='text/xml',
+            content_type="text/xml",
             body=oai_path.read_bytes(),
         )
         src = Source.objects.create(
-            url_field='http://example.com/oai-ua',
+            url_field="http://example.com/oai-ua",
             harvest_interval_minutes=60,
         )
         harvest_oai_endpoint(src.id)
-        sent_ua = responses.calls[0].request.headers.get('User-Agent', '')
-        self.assertIn('OPTIMAP', sent_ua)
+        sent_ua = responses.calls[0].request.headers.get("User-Agent", "")
+        self.assertIn("OPTIMAP", sent_ua)
 
 
 class RSSFeedHarvestingTests(TestCase):
@@ -698,19 +601,14 @@ class RSSFeedHarvestingTests(TestCase):
         """Set up test source for RSS feeds."""
         Work.objects.all().delete()
         self.source = Source.objects.create(
-            url_field="https://www.example.com/feed.rss",
-            harvest_interval_minutes=60,
-            name="Test RSS Source"
+            url_field="https://www.example.com/feed.rss", harvest_interval_minutes=60, name="Test RSS Source"
         )
 
     def test_parse_rss_feed_from_file(self):
         """Test parsing RSS feed from local file."""
-        event = HarvestingEvent.objects.create(
-            source=self.source,
-            status="in_progress"
-        )
+        event = HarvestingEvent.objects.create(source=self.source, status="in_progress")
 
-        rss_feed_path = BASE_TEST_DIR / 'harvesting' / 'rss_feed_sample.xml'
+        rss_feed_path = BASE_TEST_DIR / "harvesting" / "rss_feed_sample.xml"
         feed_url = f"file://{rss_feed_path}"
 
         processed, saved = parse_rss_feed_and_save_publications(feed_url, event)
@@ -724,23 +622,20 @@ class RSSFeedHarvestingTests(TestCase):
         self.assertEqual(pubs.count(), 2)
 
         # Check first publication
-        pub1 = pubs.filter(doi='10.1234/test-001').first()
+        pub1 = pubs.filter(doi="10.1234/test-001").first()
         self.assertIsNotNone(pub1)
-        self.assertEqual(pub1.title, 'Test Article One: Data Repository')
-        self.assertEqual(pub1.url, 'https://www.example.com/articles/test-article-1')
-        self.assertEqual(str(pub1.publicationDate), '2025-10-01')
+        self.assertEqual(pub1.title, "Test Article One: Data Repository")
+        self.assertEqual(pub1.url, "https://www.example.com/articles/test-article-1")
+        self.assertEqual(str(pub1.publicationDate), "2025-10-01")
 
         # Check second publication
-        pub2 = pubs.filter(doi='10.1234/test-002').first()
+        pub2 = pubs.filter(doi="10.1234/test-002").first()
         self.assertIsNotNone(pub2)
-        self.assertEqual(pub2.title, 'Test Article Two: Analysis Methods')
+        self.assertEqual(pub2.title, "Test Article Two: Analysis Methods")
 
     def test_rss_duplicate_detection_by_doi(self):
         """Test that duplicate detection works by DOI."""
-        event = HarvestingEvent.objects.create(
-            source=self.source,
-            status="in_progress"
-        )
+        event = HarvestingEvent.objects.create(source=self.source, status="in_progress")
 
         # Create existing publication with same DOI
         Work.objects.create(
@@ -748,10 +643,10 @@ class RSSFeedHarvestingTests(TestCase):
             doi="10.1234/test-001",
             source=self.source,
             timeperiod_startdate=[],
-            timeperiod_enddate=[]
+            timeperiod_enddate=[],
         )
 
-        rss_feed_path = BASE_TEST_DIR / 'harvesting' / 'rss_feed_sample.xml'
+        rss_feed_path = BASE_TEST_DIR / "harvesting" / "rss_feed_sample.xml"
         feed_url = f"file://{rss_feed_path}"
 
         processed, saved = parse_rss_feed_and_save_publications(feed_url, event)
@@ -762,10 +657,7 @@ class RSSFeedHarvestingTests(TestCase):
 
     def test_rss_duplicate_detection_by_url(self):
         """Test that duplicate detection works by URL."""
-        event = HarvestingEvent.objects.create(
-            source=self.source,
-            status="in_progress"
-        )
+        event = HarvestingEvent.objects.create(source=self.source, status="in_progress")
 
         # Create existing publication with same URL
         Work.objects.create(
@@ -773,10 +665,10 @@ class RSSFeedHarvestingTests(TestCase):
             url="https://www.example.com/articles/test-article-1",
             source=self.source,
             timeperiod_startdate=[],
-            timeperiod_enddate=[]
+            timeperiod_enddate=[],
         )
 
-        rss_feed_path = BASE_TEST_DIR / 'harvesting' / 'rss_feed_sample.xml'
+        rss_feed_path = BASE_TEST_DIR / "harvesting" / "rss_feed_sample.xml"
         feed_url = f"file://{rss_feed_path}"
 
         processed, saved = parse_rss_feed_and_save_publications(feed_url, event)
@@ -787,12 +679,9 @@ class RSSFeedHarvestingTests(TestCase):
 
     def test_rss_max_records_limit(self):
         """Test that max_records parameter limits RSS harvesting."""
-        event = HarvestingEvent.objects.create(
-            source=self.source,
-            status="in_progress"
-        )
+        event = HarvestingEvent.objects.create(source=self.source, status="in_progress")
 
-        rss_feed_path = BASE_TEST_DIR / 'harvesting' / 'rss_feed_sample.xml'
+        rss_feed_path = BASE_TEST_DIR / "harvesting" / "rss_feed_sample.xml"
         feed_url = f"file://{rss_feed_path}"
 
         # Limit to 1 record
@@ -806,7 +695,7 @@ class RSSFeedHarvestingTests(TestCase):
 
     def test_harvest_rss_endpoint_from_file(self):
         """Test complete RSS harvesting workflow from file."""
-        rss_feed_path = BASE_TEST_DIR / 'harvesting' / 'rss_feed_sample.xml'
+        rss_feed_path = BASE_TEST_DIR / "harvesting" / "rss_feed_sample.xml"
 
         # Update source to use file:// URL
         self.source.url_field = f"file://{rss_feed_path}"
@@ -816,8 +705,8 @@ class RSSFeedHarvestingTests(TestCase):
         harvest_rss_endpoint(self.source.id, max_records=10)
 
         # Check event status
-        event = HarvestingEvent.objects.filter(source=self.source).latest('started_at')
-        self.assertEqual(event.status, 'completed')
+        event = HarvestingEvent.objects.filter(source=self.source).latest("started_at")
+        self.assertEqual(event.status, "completed")
 
         # Check publications
         pubs = Work.objects.filter(job=event)
@@ -833,9 +722,9 @@ class RSSFeedHarvestingTests(TestCase):
         harvest_rss_endpoint(self.source.id)
 
         # Check event was marked as completed (feedparser returns empty feed for invalid URLs)
-        event = HarvestingEvent.objects.filter(source=self.source).latest('started_at')
+        event = HarvestingEvent.objects.filter(source=self.source).latest("started_at")
         # Event completes but creates no publications
-        self.assertEqual(event.status, 'completed')
+        self.assertEqual(event.status, "completed")
 
         # No publications should be created
         pubs = Work.objects.filter(job=event)
@@ -843,10 +732,7 @@ class RSSFeedHarvestingTests(TestCase):
 
     def test_rss_invalid_feed_url(self):
         """Test handling of invalid RSS feed URL."""
-        event = HarvestingEvent.objects.create(
-            source=self.source,
-            status="in_progress"
-        )
+        event = HarvestingEvent.objects.create(source=self.source, status="in_progress")
 
         # Try to parse non-existent file
         feed_url = "file:///tmp/nonexistent_feed.xml"
@@ -858,7 +744,7 @@ class RSSFeedHarvestingTests(TestCase):
         self.assertEqual(saved, 0)
 
 
-JANEWAY_FIXTURES = BASE_TEST_DIR / 'harvesting' / 'janeway'
+JANEWAY_FIXTURES = BASE_TEST_DIR / "harvesting" / "janeway"
 
 
 def _load_soup(name):
@@ -918,12 +804,12 @@ class JanewayGeometadataExtractionTests(TestCase):
     def test_geojson_link_branch(self):
         href = "http://janeway.test/dqj/plugins/geometadata/download/article/53/geojson/"
         body = (JANEWAY_FIXTURES / "article_geojson_link.geojson").read_text()
-        responses.add(responses.GET, href, body=body,
-                      content_type="application/geo+json", status=200)
+        responses.add(responses.GET, href, body=body, content_type="application/geo+json", status=200)
         soup = _load_soup("article_geojson_link.html")
         # base_url forces the relative href in the fixture to resolve to the mocked absolute URL
         geom, label = extract_geometry_from_html(
-            soup, base_url="http://janeway.test/dqj/article/id/53/",
+            soup,
+            base_url="http://janeway.test/dqj/article/id/53/",
         )
         self.assertEqual(label, "link rel=alternate geo+json")
         self.assertEnvelope(geom, *self.SULAWESI_BBOX)
@@ -944,8 +830,7 @@ class JanewayGeometadataExtractionTests(TestCase):
     @responses.activate
     def test_geojson_link_falls_through_on_malformed_body(self):
         href = "https://example.invalid/feature_collection.geojson"
-        responses.add(responses.GET, href, body="not json",
-                      content_type="application/geo+json", status=200)
+        responses.add(responses.GET, href, body="not json", content_type="application/geo+json", status=200)
         soup = _load_soup("article_link_and_dc.html")
         geom, label = extract_geometry_from_html(soup)
         self.assertEqual(label, "DC.SpatialCoverage")
@@ -981,15 +866,13 @@ class JanewayGeometadataExtractionTests(TestCase):
         geom, label = extract_geometry_from_html(soup)
         self.assertEqual(label, "schema.org JSON-LD")
         self.assertEnvelope(geom, *self.SULAWESI_BBOX)
-        self.assertEqual(len(responses.calls), 0,
-                         "geo+json link should not be fetched when JSON-LD matches first")
+        self.assertEqual(len(responses.calls), 0, "geo+json link should not be fetched when JSON-LD matches first")
 
     @responses.activate
     def test_priority_geojson_link_beats_dc_when_no_jsonld(self):
         href = "https://example.invalid/feature_collection.geojson"
         body = (JANEWAY_FIXTURES / "article_geojson_link.geojson").read_text()
-        responses.add(responses.GET, href, body=body,
-                      content_type="application/geo+json", status=200)
+        responses.add(responses.GET, href, body=body, content_type="application/geo+json", status=200)
         soup = _load_soup("article_link_and_dc.html")
         geom, label = extract_geometry_from_html(soup)
         self.assertEqual(label, "link rel=alternate geo+json")

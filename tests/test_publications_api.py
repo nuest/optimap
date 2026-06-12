@@ -1,22 +1,25 @@
 # SPDX-FileCopyrightText: 2022 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from datetime import date
 import os
-from django.test import Client, TestCase
-from works.models import Work
-from django.contrib.gis.geos import Point, MultiPoint, LineString, Polygon, GeometryCollection
+from datetime import date
+
 from django.contrib.auth import get_user_model
+from django.contrib.gis.geos import GeometryCollection, LineString, MultiPoint, Point, Polygon
+from django.test import Client, TestCase
+
+from works.models import Work
+
 User = get_user_model()
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'optimap.settings')
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "optimap.settings")
+
 
 class PublicationsApiTest(TestCase):
-    
     def setUp(self):
         self.client = Client()
-        self.user = User.objects.create_user('unittest', 'unit@test.com', 'test')
-        self.client.login(username='unittest', password='test')
+        self.user = User.objects.create_user("unittest", "unit@test.com", "test")
+        self.client.login(username="unittest", password="test")
 
         pub1 = Work.objects.create(
             title="Publication One",
@@ -28,7 +31,8 @@ class PublicationsApiTest(TestCase):
                 Point(0, 0),
                 MultiPoint(Point(10, 10), Point(20, 20)),
                 LineString([Point(11, 12), Point(31, 32)]),
-                Polygon( ((52, 8), (55, 8), (55, 9), (52, 8)) ))
+                Polygon(((52, 8), (55, 8), (55, 9), (52, 8))),
+            ),
         )
         pub1.save()
 
@@ -39,7 +43,7 @@ class PublicationsApiTest(TestCase):
             status="p",
             publicationDate=date(2022, 10, 24),
             doi="10.1234/test-doi-two",
-            geometry=GeometryCollection(Point(1, 1))
+            geometry=GeometryCollection(Point(1, 1)),
         )
         pub2.save()
 
@@ -47,48 +51,50 @@ class PublicationsApiTest(TestCase):
         Work.objects.all().delete()
 
     def test_api_redirect(self):
-        response = self.client.get('/api')
+        response = self.client.get("/api")
         self.assertEqual(response.status_code, 301)
-        self.assertEqual(response.url, '/api/')
+        self.assertEqual(response.url, "/api/")
 
-        response = self.client.get('/api/')
+        response = self.client.get("/api/")
         self.assertEqual(response.status_code, 301)
-        self.assertEqual(response.url, 'v1/')
+        self.assertEqual(response.url, "v1/")
 
-        response = self.client.get('/api/v1')
+        response = self.client.get("/api/v1")
         self.assertEqual(response.status_code, 301)
-        self.assertEqual(response.url, '/api/v1/')
+        self.assertEqual(response.url, "/api/v1/")
 
     def test_api_root(self):
-        response = self.client.get('/api/v1/works/')
+        response = self.client.get("/api/v1/works/")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.get('Content-Type'), 'application/json')
+        self.assertEqual(response.get("Content-Type"), "application/json")
 
-        results = response.json()['results']
+        results = response.json()["results"]
 
-        self.assertEqual(results['type'], 'FeatureCollection')
-        self.assertEqual(len(results['features']), 2)
+        self.assertEqual(results["type"], "FeatureCollection")
+        self.assertEqual(len(results["features"]), 2)
 
     def test_api_publication(self):
-        all = self.client.get('/api/v1/works/').json()
-        one_publication = [feat for feat in all['results']['features'] if feat['properties']['title'] == 'Publication One']
-        #print('\n\n %s \n\n' % all)
-        response = self.client.get('/api/v1/works/%s.json' % one_publication[0]['id'])
+        all = self.client.get("/api/v1/works/").json()
+        one_publication = [
+            feat for feat in all["results"]["features"] if feat["properties"]["title"] == "Publication One"
+        ]
+        # print('\n\n %s \n\n' % all)
+        response = self.client.get("/api/v1/works/%s.json" % one_publication[0]["id"])
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.get('Content-Type'), 'application/json')
+        self.assertEqual(response.get("Content-Type"), "application/json")
 
         body = response.json()
-        self.assertEqual(body['type'], 'Feature')
-        self.assertEqual(body['geometry']['type'], 'GeometryCollection')
+        self.assertEqual(body["type"], "Feature")
+        self.assertEqual(body["geometry"]["type"], "GeometryCollection")
 
-        self.assertEqual(len(body['geometry']['geometries']), 4)
-        self.assertEqual(body['geometry']['geometries'][2]['type'], 'LineString')
-        self.assertEqual(body['geometry']['geometries'][2]['coordinates'][0], [11.0, 12.0])
-        self.assertEqual(body['properties']['title'], 'Publication One')
-        self.assertEqual(body['properties']['publicationDate'], '2022-10-10')
+        self.assertEqual(len(body["geometry"]["geometries"]), 4)
+        self.assertEqual(body["geometry"]["geometries"][2]["type"], "LineString")
+        self.assertEqual(body["geometry"]["geometries"][2]["coordinates"][0], [11.0, 12.0])
+        self.assertEqual(body["properties"]["title"], "Publication One")
+        self.assertEqual(body["properties"]["publicationDate"], "2022-10-10")
 
     def test_api_publication_99_missing(self):
-        response = self.client.get('/api/v1/works/99.json')
+        response = self.client.get("/api/v1/works/99.json")
         self.assertEqual(response.status_code, 404)
 
     def test_api_exposes_placename_and_country_code(self):
@@ -105,30 +111,30 @@ class PublicationsApiTest(TestCase):
             geometry=GeometryCollection(Point(13.405, 52.52)),
         )
         Work.objects.filter(pk=pub.pk).update(placename="Berlin", country_code="DE")
-        response = self.client.get(f'/api/v1/works/{pub.id}.json')
+        response = self.client.get(f"/api/v1/works/{pub.id}.json")
         self.assertEqual(response.status_code, 200)
-        properties = response.json()['properties']
-        self.assertEqual(properties['placename'], 'Berlin')
-        self.assertEqual(properties['country_code'], 'DE')
+        properties = response.json()["properties"]
+        self.assertEqual(properties["placename"], "Berlin")
+        self.assertEqual(properties["country_code"], "DE")
 
     def test_api_emits_null_placename_when_unset(self):
         # Works without geocoding still expose the keys (set to null) so the
         # response shape is stable for clients.
-        properties = self.client.get('/api/v1/works/').json()['results']['features'][0]['properties']
-        self.assertIn('placename', properties)
-        self.assertIn('country_code', properties)
-        self.assertIsNone(properties['placename'])
-        self.assertIsNone(properties['country_code'])
+        properties = self.client.get("/api/v1/works/").json()["results"]["features"][0]["properties"]
+        self.assertIn("placename", properties)
+        self.assertIn("country_code", properties)
+        self.assertIsNone(properties["placename"])
+        self.assertIsNone(properties["country_code"])
 
     def test_api_exposes_status_for_frontend_layer_split(self):
         # The frontend splits the map into a "Published" and an "Unpublished"
         # overlay (visible to admins) using `properties.status`. Pin the
         # contract so it doesn't silently regress.
-        properties = self.client.get('/api/v1/works/').json()['results']['features'][0]['properties']
-        self.assertIn('status', properties)
-        self.assertIn('status_display', properties)
-        self.assertEqual(properties['status'], 'p')
-        self.assertEqual(properties['status_display'], 'Published')
+        properties = self.client.get("/api/v1/works/").json()["results"]["features"][0]["properties"]
+        self.assertIn("status", properties)
+        self.assertIn("status_display", properties)
+        self.assertEqual(properties["status"], "p")
+        self.assertEqual(properties["status_display"], "Published")
 
     def test_api_returns_unpublished_only_to_staff(self):
         # Anonymous / non-staff users see only Published works. Staff users
@@ -143,13 +149,13 @@ class PublicationsApiTest(TestCase):
         )
 
         # Non-staff (logged-in user from setUp) — only published works.
-        body = self.client.get('/api/v1/works/').json()
-        statuses = sorted(f['properties']['status'] for f in body['results']['features'])
-        self.assertEqual(statuses, ['p', 'p'])
+        body = self.client.get("/api/v1/works/").json()
+        statuses = sorted(f["properties"]["status"] for f in body["results"]["features"])
+        self.assertEqual(statuses, ["p", "p"])
 
         # Staff — published and unpublished.
-        admin = User.objects.create_user('admintest', 'admin@test.com', 'test', is_staff=True)
+        admin = User.objects.create_user("admintest", "admin@test.com", "test", is_staff=True)
         self.client.force_login(admin)
-        body = self.client.get('/api/v1/works/').json()
-        statuses = sorted(f['properties']['status'] for f in body['results']['features'])
-        self.assertEqual(statuses, ['h', 'p', 'p'])
+        body = self.client.get("/api/v1/works/").json()
+        statuses = sorted(f["properties"]["status"] for f in body["results"]["features"])
+        self.assertEqual(statuses, ["h", "p", "p"])

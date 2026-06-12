@@ -3,18 +3,16 @@
 
 """Tests for the GeoScienceWorld harvester (issue #251)."""
 
-import json
 import os
-import unittest
 from unittest.mock import MagicMock, patch
 
 import django
-from django.test import TestCase, tag, override_settings
+from django.test import TestCase, override_settings, tag
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'optimap.settings')
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "optimap.settings")
 django.setup()
 
-from django.contrib.gis.geos import GeometryCollection, Point, Polygon
+from django.contrib.gis.geos import GeometryCollection
 
 from works.harvesting.geoscienceworld import (
     _geom_from_geoextent_result,
@@ -26,7 +24,7 @@ from works.models import HarvestingEvent, Source, Work
 def _make_source(doi_prefix="10.1190"):
     return Source.objects.create(
         name=f"GSW Test Source ({doi_prefix})",
-        url_field=f"https://pubs.geoscienceworld.org/test",
+        url_field="https://pubs.geoscienceworld.org/test",
         source_type="geoscienceworld",
         doi_prefix=doi_prefix,
         default_work_type="article",
@@ -48,13 +46,17 @@ class GeomFromGeoextentResultTest(TestCase):
         self.assertTrue(result.empty)
 
     def test_point_feature(self):
-        result = _geom_from_geoextent_result({
-            "features": [{
-                "type": "Feature",
-                "geometry": {"type": "Point", "coordinates": [-104.5, 38.2]},
-                "properties": {},
-            }]
-        })
+        result = _geom_from_geoextent_result(
+            {
+                "features": [
+                    {
+                        "type": "Feature",
+                        "geometry": {"type": "Point", "coordinates": [-104.5, 38.2]},
+                        "properties": {},
+                    }
+                ]
+            }
+        )
         self.assertIsInstance(result, GeometryCollection)
         self.assertFalse(result.empty)
         self.assertEqual(len(result), 1)
@@ -65,39 +67,49 @@ class GeomFromGeoextentResultTest(TestCase):
 
     def test_polygon_feature(self):
         coords = [[-105.0, 37.0], [-103.0, 37.0], [-103.0, 39.0], [-105.0, 39.0], [-105.0, 37.0]]
-        result = _geom_from_geoextent_result({
-            "features": [{
-                "type": "Feature",
-                "geometry": {"type": "Polygon", "coordinates": [coords]},
-                "properties": {},
-            }]
-        })
+        result = _geom_from_geoextent_result(
+            {
+                "features": [
+                    {
+                        "type": "Feature",
+                        "geometry": {"type": "Polygon", "coordinates": [coords]},
+                        "properties": {},
+                    }
+                ]
+            }
+        )
         self.assertFalse(result.empty)
         self.assertEqual(result[0].geom_type, "Polygon")
 
     def test_multiple_features_collected(self):
-        result = _geom_from_geoextent_result({
-            "features": [
-                {"type": "Feature", "geometry": {"type": "Point", "coordinates": [10.0, 50.0]}, "properties": {}},
-                {"type": "Feature", "geometry": {"type": "Point", "coordinates": [20.0, 60.0]}, "properties": {}},
-            ]
-        })
+        result = _geom_from_geoextent_result(
+            {
+                "features": [
+                    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [10.0, 50.0]}, "properties": {}},
+                    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [20.0, 60.0]}, "properties": {}},
+                ]
+            }
+        )
         self.assertEqual(len(result), 2)
 
     def test_null_geometry_feature_skipped(self):
-        result = _geom_from_geoextent_result({
-            "features": [
-                {"type": "Feature", "geometry": None, "properties": {}},
-            ]
-        })
+        result = _geom_from_geoextent_result(
+            {
+                "features": [
+                    {"type": "Feature", "geometry": None, "properties": {}},
+                ]
+            }
+        )
         self.assertTrue(result.empty)
 
     def test_malformed_geometry_skipped(self):
-        result = _geom_from_geoextent_result({
-            "features": [
-                {"type": "Feature", "geometry": {"type": "NotAType", "coordinates": []}, "properties": {}},
-            ]
-        })
+        result = _geom_from_geoextent_result(
+            {
+                "features": [
+                    {"type": "Feature", "geometry": {"type": "NotAType", "coordinates": []}, "properties": {}},
+                ]
+            }
+        )
         self.assertTrue(result.empty)
 
 
@@ -121,11 +133,13 @@ CROSSREF_PAGE = {
 }
 
 GEOEXTENT_RESULT = {
-    "features": [{
-        "type": "Feature",
-        "geometry": {"type": "Point", "coordinates": [-104.5, 38.2]},
-        "properties": {"source": "GeoScienceWorld"},
-    }],
+    "features": [
+        {
+            "type": "Feature",
+            "geometry": {"type": "Point", "coordinates": [-104.5, 38.2]},
+            "properties": {"source": "GeoScienceWorld"},
+        }
+    ],
     "bbox": [38.2, -104.5, 38.2, -104.5],
     "crs": "EPSG:4326",
 }
@@ -149,8 +163,11 @@ class ParseGswResponseTest(TestCase):
         mock_from_remote.return_value = GEOEXTENT_RESULT
 
         saved, seen = parse_gsw_response_and_save_works(
-            self.source, self.event, "10.1190",
-            max_records=1, throttle=0,
+            self.source,
+            self.event,
+            "10.1190",
+            max_records=1,
+            throttle=0,
         )
 
         self.assertEqual(saved, 1)
@@ -177,8 +194,11 @@ class ParseGswResponseTest(TestCase):
         mock_from_remote.side_effect = Exception("Cloudflare blocked")
 
         saved, seen = parse_gsw_response_and_save_works(
-            self.source, self.event, "10.1190",
-            max_records=1, throttle=0,
+            self.source,
+            self.event,
+            "10.1190",
+            max_records=1,
+            throttle=0,
         )
 
         self.assertEqual(saved, 1)
@@ -196,11 +216,19 @@ class ParseGswResponseTest(TestCase):
         mock_from_remote.return_value = GEOEXTENT_RESULT
 
         parse_gsw_response_and_save_works(
-            self.source, self.event, "10.1190", max_records=1, throttle=0,
+            self.source,
+            self.event,
+            "10.1190",
+            max_records=1,
+            throttle=0,
         )
         event2 = HarvestingEvent.objects.create(source=self.source, status="in_progress")
         saved2, _ = parse_gsw_response_and_save_works(
-            self.source, event2, "10.1190", max_records=1, throttle=0,
+            self.source,
+            event2,
+            "10.1190",
+            max_records=1,
+            throttle=0,
         )
         self.assertEqual(saved2, 0)
         self.assertEqual(Work.objects.filter(doi="10.1190/geo2020-0528.1").count(), 1)
@@ -216,14 +244,22 @@ class ParseGswResponseTest(TestCase):
         mock_from_remote.return_value = GEOEXTENT_RESULT
 
         parse_gsw_response_and_save_works(
-            self.source, self.event, "10.1190", max_records=1, throttle=0,
+            self.source,
+            self.event,
+            "10.1190",
+            max_records=1,
+            throttle=0,
         )
         self.assertEqual(mock_from_remote.call_count, 1)
 
         event2 = HarvestingEvent.objects.create(source=self.source, status="in_progress")
         with patch("works.harvesting.geoscienceworld.time.sleep") as mock_sleep:
             parse_gsw_response_and_save_works(
-                self.source, event2, "10.1190", max_records=1, throttle=2,
+                self.source,
+                event2,
+                "10.1190",
+                max_records=1,
+                throttle=2,
             )
             mock_sleep.assert_not_called()
         # geoextent not called a second time
@@ -241,12 +277,16 @@ class ParseGswResponseTest(TestCase):
 
         with patch("works.harvesting.geoscienceworld.time.sleep") as mock_sleep:
             parse_gsw_response_and_save_works(
-                self.source, self.event, "10.1190", max_records=1, throttle=0,
+                self.source,
+                self.event,
+                "10.1190",
+                max_records=1,
+                throttle=0,
             )
             mock_sleep.assert_not_called()
 
 
-@tag('online')
+@tag("online")
 class GswOnlineTest(TestCase):
     """Live integration test against GeoScienceWorld via geoextent.
 
@@ -258,11 +298,12 @@ class GswOnlineTest(TestCase):
 
     def _skip_if_unreachable(self):
         try:
-            import geoextent.lib.extent as geoextent_lib
+            import geoextent.lib.extent as geoextent_lib  # noqa: F401
         except ImportError:
             self.skipTest("geoextent not installed")
         try:
             from curl_cffi import requests as cffi_requests
+
             cffi_requests.head("https://pubs.geoscienceworld.org/", impersonate="chrome", timeout=10)
         except Exception:
             self.skipTest("GeoScienceWorld unreachable")
@@ -285,6 +326,5 @@ class GswOnlineTest(TestCase):
         self.assertIsInstance(geom, GeometryCollection)
         self.assertFalse(
             geom.empty,
-            f"Expected coordinates for DOI {self.KNOWN_DOI} but got empty geometry. "
-            f"geoextent result: {result}",
+            f"Expected coordinates for DOI {self.KNOWN_DOI} but got empty geometry. geoextent result: {result}",
         )

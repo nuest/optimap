@@ -4,14 +4,15 @@
 """Publications API URL Configuration."""
 
 from rest_framework import routers
+
 from works.viewsets import (
-    SourceViewSet,
-    WorkViewSet,
-    SubscriptionViewSet,
-    GlobalRegionViewSet,
     CollectionViewSet,
     GeoextentViewSet,
+    GlobalRegionViewSet,
+    SourceViewSet,
     StatisticsViewSet,
+    SubscriptionViewSet,
+    WorkViewSet,
 )
 
 router = routers.DefaultRouter()

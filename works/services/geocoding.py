@@ -74,8 +74,7 @@ def _build_geocoder():
     """
     from geopy.geocoders import Nominatim
 
-    user_agent = getattr(settings, "OPTIMAP_GEOCODER_USER_AGENT",
-                         settings.OPTIMAP_USER_AGENT)
+    user_agent = getattr(settings, "OPTIMAP_GEOCODER_USER_AGENT", settings.OPTIMAP_USER_AGENT)
     return Nominatim(user_agent=user_agent, timeout=10)
 
 
@@ -127,10 +126,7 @@ def _reverse_geocode_lookup(lat: float, lon: float) -> dict | None:
             "osm_type": osm_type,
             "osm_id": osm_id,
             "place_id": raw.get("place_id"),
-            "osm_url": (
-                f"https://www.openstreetmap.org/{osm_type}/{osm_id}"
-                if osm_type and osm_id else None
-            ),
+            "osm_url": (f"https://www.openstreetmap.org/{osm_type}/{osm_id}" if osm_type and osm_id else None),
         }
 
     cache.set(key, result, timeout=_CACHE_TTL)
@@ -189,8 +185,7 @@ def _representative_points(geom, max_points: int = 20) -> list[tuple[float, floa
         gt = g.geom_type
         if gt == "Point":
             _add(g.y, g.x)
-        elif gt in ("MultiPoint", "GeometryCollection",
-                    "MultiPolygon", "MultiLineString"):
+        elif gt in ("MultiPoint", "GeometryCollection", "MultiPolygon", "MultiLineString"):
             for child in g:
                 _walk(child)
                 if len(points) >= max_points:
@@ -204,8 +199,10 @@ def _representative_points(geom, max_points: int = 20) -> list[tuple[float, floa
                 minx = miny = maxx = maxy = None
             if minx is not None:
                 for lat, lon in (
-                    (miny, minx), (miny, maxx),
-                    (maxy, minx), (maxy, maxx),
+                    (miny, minx),
+                    (miny, maxx),
+                    (maxy, minx),
+                    (maxy, maxx),
                 ):
                     if len(points) >= max_points:
                         return
@@ -237,9 +234,7 @@ def _common_address(addresses: list[dict]) -> Tuple[str | None, str | None]:
     if not addresses:
         return (None, None)
 
-    country_codes = {
-        a.get("country_code") for a in addresses if a.get("country_code")
-    }
+    country_codes = {a.get("country_code") for a in addresses if a.get("country_code")}
     if len(country_codes) == 1:
         country_code = next(iter(country_codes)).upper()
     else:
@@ -286,21 +281,21 @@ def collect_geocoding_matches(geom, max_points: int = 20) -> list[dict]:
         info = _reverse_geocode_lookup(lat, lon)
         if not info or not info.get("address"):
             continue
-        matches.append({
-            "lat": lat,
-            "lon": lon,
-            "osm_type": info.get("osm_type"),
-            "osm_id": info.get("osm_id"),
-            "place_id": info.get("place_id"),
-            "osm_url": info.get("osm_url"),
-            "display_name": info.get("display_name"),
-        })
+        matches.append(
+            {
+                "lat": lat,
+                "lon": lon,
+                "osm_type": info.get("osm_type"),
+                "osm_id": info.get("osm_id"),
+                "place_id": info.get("place_id"),
+                "osm_url": info.get("osm_url"),
+                "display_name": info.get("display_name"),
+            }
+        )
     return matches
 
 
-def geocode_geometry(
-    geom, max_points: int = 20
-) -> Tuple[str | None, str | None, int]:
+def geocode_geometry(geom, max_points: int = 20) -> Tuple[str | None, str | None, int]:
     """Reverse-geocode each representative point of ``geom`` and return the LCA.
 
     Returns ``(placename, country_code, n_geocoded)``:

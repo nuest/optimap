@@ -1,18 +1,20 @@
 # SPDX-FileCopyrightText: 2025 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import os
 import io
-import zipfile
+import os
 import shutil
-import urllib.request
 import urllib.parse
+import urllib.request
+import zipfile
+
 from django.conf import settings
-from works.models import GlobalRegion
 from django.contrib.gis.gdal import DataSource
 from django.contrib.gis.geos import MultiPolygon, Polygon
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
+
+from works.models import GlobalRegion
 
 # Use configurable data directory if set, otherwise fall back to command directory
 COMMAND_DIR = os.path.dirname(__file__)
@@ -21,6 +23,7 @@ COMMAND_DIR = os.path.dirname(__file__)
 def _data_dir():
     # Read at call time so override_settings(GLOBAL_REGIONS_DATA_DIR=...) is honored.
     return settings.GLOBAL_REGIONS_DATA_DIR or COMMAND_DIR
+
 
 CONTINENTS_URL = (
     "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/"
@@ -44,7 +47,7 @@ class Command(BaseCommand):
     help = "Load 7 continents (Esri Hub) and 10 oceans (MarineRegions Global Oceans and Seas v1) into GlobalRegion"
 
     def handle(self, *args, **options):
-        self.stdout.write(f"Looading global regions…")
+        self.stdout.write("Looading global regions…")
 
         data_dir = _data_dir()
 
@@ -56,7 +59,9 @@ class Command(BaseCommand):
         continents_path = os.path.join(data_dir, CONTINENTS_FILE)
 
         if os.path.exists(continents_path):
-            self.stdout.write(f"File {continents_path} already exists, not downloading data again - delete it to renew the global regions")
+            self.stdout.write(
+                f"File {continents_path} already exists, not downloading data again - delete it to renew the global regions"
+            )
         else:
             self.stdout.write("Downloading Esri World Continents…")
             with urllib.request.urlopen(CONTINENTS_URL) as resp, open(continents_path, "wb") as out:
@@ -66,18 +71,17 @@ class Command(BaseCommand):
         ds = DataSource(continents_path)
         layer = ds[0]
         for feat in layer:
-            name = feat.get("CONTINENT") or feat.get(
-                "Name") or feat.get("continent")
+            name = feat.get("CONTINENT") or feat.get("Name") or feat.get("continent")
             geom = feat.geom.geos
 
             obj, created = GlobalRegion.objects.update_or_create(
                 name=name,
                 region_type=GlobalRegion.CONTINENT,
                 defaults={
-                    "geom":       geom,
+                    "geom": geom,
                     "source_url": CONTINENTS_URL,
-                    "license":    "https://www.arcgis.com/sharing/rest/content/items/57c1ade4fa7c4e2384e6a23f2b3bd254/info/metadata/metadata.xml?format=default&output=html",
-                }
+                    "license": "https://www.arcgis.com/sharing/rest/content/items/57c1ade4fa7c4e2384e6a23f2b3bd254/info/metadata/metadata.xml?format=default&output=html",
+                },
             )
             verb = "Created" if created else "Updated"
             self.stdout.write(f"{verb} continent '{obj.name}'")
@@ -87,22 +91,25 @@ class Command(BaseCommand):
         oceans_simplified_path = os.path.join(data_dir, OCEANS_SIMPLIFIED_FILE)
 
         # Download and extract if GeoPackage doesn't exist
-        gpkg_downloaded = False
         if os.path.exists(oceans_gpkg_path):
-            self.stdout.write(f"File {oceans_gpkg_path} already exists, not downloading data again - delete it to renew the global regions")
+            self.stdout.write(
+                f"File {oceans_gpkg_path} already exists, not downloading data again - delete it to renew the global regions"
+            )
         else:
             self.stdout.write("Downloading MarineRegions Global Oceans and Seas…")
 
             # Download ZIP file with form data (required by Marine Regions)
-            form_data = urllib.parse.urlencode({
-                'name': 'OPTIMAP Project TU Dresden',
-                'organisation': 'TU Dresden',
-                'email': 'komet@tu-dresden.de',
-                'country': 'Germany',
-                'user_category': 'academia',
-                'purpose_category': 'Research',
-                'agree': '1'
-            }).encode('utf-8')
+            form_data = urllib.parse.urlencode(
+                {
+                    "name": "OPTIMAP Project TU Dresden",
+                    "organisation": "TU Dresden",
+                    "email": "komet@tu-dresden.de",
+                    "country": "Germany",
+                    "user_category": "academia",
+                    "purpose_category": "Research",
+                    "agree": "1",
+                }
+            ).encode("utf-8")
 
             req = urllib.request.Request(OCEANS_DOWNLOAD_URL, data=form_data)
             with urllib.request.urlopen(req) as resp:
@@ -113,15 +120,13 @@ class Command(BaseCommand):
             with zipfile.ZipFile(io.BytesIO(zip_data)) as zf:
                 # Extract the .gpkg file
                 for name in zf.namelist():
-                    if name.endswith('.gpkg'):
+                    if name.endswith(".gpkg"):
                         zf.extract(name, data_dir)
                         # Rename if necessary
                         extracted_path = os.path.join(data_dir, name)
                         if extracted_path != oceans_gpkg_path:
                             shutil.move(extracted_path, oceans_gpkg_path)
                         break
-
-            gpkg_downloaded = True
 
             # Delete old simplified file if GeoPackage was just downloaded
             if os.path.exists(oceans_simplified_path):
@@ -130,7 +135,9 @@ class Command(BaseCommand):
 
         # Simplify geometries if simplified file doesn't exist
         if os.path.exists(oceans_simplified_path):
-            self.stdout.write(f"Simplified file {oceans_simplified_path} already exists, not re-simplifying - delete it to regenerate")
+            self.stdout.write(
+                f"Simplified file {oceans_simplified_path} already exists, not re-simplifying - delete it to regenerate"
+            )
         else:
             self.stdout.write("\nSimplifying ocean geometries...")
             tolerance = settings.OCEAN_SIMPLIFICATION_TOLERANCE
@@ -139,9 +146,7 @@ class Command(BaseCommand):
             self.stdout.write(f"Using tolerance={tolerance}, percentile={percentile}")
 
             # Call the simplify_ocean_geometries command
-            call_command('simplify_ocean_geometries',
-                        tolerance=tolerance,
-                        percentile=percentile)
+            call_command("simplify_ocean_geometries", tolerance=tolerance, percentile=percentile)
 
             self.stdout.write(self.style.SUCCESS("Ocean geometry simplification complete\n"))
 
@@ -178,10 +183,10 @@ class Command(BaseCommand):
                 name=name,
                 region_type=GlobalRegion.OCEAN,
                 defaults={
-                    "geom":       geom,
+                    "geom": geom,
                     "source_url": OCEANS_DOI,
-                    "license":    "https://creativecommons.org/licenses/by/4.0/",
-                }
+                    "license": "https://creativecommons.org/licenses/by/4.0/",
+                },
             )
             verb = "Created" if created else "Updated"
             self.stdout.write(f"{verb} ocean '{obj.name}'")

@@ -1,8 +1,10 @@
 # SPDX-FileCopyrightText: 2025 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import optimap
 from django.conf import settings
+
+import optimap
+
 
 def get_version(request):
     """
@@ -10,12 +12,13 @@ def get_version(request):
     """
     return {"optimap_version": optimap.__version__}
 
+
 def gazetteer_settings(request):
     """
     Return gazetteer/geocoding settings for use in templates.
     """
     return {
-        "gazetteer_provider": getattr(settings, 'GAZETTEER_PROVIDER', 'nominatim'),
-        "gazetteer_placeholder": getattr(settings, 'GAZETTEER_PLACEHOLDER', 'Search for a location...'),
-        "gazetteer_api_key": getattr(settings, 'GAZETTEER_API_KEY', ''),
+        "gazetteer_provider": getattr(settings, "GAZETTEER_PROVIDER", "nominatim"),
+        "gazetteer_placeholder": getattr(settings, "GAZETTEER_PLACEHOLDER", "Search for a location..."),
+        "gazetteer_api_key": getattr(settings, "GAZETTEER_API_KEY", ""),
     }

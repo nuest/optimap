@@ -12,7 +12,6 @@ from django.test import Client, TestCase
 
 from works.bok import client as bok_client
 
-
 FIXTURE_PATH = os.path.join(os.path.dirname(__file__), "fixtures", "bok_sample.json")
 
 

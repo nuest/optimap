@@ -71,10 +71,7 @@ class Command(BaseCommand):
         configured = list(caches)
         unknown = [a for a in (only + exclude) if a not in configured]
         if unknown:
-            raise CommandError(
-                f"Unknown cache alias(es): {', '.join(unknown)}. "
-                f"Configured: {', '.join(configured)}"
-            )
+            raise CommandError(f"Unknown cache alias(es): {', '.join(unknown)}. Configured: {', '.join(configured)}")
 
         if only:
             targets = only
@@ -92,6 +89,4 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.SUCCESS(f"Cleared: {alias} ({backend})"))
 
         if not dry_run:
-            self.stdout.write(self.style.SUCCESS(
-                f"Done — cleared {len(targets)} cache(s)."
-            ))
+            self.stdout.write(self.style.SUCCESS(f"Done — cleared {len(targets)} cache(s)."))

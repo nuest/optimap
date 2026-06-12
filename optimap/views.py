@@ -15,52 +15,61 @@ This module handles:
 """
 
 import logging
+
 logger = logging.getLogger(__name__)
 
-from django.shortcuts import render
+import tempfile
+from datetime import datetime
+from pathlib import Path
+
+import geoextent.lib.features
+import humanize
+from django.conf import settings
 from django.http import HttpResponse
+from django.shortcuts import render
+from django.urls import reverse
 from django.utils.decorators import method_decorator
+from django.utils.timezone import get_default_timezone
 from django.views.decorators.cache import cache_page, never_cache
 from django.views.generic import View
-from django.conf import settings
-import tempfile
-from pathlib import Path
-from datetime import datetime
-from django.utils.timezone import get_default_timezone
-import humanize
+
+from works.feeds import normalize_region_slug
 from works.models import Collection, GlobalRegion
 from works.seo import build_homepage_meta
-from works import views_regions
-from works.feeds import normalize_region_slug
-from django.urls import reverse
-import geoextent.lib.features
 from works.serializers import get_available_gazetteers as _available_gazetteers
 
 
 def main(request):
     # Pass the 'next' parameter to template for login redirect
-    next_url = request.GET.get('next', '')
-    return render(request, "main.html", {
-        'next': next_url,
-        'meta': build_homepage_meta(request),
-        'canonical_url': request.build_absolute_uri(reverse("optimap:main")),
-        'map_chunk_size': settings.OPTIMAP_MAP_CHUNK_SIZE,
-    })
+    next_url = request.GET.get("next", "")
+    return render(
+        request,
+        "main.html",
+        {
+            "next": next_url,
+            "meta": build_homepage_meta(request),
+            "canonical_url": request.build_absolute_uri(reverse("optimap:main")),
+            "map_chunk_size": settings.OPTIMAP_MAP_CHUNK_SIZE,
+        },
+    )
 
-@cache_page(24 * 3600, cache='memory')
+
+@cache_page(24 * 3600, cache="memory")
 def about(request):
-    return render(request, 'about.html')
+    return render(request, "about.html")
 
-@cache_page(24 * 3600, cache='memory')
+
+@cache_page(24 * 3600, cache="memory")
 def accessibility(request):
-    return render(request, 'accessibility.html')
+    return render(request, "accessibility.html")
 
-@cache_page(24 * 3600, cache='memory')
+
+@cache_page(24 * 3600, cache="memory")
 def privacy(request):
-    return render(request, 'privacy.html')
+    return render(request, "privacy.html")
+
 
 @never_cache
-
 def data(request):
     """
     Renders the data page showing links and sizes for the latest dumps.
@@ -69,14 +78,14 @@ def data(request):
     cache_dir.mkdir(exist_ok=True)
 
     # scan for existing dumps
-    geojson_files = sorted(cache_dir.glob('optimap_data_dump_*.geojson'), reverse=True)
-    gpkg_files    = sorted(cache_dir.glob('optimap_data_dump_*.gpkg'),   reverse=True)
-    csv_files     = sorted(cache_dir.glob('optimap_data_dump_*.csv'),    reverse=True)
+    geojson_files = sorted(cache_dir.glob("optimap_data_dump_*.geojson"), reverse=True)
+    gpkg_files = sorted(cache_dir.glob("optimap_data_dump_*.gpkg"), reverse=True)
+    csv_files = sorted(cache_dir.glob("optimap_data_dump_*.csv"), reverse=True)
 
-    last_geo  = geojson_files[0] if geojson_files else None
+    last_geo = geojson_files[0] if geojson_files else None
     last_gzip = Path(str(last_geo) + ".gz") if last_geo else None
-    last_gpkg = gpkg_files[0]    if gpkg_files    else None
-    last_csv  = csv_files[0]     if csv_files     else None
+    last_gpkg = gpkg_files[0] if gpkg_files else None
+    last_csv = csv_files[0] if csv_files else None
 
     # — Supervisor check: ensure all dump file times are within 1 hour
     dump_files = (last_geo, last_gzip, last_gpkg, last_csv)
@@ -84,14 +93,15 @@ def data(request):
     if mtimes and (max(mtimes) - min(mtimes) > 3600):
         ts_map = {
             p.name: datetime.fromtimestamp(p.stat().st_mtime, get_default_timezone())
-            for p in dump_files if p and p.exists()
+            for p in dump_files
+            if p and p.exists()
         }
         logger.warning("Data dump timestamps differ by >1h: %s", ts_map)
 
     # humanized sizes
-    geojson_size    = humanize.naturalsize(last_geo.stat().st_size, binary=True) if last_geo else None
+    geojson_size = humanize.naturalsize(last_geo.stat().st_size, binary=True) if last_geo else None
     geopackage_size = humanize.naturalsize(last_gpkg.stat().st_size, binary=True) if last_gpkg else None
-    csv_size        = humanize.naturalsize(last_csv.stat().st_size, binary=True) if last_csv else None
+    csv_size = humanize.naturalsize(last_csv.stat().st_size, binary=True) if last_csv else None
 
     # last updated timestamp (using JSON file)
     if last_geo:
@@ -100,22 +110,28 @@ def data(request):
     else:
         last_updated = None
 
-    return render(request, 'data.html', {
-        'geojson_size':    geojson_size,
-        'geopackage_size': geopackage_size,
-        'csv_size':        csv_size,
-        'interval':        settings.DATA_DUMP_INTERVAL_HOURS,
-        'last_updated':    last_updated,
-        'last_geojson':    last_geo.name  if last_geo else None,
-        'last_gpkg':       last_gpkg.name if last_gpkg else None,
-        'last_csv':        last_csv.name  if last_csv  else None,
-        'pygeoapi_enabled': getattr(settings, 'PYGEOAPI_ENABLED', False),
-    })
+    return render(
+        request,
+        "data.html",
+        {
+            "geojson_size": geojson_size,
+            "geopackage_size": geopackage_size,
+            "csv_size": csv_size,
+            "interval": settings.DATA_DUMP_INTERVAL_HOURS,
+            "last_updated": last_updated,
+            "last_geojson": last_geo.name if last_geo else None,
+            "last_gpkg": last_gpkg.name if last_gpkg else None,
+            "last_csv": last_csv.name if last_csv else None,
+            "pygeoapi_enabled": getattr(settings, "PYGEOAPI_ENABLED", False),
+        },
+    )
+
 
 def feeds_list(request):
     """Display available predefined feeds grouped by global regions."""
     regions = GlobalRegion.objects.all().order_by("name")
     return render(request, "feeds.html", {"regions": regions})
+
 
 def geoextent(request):
     """Geoextent extraction UI page."""
@@ -126,44 +142,44 @@ def geoextent(request):
 
     # Organize file formats by handler type with display names
     supported_formats = []
-    for handler in features.get('file_formats', []):
-        display_name = handler.get('display_name', handler['handler'])
-        extensions = [ext.lstrip('.') for ext in handler.get('file_extensions', [])]
-        description = handler.get('description', '')
+    for handler in features.get("file_formats", []):
+        display_name = handler.get("display_name", handler["handler"])
+        extensions = [ext.lstrip(".") for ext in handler.get("file_extensions", [])]
+        description = handler.get("description", "")
         if extensions:
-            supported_formats.append({
-                'name': display_name,
-                'extensions': extensions,
-                'description': description
-            })
+            supported_formats.append({"name": display_name, "extensions": extensions, "description": description})
 
     # Extract provider details with descriptions and URLs
     supported_providers = []
-    for provider in features.get('content_providers', []):
-        supported_providers.append({
-            'name': provider.get('name', 'Unknown'),
-            'description': provider.get('description', ''),
-            'website': provider.get('website', ''),
-            'examples': provider.get('examples', [])
-        })
+    for provider in features.get("content_providers", []):
+        supported_providers.append(
+            {
+                "name": provider.get("name", "Unknown"),
+                "description": provider.get("description", ""),
+                "website": provider.get("website", ""),
+                "examples": provider.get("examples", []),
+            }
+        )
 
     context = {
-        'supported_formats': supported_formats,
-        'supported_providers': supported_providers,
-        'geoextent_version': features.get('version', 'unknown'),
-        'max_file_size_mb': getattr(settings, 'GEOEXTENT_MAX_FILE_SIZE_MB', 100),
-        'max_batch_size_mb': getattr(settings, 'GEOEXTENT_MAX_BATCH_SIZE_MB', 500),
-        'max_download_size_mb': getattr(settings, 'GEOEXTENT_MAX_DOWNLOAD_SIZE_MB', 1000),
-        'copy_ttl_seconds': getattr(settings, 'GEOEXTENT_COPY_TTL_SECONDS', 300),
-        'copy_ttl_minutes': max(1, getattr(settings, 'GEOEXTENT_COPY_TTL_SECONDS', 300) // 60),
-        'available_gazetteers': _available_gazetteers(),
+        "supported_formats": supported_formats,
+        "supported_providers": supported_providers,
+        "geoextent_version": features.get("version", "unknown"),
+        "max_file_size_mb": getattr(settings, "GEOEXTENT_MAX_FILE_SIZE_MB", 100),
+        "max_batch_size_mb": getattr(settings, "GEOEXTENT_MAX_BATCH_SIZE_MB", 500),
+        "max_download_size_mb": getattr(settings, "GEOEXTENT_MAX_DOWNLOAD_SIZE_MB", 1000),
+        "copy_ttl_seconds": getattr(settings, "GEOEXTENT_COPY_TTL_SECONDS", 300),
+        "copy_ttl_minutes": max(1, getattr(settings, "GEOEXTENT_COPY_TTL_SECONDS", 300) // 60),
+        "available_gazetteers": _available_gazetteers(),
     }
 
-    return render(request, 'geoextent.html', context)
+    return render(request, "geoextent.html", context)
 
-@method_decorator(cache_page(3600, cache='memory'), name='dispatch')
+
+@method_decorator(cache_page(3600, cache="memory"), name="dispatch")
 class RobotsView(View):
-    http_method_names = ['get']
+    http_method_names = ["get"]
+
     def get(self, request):
 
         # Build robots.txt content
@@ -206,20 +222,23 @@ class RobotsView(View):
         response = HttpResponse(content, content_type="text/plain")
         return response
 
+
 def custom_404(request, exception=None):
     """Custom 404 error handler"""
-    return render(request, '404.html', status=404)
+    return render(request, "404.html", status=404)
+
 
 def custom_500(request):
     """Custom 500 error handler"""
-    return render(request, '500.html', status=500)
+    return render(request, "500.html", status=500)
 
-@cache_page(3600, cache='memory')
+
+@cache_page(3600, cache="memory")
 def feeds(request):
 
     global_feeds = [
-        { "title": "Geo RSS",     "url": reverse("optimap:api-feed-georss")   },
-        { "title": "Atom",        "url": reverse("optimap:api-feed-atom")     },
+        {"title": "Geo RSS", "url": reverse("optimap:api-feed-georss")},
+        {"title": "Atom", "url": reverse("optimap:api-feed-atom")},
     ]
 
     regions = GlobalRegion.objects.all().order_by("region_type", "name")
@@ -231,15 +250,23 @@ def feeds(request):
         region.normalized_slug = slug
         regions_with_slugs.append(region)
 
-    return render(request, "feeds.html", {
-        "global_feeds": global_feeds,
-        "regions": regions_with_slugs,
-    })
+    return render(
+        request,
+        "feeds.html",
+        {
+            "global_feeds": global_feeds,
+            "regions": regions_with_slugs,
+        },
+    )
 
 
-@cache_page(3600, cache='memory')
+@cache_page(3600, cache="memory")
 def sitemap_page(request):
     """Human-readable sitemap page"""
-    return render(request, 'sitemap_page.html', {
-        'collections': Collection.objects.filter(is_published=True).order_by('name'),
-    })
+    return render(
+        request,
+        "sitemap_page.html",
+        {
+            "collections": Collection.objects.filter(is_published=True).order_by("name"),
+        },
+    )

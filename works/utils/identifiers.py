@@ -10,7 +10,9 @@ This module provides centralized logic for resolving various identifier types
 
 import logging
 from urllib.parse import unquote
+
 from django.http import Http404
+
 from works.models import Work
 
 logger = logging.getLogger(__name__)
@@ -52,10 +54,10 @@ def resolve_work_identifier(identifier):
     identifier_type = None
 
     # Strategy 1: Try DOI first (contains '/' or starts with '10.')
-    if '/' in identifier or identifier.startswith('10.'):
+    if "/" in identifier or identifier.startswith("10."):
         try:
             work = Work.objects.get(doi=identifier)
-            identifier_type = 'doi'
+            identifier_type = "doi"
             logger.debug(f"Found work by DOI: {identifier}")
         except Work.DoesNotExist:
             logger.debug(f"No work found with DOI: {identifier}")
@@ -64,7 +66,7 @@ def resolve_work_identifier(identifier):
     if work is None and identifier.isdigit():
         try:
             work = Work.objects.get(id=int(identifier))
-            identifier_type = 'id'
+            identifier_type = "id"
             logger.debug(f"Found work by ID: {identifier}")
         except Work.DoesNotExist:
             logger.debug(f"No work found with ID: {identifier}")

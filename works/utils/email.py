@@ -17,5 +17,5 @@ def render_email(template_name: str, context: dict) -> tuple[str, str]:
     backend_template = get_template(template_name)
     # .template is the raw django.template.base.Template — accepts Context directly.
     content = backend_template.template.render(Context(context, autoescape=False))
-    subject, _, body = content.partition('\n\n')
+    subject, _, body = content.partition("\n\n")
     return subject.strip(), body

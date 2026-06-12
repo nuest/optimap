@@ -2,24 +2,27 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import os
+
 import django
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "optimap.settings")
 django.setup()
 
 import xml.etree.ElementTree as ET
-from django.test import TestCase
-from django.contrib.gis.geos import Point, LineString, Polygon, GeometryCollection
 from datetime import datetime
+
+from django.contrib.gis.geos import GeometryCollection, LineString, Point, Polygon
+from django.test import TestCase
+from xmldiff import formatting
+from xmldiff import main as xmldiff_main
+
 from works.models import Work
 
-from xmldiff import main as xmldiff_main
-from xmldiff import formatting
 
 class GeoFeedTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
-        """ Set up test publications with geospatial data """
+        """Set up test publications with geospatial data"""
         Work.objects.all().delete()
         cls.pub1 = Work.objects.create(
             title="Point Test",
@@ -28,7 +31,7 @@ class GeoFeedTestCase(TestCase):
             status="p",
             publicationDate=datetime(2023, 5, 10),
             doi="10.1234/test-doi-1",
-            geometry=GeometryCollection(Point(12.4924, 41.8902))  
+            geometry=GeometryCollection(Point(12.4924, 41.8902)),
         )
 
         cls.pub2 = Work.objects.create(
@@ -38,9 +41,7 @@ class GeoFeedTestCase(TestCase):
             status="p",
             publicationDate=datetime(2023, 5, 15),
             doi="10.1234/test-doi-2",
-            geometry=GeometryCollection(Polygon([
-                (10.0, 50.0), (11.0, 51.0), (12.0, 50.0), (10.0, 50.0)
-            ])) 
+            geometry=GeometryCollection(Polygon([(10.0, 50.0), (11.0, 51.0), (12.0, 50.0), (10.0, 50.0)])),
         )
 
         cls.pub3 = Work.objects.create(
@@ -50,11 +51,11 @@ class GeoFeedTestCase(TestCase):
             status="p",
             publicationDate=datetime(2023, 5, 20),
             doi="10.1234/test-doi-3",
-            geometry=GeometryCollection(LineString([(5.0, 45.0), (6.0, 46.0), (7.0, 45.5)])) 
+            geometry=GeometryCollection(LineString([(5.0, 45.0), (6.0, 46.0), (7.0, 45.5)])),
         )
 
     def _fetch_feed(self, feed_type):
-        """ Helper function to fetch RSS/Atom feed content """
+        """Helper function to fetch RSS/Atom feed content"""
         feed_urls = {
             "georss": "/api/v1/feeds/optimap-global.rss",
             "geoatom": "/api/v1/feeds/optimap-global.atom",
@@ -68,30 +69,25 @@ class GeoFeedTestCase(TestCase):
 
         self.assertEqual(response.status_code, 200, f"Feed {feed_type} did not return 200")
 
-        xml_content = response.content.decode('utf-8')
+        xml_content = response.content.decode("utf-8")
 
         return xml_content
 
     def _normalize_timestamps(self, xml_content):
-        """ Replace dynamic values with placeholders for stable comparison """
+        """Replace dynamic values with placeholders for stable comparison"""
         import re
+
         xml_content = re.sub(
-            r'<lastBuildDate>[^<]+</lastBuildDate>',
-            '<lastBuildDate>TIMESTAMP</lastBuildDate>',
-            xml_content
+            r"<lastBuildDate>[^<]+</lastBuildDate>", "<lastBuildDate>TIMESTAMP</lastBuildDate>", xml_content
         )
-        xml_content = re.sub(
-            r'<updated>[^<]+</updated>',
-            '<updated>TIMESTAMP</updated>',
-            xml_content
-        )
+        xml_content = re.sub(r"<updated>[^<]+</updated>", "<updated>TIMESTAMP</updated>", xml_content)
         # Normalize test-server hostnames so the reference is environment-agnostic.
-        xml_content = xml_content.replace('http://testserver', 'http://TESTSERVER')
-        xml_content = xml_content.replace('http://127.0.0.1:8000', 'http://TESTSERVER')
+        xml_content = xml_content.replace("http://testserver", "http://TESTSERVER")
+        xml_content = xml_content.replace("http://127.0.0.1:8000", "http://TESTSERVER")
         return xml_content
 
     def _compare_with_reference(self, generated_xml, filename):
-        """ Save and compare generated XML with reference file """
+        """Save and compare generated XML with reference file"""
         reference_path = os.path.join(os.path.dirname(__file__), "reference", filename)
 
         if not os.path.exists(reference_path):
@@ -110,20 +106,21 @@ class GeoFeedTestCase(TestCase):
         diff = xmldiff_main.diff_texts(
             normalized_reference.encode("utf-8"),
             normalized_generated.encode("utf-8"),
-            formatter=formatting.DiffFormatter()
+            formatter=formatting.DiffFormatter(),
         )
 
         if diff:
             self.fail(f"{filename} does not match reference!\n\nDiff:\n{diff}")
 
     def _extract_namespaces(self, xml_content):
-        """ Extract namespaces dynamically from XML content """
+        """Extract namespaces dynamically from XML content"""
         try:
             from io import StringIO
-            xml_buffer = StringIO(xml_content) 
-            
+
+            xml_buffer = StringIO(xml_content)
+
             namespace_map = {}
-            for event, (prefix, uri) in ET.iterparse(xml_buffer, events=['start-ns']):
+            for event, (prefix, uri) in ET.iterparse(xml_buffer, events=["start-ns"]):
                 namespace_map[prefix] = uri
 
             return namespace_map
@@ -132,7 +129,7 @@ class GeoFeedTestCase(TestCase):
             return {}
 
     def _parse_xml(self, xml_content):
-        """ Parse XML while handling namespace prefixes """
+        """Parse XML while handling namespace prefixes"""
         try:
             return ET.ElementTree(ET.fromstring(xml_content))
         except ET.ParseError as e:
@@ -140,18 +137,18 @@ class GeoFeedTestCase(TestCase):
             self.fail("Invalid XML response! Check namespace prefixes.")
 
     def test_georss_feed(self):
-        """ Test GeoRSS feed structure and content """
+        """Test GeoRSS feed structure and content"""
         georss_xml = self._fetch_feed("georss")
         self._compare_with_reference(georss_xml, "expected_georss.xml")
 
         root = self._parse_xml(georss_xml).getroot()
-        namespace = self._extract_namespaces(georss_xml) 
+        namespace = self._extract_namespaces(georss_xml)
 
         points = root.findall(".//georss:point", namespaces=namespace)
         self.assertEqual(len(points), 1, "Expected at least one <georss:point> element")
 
     def test_geoatom_feed(self):
-        """ Test GeoAtom feed structure and content """
+        """Test GeoAtom feed structure and content"""
         geoatom_xml = self._fetch_feed("geoatom")
         self._compare_with_reference(geoatom_xml, "expected_geoatom.xml")
 

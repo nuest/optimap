@@ -74,10 +74,12 @@ class Command(BaseCommand):
         step = (min_interval / len(sources)) if stagger else None
 
         prefix = "[dry-run] " if dry_run else ""
-        self.stdout.write(self.style.SUCCESS(
-            f"{prefix}Resetting recurring schedules for {len(sources)} source(s) "
-            f"({'staggered' if stagger else 'no stagger'}). Min interval: {min_interval} min."
-        ))
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"{prefix}Resetting recurring schedules for {len(sources)} source(s) "
+                f"({'staggered' if stagger else 'no stagger'}). Min interval: {min_interval} min."
+            )
+        )
 
         rebuilt = 0
         for index, source in enumerate(sources):
@@ -111,19 +113,21 @@ class Command(BaseCommand):
         if clear_manual:
             qs = Schedule.objects.filter(name__startswith="Manual Harvest Source ")
             cleared = qs.count()
-            self.stdout.write(
-                f"  {prefix}Deleting {cleared} 'Manual Harvest Source ...' one-off schedule(s)."
-            )
+            self.stdout.write(f"  {prefix}Deleting {cleared} 'Manual Harvest Source ...' one-off schedule(s).")
             if not dry_run:
                 qs.delete()
 
         if dry_run:
-            self.stdout.write(self.style.WARNING(
-                f"\nDry run complete. Would have rebuilt {len(sources)} schedule(s)"
-                + (f" and cleared {cleared} manual one-off(s)." if clear_manual else ".")
-            ))
+            self.stdout.write(
+                self.style.WARNING(
+                    f"\nDry run complete. Would have rebuilt {len(sources)} schedule(s)"
+                    + (f" and cleared {cleared} manual one-off(s)." if clear_manual else ".")
+                )
+            )
         else:
-            self.stdout.write(self.style.SUCCESS(
-                f"\nRebuilt {rebuilt} schedule(s)"
-                + (f" and cleared {cleared} manual one-off(s)." if clear_manual else ".")
-            ))
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"\nRebuilt {rebuilt} schedule(s)"
+                    + (f" and cleared {cleared} manual one-off(s)." if clear_manual else ".")
+                )
+            )

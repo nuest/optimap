@@ -24,18 +24,20 @@ class LinkHeaderPagination(LimitOffsetPagination):
         current_url = self.request.build_absolute_uri()
         first_url = replace_query_param(
             replace_query_param(current_url, self.limit_query_param, self.limit),
-            self.offset_query_param, 0,
+            self.offset_query_param,
+            0,
         )
         # True last-page offset: the start of the page that contains the final item.
         # e.g. count=10, limit=3 → last page at offset 9 (not 7).
         last_offset = (max(0, self.count - 1) // self.limit) * self.limit
         last_url = replace_query_param(
             replace_query_param(current_url, self.limit_query_param, self.limit),
-            self.offset_query_param, last_offset,
+            self.offset_query_param,
+            last_offset,
         )
         links.append(f'<{first_url}>; rel="first"')
         links.append(f'<{last_url}>; rel="last"')
 
         if links:
-            response['Link'] = ', '.join(links)
+            response["Link"] = ", ".join(links)
         return response

@@ -2,14 +2,17 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import os
+
 import django
+
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "optimap.settings")
 django.setup()
 
-from django.contrib.messages import get_messages
-from django.test import TestCase, Client, override_settings
-from django.urls import reverse
 from django.contrib.auth import get_user_model
+from django.contrib.messages import get_messages
+from django.test import Client, TestCase, override_settings
+from django.urls import reverse
+
 from works.models import BlockedEmail
 
 User = get_user_model()
@@ -79,7 +82,7 @@ class CustomLogoutViewTests(TestCase):
     def test_logout_actually_logs_user_out(self):
         self.client.force_login(self.user)
         self.client.get(self.url)
-        response = self.client.get(reverse("optimap:usersettings"))
+        self.client.get(reverse("optimap:usersettings"))
         # user_settings redirects unauthenticated users to an error page (200),
         # not to a login page, so check that the user key is gone from the session.
         self.assertNotIn("_auth_user_id", self.client.session)

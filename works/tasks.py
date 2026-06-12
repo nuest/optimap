@@ -23,26 +23,24 @@ import subprocess
 import tempfile
 import time
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone as dt_timezone
+from datetime import datetime, timedelta
+from datetime import timezone as dt_timezone
 from pathlib import Path
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.mail import EmailMessage, send_mail
 from django.core.serializers import serialize
 from django.urls import reverse
 from django.utils import timezone
-from works.utils.email import render_email
 from django_q.models import Schedule
 from django_q.tasks import schedule
-
-from works.models import EmailLog, Subscription, Work
 
 # -----------------------------------------------------------------------------
 # Re-exports from the harvesting package — preserve the public surface that
 # Django-Q schedule rows (`works.tasks.harvest_*`), tests, and admin actions
 # reference by dotted path.
 # -----------------------------------------------------------------------------
-
 from works.harvesting.common import (  # noqa: F401
     HarvestStats,
     HarvestWarningCollector,
@@ -69,6 +67,10 @@ from works.harvesting.crossref import (  # noqa: F401
     fetch_copernicus_abstract,
     harvest_crossref_prefix,
     parse_crossref_response_and_save_works,
+)
+from works.harvesting.geoscienceworld import (  # noqa: F401
+    harvest_geoscienceworld,
+    parse_gsw_response_and_save_works,
 )
 from works.harvesting.metadata_html import (  # noqa: F401
     _extract_dc_box,
@@ -102,10 +104,6 @@ from works.harvesting.oai import (  # noqa: F401
     harvest_oai_endpoint,
     parse_oai_xml_and_save_works,
 )
-from works.harvesting.geoscienceworld import (  # noqa: F401
-    harvest_geoscienceworld,
-    parse_gsw_response_and_save_works,
-)
 from works.harvesting.openalex import build_openalex_fields  # noqa: F401
 from works.harvesting.openalex_source import (  # noqa: F401
     OPENALEX_API_URL,
@@ -127,18 +125,19 @@ from works.harvesting.sessions import (  # noqa: F401
     _oai_session,
     _short_body,
 )
-
-from django.contrib.auth import get_user_model
+from works.models import EmailLog, Subscription, Work
+from works.utils.email import render_email
 
 logger = logging.getLogger(__name__)
 BASE_URL = settings.BASE_URL
-CACHE_DIR = Path(tempfile.gettempdir()) / 'optimap_cache'
+CACHE_DIR = Path(tempfile.gettempdir()) / "optimap_cache"
 User = get_user_model()
 
 
 # -----------------------------------------------------------------------------
 # Data-dump helpers (used by regenerate_geojson_cache / regenerate_geopackage_cache).
 # -----------------------------------------------------------------------------
+
 
 def generate_data_dump_filename(extension: str) -> str:
     ts = datetime.now(dt_timezone.utc).strftime("%Y%m%dT%H%M%S")
@@ -179,6 +178,7 @@ def cleanup_old_data_dumps(directory: Path, keep: int):
 # Monthly email digest.
 # -----------------------------------------------------------------------------
 
+
 def send_monthly_email(trigger_source="manual", sent_by=None):
     """
     Send the monthly digest of new manuscripts to users who opted in.
@@ -192,8 +192,7 @@ def send_monthly_email(trigger_source="manual", sent_by=None):
       - Respect settings.EMAIL_SEND_DELAY if present.
     """
     recipients_qs = (
-        User.objects
-        .filter(userprofile__notify_new_manuscripts=True)
+        User.objects.filter(userprofile__notify_new_manuscripts=True)
         .exclude(email__isnull=True)
         .exclude(email__exact="")
         .values_list("email", flat=True)
@@ -221,8 +220,8 @@ def send_monthly_email(trigger_source="manual", sent_by=None):
             return f"https://doi.org/{work.doi}"
         return work.url or ""
 
-    manuscripts = [{'title': w.title, 'link': link_for(w)} for w in new_manuscripts]
-    subject, content = render_email('email/monthly_digest.en.txt', {'manuscripts': manuscripts})
+    manuscripts = [{"title": w.title, "link": link_for(w)} for w in new_manuscripts]
+    subject, content = render_email("email/monthly_digest.en.txt", {"manuscripts": manuscripts})
 
     delay_seconds = getattr(settings, "EMAIL_SEND_DELAY", 0)
 
@@ -258,7 +257,7 @@ def send_monthly_email(trigger_source="manual", sent_by=None):
             )
 
 
-def send_subscription_based_email(trigger_source='manual', sent_by=None, user_ids=None, interval=None):
+def send_subscription_based_email(trigger_source="manual", sent_by=None, user_ids=None, interval=None):
     """
     Send subscription-based notifications grouped by region.
 
@@ -275,13 +274,13 @@ def send_subscription_based_email(trigger_source='manual', sent_by=None, user_id
     weekly, 31 days for monthly, 31 days when interval is None).
     ``last_notified`` is updated only after a successful send.
     """
-    query = Subscription.objects.filter(subscribed=True, user__isnull=False).prefetch_related('regions')
+    query = Subscription.objects.filter(subscribed=True, user__isnull=False).prefetch_related("regions")
     if user_ids:
         query = query.filter(user__id__in=user_ids)
     if interval is not None:
         query = query.filter(notification_interval=interval)
 
-    fallback_days = 7 if interval == 'weekly' else 31
+    fallback_days = 7 if interval == "weekly" else 31
 
     for subscription in query:
         user_email = subscription.user.email
@@ -291,8 +290,10 @@ def send_subscription_based_email(trigger_source='manual', sent_by=None, user_id
             logger.info(f"Skipping subscription for {user_email} - no regions selected")
             continue
 
-        cutoff = subscription.last_notified if subscription.last_notified else (
-            timezone.now() - timedelta(days=fallback_days)
+        cutoff = (
+            subscription.last_notified
+            if subscription.last_notified
+            else (timezone.now() - timedelta(days=fallback_days))
         )
 
         region_publications = defaultdict(list)
@@ -306,12 +307,9 @@ def send_subscription_based_email(trigger_source='manual', sent_by=None, user_id
                 geometry__isnull=False,
                 geometry__bboverlaps=region.geom,
                 creationDate__gte=cutoff,
-            ).order_by('-creationDate')[:50]
+            ).order_by("-creationDate")[:50]
 
-            matching_pubs = [
-                work for work in candidates
-                if prepared_geom.intersects(work.geometry)
-            ]
+            matching_pubs = [work for work in candidates if prepared_geom.intersects(work.geometry)]
 
             if matching_pubs:
                 region_publications[region] = matching_pubs
@@ -330,67 +328,86 @@ def send_subscription_based_email(trigger_source='manual', sent_by=None, user_id
             region_url = f"{BASE_URL}{region.get_absolute_url()}"
             pub_items = [
                 {
-                    'title': (w.title[:100] + '...' if len(w.title) > 100 else w.title),
-                    'link': _get_article_link(w),
+                    "title": (w.title[:100] + "..." if len(w.title) > 100 else w.title),
+                    "link": _get_article_link(w),
                 }
                 for w in pubs[:10]
             ]
-            region_groups.append({
-                'name': region.name,
-                'region_type': region.get_region_type_display(),
-                'pub_count': len(pubs),
-                'region_url': region_url,
-                'pubs': pub_items,
-                'extra_count': max(0, len(pubs) - 10),
-            })
+            region_groups.append(
+                {
+                    "name": region.name,
+                    "region_type": region.get_region_type_display(),
+                    "pub_count": len(pubs),
+                    "region_url": region_url,
+                    "pubs": pub_items,
+                    "extra_count": max(0, len(pubs) - 10),
+                }
+            )
 
-        subject, content = render_email('email/subscription_regional.en.txt', {
-            'total_publications': total_publications,
-            'username': subscription.user.username,
-            'region_groups': region_groups,
-            'manage_subscriptions': manage_subscriptions,
-            'unsubscribe_all': unsubscribe_all,
-            'base_url': BASE_URL,
-        })
+        subject, content = render_email(
+            "email/subscription_regional.en.txt",
+            {
+                "total_publications": total_publications,
+                "username": subscription.user.username,
+                "region_groups": region_groups,
+                "manage_subscriptions": manage_subscriptions,
+                "unsubscribe_all": unsubscribe_all,
+                "base_url": BASE_URL,
+            },
+        )
 
         try:
             email = EmailMessage(subject, content, settings.EMAIL_HOST_USER, [user_email])
             email.send()
-            EmailLog.log_email(user_email, subject, content, sent_by=sent_by, trigger_source=trigger_source, status="success")
-            logger.info(f"Sent regional subscription email to {user_email} with {total_publications} publications across {len(region_publications)} regions")
+            EmailLog.log_email(
+                user_email, subject, content, sent_by=sent_by, trigger_source=trigger_source, status="success"
+            )
+            logger.info(
+                f"Sent regional subscription email to {user_email} with {total_publications} publications across {len(region_publications)} regions"
+            )
             subscription.last_notified = timezone.now()
-            subscription.save(update_fields=['last_notified'])
+            subscription.save(update_fields=["last_notified"])
             time.sleep(settings.EMAIL_SEND_DELAY)
         except Exception as e:
             error_message = str(e)
             logger.error(f"Failed to send subscription email to {user_email}: {error_message}")
-            EmailLog.log_email(user_email, subject, content, sent_by=sent_by, trigger_source=trigger_source, status="failed", error_message=error_message)
+            EmailLog.log_email(
+                user_email,
+                subject,
+                content,
+                sent_by=sent_by,
+                trigger_source=trigger_source,
+                status="failed",
+                error_message=error_message,
+            )
 
 
 def schedule_monthly_email_task(sent_by=None):
-    if not Schedule.objects.filter(func='publications.tasks.send_monthly_email').exists():
+    if not Schedule.objects.filter(func="publications.tasks.send_monthly_email").exists():
         now = datetime.now()
         last_day_of_month = calendar.monthrange(now.year, now.month)[1]
         next_run_date = now.replace(day=last_day_of_month, hour=23, minute=59)
         schedule(
-            'publications.tasks.send_monthly_email',
-            schedule_type='M',
+            "publications.tasks.send_monthly_email",
+            schedule_type="M",
             repeats=-1,
             next_run=next_run_date,
-            kwargs={'trigger_source': 'scheduled', 'sent_by': sent_by.id if sent_by else None}
+            kwargs={"trigger_source": "scheduled", "sent_by": sent_by.id if sent_by else None},
         )
         logger.info(f"Scheduled 'schedule_monthly_email_task' for {next_run_date}")
 
 
 def schedule_subscription_email_task(sent_by=None):
-    monthly_kwargs = {'trigger_source': 'scheduled', 'interval': 'monthly', 'sent_by': sent_by.id if sent_by else None}
-    if not Schedule.objects.filter(func='publications.tasks.send_subscription_based_email', kwargs__contains='"interval": "monthly"').exists():
+    monthly_kwargs = {"trigger_source": "scheduled", "interval": "monthly", "sent_by": sent_by.id if sent_by else None}
+    if not Schedule.objects.filter(
+        func="publications.tasks.send_subscription_based_email", kwargs__contains='"interval": "monthly"'
+    ).exists():
         now = datetime.now()
         last_day_of_month = calendar.monthrange(now.year, now.month)[1]
         next_run_date = now.replace(day=last_day_of_month, hour=23, minute=59)
         schedule(
-            'publications.tasks.send_subscription_based_email',
-            schedule_type='M',
+            "publications.tasks.send_subscription_based_email",
+            schedule_type="M",
             repeats=-1,
             next_run=next_run_date,
             kwargs=monthly_kwargs,
@@ -399,12 +416,14 @@ def schedule_subscription_email_task(sent_by=None):
 
 
 def schedule_weekly_subscription_email_task(sent_by=None):
-    weekly_kwargs = {'trigger_source': 'scheduled', 'interval': 'weekly', 'sent_by': sent_by.id if sent_by else None}
-    if not Schedule.objects.filter(func='publications.tasks.send_subscription_based_email', kwargs__contains='"interval": "weekly"').exists():
+    weekly_kwargs = {"trigger_source": "scheduled", "interval": "weekly", "sent_by": sent_by.id if sent_by else None}
+    if not Schedule.objects.filter(
+        func="publications.tasks.send_subscription_based_email", kwargs__contains='"interval": "weekly"'
+    ).exists():
         schedule(
-            'publications.tasks.send_subscription_based_email',
-            schedule_type='C',
-            cron='0 2 * * 1',
+            "publications.tasks.send_subscription_based_email",
+            schedule_type="C",
+            cron="0 2 * * 1",
             repeats=-1,
             kwargs=weekly_kwargs,
         )
@@ -414,6 +433,7 @@ def schedule_weekly_subscription_email_task(sent_by=None):
 # -----------------------------------------------------------------------------
 # Inactivity warning (#120) and deletion list (#121).
 # -----------------------------------------------------------------------------
+
 
 def _next_monday():
     """Return next Monday at 08:00 (always at least 1 day ahead)."""
@@ -425,12 +445,13 @@ def _next_monday():
 def send_inactivity_warning_emails(trigger_source="scheduled"):
     """Email users in the 12-to-13-month inactivity window (#120)."""
     from django.contrib.auth import get_user_model
+
     from works.models import EmailLog
     from works.views.auth import is_email_blocked
 
     User = get_user_model()
     now = timezone.now()
-    warning_cutoff  = now - timedelta(days=settings.INACTIVITY_WARNING_DAYS)
+    warning_cutoff = now - timedelta(days=settings.INACTIVITY_WARNING_DAYS)
     deletion_cutoff = now - timedelta(days=settings.INACTIVITY_DELETION_DAYS)
 
     users = User.objects.filter(
@@ -445,22 +466,28 @@ def send_inactivity_warning_emails(trigger_source="scheduled"):
         if is_email_blocked(user.email):
             logger.info("Skipping blocked address %s for inactivity warning.", user.email)
             continue
-        subject, body = render_email("email/account_inactivity_warning.en.txt", {
-            "email": user.email,
-            "login_url": login_url,
-        })
+        subject, body = render_email(
+            "email/account_inactivity_warning.en.txt",
+            {
+                "email": user.email,
+                "login_url": login_url,
+            },
+        )
         try:
             send_mail(subject, body, settings.EMAIL_HOST_USER, [user.email], fail_silently=False)
             EmailLog.log_email(user.email, subject, body, trigger_source=trigger_source, status="success")
         except Exception as ex:  # noqa: BLE001
             logger.exception("Failed to send inactivity warning to %s.", user.email)
-            EmailLog.log_email(user.email, subject, body, trigger_source=trigger_source, status="failed", error_message=str(ex))
+            EmailLog.log_email(
+                user.email, subject, body, trigger_source=trigger_source, status="failed", error_message=str(ex)
+            )
         time.sleep(settings.EMAIL_SEND_DELAY)
 
 
 def send_inactivity_deletion_list_to_admins(trigger_source="scheduled"):
     """Email admins a list of users inactive for 13+ months (#121)."""
     from django.contrib.auth import get_user_model
+
     from works.models import EmailLog
 
     User = get_user_model()
@@ -468,19 +495,13 @@ def send_inactivity_deletion_list_to_admins(trigger_source="scheduled"):
     deletion_cutoff = now - timedelta(days=settings.INACTIVITY_DELETION_DAYS)
 
     stale_users = list(
-        User.objects.filter(is_active=True, last_login__lt=deletion_cutoff)
-        .exclude(email="")
-        .order_by("last_login")
+        User.objects.filter(is_active=True, last_login__lt=deletion_cutoff).exclude(email="").order_by("last_login")
     )
     if not stale_users:
         logger.info("send_inactivity_deletion_list_to_admins: no users pending deletion.")
         return
 
-    admin_emails = list(
-        User.objects.filter(is_staff=True)
-        .exclude(email="")
-        .values_list("email", flat=True)
-    )
+    admin_emails = list(User.objects.filter(is_staff=True).exclude(email="").values_list("email", flat=True))
     if not admin_emails:
         logger.warning("send_inactivity_deletion_list_to_admins: no admin emails configured.")
         return
@@ -488,48 +509,55 @@ def send_inactivity_deletion_list_to_admins(trigger_source="scheduled"):
     # Attach the date of the most recent successful warning email to each user.
     stale_emails = [u.email for u in stale_users]
     warning_log_by_email = {}
-    for log in (
-        EmailLog.objects
-        .filter(recipient_email__in=stale_emails, subject__icontains="account will be deleted", status="success")
-        .order_by("-sent_at")
-    ):
+    for log in EmailLog.objects.filter(
+        recipient_email__in=stale_emails, subject__icontains="account will be deleted", status="success"
+    ).order_by("-sent_at"):
         warning_log_by_email.setdefault(log.recipient_email, log)
     for user in stale_users:
         user.warning_log = warning_log_by_email.get(user.email)
 
     admin_url = f"{settings.BASE_URL}{reverse('admin:works_customuser_changelist')}"
-    subject, body = render_email("email/account_deletion_pending.en.txt", {
-        "count": len(stale_users),
-        "users": stale_users,
-        "admin_url": admin_url,
-    })
+    subject, body = render_email(
+        "email/account_deletion_pending.en.txt",
+        {
+            "count": len(stale_users),
+            "users": stale_users,
+            "admin_url": admin_url,
+        },
+    )
     for admin_email in admin_emails:
         try:
             send_mail(subject, body, settings.EMAIL_HOST_USER, [admin_email], fail_silently=False)
             EmailLog.log_email(admin_email, subject, body, trigger_source=trigger_source, status="success")
         except Exception as ex:  # noqa: BLE001
             logger.exception("Failed to send deletion list to admin %s.", admin_email)
-            EmailLog.log_email(admin_email, subject, body, trigger_source=trigger_source, status="failed", error_message=str(ex))
+            EmailLog.log_email(
+                admin_email, subject, body, trigger_source=trigger_source, status="failed", error_message=str(ex)
+            )
         time.sleep(settings.EMAIL_SEND_DELAY)
 
 
 def schedule_inactivity_warning_task():
     if not Schedule.objects.filter(func="works.tasks.send_inactivity_warning_emails").exists():
-        schedule("works.tasks.send_inactivity_warning_emails",
-                 schedule_type="W", repeats=-1, next_run=_next_monday())
+        schedule("works.tasks.send_inactivity_warning_emails", schedule_type="W", repeats=-1, next_run=_next_monday())
         logger.info("Scheduled send_inactivity_warning_emails weekly.")
 
 
 def schedule_inactivity_deletion_task():
     if not Schedule.objects.filter(func="works.tasks.send_inactivity_deletion_list_to_admins").exists():
-        schedule("works.tasks.send_inactivity_deletion_list_to_admins",
-                 schedule_type="W", repeats=-1, next_run=_next_monday())
+        schedule(
+            "works.tasks.send_inactivity_deletion_list_to_admins",
+            schedule_type="W",
+            repeats=-1,
+            next_run=_next_monday(),
+        )
         logger.info("Scheduled send_inactivity_deletion_list_to_admins weekly.")
 
 
 # -----------------------------------------------------------------------------
 # Data dump regeneration.
 # -----------------------------------------------------------------------------
+
 
 def _unwrap_geometry_collection(geom):
     """Unwrap a single-member GeometryCollection to its primitive type.
@@ -556,12 +584,27 @@ def _unwrap_geometry_collection(geom):
 
 
 _DUMP_FIELDS = [
-    "title", "type", "doi", "url", "publicationDate", "abstract",
-    "volume", "issue", "first_page", "last_page",
-    "timeperiod_startdate", "timeperiod_enddate",
-    "authors", "keywords", "topics", "bok_concepts",
-    "placename", "country_code",
-    "openalex_id", "openalex_open_access_status", "openalex_is_retracted",
+    "title",
+    "type",
+    "doi",
+    "url",
+    "publicationDate",
+    "abstract",
+    "volume",
+    "issue",
+    "first_page",
+    "last_page",
+    "timeperiod_startdate",
+    "timeperiod_enddate",
+    "authors",
+    "keywords",
+    "topics",
+    "bok_concepts",
+    "placename",
+    "country_code",
+    "openalex_id",
+    "openalex_open_access_status",
+    "openalex_is_retracted",
 ]
 
 
@@ -572,11 +615,7 @@ def regenerate_geojson_cache():
     json_filename = generate_data_dump_filename("geojson")
     json_path = os.path.join(cache_dir, json_filename)
 
-    works_qs = (
-        Work.objects.filter(status="p")
-        .select_related("source")
-        .prefetch_related("collections")
-    )
+    works_qs = Work.objects.filter(status="p").select_related("source").prefetch_related("collections")
 
     base_url = settings.BASE_URL.rstrip("/")
     extra = {
@@ -606,7 +645,7 @@ def regenerate_geojson_cache():
 
     gzip_filename = generate_data_dump_filename("geojson.gz")
     gzip_path = os.path.join(cache_dir, gzip_filename)
-    with open(json_path, 'rb') as fin, gzip.open(gzip_path, 'wb') as fout:
+    with open(json_path, "rb") as fin, gzip.open(gzip_path, "wb") as fout:
         fout.writelines(fin)
 
     size = os.path.getsize(json_path)

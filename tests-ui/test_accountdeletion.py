@@ -1,42 +1,42 @@
 # SPDX-FileCopyrightText: 2025 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import os
-import django
 import unittest
-from helium import *
 from time import sleep
-from django.core.cache import cache
+
 from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
+from django.core.cache import cache
+from helium import *
 
 User = get_user_model()
+
 
 class AccountDeletionUITest(StaticLiveServerTestCase):
     def setUp(self):
         """Set up the test user and start browser"""
         self.email = "testuser@example.com"
-        self.token = "mock-token-12345" 
-        self.delete_token = "mock-delete-token-67890"  
-        
+        self.token = "mock-token-12345"
+        self.delete_token = "mock-delete-token-67890"
+
         User.objects.filter(email=self.email).delete()
 
         self.user = User.objects.create_user(username=self.email, email=self.email, password="password")
 
-        cache.set(self.token, self.email, timeout=300)  
-        cache.set(f"user_delete_token_{self.delete_token}", self.user.id, timeout=600)  
+        cache.set(self.token, self.email, timeout=300)
+        cache.set(f"user_delete_token_{self.delete_token}", self.user.id, timeout=600)
 
         # Start browser
         self.browser = start_chrome(f"{self.live_server_url}/", headless=True)
 
     def test_delete_account(self):
 
-        click(S('#unifiedMenuDropdown'))
+        click(S("#unifiedMenuDropdown"))
 
-        write(self.email,  into='email')
+        write(self.email, into="email")
         click(S('button[type="submit"]'))
 
-        go_to(f"{self.live_server_url}/login/{self.token}")  
+        go_to(f"{self.live_server_url}/login/{self.token}")
         sleep(3)
 
         go_to(f"{self.live_server_url}/usersettings/")
@@ -67,6 +67,7 @@ class AccountDeletionUITest(StaticLiveServerTestCase):
         """Close browser after test"""
         if self.browser:
             kill_browser()
+
 
 if __name__ == "__main__":
     unittest.main()

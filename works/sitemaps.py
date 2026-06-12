@@ -2,12 +2,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from django.contrib.sitemaps import Sitemap
-from .models import Work, GlobalRegion
 from django.urls import reverse
 
+from .models import GlobalRegion, Work
 
-class WorksSitemap(Sitemap): # based on django.contrib.sitemaps.GenericSitemap
 
+class WorksSitemap(Sitemap):  # based on django.contrib.sitemaps.GenericSitemap
     priority = 0.5
     changefreq = "weekly"
     queryset = Work.objects.all().filter(status="p")
@@ -26,36 +26,39 @@ class WorksSitemap(Sitemap): # based on django.contrib.sitemaps.GenericSitemap
         """Return the last modification date of the work."""
         return item.lastUpdate
 
+
 class StaticViewSitemap(Sitemap):
     priority = 0.5
     changefreq = "monthly"
 
     def items(self):
         return [
-            "main",           # Home page (/)
-            "about",          # About page (/about/)
+            "main",  # Home page (/)
+            "about",  # About page (/about/)
             "accessibility",  # Accessibility statement (/accessibility/)
-            "contribute",     # Contribute page (/contribute/)
-            "data",           # Data download page (/data/)
-            "feeds",          # RSS/Atom feeds listing (/feeds/)
-            "geoextent",      # Geoextent extraction tool (/geoextent/)
-            "privacy",        # Privacy policy (/privacy/)
-            "redoc",          # API schema UI (/api/schema/ui/)
-            "sitemap-page",   # Human-readable sitemap (/pages/)
-            "works",          # Works listing (/works/)
+            "contribute",  # Contribute page (/contribute/)
+            "data",  # Data download page (/data/)
+            "feeds",  # RSS/Atom feeds listing (/feeds/)
+            "geoextent",  # Geoextent extraction tool (/geoextent/)
+            "privacy",  # Privacy policy (/privacy/)
+            "redoc",  # API schema UI (/api/schema/ui/)
+            "sitemap-page",  # Human-readable sitemap (/pages/)
+            "works",  # Works listing (/works/)
         ]
 
     def location(self, item):
         return reverse(f"optimap:{item}")
 
+
 class FeedsSitemap(Sitemap):
     """Sitemap for global regional feeds (continents and oceans)."""
+
     priority = 0.6
     changefreq = "daily"
 
     def items(self):
         """Return all GlobalRegion objects (continents and oceans)."""
-        return GlobalRegion.objects.all().order_by('region_type', 'name')
+        return GlobalRegion.objects.all().order_by("region_type", "name")
 
     def location(self, obj):
         """Return the feed page URL for each region."""

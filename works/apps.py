@@ -2,22 +2,23 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import logging
+
 from django.apps import AppConfig
-from django.db.models.signals import post_migrate
 from django.conf import settings
+from django.db.models.signals import post_migrate
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
+
 def schedule_data_dump(sender, **kwargs):
     from django_q.models import Schedule
-    from django_q.tasks  import schedule
+    from django_q.tasks import schedule
 
     func_name = "works.tasks.regenerate_all_data_dumps"
     # Drop legacy single-format schedules so existing deployments migrate to
     # the umbrella that produces GeoJSON + GeoPackage + CSV in one pass.
-    legacy = ("works.tasks.regenerate_geopackage_cache",
-              "works.tasks.regenerate_geojson_cache")
+    legacy = ("works.tasks.regenerate_geopackage_cache", "works.tasks.regenerate_geojson_cache")
     Schedule.objects.filter(func__in=legacy).delete()
 
     if not Schedule.objects.filter(func=func_name).exists():
@@ -34,8 +35,10 @@ def schedule_data_dump(sender, **kwargs):
             settings.DATA_DUMP_INTERVAL_HOURS,
         )
 
+
 def ensure_deleted_user_sentinel(sender, **kwargs):
     from works.models import CustomUser
+
     CustomUser.objects.get_or_create(
         username="deleted",
         defaults={"email": "", "is_active": False, "is_staff": False},
@@ -43,7 +46,8 @@ def ensure_deleted_user_sentinel(sender, **kwargs):
 
 
 def schedule_inactivity_tasks(sender, **kwargs):
-    from works.tasks import schedule_inactivity_warning_task, schedule_inactivity_deletion_task
+    from works.tasks import schedule_inactivity_deletion_task, schedule_inactivity_warning_task
+
     schedule_inactivity_warning_task()
     schedule_inactivity_deletion_task()
 
@@ -56,31 +60,32 @@ def _update_pygeoapi_extent(sender=None, **kwargs):
     so it only runs once per process lifetime.
     """
     from django.core.signals import request_started
+
     request_started.disconnect(_update_pygeoapi_extent)
 
-    if not getattr(settings, 'PYGEOAPI_ENABLED', False):
+    if not getattr(settings, "PYGEOAPI_ENABLED", False):
         return
     try:
         from django.contrib.gis.db.models import Extent
+
         from works.models import Work
-        result = Work.objects.filter(status='p').exclude(geometry__isnull=True).aggregate(
-            extent=Extent('geometry')
-        )
-        bbox = result.get('extent')
+
+        result = Work.objects.filter(status="p").exclude(geometry__isnull=True).aggregate(extent=Extent("geometry"))
+        bbox = result.get("extent")
         if bbox:
-            settings.PYGEOAPI_CONFIG['resources']['works']['extents']['spatial']['bbox'] = list(bbox)
+            settings.PYGEOAPI_CONFIG["resources"]["works"]["extents"]["spatial"]["bbox"] = list(bbox)
             logger.info("Updated pygeoapi works spatial extent to actual data: %s", bbox)
     except Exception as exc:
         logger.debug("Could not update pygeoapi extent at startup (non-fatal): %s", exc)
 
 
 class WorksConfig(AppConfig):
-    name               = "works"
+    name = "works"
     default_auto_field = "django.db.models.BigAutoField"
 
     def ready(self):
-        import works.signals
         from django.core.signals import request_started
+
         request_started.connect(_update_pygeoapi_extent, weak=False)
         post_migrate.connect(
             schedule_data_dump,
