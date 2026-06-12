@@ -15,7 +15,7 @@ from pathlib import Path
 from rest_framework import viewsets, status
 from rest_framework_gis import filters
 from rest_framework.permissions import IsAuthenticatedOrReadOnly, AllowAny
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from drf_spectacular.utils import (
     extend_schema, extend_schema_view, inline_serializer, OpenApiResponse, OpenApiExample,
@@ -28,11 +28,12 @@ from django.contrib.gis.geos import Polygon, Point, MultiPoint
 # Import geoextent at module level
 import geoextent.lib.extent as geoextent
 
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Case, When, Value, IntegerField
 from .models import Work, Source, Subscription, GlobalRegion, Collection
 from .utils.provenance import public_subset
 from .serializers import (
     WorkSerializer,
+    WorkMinimalSerializer,
     SourceSerializer,
     SubscriptionSerializer,
     GlobalRegionSerializer,
@@ -87,7 +88,10 @@ class SourceViewSet(viewsets.ReadOnlyModelViewSet):
         description=(
             "Returns published works as a GeoJSON `FeatureCollection`. Admins additionally "
             "see drafts and harvested-but-unpublished works. Filter the spatial slice with "
-            "`?in_bbox=west,south,east,north`."
+            "`?in_bbox=west,south,east,north`.\n\n"
+            "Pass `?minimal=true` to receive only `id`, `title`, `doi`, `status`, "
+            "`status_display`, and `geometry` — the reduced payload is used by the map "
+            "for chunked loading; full details are fetched lazily per work."
         ),
         tags=["Works"],
     ),
@@ -107,6 +111,11 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = WorkSerializer
     permission_classes = [IsAuthenticatedOrReadOnly]
 
+    def get_serializer_class(self):
+        if self.request.query_params.get('minimal') == 'true':
+            return WorkMinimalSerializer
+        return WorkSerializer
+
     def get_queryset(self):
         """
         Return all publications for admin users, only published ones for others.
@@ -117,7 +126,21 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
         they can view provenance for harvested/contributed/draft works too.
         """
         if self.request.user.is_authenticated and self.request.user.is_staff:
-            return Work.objects.all().order_by("-creationDate", "-id").distinct()
+            qs = Work.objects.all().distinct()
+            # query_params is a DRF-only attribute; fall back to .GET for plain WSGIRequests.
+            qp = getattr(self.request, 'query_params', self.request.GET)
+            if qp.get('minimal') == 'true':
+                # For map loading, put published works (which have geometry) first so
+                # markers appear in the first chunk instead of at the end of 4k harvested ones.
+                qs = qs.annotate(
+                    _status_priority=Case(
+                        When(status='p', then=Value(0)), default=Value(1),
+                        output_field=IntegerField(),
+                    )
+                ).order_by('_status_priority', '-creationDate', '-id')
+            else:
+                qs = qs.order_by('-creationDate', '-id')
+            return qs
         if getattr(self, 'action', None) == 'provenance' and self.request.user.is_authenticated:
             curated = Work.objects.filter(collections__curators=self.request.user)
             public  = Work.objects.filter(status="p")
@@ -1341,3 +1364,65 @@ class GeoextentViewSet(viewsets.ViewSet):
                 {'error': 'NER extraction error', 'details': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+@extend_schema_view(
+    list=extend_schema(
+        summary="Site statistics (cached, 24 h TTL)",
+        description=(
+            "Returns aggregate counts for the OPTIMAP database. "
+            "Results are cached for 24 hours.\n\n"
+            "`total_works_for_user` equals `published_works` for anonymous and non-staff users, "
+            "and `total_works` for staff — matching the total that `/api/v1/works/` returns for "
+            "the caller. Use it to drive a loading progress indicator."
+        ),
+        tags=["Statistics"],
+        responses={
+            200: OpenApiResponse(
+                description="Aggregate counts.",
+                response=inline_serializer(
+                    name="StatisticsResponse",
+                    fields={
+                        "total_works": drf_serializers.IntegerField(
+                            help_text="Total works in the database across all statuses.",
+                        ),
+                        "total_works_for_user": drf_serializers.IntegerField(
+                            help_text=(
+                                "Works visible to the current caller: published_works for "
+                                "anonymous/non-staff, total_works for staff."
+                            ),
+                        ),
+                        "published_works": drf_serializers.IntegerField(),
+                        "with_geometry": drf_serializers.IntegerField(),
+                        "with_temporal": drf_serializers.IntegerField(),
+                        "with_authors": drf_serializers.IntegerField(),
+                        "with_doi": drf_serializers.IntegerField(),
+                        "with_abstract": drf_serializers.IntegerField(),
+                        "open_access": drf_serializers.IntegerField(),
+                        "from_openalex": drf_serializers.IntegerField(),
+                        "with_complete_metadata": drf_serializers.IntegerField(),
+                        "complete_percentage": drf_serializers.FloatField(),
+                        "works_by_status": drf_serializers.DictField(
+                            child=drf_serializers.IntegerField(),
+                            help_text="Count per status code: p=published, h=harvested, c=contributed, d=draft, t=testing, w=withdrawn.",
+                        ),
+                        "sources": drf_serializers.IntegerField(),
+                        "collections": drf_serializers.IntegerField(),
+                        "users": drf_serializers.IntegerField(),
+                    },
+                ),
+            ),
+        },
+    ),
+)
+class StatisticsViewSet(viewsets.ViewSet):
+    """Read-only viewset exposing cached site-wide statistics."""
+
+    permission_classes = [AllowAny]
+
+    def list(self, request):
+        from works.utils.statistics import get_cached_statistics
+        stats = get_cached_statistics()
+        is_staff = request.user.is_authenticated and request.user.is_staff
+        total_for_user = stats.get('total_works', 0) if is_staff else stats.get('published_works', 0)
+        return Response({**stats, 'total_works_for_user': total_for_user})

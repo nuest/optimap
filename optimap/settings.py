@@ -140,7 +140,7 @@ AUTH_USER_MODEL = "works.CustomUser"
 
 REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
+    'DEFAULT_PAGINATION_CLASS': 'works.pagination.LinkHeaderPagination',
 	'PAGE_SIZE': 999,
 }
 
@@ -236,6 +236,7 @@ download URLs directly.
         {'name': 'Downloads', 'description': 'Flat-file dumps of the full work corpus (GeoJSON, GeoPackage, CSV).'},
         {'name': 'Collections', 'description': 'Curated groups of published works. The list/detail endpoints return collection metadata with a `works_count` and embedded links to feeds and downloads. Per-collection GeoRSS/GeoAtom feeds are served by the Django syndication framework and are documented in the API description above.'},
         {'name': 'Body of Knowledge', 'description': 'Search the cached [EO4GEO Body of Knowledge](https://geospacebok.eu) for concept tagging.'},
+        {'name': 'Statistics', 'description': 'Cached aggregate counts for works, sources, collections, and users. Refreshed every 24 h.'},
     ],
     'SWAGGER_UI_DIST': 'SIDECAR',  # shorthand to use the sidecar instead
     'SWAGGER_UI_FAVICON_HREF': 'SIDECAR',
@@ -639,6 +640,9 @@ def _calculate_page_size_options(min_size, max_size, default=None):
     return sorted(options)
 
 WORKS_PAGE_SIZE_OPTIONS = _calculate_page_size_options(WORKS_PAGE_SIZE_MIN, WORKS_PAGE_SIZE_MAX, default=PAGE_MAX_ITEMS)
+
+# Number of works fetched per chunk when loading the main map.
+OPTIMAP_MAP_CHUNK_SIZE = int(env('OPTIMAP_MAP_CHUNK_SIZE', default=500))
 
 # OGC API - Features via pygeoapi (issue #19)
 # Served at /ogcapi/ when etc/pygeoapi-config.yml is present and the

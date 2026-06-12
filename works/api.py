@@ -11,6 +11,7 @@ from works.viewsets import (
     GlobalRegionViewSet,
     CollectionViewSet,
     GeoextentViewSet,
+    StatisticsViewSet,
 )
 
 router = routers.DefaultRouter()
@@ -20,5 +21,6 @@ router.register(r"subscriptions", SubscriptionViewSet, basename="subscription")
 router.register(r"global-regions", GlobalRegionViewSet, basename="global-region")
 router.register(r"collections", CollectionViewSet, basename="collection")
 router.register(r"geoextent", GeoextentViewSet, basename="geoextent")
+router.register(r"statistics", StatisticsViewSet, basename="statistics")
 
 urlpatterns = router.urls

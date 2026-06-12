@@ -44,6 +44,7 @@ def main(request):
         'next': next_url,
         'meta': build_homepage_meta(request),
         'canonical_url': request.build_absolute_uri(reverse("optimap:main")),
+        'map_chunk_size': settings.OPTIMAP_MAP_CHUNK_SIZE,
     })
 
 @cache_page(24 * 3600, cache='memory')

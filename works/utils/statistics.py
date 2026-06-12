@@ -9,7 +9,7 @@ Provides cached statistics about the work database.
 
 from django.core.cache import cache
 from django.db.models import Count, Q
-from works.models import Work
+from works.models import Work, Source, Collection
 
 
 STATS_CACHE_KEY = 'publications_statistics'
@@ -24,6 +24,9 @@ def calculate_statistics():
         dict: Statistics including total count, published count,
               counts with geometry, temporal data, authors, etc.
     """
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+
     # Base queryset for published works
     published = Work.objects.filter(status='p')
 
@@ -48,6 +51,13 @@ def calculate_statistics():
         ).exclude(
             openalex_id=''
         ).count(),
+        'works_by_status': {
+            s: Work.objects.filter(status=s).count()
+            for s in ('p', 'h', 'c', 'd', 't', 'w')
+        },
+        'sources': Source.objects.count(),
+        'collections': Collection.objects.count(),
+        'users': User.objects.count(),
     }
 
     # Calculate percentage with complete metadata (geometry + temporal + authors)

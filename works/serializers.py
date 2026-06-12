@@ -142,6 +142,18 @@ class WorkSerializer(GeoFeatureModelSerializer):
                 for c in codes
             ]
 
+class WorkMinimalSerializer(GeoFeatureModelSerializer):
+    """Slim serializer for chunked map loading — geometry + identifiers only."""
+
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+
+    class Meta:
+        model = Work
+        geo_field = "geometry"
+        auto_bbox = False
+        fields = ["id", "title", "doi", "status", "status_display"]
+
+
 class SubscriptionSerializer(GeoFeatureModelSerializer):
     class Meta:
         model = Subscription

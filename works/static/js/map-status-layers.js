@@ -31,8 +31,8 @@
      * @param {Object} [options]
      * @param {Function} [options.styleFn] - Base style function (defaults to window.publicationStyle).
      * @param {Function} [options.popupFn] - Base onEachFeature function (defaults to window.publicationPopup).
-     * @param {string}   [options.publishedLabelTemplate]   - Defaults to 'Published works ({n})'.
-     * @param {string}   [options.unpublishedLabelTemplate] - Defaults to 'Unpublished works ({n})'.
+     * @param {string}   [options.publishedLabel]   - Defaults to 'Published works'.
+     * @param {string}   [options.unpublishedLabel] - Defaults to 'Unpublished works'.
      */
     constructor(map, layerControl, features, options) {
       options = options || {};
@@ -41,8 +41,8 @@
 
       const styleFn = options.styleFn || (typeof publicationStyle === 'function' ? publicationStyle : null);
       const popupFn = options.popupFn || (typeof publicationPopup === 'function' ? publicationPopup : null);
-      const publishedLabelTemplate = options.publishedLabelTemplate || 'Published works ({n})';
-      const unpublishedLabelTemplate = options.unpublishedLabelTemplate || 'Unpublished works ({n})';
+      const publishedLabel = options.publishedLabel || options.publishedLabelTemplate || 'Published works';
+      const unpublishedLabel = options.unpublishedLabel || options.unpublishedLabelTemplate || 'Unpublished works';
 
       this.publishedGroup = L.featureGroup();
       this.unpublishedGroup = L.featureGroup();
@@ -54,33 +54,24 @@
         // Render GeoJSON Points as circleMarkers (same as the work landing page)
         // instead of the default pin-marker. The style function is not called for
         // layers created by pointToLayer, so we compute the style here directly.
-        pointToLayer: function (feature, latlng) {
+        pointToLayer: (feature, latlng) => {
           const base = styleFn ? styleFn(feature) : {};
           const style = isUnpublished(feature) ? unpublishedStyle(base) : base;
           return L.circleMarker(latlng, Object.assign({ radius: 6 }, style));
         },
-        style: function (feature) {
+        style: (feature) => {
           const base = styleFn ? styleFn(feature) : {};
           return isUnpublished(feature) ? unpublishedStyle(base) : base;
         },
-        onEachFeature: function (feature, layer) {
+        onEachFeature: (feature, layer) => {
           if (popupFn) popupFn(feature, layer);
+          if (isUnpublished(feature)) {
+            this.unpublishedGroup.addLayer(layer);
+          } else {
+            this.publishedGroup.addLayer(layer);
+          }
         },
       });
-
-      let publishedCount = 0;
-      let unpublishedCount = 0;
-      this.allLayer.eachLayer((layer) => {
-        if (layer.feature && isUnpublished(layer.feature)) {
-          this.unpublishedGroup.addLayer(layer);
-          unpublishedCount++;
-        } else {
-          this.publishedGroup.addLayer(layer);
-          publishedCount++;
-        }
-      });
-      this.publishedCount = publishedCount;
-      this.unpublishedCount = unpublishedCount;
 
       // Parent group both managers (search/zoom) can still treat as the
       // single "publications group". Toggling it via map.addLayer/removeLayer
@@ -88,15 +79,13 @@
       this.publicationsGroup = L.featureGroup([this.publishedGroup, this.unpublishedGroup]);
       this.publicationsGroup.addTo(this.map);
 
-      this.layerControl.addOverlay(
-        this.publishedGroup,
-        publishedLabelTemplate.replace('{n}', publishedCount)
-      );
-      if (unpublishedCount > 0) {
-        this.layerControl.addOverlay(
-          this.unpublishedGroup,
-          unpublishedLabelTemplate.replace('{n}', unpublishedCount)
-        );
+      this._unpublishedLabel = unpublishedLabel;
+      this._unpublishedRegistered = false;
+
+      this.layerControl.addOverlay(this.publishedGroup, publishedLabel);
+      if (this.unpublishedGroup.getLayers().length > 0) {
+        this.layerControl.addOverlay(this.unpublishedGroup, unpublishedLabel);
+        this._unpublishedRegistered = true;
       }
     }
 
@@ -120,6 +109,22 @@
      */
     getPublicationsGroup() {
       return this.publicationsGroup;
+    }
+
+    /**
+     * Add a new batch of GeoJSON features to the existing layers.
+     * Called by the chunked-loading loop in main.js for each page after the first.
+     * Routing to published/unpublished groups happens inside onEachFeature.
+     * @param {Array} features - Array of GeoJSON feature objects.
+     */
+    addFeatures(features) {
+      const hadUnpublished = this._unpublishedRegistered;
+      this.allLayer.addData({ type: 'FeatureCollection', features });
+      // Register the Unpublished overlay the first time an unpublished work appears.
+      if (!hadUnpublished && this.unpublishedGroup.getLayers().length > 0) {
+        this.layerControl.addOverlay(this.unpublishedGroup, this._unpublishedLabel);
+        this._unpublishedRegistered = true;
+      }
     }
   }
 

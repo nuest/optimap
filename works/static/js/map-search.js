@@ -527,4 +527,13 @@ class MapSearchManager {
       this.performSearch(this.searchInput.value);
     }
   }
+
+  /**
+   * Append a new batch of publication features (chunked loading).
+   * @param {Array} features - Array of GeoJSON feature objects from one chunk.
+   */
+  addPublications(features) {
+    if (!Array.isArray(features)) return;
+    this.allPublications = this.allPublications.concat(features);
+  }
 }
