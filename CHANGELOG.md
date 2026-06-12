@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add Ruff code formatter with enforcement via test suite and CI (#70). Configuration in `pyproject.toml` (line length 119, rules E/F/I). VSCode format-on-save via `.vscode/settings.json`; PyCharm via the Ruff plugin.
+
 ### Changed
 
 - **EO4GEO BoK upgraded to `current` version (GeoSpaceBoK, 1,212 concepts)**. The default `OPTIMAP_BOK_VERSION` is now `current` instead of the pinned `v3` snapshot. The `current` version is served by [geospacebok.eu](https://geospacebok.eu) and adds 327 concepts compared to v3, including a heavily expanded GC3 AI/ML hierarchy (6 → 52 codes, e.g. `GC3-11-2` Space-time dynamic reasoning) and a new top-level `GN` category for GNSS concepts (~277 sub-codes). `OPTIMAP_BOK_CONCEPT_BASE_URL` default updated from `http://bok.eo4geo.eu` to `https://geospacebok.eu`; concept chips now link to `https://geospacebok.eu/<CODE>`. The `--version` flag on `refresh_bok_snapshot` has been renamed to `--bok-version` to avoid conflict with Django's built-in `--version` flag.

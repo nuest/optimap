@@ -6,3 +6,4 @@ fiona
 coverage
 reuse
 fpdf2
+ruff

@@ -109,6 +109,24 @@ OPTIMAP_DEBUG=True OPTIMAP_CACHE=dummy python manage.py runserver
 
 Access at http://127.0.0.1:8000/
 
+### Code formatting
+
+[Ruff](https://docs.astral.sh/ruff/) is used for formatting, import sorting, and linting. Configuration is in `pyproject.toml`.
+
+```bash
+# Check formatting and lint (what CI runs)
+ruff format --check .
+ruff check .
+
+# Apply formatting and auto-fixable lint issues
+ruff format .
+ruff check --fix .
+```
+
+**VSCode**: install the [Ruff extension](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff) (recommended in `.vscode/extensions.json`); `.vscode/settings.json` enables format-on-save automatically.
+
+**PyCharm**: install the [Ruff plugin](https://plugins.jetbrains.com/plugin/20574-ruff) from JetBrains Marketplace and enable "Run ruff on save". PyCharm reads `pyproject.toml` automatically.
+
 ### Testing
 
 All tests are always run using the virtual environment defined in `.venv/`; the Docker config is only for deployment of the the app.
@@ -427,6 +445,7 @@ For harvest completion/failure emails use `render_harvest_email` from `works.har
 - **Email debugging**: Set `EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend` in `.env`
 - **Django-Q cluster**: Must be running separately for harvesting/scheduled tasks to execute
 - **Data dumps retention**: Controlled by `OPTIMAP_DATA_DUMP_RETENTION` (default: 3)
+- **Formatter not installed**: Run `pip install -r requirements-dev.txt`; verify with `ruff format --check .` and `ruff check .`.
 - **Django template comments `{# … #}` must be on a single line.** The parser does not support multi-line `{# #}` blocks — a newline inside the comment is rendered verbatim and may break the page. For multi-line notes use `{% comment %}…{% endcomment %}` instead.
 
 ## File Structure Highlights

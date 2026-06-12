@@ -1,0 +1,16 @@
+[tool.ruff]
+line-length = 119
+exclude = ["*/migrations/*"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = [
+    "E402", # module-level imports not at top — common in Django (loggers between imports)
+    "E501", # line too long — ruff format handles wrappable lines; string literals can't be auto-wrapped
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests-ui/**" = ["F403", "F405", "F821"] # helium uses star imports; test_loginconfirm.py has class-body self refs
+
+[tool.ruff.format]
+quote-style = "double"
