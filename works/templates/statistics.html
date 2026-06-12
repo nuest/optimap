@@ -107,7 +107,8 @@
   <h2 class="mt-4">Works over time</h2>
   <div class="card mb-4">
     <div class="card-body">
-      <canvas id="worksTimeChart" height="80"></canvas>
+      <canvas id="worksTimeChart" height="80" aria-label="Works published over time, line chart"></canvas>
+      <p class="text-muted small mt-1">The chart shows the cumulative count of published works by date. The same data is available in the breakdown tables below.</p>
     </div>
   </div>
   {% endif %}
@@ -118,7 +119,7 @@
       <h2>By continent</h2>
       {% if snapshot_by_continent %}
       <table class="table table-sm table-striped">
-        <thead><tr><th>Continent</th><th class="text-right">Works</th></tr></thead>
+        <thead><tr><th scope="col">Continent</th><th scope="col" class="text-right">Works</th></tr></thead>
         <tbody>
           {% for row in snapshot_by_continent %}
           <tr>
@@ -134,7 +135,7 @@
       <h2>By ocean</h2>
       {% if snapshot_by_ocean %}
       <table class="table table-sm table-striped">
-        <thead><tr><th>Ocean</th><th class="text-right">Works</th></tr></thead>
+        <thead><tr><th scope="col">Ocean</th><th scope="col" class="text-right">Works</th></tr></thead>
         <tbody>
           {% for row in snapshot_by_ocean %}
           <tr>
@@ -154,7 +155,7 @@
       {% if snapshot.by_country %}
       <div style="max-height: 320px; overflow-y: auto;">
         <table class="table table-sm table-striped mb-0">
-          <thead><tr><th>Country</th><th class="text-right">Works</th></tr></thead>
+          <thead><tr><th scope="col">Country</th><th scope="col" class="text-right">Works</th></tr></thead>
           <tbody>
             {% for row in snapshot.by_country %}
             <tr><td>{{ row.name }}</td><td class="text-right">{{ row.count }}</td></tr>
@@ -169,7 +170,7 @@
       {% if snapshot.by_publisher %}
       <div style="max-height: 320px; overflow-y: auto;">
         <table class="table table-sm table-striped mb-0">
-          <thead><tr><th>Publisher</th><th class="text-right">Works</th></tr></thead>
+          <thead><tr><th scope="col">Publisher</th><th scope="col" class="text-right">Works</th></tr></thead>
           <tbody>
             {% for row in snapshot.by_publisher %}
             <tr><td>{{ row.name }}</td><td class="text-right">{{ row.count }}</td></tr>
@@ -187,7 +188,7 @@
       {% if snapshot.by_journal %}
       <div style="max-height: 320px; overflow-y: auto;">
         <table class="table table-sm table-striped mb-0">
-          <thead><tr><th>Journal / source</th><th class="text-right">Works</th></tr></thead>
+          <thead><tr><th scope="col">Journal / source</th><th scope="col" class="text-right">Works</th></tr></thead>
           <tbody>
             {% for row in snapshot.by_journal %}
             <tr><td>{{ row.name }}</td><td class="text-right">{{ row.count }}</td></tr>
@@ -201,7 +202,7 @@
       <h2>By collection</h2>
       {% if snapshot.by_collection %}
       <table class="table table-sm table-striped">
-        <thead><tr><th>Collection</th><th class="text-right">Works</th></tr></thead>
+        <thead><tr><th scope="col">Collection</th><th scope="col" class="text-right">Works</th></tr></thead>
         <tbody>
           {% for row in snapshot.by_collection %}
           <tr>
@@ -234,26 +235,27 @@
   </div>
   <div class="card mb-4">
     <div class="card-body">
-      <canvas id="sourceCoverageChart" height="80"></canvas>
+      <canvas id="sourceCoverageChart" height="80" aria-label="Source coverage comparison, bar chart"></canvas>
+      <p class="text-muted small mt-1">The chart compares the number of published works in OPTIMAP with the total works in OpenAlex for the selected source.</p>
     </div>
   </div>
   <div class="table-responsive mb-4">
     <table class="table table-sm table-striped">
       <thead>
         <tr>
-          <th>Source</th>
-          <th class="text-right">OPTIMAP works</th>
-          <th class="text-right">OpenAlex total</th>
-          <th class="text-right">Coverage
+          <th scope="col">Source</th>
+          <th scope="col" class="text-right">OPTIMAP works</th>
+          <th scope="col" class="text-right">OpenAlex total</th>
+          <th scope="col" class="text-right">Coverage
             <i class="fas fa-info-circle text-muted" data-toggle="tooltip"
                title="Share of OpenAlex-indexed works present in OPTIMAP. N/A when the source has no OpenAlex ID."
                style="cursor:help;"></i>
           </th>
-          <th class="text-right">With geometry</th>
-          <th class="text-right">With temporal</th>
-          <th class="text-right">Open access</th>
-          <th class="text-right">Contributors</th>
-          <th>Last updated</th>
+          <th scope="col" class="text-right">With geometry</th>
+          <th scope="col" class="text-right">With temporal</th>
+          <th scope="col" class="text-right">Open access</th>
+          <th scope="col" class="text-right">Contributors</th>
+          <th scope="col">Last updated</th>
         </tr>
       </thead>
       <tbody>

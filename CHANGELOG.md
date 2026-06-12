@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Accessibility improvements across all pages** (closes #173). Template-level WCAG 2.1 fixes: `role="application"` and `aria-label` added statically to map containers (`<div id="map">`, `<div id="mini-map">`); `aria-modal="true"` and `aria-labelledby` added to both account-deletion modals in user settings; missing `<label for="email_new">` added to the change-email form; grouped region checkboxes on the subscriptions page now use semantic `<fieldset>`/`<legend>` instead of `<div>`; all data tables on the statistics page now have `scope="col"` on `<th>` elements; Chart.js canvas elements have `aria-label` and a visible text caption; decorative icons inside badges now carry `aria-hidden="true"`; dropdown dividers in the navigation menu are marked `aria-hidden="true"`; the generic "here" link in the About page is replaced with descriptive anchor text; the "accessibility" typo in about.html is fixed. Automated testing: `axe-selenium-python` added to dev dependencies; new `tests-ui/test_accessibility.py` runs axe-core scans on six public pages asserting zero critical/serious violations; new `tests/test_accessibility_html.py` adds fast Django-client assertions for the specific ARIA attributes introduced.
+
 ## [0.25.0] - 2026-06-12
 
 ### Added

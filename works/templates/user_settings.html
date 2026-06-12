@@ -210,6 +210,7 @@
                 </div>
               </div>
               <div class="form-group row px-3">
+                <label for="email_new" class="col-form-label">New email address</label>
                 <input
                   id="email_new"
                   placeholder="Enter your new email"
@@ -270,11 +271,11 @@
               Delete Account
             </button>
 
-            <div id="modal1" class="modal" tabindex="-1" role="dialog">
+            <div id="modal1" class="modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="modal1-title">
               <div class="modal-dialog" role="document">
                 <div class="modal-content">
                   <div class="modal-header">
-                    <h5 class="modal-title">Delete Account</h5>
+                    <h5 class="modal-title" id="modal1-title">Delete Account</h5>
                     <button
                       type="button"
                       class="close"
@@ -315,13 +316,13 @@
           </div>
         </div>
         <!-- Final Confirmation Modal (Only Shows After Clicking Email Link) -->
-        <div id="finalDeleteModal" class="modal fade" tabindex="-1">
+        <div id="finalDeleteModal" class="modal fade" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="finalDeleteModal-title">
           <div class="modal-dialog">
             <div class="modal-content">
               <div class="modal-header">
-                <h5 class="modal-title">Final Confirmation</h5>
-                <button type="button" class="close" data-dismiss="modal">
-                  <span>&times;</span>
+                <h5 class="modal-title" id="finalDeleteModal-title">Final Confirmation</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                  <span aria-hidden="true">&times;</span>
                 </button>
               </div>
               <div class="modal-body">

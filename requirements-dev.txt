@@ -1,5 +1,6 @@
 helium
 pyvirtualdisplay
+axe-selenium-python
 responses
 xmldiff
 fiona

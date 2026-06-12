@@ -105,13 +105,13 @@
                     <div class="mb-1">
                       <span class="badge {% if work.has_geo %}badge-success{% else %}badge-secondary{% endif %}"
                             title="{% if work.has_geo %}Has spatial extent{% else %}No spatial extent{% endif %}">
-                        <i class="fas fa-map-marker-alt"></i> Spatial
+                        <i class="fas fa-map-marker-alt" aria-hidden="true"></i> Spatial
                       </span>
                     </div>
                     <div>
                       <span class="badge {% if work.has_temporal %}badge-success{% else %}badge-secondary{% endif %}"
                             title="{% if work.has_temporal %}Has temporal extent{% else %}No temporal extent{% endif %}">
-                        <i class="fas fa-clock"></i> Temporal
+                        <i class="fas fa-clock" aria-hidden="true"></i> Temporal
                       </span>
                     </div>
                   </div>
@@ -128,8 +128,10 @@
                   </a>
                 {% endif %}
               {% else %}
-                <button disabled class="btn btn-outline-secondary btn-sm" title="Please use the user menu at the top right to log in">
-                  <i class="fas fa-user-circle"></i> Please log in to contribute (user menu at top right)
+                <button disabled class="btn btn-outline-secondary btn-sm"
+                        title="Please use the user menu at the top right to log in"
+                        aria-label="Log in to contribute — use the user menu at the top right">
+                  <i class="fas fa-user-circle" aria-hidden="true"></i> Please log in to contribute (user menu at top right)
                 </button>
               {% endif %}
             </div>
