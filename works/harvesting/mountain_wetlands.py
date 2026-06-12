@@ -23,6 +23,8 @@ from works.models import HarvestingEvent, Source, Work
 from .common import (
     HarvestStats,
     HarvestWarningCollector,
+    _backfill_empty_doi,
+    _find_existing_work,
     _save_or_update_work,
     complete_harvest,
     ensure_collection_for_source,
@@ -182,6 +184,17 @@ def parse_mountain_wetlands_response_and_save_works(
         geom_obj = _mwr_geometry_from_study_sites(item.get("study_sites"))
         abstract = (item.get("abstractNote") or None) or None
         api_doi = _mwr_clean_doi(item.get("DOI"))
+
+        # Early dedup: skip OpenAlex for records already in the database.
+        _early_existing = _find_existing_work(doi=api_doi, url=item_url)
+        if _early_existing is not None:
+            if api_doi and not _early_existing.doi:
+                _backfill_empty_doi(_early_existing, api_doi, event)
+            _cross_source = _early_existing.source_id != source.id
+            if _cross_source or not update_existing:
+                action = "skipped_cross_source" if _cross_source else "skipped_same_source"
+                stats.record(action)
+                continue
 
         existing_metadata = {}
         if api_authors:

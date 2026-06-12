@@ -3,10 +3,17 @@
 
 """HTTP session factories and response sniffers shared by every harvester."""
 
+import hashlib
+import logging
+import re
+from urllib.parse import urlparse
+
 import requests
 from django.conf import settings
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+
+logger = logging.getLogger(__name__)
 
 # OAI-PMH ---------------------------------------------------------------------
 
@@ -61,6 +68,70 @@ def _short_body(resp: requests.Response, n: int = 240) -> str:
     if len(text) > n:
         return text[:n] + "…"
     return text
+
+
+_POW_MAX_ITERATIONS = 10_000_000
+
+
+def _try_solve_pow_challenge(session: requests.Session, response: requests.Response) -> bool:
+    """Solve a BunkerWeb/HAProxy SHA-256 Proof-of-Work bot-protection challenge.
+
+    Some repositories (e.g. GEO-LEO e-docs) protect their OAI-PMH endpoints
+    with a JS PoW challenge. The challenge is fully solvable without a browser:
+    find nonce i such that SHA-256(challenge+str(i)) has 0x00 at byte
+    challenge_index and 0x41 at challenge_index+1 (where challenge_index is
+    int(challenge[0], 16)). On success the server returns a long-lived
+    ray_clearance cookie (currently expires 2029-12-31).
+
+    Returns True if the challenge was solved and a clearance cookie is now set.
+    """
+    if "data-pow=" not in (response.text or ""):
+        return False
+
+    m = re.search(r'data-pow="([^"]+)"', response.text)
+    if not m:
+        return False
+
+    combined = m.group(1)
+    parts = combined.split("#")
+    if len(parts) != 3:
+        return False
+
+    _userkey, challenge, _signature = parts
+    challenge_index = int(challenge[0], 16)
+
+    logger.info("Bot-protection PoW challenge detected (challengeIndex=%d); solving…", challenge_index)
+
+    nonce = None
+    for i in range(_POW_MAX_ITERATIONS):
+        digest = hashlib.sha256((challenge + str(i)).encode()).digest()
+        if digest[challenge_index] == 0x00 and digest[challenge_index + 1] == 0x41:
+            nonce = i
+            break
+
+    if nonce is None:
+        logger.warning("PoW challenge: no solution found within %d iterations", _POW_MAX_ITERATIONS)
+        return False
+
+    logger.info("PoW solved: nonce=%d", nonce)
+
+    parsed = urlparse(response.url)
+    ray_post_url = f"{parsed.scheme}://{parsed.netloc}/_ray"
+    ray_response = f"{combined}#{nonce}"
+
+    post_resp = session.post(
+        ray_post_url,
+        data={"ray_clearance_response": ray_response},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        allow_redirects=False,
+    )
+
+    if "ray_clearance" in session.cookies:
+        logger.info("Bot protection bypassed (POST status=%d); ray_clearance cookie set", post_resp.status_code)
+        return True
+
+    logger.warning("PoW POST returned status=%d but no ray_clearance cookie was set", post_resp.status_code)
+    return False
 
 
 # Crossref --------------------------------------------------------------------

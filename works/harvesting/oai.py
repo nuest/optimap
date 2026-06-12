@@ -11,6 +11,7 @@ Public surface:
 
 import logging
 import re
+from urllib.parse import urlencode, urlparse, urlunparse
 from xml.dom import minidom
 
 import requests
@@ -24,6 +25,8 @@ from works.models import HarvestingEvent, Source
 from .common import (
     HarvestStats,
     HarvestWarningCollector,
+    _backfill_empty_doi,
+    _find_existing_work,
     _save_or_update_work,
     complete_harvest,
     ensure_collection_for_source,
@@ -42,6 +45,7 @@ from .sessions import (
     _looks_like_oai_xml,
     _oai_session,
     _short_body,
+    _try_solve_pow_challenge,
 )
 
 logger = logging.getLogger(__name__)
@@ -65,7 +69,13 @@ def _extract_issn(candidate: str | None) -> str | None:
 
 
 def parse_oai_xml_and_save_works(
-    content, event: HarvestingEvent, max_records=None, warning_collector=None, update_existing=False, stats=None
+    content,
+    event: HarvestingEvent,
+    max_records=None,
+    warning_collector=None,
+    update_existing=False,
+    stats=None,
+    session=None,
 ):
     source = event.source
     logger.info("Starting OAI-PMH parsing for source: %s", source.name)
@@ -153,11 +163,35 @@ def parse_oai_xml_and_save_works(
                 if issn_text:
                     break
 
-            # Per-source dedup happens later in _save_or_update_work; cheap pre-check
-            # for invalid URLs avoids building unused metadata.
             if not identifier_value or not identifier_value.startswith("http"):
                 logger.debug("Skipping invalid URL: %s", identifier_value)
                 continue
+
+            # Early dedup: avoid the expensive HTML fetch and OpenAlex API
+            # calls for records already in the database. _save_or_update_work
+            # runs the same check later, but doing it here short-circuits the
+            # network work for the common incremental-harvest case where most
+            # records are already known. When update_existing=True we still
+            # need the full pipeline for same-source records that need updates;
+            # cross-source duplicates are never updated so we can skip them
+            # unconditionally.
+            _early_existing = _find_existing_work(doi=doi_text, url=identifier_value)
+            if _early_existing is not None:
+                if doi_text and not _early_existing.doi:
+                    _backfill_empty_doi(_early_existing, doi_text, event)
+                _cross_source = _early_existing.source_id != source.id
+                if _cross_source or not update_existing:
+                    action = "skipped_cross_source" if _cross_source else "skipped_same_source"
+                    if _cross_source:
+                        logger.info(
+                            "Skipping cross-source duplicate %s — already under source id=%s",
+                            doi_text or identifier_value,
+                            _early_existing.source_id,
+                        )
+                    else:
+                        logger.debug("Skipping same-source duplicate %s", doi_text or identifier_value)
+                    stats.record(action)
+                    continue
 
             src_obj = source
 
@@ -188,7 +222,13 @@ def parse_oai_xml_and_save_works(
             geometry_source_label = None
             try:
                 logger.debug("Fetching HTML content for geometry extraction: %s", identifier_value)
-                resp = requests.get(identifier_value, timeout=10)
+                http = session if session is not None else requests
+                resp = http.get(identifier_value, timeout=10)
+                # Some landing pages redirect to the same bot-protected host on a
+                # different scheme (HTTP vs HTTPS). Secure cookies aren't sent on
+                # HTTP redirects, so solve any fresh PoW challenge here too.
+                if resp.status_code == 403 and session is not None and _try_solve_pow_challenge(session, resp):
+                    resp = http.get(identifier_value, timeout=10)
                 resp.raise_for_status()
                 soup = BeautifulSoup(resp.content, "html.parser")
                 extracted, geometry_source_label = extract_geometry_from_html(
@@ -305,6 +345,32 @@ def parse_oai_xml_and_save_works(
     )
 
 
+def _extract_resumption_url(content: bytes, base_url: str) -> str | None:
+    """Return the URL for the next OAI-PMH page, or None if this is the last page.
+
+    Parses the resumptionToken from the XML response and constructs the next
+    request URL using the base endpoint (scheme + host + path, without query).
+    """
+    try:
+        dom = minidom.parseString(content)
+        tokens = dom.documentElement.getElementsByTagName("resumptionToken")
+        if not tokens:
+            return None
+        token_node = tokens[0]
+        token_value = token_node.firstChild.nodeValue.strip() if token_node.firstChild else ""
+        if not token_value:
+            return None
+        # Build the resumption URL from the base OAI endpoint (drop existing query)
+        parsed = urlparse(base_url)
+        next_query = urlencode({"verb": "ListRecords", "resumptionToken": token_value})
+        next_url = urlunparse((parsed.scheme, parsed.netloc, parsed.path, "", next_query, ""))
+        logger.debug("OAI-PMH resumptionToken found, next page: %s", next_url)
+        return next_url
+    except Exception as e:
+        logger.warning("Failed to extract resumptionToken: %s", e)
+        return None
+
+
 def harvest_oai_endpoint(source_id, user=None, max_records=None, update_existing=False):
     user = resolve_user(user)
     source = Source.objects.get(id=source_id)
@@ -332,43 +398,82 @@ def harvest_oai_endpoint(source_id, user=None, max_records=None, update_existing
 
         logger.info("Fetching from OAI-PMH URL: %s", oai_url)
         session = _oai_session()
-        try:
-            response = session.get(oai_url, timeout=OAI_HTTP_TIMEOUT)
-        except requests.exceptions.Timeout as e:
-            raise RuntimeError(
-                f"OAI-PMH endpoint timed out after {OAI_HTTP_TIMEOUT}s (after {OAI_RETRY_TOTAL} retries): {oai_url}"
-            ) from e
-        except requests.exceptions.ConnectionError as e:
-            raise RuntimeError(
-                f"OAI-PMH endpoint unreachable (after {OAI_RETRY_TOTAL} retries): {oai_url}: {e}"
-            ) from e
-
-        if not response.ok:
-            content_type = response.headers.get("Content-Type", "?")
-            raise RuntimeError(
-                f"OAI-PMH endpoint returned HTTP {response.status_code} "
-                f"({content_type}) for {oai_url}. "
-                f"This usually means the URL is outdated or the upstream is "
-                f"down. Body preview: {_short_body(response)}"
-            )
-
-        if not _looks_like_oai_xml(response.content):
-            content_type = response.headers.get("Content-Type", "?")
-            raise RuntimeError(
-                f"OAI-PMH endpoint returned non-XML content "
-                f"(HTTP {response.status_code}, Content-Type: {content_type}) "
-                f"for {oai_url}. Body preview: {_short_body(response)}"
-            )
-
         stats = HarvestStats()
-        parse_oai_xml_and_save_works(
-            response.content,
-            event,
-            max_records=max_records,
-            warning_collector=warning_collector,
-            update_existing=update_existing,
-            stats=stats,
-        )
+        current_url = oai_url
+        page = 0
+
+        while current_url:
+            page += 1
+            logger.info("Fetching OAI-PMH page %d: %s", page, current_url)
+            try:
+                response = session.get(current_url, timeout=OAI_HTTP_TIMEOUT)
+            except requests.exceptions.Timeout as e:
+                raise RuntimeError(
+                    f"OAI-PMH endpoint timed out after {OAI_HTTP_TIMEOUT}s (after {OAI_RETRY_TOTAL} retries): {current_url}"
+                ) from e
+            except requests.exceptions.ConnectionError as e:
+                raise RuntimeError(
+                    f"OAI-PMH endpoint unreachable (after {OAI_RETRY_TOTAL} retries): {current_url}: {e}"
+                ) from e
+
+            if not response.ok:
+                # Some repositories (e.g. GEO-LEO e-docs) sit behind a
+                # HAProxy/BunkerWeb SHA-256 Proof-of-Work challenge. Solve it
+                # once on the first page; the resulting cookie covers the rest
+                # of the session (cookie expires 2029-12-31).
+                if response.status_code == 403 and _try_solve_pow_challenge(session, response):
+                    logger.info("PoW challenge solved; retrying %s", current_url)
+                    try:
+                        response = session.get(current_url, timeout=OAI_HTTP_TIMEOUT)
+                    except requests.exceptions.Timeout as e:
+                        raise RuntimeError(
+                            f"OAI-PMH endpoint timed out after {OAI_HTTP_TIMEOUT}s (after {OAI_RETRY_TOTAL} retries): {current_url}"
+                        ) from e
+                    except requests.exceptions.ConnectionError as e:
+                        raise RuntimeError(
+                            f"OAI-PMH endpoint unreachable (after {OAI_RETRY_TOTAL} retries): {current_url}: {e}"
+                        ) from e
+
+                if not response.ok:
+                    content_type = response.headers.get("Content-Type", "?")
+                    raise RuntimeError(
+                        f"OAI-PMH endpoint returned HTTP {response.status_code} "
+                        f"({content_type}) for {current_url}. "
+                        f"This usually means the URL is outdated or the upstream is "
+                        f"down. Body preview: {_short_body(response)}"
+                    )
+
+            if not _looks_like_oai_xml(response.content):
+                content_type = response.headers.get("Content-Type", "?")
+                raise RuntimeError(
+                    f"OAI-PMH endpoint returned non-XML content "
+                    f"(HTTP {response.status_code}, Content-Type: {content_type}) "
+                    f"for {current_url}. Body preview: {_short_body(response)}"
+                )
+
+            # Calculate remaining records budget for this page
+            if max_records is not None:
+                records_so_far = stats.created + stats.updated + stats.skipped_same_source + stats.skipped_cross_source
+                remaining = max_records - records_so_far
+                if remaining <= 0:
+                    logger.info("Reached max_records limit (%d), stopping pagination", max_records)
+                    break
+                page_max = remaining
+            else:
+                page_max = None
+
+            parse_oai_xml_and_save_works(
+                response.content,
+                event,
+                max_records=page_max,
+                warning_collector=warning_collector,
+                update_existing=update_existing,
+                stats=stats,
+                session=session,
+            )
+
+            # Follow resumptionToken for next page
+            current_url = _extract_resumption_url(response.content, oai_url)
 
         spatial_count, temporal_count = complete_harvest(event, stats, warning_collector)
         new_count = stats.created

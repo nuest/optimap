@@ -15,6 +15,8 @@ from works.models import HarvestingEvent, Source
 from .common import (
     HarvestStats,
     HarvestWarningCollector,
+    _backfill_empty_doi,
+    _find_existing_work,
     _save_or_update_work,
     complete_harvest,
     fail_harvest,
@@ -118,6 +120,17 @@ def parse_rss_feed_and_save_publications(
                     continue
 
                 logger.debug("Processing work: %s", title[:50])
+
+                # Early dedup: skip OpenAlex for records already in the database.
+                _early_existing = _find_existing_work(doi=doi, url=link)
+                if _early_existing is not None:
+                    if doi and not _early_existing.doi:
+                        _backfill_empty_doi(_early_existing, doi, event)
+                    _cross_source = _early_existing.source_id != source.id
+                    if _cross_source or not update_existing:
+                        action = "skipped_cross_source" if _cross_source else "skipped_same_source"
+                        stats.record(action)
+                        continue
 
                 author = None
                 authors_list = []

@@ -9,6 +9,7 @@ that can be used across all harvesting workflows (OAI-PMH, RSS, etc).
 """
 
 import logging
+import re
 import time
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import quote
@@ -99,21 +100,28 @@ class OpenAlexMatcher:
         if not title:
             return None, []
 
-        # Build search filter
-        filter_parts = [f"title.search:{quote(title)}"]
+        # Build filter with values URL-encoded. Embed in the URL directly
+        # (not via params) so requests does not double-encode the already-%xx
+        # sequences.
+        #
+        # OpenAlex treats ? and * as wildcard characters in search queries —
+        # strip them or the API returns 400.
+        # Commas are stripped from the author because OpenAlex uses unencoded
+        # comma as the filter-condition separator ("Last, First" -> two parts).
+        # raw_author_name.search is the correct field; author.search does not
+        # exist in the Works filter API.
+        title_clean = re.sub(r"[?*]", "", title).strip()
+        filter_parts = [f"title.search:{quote(title_clean, safe='')}"]
         if author:
-            filter_parts.append(f"author.search:{quote(author)}")
+            author_clean = author.replace(",", " ").strip()
+            filter_parts.append(f"raw_author_name.search:{quote(author_clean, safe='')}")
 
         filter_str = ",".join(filter_parts)
-        url = f"{OPENALEX_API_BASE}/works"
-        params = {
-            "filter": filter_str,
-            "per-page": 5,  # Get top 5 matches
-        }
+        url = f"{OPENALEX_API_BASE}/works?filter={filter_str}&per-page=5"
 
         logger.debug("Matching by title%s: %s", " + author" if author else "", title[:50])
 
-        data = self._make_request(url, params)
+        data = self._make_request(url)
         if not data or not data.get("results"):
             return None, []
 
