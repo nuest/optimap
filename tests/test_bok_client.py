@@ -37,7 +37,7 @@ class BokTrimAndDeriveTests(TestCase):
         cv = snapshot["CV"]
         self.assertEqual(cv["code"], "CV")
         self.assertEqual(cv["name"], "Cartography and Visualization")
-        self.assertEqual(cv["uri"], "http://bok.eo4geo.eu/CV")
+        self.assertEqual(cv["uri"], "https://geospacebok.eu/CV")
         # parent of CV is GIST.
         self.assertEqual(cv["parent_code"], "GIST")
         self.assertEqual(cv["breadcrumb"], [{"code": "GIST", "name": "Geographic Information Science and Technology"}])
@@ -68,7 +68,7 @@ class BokTrimAndDeriveTests(TestCase):
 
     def test_resolve_marks_unknown_codes_as_orphan(self):
         with patch.object(bok_client, "fetch_bok_snapshot") as fake_fetch:
-            fake_fetch.return_value = {"CV": {"code": "CV", "name": "Cartography", "uri": "http://bok.eo4geo.eu/CV", "description": "x", "parent_code": "", "breadcrumb": []}}
+            fake_fetch.return_value = {"CV": {"code": "CV", "name": "Cartography", "uri": "https://geospacebok.eu/CV", "description": "x", "parent_code": "", "breadcrumb": []}}
             cache.clear()
             resolved = bok_client.resolve(["CV", "REMOVED"])
         self.assertEqual(resolved[0]["code"], "CV")

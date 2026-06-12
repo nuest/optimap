@@ -45,7 +45,7 @@ class BokSearchEndpointTests(TestCase):
         body = resp.json()
         self.assertGreaterEqual(body["count"], 1)
         cv = next(r for r in body["results"] if r["code"] == "CV")
-        self.assertEqual(cv["uri"], "http://bok.eo4geo.eu/CV")
+        self.assertEqual(cv["uri"], "https://geospacebok.eu/CV")
         self.assertEqual(cv["parent_code"], "GIST")
         self.assertEqual(cv["breadcrumb"][0]["code"], "GIST")
 
