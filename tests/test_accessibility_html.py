@@ -53,7 +53,7 @@ class PublicPageAccessibilityHtmlTests(TestCase):
         self.assertContains(response, 'dropdown-divider" aria-hidden="true"')
 
     def test_work_landing_mini_map_has_role(self):
-        response = self.client.get(reverse("optimap:statistics"))
+        self.client.get(reverse("optimap:statistics"))
         # mini-map is on work landing pages — tested by checking the template
         # contains the attribute; the work landing page requires a fixture work.
         pass

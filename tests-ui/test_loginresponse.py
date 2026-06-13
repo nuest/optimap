@@ -45,9 +45,7 @@ class LoginresponseTest(StaticLiveServerTestCase):
             get_driver().save_screenshot(os.path.join(os.getcwd(), "tests-ui", "screenshots", "Loginresponse.png"))
 
             # Verify success message appears
-            self.assertTrue(
-                Text("We sent a login link").exists(), "Login response message not found"
-            )
+            self.assertTrue(Text("We sent a login link").exists(), "Login response message not found")
 
             # Now test the actual login using the token
             go_to(f"{self.live_server_url}/login/{self.token}")

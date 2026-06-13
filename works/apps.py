@@ -105,3 +105,4 @@ class WorksConfig(AppConfig):
             weak=False,
             dispatch_uid="works.schedule_inactivity_tasks",
         )
+        import works.signals  # noqa: F401 — connects @receiver decorators

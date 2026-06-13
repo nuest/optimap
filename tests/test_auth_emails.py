@@ -66,9 +66,9 @@ class EmailChangeEmailContentTests(TestCase):
 
     def test_notification_email_sent_to_old_address_after_confirmation(self):
         """After confirming an email change, the old address receives a security notice."""
-        # Key format: EMAIL_CONFIRMATION_TOKEN_PREFIX + "_" + email_new = "email_confirmation__new@..."
+        # Key format: EMAIL_CONFIRMATION_TOKEN_PREFIX + "_" + email_new = "email_confirmation_new@..."
         cache.set(
-            "email_confirmation__new@example.com",
+            "email_confirmation_new@example.com",
             {
                 "token": "testtoken123",
                 "old_email": "old@example.com",

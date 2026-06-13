@@ -175,9 +175,15 @@ class SourceCoverageSnapshotTests(TestCase):
         self.assertEqual(snap.by_year, [])
 
 
-@override_settings(CACHES=_CACHES)
+@override_settings(CACHES=_CACHES, CACHE_MIDDLEWARE_ALIAS="dummy")
 class StatisticsAPITests(TestCase):
     """GET /api/v1/statistics/ returns expected shape."""
+
+    def setUp(self):
+        from django.core.cache import caches
+
+        for alias in _CACHES:
+            caches[alias].clear()
 
     def test_returns_200(self):
         resp = self.client.get(STATS_URL)

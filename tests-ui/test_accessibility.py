@@ -117,7 +117,7 @@ class AccessibilityAuditTests(StaticLiveServerTestCase):
             start_chrome(f"{self.live_server_url}/about/", headless=True)
             driver = get_driver()
             links = driver.find_elements("tag name", "a")
-            bare = [l for l in links if l.text.strip().lower() == "here"]
+            bare = [link for link in links if link.text.strip().lower() == "here"]
             self.assertEqual([], bare, "Found bare 'here' link text on about page")
         finally:
             kill_browser()
