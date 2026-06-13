@@ -104,16 +104,18 @@ class OpenAlexMatcher:
         # (not via params) so requests does not double-encode the already-%xx
         # sequences.
         #
-        # OpenAlex treats ? and * as wildcard characters in search queries —
-        # strip them or the API returns 400.
-        # Commas are stripped from the author because OpenAlex uses unencoded
-        # comma as the filter-condition separator ("Last, First" -> two parts).
+        # OpenAlex treats ? and * as wildcard characters — strip them.
+        # Commas must also be removed from both title and author: the HTTP
+        # server URL-decodes the query string before OpenAlex parses it, so
+        # %2C in a value becomes a literal comma that OpenAlex splits on as a
+        # filter-condition separator, producing a 400.
         # raw_author_name.search is the correct field; author.search does not
         # exist in the Works filter API.
-        title_clean = re.sub(r"[?*]", "", title).strip()
+        title_clean = re.sub(r"[,?*]", " ", title)
+        title_clean = re.sub(r"\s+", " ", title_clean).strip()
         filter_parts = [f"title.search:{quote(title_clean, safe='')}"]
         if author:
-            author_clean = author.replace(",", " ").strip()
+            author_clean = re.sub(r"\s+", " ", author.replace(",", " ")).strip()
             filter_parts.append(f"raw_author_name.search:{quote(author_clean, safe='')}")
 
         filter_str = ",".join(filter_parts)
