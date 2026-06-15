@@ -1441,13 +1441,13 @@
     if (wrap) {
       if (canSimplify) {
         wrap.removeAttribute('title');
-        $(wrap).tooltip('dispose');
+        try { $(wrap).tooltip('dispose'); } catch (_) {}
       } else {
         const msg = pts === 0
           ? 'No geometry on the map — draw or add a polygon first'
           : 'Geometry is already simple (≤ 5 vertices) — no simplification needed';
         wrap.setAttribute('title', msg);
-        $(wrap).tooltip('dispose').tooltip();
+        try { $(wrap).tooltip('dispose').tooltip(); } catch (_) {}
       }
     }
   }
@@ -1525,7 +1525,7 @@
         const wrap = document.getElementById('contribution-submit-btn-wrap');
         if (wrap) {
           wrap.setAttribute('title', 'Add spatial or temporal extent to enable submission');
-          $(wrap).tooltip('dispose').tooltip();
+          try { $(wrap).tooltip('dispose').tooltip(); } catch (_) {}
         }
       }
     }
