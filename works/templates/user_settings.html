@@ -224,11 +224,6 @@
                 <button type="submit" class="btn btn-outline-warning">
                   Save Changes
                 </button>
-                <div class="col-sm-2">
-                  <button type="reset" class="btn btn-outline-danger">
-                    Cancel
-                  </button>
-                </div>
               </div>
             </form>
           </div>
@@ -393,6 +388,10 @@
         .then((r) => r.json())
         .then((d) => d.username);
     }
+
+    $("#collapseOne").on("hide.bs.collapse", function () {
+      document.getElementById("email_new").value = "";
+    });
 
     if (rbToggle && rbInput && rbGen) {
       rbToggle.addEventListener("change", function () {
