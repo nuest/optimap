@@ -533,7 +533,13 @@ class Command(BaseCommand):
             "--max-records",
             type=int,
             default=None,
-            help="Maximum number of records to harvest per source (default: unlimited)",
+            help=(
+                "Maximum number of records to harvest per source (default: unlimited). "
+                "For OAI-PMH sources, harvesting proceeds newest-year-first; "
+                "--max-records stops as soon as the limit is reached, so the oldest "
+                "year visited may be only partially harvested. The harvest summary "
+                "marks such years as '(partial)'."
+            ),
         )
         parser.add_argument(
             "--update",
@@ -696,13 +702,14 @@ class Command(BaseCommand):
             if max_records:
                 self.stdout.write(f"Max records: {max_records}")
 
+            harvest_start = timezone.now()
             try:
                 # Find or create source
                 source = self._get_or_create_source(config, create_sources)
 
                 # Harvest based on source type
-                harvest_start = timezone.now()
                 source_type = config.get("source_type", "oai-pmh")
+                oai_result = None
 
                 if update_existing:
                     self.stdout.write(
@@ -768,7 +775,7 @@ class Command(BaseCommand):
                 else:
                     # Covers source_type in {oai-pmh, ojs, janeway} — all share the OAI harvester.
                     self.stdout.write(f"Source type: {source_type}")
-                    harvest_oai_endpoint(
+                    oai_result = harvest_oai_endpoint(
                         source.id,
                         user=user,
                         max_records=max_records,
@@ -778,45 +785,44 @@ class Command(BaseCommand):
                 # Get results
                 event = HarvestingEvent.objects.filter(source=source).latest("started_at")
                 pub_count = Work.objects.filter(job=event).count()
+                skipped_count = event.records_skipped or 0
+                spatial_count = Work.objects.filter(job=event).exclude(geometry__isnull=True).count()
+                temporal_count = Work.objects.filter(job=event).exclude(timeperiod_startdate=[]).count()
 
                 duration = (timezone.now() - harvest_start).total_seconds()
 
                 if event.status == "completed":
-                    skipped_count = event.records_skipped or 0
-                    skip_note = f", {skipped_count} skipped" if skipped_count else ""
-                    self.stdout.write(
-                        self.style.SUCCESS(
-                            f"✓ Successfully harvested {pub_count} publications in {duration:.1f}s{skip_note}"
-                        )
-                    )
                     total_harvested += pub_count
-                    results.append(
-                        {
-                            "source": config["name"],
-                            "status": "success",
-                            "count": pub_count,
-                            "duration": duration,
-                        }
-                    )
+                    result = {
+                        "source": config["name"],
+                        "status": "success",
+                        "count": pub_count,
+                        "skipped": skipped_count,
+                        "spatial": spatial_count,
+                        "temporal": temporal_count,
+                        "duration": duration,
+                        "visited_years": [],
+                        "partial_year": None,
+                    }
+                    if source_type in ("oai-pmh", "ojs", "janeway") and oai_result:
+                        result["visited_years"] = oai_result.get("visited_years", [])
+                        result["partial_year"] = oai_result.get("partial_year")
+                    results.append(result)
                 else:
-                    self.stdout.write(self.style.ERROR(f"✗ Harvesting failed with status: {event.status}"))
                     total_failed += 1
                     results.append(
                         {
                             "source": config["name"],
                             "status": "failed",
                             "count": 0,
+                            "skipped": skipped_count,
+                            "spatial": spatial_count,
+                            "temporal": temporal_count,
                             "duration": duration,
+                            "visited_years": [],
+                            "partial_year": None,
                         }
                     )
-
-                # Show spatial/temporal metadata stats
-                spatial_count = Work.objects.filter(job=event).exclude(geometry__isnull=True).count()
-
-                temporal_count = Work.objects.filter(job=event).exclude(timeperiod_startdate=[]).count()
-
-                self.stdout.write(f"  Spatial metadata: {spatial_count}/{pub_count} publications")
-                self.stdout.write(f"  Temporal metadata: {temporal_count}/{pub_count} publications")
 
             except Exception as e:
                 self.stdout.write(self.style.ERROR(f"✗ Error: {str(e)}"))
@@ -827,30 +833,52 @@ class Command(BaseCommand):
                         "source": config["name"],
                         "status": "error",
                         "count": 0,
+                        "skipped": 0,
+                        "spatial": 0,
+                        "temporal": 0,
+                        "duration": (timezone.now() - harvest_start).total_seconds(),
+                        "visited_years": [],
+                        "partial_year": None,
                         "error": str(e),
                     }
                 )
 
-        # Print summary
+        # Print consolidated summary (single report — no per-source inline results above)
         self.stdout.write(self.style.SUCCESS(f"\n{'=' * 70}"))
         self.stdout.write(self.style.SUCCESS("Harvest Summary"))
-        self.stdout.write(self.style.SUCCESS(f"{'=' * 70}\n"))
+        self.stdout.write(self.style.SUCCESS(f"{'=' * 70}"))
 
         for result in results:
+            self.stdout.write("")
             if result["status"] == "success":
-                symbol, style = "✓", self.style.SUCCESS
+                pub = result["count"]
+                skipped = result.get("skipped", 0)
+                spatial = result.get("spatial", 0)
+                temporal = result.get("temporal", 0)
+                dur = result["duration"]
                 self.stdout.write(
-                    style(
-                        f"{symbol} {result['source']:30} {result['count']:5} publications ({result['duration']:.1f}s)"
-                    )
+                    self.style.SUCCESS(f"✓ {result['source']}  —  {pub} new, {skipped} skipped  ({dur:.1f}s)")
                 )
+                self.stdout.write(f"  Spatial: {spatial}/{pub}  |  Temporal: {temporal}/{pub}")
+                visited = result.get("visited_years", [])
+                partial = result.get("partial_year")
+                if visited:
+                    year_parts = []
+                    for y in visited:
+                        label = str(y)
+                        if y == partial:
+                            label += " (partial — max-records hit)"
+                        year_parts.append(label)
+                    self.stdout.write(f"  Years:   {', '.join(year_parts)}")
             elif result["status"] == "skipped":
-                self.stdout.write(self.style.WARNING(f"⊘ {result['source']:30} skipped (disabled)"))
+                self.stdout.write(self.style.WARNING(f"⊘ {result['source']}  —  skipped (disabled)"))
             else:
                 error_msg = result.get("error", result["status"])
-                self.stdout.write(self.style.ERROR(f"✗ {result['source']:30} Failed: {error_msg}"))
+                dur = result.get("duration", 0)
+                self.stdout.write(self.style.ERROR(f"✗ {result['source']}  —  failed ({dur:.1f}s): {error_msg}"))
 
-        self.stdout.write(f"\nTotal publications harvested: {total_harvested}")
+        self.stdout.write(self.style.SUCCESS(f"\n{'=' * 70}"))
+        self.stdout.write(f"Total publications harvested: {total_harvested}")
         if total_failed > 0:
             self.stdout.write(self.style.WARNING(f"Failed sources: {total_failed}"))
         if total_skipped > 0:
@@ -859,8 +887,7 @@ class Command(BaseCommand):
                     f"Skipped (disabled) sources: {total_skipped}. Use --include-disabled to attempt them anyway."
                 )
             )
-
-        self.stdout.write(self.style.SUCCESS(f"\n{'=' * 70}\n"))
+        self.stdout.write(self.style.SUCCESS(f"{'=' * 70}\n"))
 
     def _insert_sources(self, include_disabled=False):
         """Create Source rows for every entry in SOURCE_CONFIG without harvesting.

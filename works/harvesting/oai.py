@@ -150,8 +150,6 @@ def parse_oai_xml_and_save_works(
             raw_date_value = get_field("date") or get_field("dc:date")
             date_value = parse_publication_date(raw_date_value)
 
-            logger.debug("Processing work: %s", title_value[:50] if title_value else "No title")
-
             doi_text = None
             issn_text = None
             for u in identifiers:
@@ -196,6 +194,8 @@ def parse_oai_xml_and_save_works(
                         logger.debug("Skipping same-source duplicate %s", doi_text or identifier_value)
                     stats.record(action)
                     continue
+
+            logger.debug("Processing work: %s", title_value[:50] if title_value else "No title")
 
             src_obj = source
 
@@ -404,8 +404,8 @@ def _is_no_records_match(content: bytes) -> bool:
     return False
 
 
-def _year_chunk_urls(base_url: str, list_params: dict, start_year: int, end_year: int):
-    """Yield one OAI-PMH ListRecords URL per calendar year, latest first.
+def _year_chunk_items(base_url: str, list_params: dict, start_year: int, end_year: int):
+    """Yield ``(year, url)`` pairs for OAI-PMH ListRecords requests, latest first.
 
     Each URL covers exactly one year via ``from``/``until`` so the server
     never has to generate a full-history response in a single request.
@@ -414,9 +414,12 @@ def _year_chunk_urls(base_url: str, list_params: dict, start_year: int, end_year
     """
     for year in range(end_year, start_year - 1, -1):
         yield (
-            base_url
-            + "?"
-            + urlencode({"verb": "ListRecords", **list_params, "from": f"{year}-01-01", "until": f"{year}-12-31"})
+            year,
+            (
+                base_url
+                + "?"
+                + urlencode({"verb": "ListRecords", **list_params, "from": f"{year}-01-01", "until": f"{year}-12-31"})
+            ),
         )
 
 
@@ -434,6 +437,8 @@ def harvest_oai_endpoint(source_id, user=None, max_records=None, update_existing
     new_count = None
     spatial_count = None
     temporal_count = None
+    visited_years: list[int] = []
+    partial_year: int | None = None
 
     warning_collector = HarvestWarningCollector()
     warning_collector.setLevel(logging.INFO)
@@ -462,28 +467,29 @@ def harvest_oai_endpoint(source_id, user=None, max_records=None, update_existing
         has_date_filter = "from" in existing_qs or "until" in existing_qs
         if has_date_filter:
             logger.info("Source URL has explicit date filter — skipping year chunking: %s", source.url_field)
-            chunk_urls = [source.url_field]
+            chunk_items: list[tuple[int | None, str]] = [(None, source.url_field)]
         else:
             earliest_year = _get_earliest_year(base_oai_url, session)
             current_year = timezone.now().year
-            chunk_urls = list(_year_chunk_urls(base_oai_url, list_params, earliest_year, current_year))
+            chunk_items = list(_year_chunk_items(base_oai_url, list_params, earliest_year, current_year))
             logger.info(
                 "Harvesting %s in %d year chunks (%d → %d, latest first)",
                 source.name,
-                len(chunk_urls),
+                len(chunk_items),
                 current_year,
                 earliest_year,
             )
 
         budget_exhausted = False
 
-        for chunk_url in chunk_urls:
+        for chunk_year, chunk_url in chunk_items:
             if budget_exhausted:
                 break
 
             logger.info("Fetching from OAI-PMH URL: %s", chunk_url)
             current_url = chunk_url
             page = 0
+            year_had_records = False
 
             while current_url and not budget_exhausted:
                 page += 1
@@ -539,6 +545,12 @@ def harvest_oai_endpoint(source_id, user=None, max_records=None, update_existing
                     logger.debug("No records in chunk %s", chunk_url)
                     break
 
+                # First non-empty response for this year: mark it visited.
+                if not year_had_records:
+                    year_had_records = True
+                    if chunk_year is not None:
+                        visited_years.append(chunk_year)
+
                 # Calculate remaining records budget for this page
                 if max_records is not None:
                     records_so_far = (
@@ -546,8 +558,12 @@ def harvest_oai_endpoint(source_id, user=None, max_records=None, update_existing
                     )
                     remaining = max_records - records_so_far
                     if remaining <= 0:
+                        # Budget consumed by the previous page; current_url points to
+                        # unparsed pages, so this year is only partially covered.
                         logger.info("Reached max_records limit (%d), stopping pagination", max_records)
                         budget_exhausted = True
+                        if chunk_year is not None:
+                            partial_year = chunk_year
                         break
                     page_max = remaining
                 else:
@@ -625,4 +641,4 @@ def harvest_oai_endpoint(source_id, user=None, max_records=None, update_existing
     finally:
         logger.removeHandler(warning_collector)
 
-    return new_count, spatial_count, temporal_count
+    return {"visited_years": visited_years, "partial_year": partial_year}
