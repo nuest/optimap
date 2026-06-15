@@ -313,32 +313,6 @@
 
 {% if has_geometry or can_contribute %}
 <div id="mini-map" role="application" aria-label="Interactive map showing the spatial extent of this publication"></div>
-{% if can_contribute %}
-<div id="geometry-simplify-panel" class="alert alert-warning mt-2 mb-0" style="display:none;" role="alert">
-  <div class="d-flex justify-content-between align-items-center mb-2">
-    <strong><i class="fas fa-draw-polygon"></i> <span id="simplify-panel-title">Geometry is large — simplify before adding</span></strong>
-    <button type="button" class="close ml-2" id="simplify-close-btn" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-  </div>
-  <p class="mb-2 small" id="simplify-size-info">Size: — | Points: —</p>
-  <div class="form-group mb-2">
-    <label class="mb-1 small">Simplification tolerance: <strong id="simplify-tolerance-label">—</strong></label>
-    <div class="d-flex align-items-center">
-      <span class="text-muted small mr-2" style="white-space:nowrap">More detail</span>
-      <input type="range" class="custom-range flex-grow-1 mx-1" id="simplify-slider" min="0" max="100" value="0">
-      <span class="text-muted small ml-2" style="white-space:nowrap">Simpler</span>
-    </div>
-  </div>
-  <div class="btn-group btn-group-sm mb-3" role="group" aria-label="Simplification presets">
-    <button type="button" class="btn btn-outline-secondary" data-simplify-tolerance="0.01">Light (~1 km)</button>
-    <button type="button" class="btn btn-outline-secondary" data-simplify-tolerance="0.1">Medium (~11 km)</button>
-    <button type="button" class="btn btn-outline-secondary" data-simplify-tolerance="0.5">Aggressive (~55 km)</button>
-  </div>
-  <div class="d-flex align-items-center">
-    <button type="button" class="btn btn-sm btn-warning mr-3" id="simplify-apply-btn">Apply and add to map</button>
-    <a href="#" class="small text-muted" id="simplify-keep-btn">Keep original</a>
-  </div>
-</div>
-{% endif %}
 {% else %}
 <div class="alert alert-secondary" role="alert">
   <strong><i class="fas fa-info-circle"></i> Missing information:</strong>
@@ -357,6 +331,7 @@
   </div>
   <div class="card-body">
     <form id="contribution-form">
+      {# Spatial extent + spatial tools (simplification, NER suggestions) #}
       <div class="mb-4" id="contribute-spatial">
         <h6 class="font-weight-bold"><i class="fas fa-map-marked-alt"></i> Spatial extent (geographic location)</h6>
         {% if has_geometry %}
@@ -371,16 +346,51 @@
           </button>
           <small class="form-text text-muted" id="paste-geoextents-help"></small>
         </div>
-      </div>
 
-      {# NER suggestions — between spatial and temporal because results feed both #}
-      <div id="ner-suggest-panel" class="mb-4">
-        <button type="button" class="btn btn-sm btn-outline-secondary" id="ner-suggest-toggle"
-                data-toggle="collapse" data-target="#ner-suggest-body" aria-expanded="false"
-                aria-controls="ner-suggest-body">
-          <i class="fas fa-magic"></i> Suggest locations and dates from text
-        </button>
-        <div id="ner-suggest-body" class="collapse mt-2 border rounded p-3 bg-light">
+        {# Spatial tools row: both toggle buttons sit side by side #}
+        <div class="d-flex flex-wrap mb-2" style="gap:.5rem;">
+          <div id="geometry-simplify-offer" data-toggle="tooltip"
+               title="Draw or add a polygon with more than 5 vertices to enable simplification">
+            <button type="button" class="btn btn-sm btn-outline-secondary"
+                    id="simplify-offer-btn" aria-expanded="false" aria-controls="geometry-simplify-panel" disabled>
+              <i class="fas fa-compress-arrows-alt"></i> Simplify geometry
+            </button>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="ner-suggest-toggle"
+                  data-toggle="collapse" data-target="#ner-suggest-body" aria-expanded="false"
+                  aria-controls="ner-suggest-body">
+            <i class="fas fa-magic"></i> Suggest locations and dates from text
+          </button>
+        </div>
+
+        <div id="geometry-simplify-panel" class="border rounded p-3 bg-light mb-2" style="display:none;" role="region" aria-label="Simplification controls">
+          <strong class="small d-block mb-2"><i class="fas fa-draw-polygon"></i> <span id="simplify-panel-title">Simplify geometry</span></strong>
+          <p class="mb-1 small" id="simplify-size-info">Size: — | Points: —</p>
+          <p class="small mb-2">
+            <span style="display:inline-block;width:.8em;height:.8em;background:#3388ff;border-radius:2px;vertical-align:middle;" aria-hidden="true"></span> Current geometry &nbsp;
+            <span style="display:inline-block;width:.8em;height:.8em;background:#e67e00;border-radius:2px;vertical-align:middle;" aria-hidden="true"></span> Simplified preview
+          </p>
+          <p class="small text-muted mb-2"><i class="fas fa-info-circle"></i> Apply or discard simplification before editing geometry manually on the map.</p>
+          <div class="form-group mb-2">
+            <label class="mb-1 small">Simplification tolerance: <strong id="simplify-tolerance-label">—</strong></label>
+            <div class="d-flex align-items-center">
+              <span class="text-muted small mr-2" style="white-space:nowrap">More detail</span>
+              <input type="range" class="custom-range flex-grow-1 mx-1" id="simplify-slider" min="0" max="100" value="0">
+              <span class="text-muted small ml-2" style="white-space:nowrap">Simpler</span>
+            </div>
+          </div>
+          <div class="btn-group btn-group-sm mb-3" role="group" aria-label="Simplification presets">
+            <button type="button" class="btn btn-outline-secondary" data-simplify-tolerance="0.01">Light (~1 km)</button>
+            <button type="button" class="btn btn-outline-secondary" data-simplify-tolerance="0.1">Medium (~11 km)</button>
+            <button type="button" class="btn btn-outline-secondary" data-simplify-tolerance="0.5">Aggressive (~55 km)</button>
+          </div>
+          <div class="d-flex align-items-center">
+            <button type="button" class="btn btn-sm btn-primary mr-2" id="simplify-apply-btn">Apply and add to map</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="simplify-keep-btn">Abort simplification</button>
+          </div>
+        </div>
+
+        <div id="ner-suggest-body" class="collapse mb-2 border rounded p-3 bg-light">
           <p class="small text-muted mb-2">
             Uses Named Entity Recognition (NER) to find place names and date mentions in the
             title and abstract. Place results can be added to the map; date results can fill
@@ -459,7 +469,7 @@
           <div id="ner-error-msg" class="alert alert-danger small mt-2" style="display:none;"></div>
         </div>
       </div>
-      {# end NER suggestions #}
+      {# end spatial tools: simplification + NER suggestions #}
 
       <div class="mb-4" id="contribute-temporal">
         <h6 class="font-weight-bold"><i class="fas fa-calendar"></i> Temporal extent (time period)</h6>
@@ -484,9 +494,12 @@
       </div>
 
       <div class="text-center">
-        <button type="submit" class="btn btn-primary btn-lg">
-          <i class="fas fa-paper-plane"></i> Submit contribution
-        </button>
+        <span id="contribution-submit-wrap" data-toggle="tooltip"
+              title="Add spatial or temporal extent to enable submission" style="display:inline-block;">
+          <button type="submit" id="contribution-submit-btn" class="btn btn-primary btn-lg" disabled>
+            <i class="fas fa-paper-plane"></i> Submit contribution
+          </button>
+        </span>
         <p class="text-muted mt-2 small">
           You can submit spatial extent, temporal extent, or both together.
         </p>
@@ -543,7 +556,7 @@
     </ul>
 
     <div class="text-center mt-3">
-      <button type="button" id="bok-save-btn" class="btn btn-primary btn-lg">
+      <button type="button" id="bok-save-btn" class="btn btn-primary btn-lg" disabled>
         <i class="fas fa-paper-plane"></i> Save topics
       </button>
       <p class="text-muted mt-2 small">
@@ -562,6 +575,13 @@
   .ner-matched   { background: #d4f0c0; border-radius: 2px; padding: 0 1px; }
   .ner-ambiguous { background: #fff3cd; border-radius: 2px; padding: 0 1px; }
   .btn-xs { padding: 0.15rem 0.4rem; font-size: 0.75rem; line-height: 1.2; border-radius: 0.2rem; }
+  /* Submit-button attention pulse (fired after applying simplification) */
+  @keyframes optimap-submit-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(0,123,255,.65); }
+    60%  { box-shadow: 0 0 0 10px rgba(0,123,255,0); }
+    100% { box-shadow: 0 0 0 0 rgba(0,123,255,0); }
+  }
+  .optimap-submit-blink { animation: optimap-submit-pulse .55s ease-out 2; }
 </style>
 <script>
   window.OPTIMAP_BOK = {
@@ -573,6 +593,16 @@
   };
 </script>
 <script src="{% static 'js/bok-tagger.js' %}"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    var bokSelected = document.getElementById('bok-selected');
+    if (bokSelected) {
+      new MutationObserver(function () {
+        window._markContributionDirty?.('bok-save-btn');
+      }).observe(bokSelected, { childList: true, subtree: true });
+    }
+  });
+</script>
 {% endif %}
 
   <script src="{% static 'js/leaflet.js' %}"></script>
@@ -613,6 +643,35 @@
       : null;
     let drawnItems = null;
     let featureGroup = null;
+
+    // Enable a submit/save button, optionally adding a brief attention pulse.
+    // Also clears the "inactive" tooltip on the wrapping element (if present).
+    window._markContributionDirty = function (btnId, blink) {
+      var btn = document.getElementById(btnId);
+      if (!btn) return;
+      btn.disabled = false;
+      // Remove tooltip from wrapper so the hint no longer shows when active.
+      var wrap = document.getElementById(btnId + '-wrap');
+      if (wrap) { wrap.removeAttribute('title'); $(wrap).tooltip('dispose'); }
+      if (blink) {
+        btn.classList.remove('optimap-submit-blink');
+        // Force reflow so the re-add triggers the animation.
+        void btn.offsetWidth;
+        btn.classList.add('optimap-submit-blink');
+        btn.addEventListener('animationend', function () {
+          btn.classList.remove('optimap-submit-blink');
+        }, { once: true });
+      }
+    };
+
+    // Temporal extent inputs enable the submit button when touched.
+    ['start-date', 'end-date'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.addEventListener('input', function () {
+        window._markContributionDirty('contribution-submit-btn');
+      });
+    });
+
     if (map) {
 
     // Display existing geometry if available
@@ -823,15 +882,29 @@
                 _forceSubmit = true;
                 contributionForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
               },
-              null
+              null,
+              'Cancel'
             );
             return;
           }
           if (geomSizeKB > GEOMETRY_WARN_SIZE_KB) {
-            OPTIMAP_FLASH('warning',
-              `The geometry is ${geomSizeKB} KB. Large polygons may be slow to process — ` +
-              `consider using the simplification controls below, or submit as-is.`
+            showSimplifyPanel(
+              drawnItems.toGeoJSON(),
+              'Simplify before submitting? (optional)',
+              'Apply and submit',
+              function (simplified) {
+                drawnItems.clearLayers();
+                L.geoJSON(simplified).eachLayer(l => drawnItems.addLayer(l));
+                _forceSubmit = true;
+                contributionForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+              },
+              function () {
+                _forceSubmit = true;
+                contributionForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+              },
+              'Submit as-is'
             );
+            return;
           }
         }
         _forceSubmit = false;
@@ -1310,7 +1383,7 @@
     }
   }
 
-  function showSimplifyPanel(originalGeoJSON, title, applyLabel, onApply, onKeep) {
+  function showSimplifyPanel(originalGeoJSON, title, applyLabel, onApply, onKeep, keepLabel) {
     _simplifyOriginal   = originalGeoJSON;
     _simplifyOrigPts    = countGeometryPoints(originalGeoJSON);
     _simplifyOrigSizeKB = Math.round(geometryByteSize(originalGeoJSON) / 1024);
@@ -1319,6 +1392,16 @@
 
     document.getElementById('simplify-panel-title').textContent = title;
     document.getElementById('simplify-apply-btn').textContent   = applyLabel;
+
+    const keepBtnEl = document.getElementById('simplify-keep-btn');
+    if (keepBtnEl) {
+      keepBtnEl.textContent   = (keepLabel != null && keepLabel !== '') ? keepLabel : 'Abort simplification';
+      keepBtnEl.style.display = '';
+    }
+
+    // Reflect open state on the offer toggle button (mirrors Bootstrap's aria-expanded pattern).
+    const offerBtnEl = document.getElementById('simplify-offer-btn');
+    if (offerBtnEl) offerBtnEl.setAttribute('aria-expanded', 'true');
 
     if (_simplifyPreviewLyr && map) map.removeLayer(_simplifyPreviewLyr);
     _simplifyPreviewLyr = L.geoJSON(originalGeoJSON, { style: { color: '#e67e00', weight: 2, fillOpacity: 0.15 } });
@@ -1337,6 +1420,36 @@
     const panel = document.getElementById('geometry-simplify-panel');
     if (panel) panel.style.display = 'none';
     _simplifyOriginal = null; _simplifyOnApply = null; _simplifyOnKeep = null;
+
+    const offerBtnEl = document.getElementById('simplify-offer-btn');
+    if (offerBtnEl) offerBtnEl.setAttribute('aria-expanded', 'false');
+    const keepBtnEl = document.getElementById('simplify-keep-btn');
+    if (keepBtnEl) { keepBtnEl.style.display = ''; keepBtnEl.textContent = 'Abort simplification'; }
+
+    _refreshSimplifyOffer();
+  }
+
+  function _refreshSimplifyOffer() {
+    const offerBtn = document.getElementById('simplify-offer-btn');
+    if (!offerBtn) return;
+    const pts = (typeof drawnItems !== 'undefined' && drawnItems)
+      ? countGeometryPoints(drawnItems.toGeoJSON())
+      : 0;
+    const canSimplify = pts > 5;
+    offerBtn.disabled = !canSimplify;
+    const wrap = document.getElementById('geometry-simplify-offer');
+    if (wrap) {
+      if (canSimplify) {
+        wrap.removeAttribute('title');
+        $(wrap).tooltip('dispose');
+      } else {
+        const msg = pts === 0
+          ? 'No geometry on the map — draw or add a polygon first'
+          : 'Geometry is already simple (≤ 5 vertices) — no simplification needed';
+        wrap.setAttribute('title', msg);
+        $(wrap).tooltip('dispose').tooltip();
+      }
+    }
   }
 
   document.addEventListener('DOMContentLoaded', function () {
@@ -1361,12 +1474,6 @@
       if (cb) cb();
     });
 
-    const closeBtn = document.getElementById('simplify-close-btn');
-    if (closeBtn) closeBtn.addEventListener('click', function () {
-      const cb = _simplifyOnKeep;
-      hideSimplifyPanel();
-      if (cb) cb();
-    });
 
     document.querySelectorAll('[data-simplify-tolerance]').forEach(btn => {
       btn.addEventListener('click', function () {
@@ -1374,6 +1481,76 @@
         _updateSimplifyPreview();
       });
     });
+
+    const offerBtn = document.getElementById('simplify-offer-btn');
+    if (offerBtn) offerBtn.addEventListener('click', function () {
+      const panel = document.getElementById('geometry-simplify-panel');
+      if (panel && panel.style.display !== 'none') {
+        hideSimplifyPanel();
+        return;
+      }
+      if (typeof drawnItems === 'undefined' || !drawnItems) return;
+      showSimplifyPanel(
+        drawnItems.toGeoJSON(),
+        'Simplify geometry (optional)',
+        'Apply simplification',
+        function (simplified) {
+          drawnItems.clearLayers();
+          L.geoJSON(simplified).eachLayer(l => drawnItems.addLayer(l));
+          _refreshSimplifyOffer();
+          window._markContributionDirty?.('contribution-submit-btn', true);
+        },
+        null
+        // no keepLabel → keep button hidden; toggle button serves as dismiss
+      );
+    });
+
+    // Wire draw/edit/delete events from within this IIFE so _refreshSimplifyOffer
+    // stays in scope (script block 1 is a separate script and cannot reach into here).
+    function _hasTemporalContent() {
+      const s = document.getElementById('start-date');
+      const e = document.getElementById('end-date');
+      return (s && s.value.trim()) || (e && e.value.trim());
+    }
+    function _onDrawChange() {
+      _refreshSimplifyOffer();
+      const pts = (typeof drawnItems !== 'undefined' && drawnItems)
+        ? countGeometryPoints(drawnItems.toGeoJSON()) : 0;
+      if (pts > 0) {
+        window._markContributionDirty?.('contribution-submit-btn');
+      } else if (!_hasTemporalContent()) {
+        // All geometry gone and no temporal content — nothing left to submit.
+        const btn = document.getElementById('contribution-submit-btn');
+        if (btn) btn.disabled = true;
+        const wrap = document.getElementById('contribution-submit-btn-wrap');
+        if (wrap) {
+          wrap.setAttribute('title', 'Add spatial or temporal extent to enable submission');
+          $(wrap).tooltip('dispose').tooltip();
+        }
+      }
+    }
+    if (typeof map !== 'undefined' && map) {
+      map.on(L.Draw.Event.CREATED, _onDrawChange);
+      map.on(L.Draw.Event.DELETED, _onDrawChange);
+      map.on(L.Draw.Event.EDITED,  _onDrawChange);
+    }
+
+    // Paste-geoextents adds layers synchronously; refresh after the click settles.
+    const pasteBtnOffer = document.getElementById('paste-geoextents-btn');
+    if (pasteBtnOffer) pasteBtnOffer.addEventListener('click', function () {
+      setTimeout(function () {
+        _refreshSimplifyOffer();
+        window._markContributionDirty?.('contribution-submit-btn');
+      }, 0);
+    });
+
+    // Show button immediately if geometry is already loaded (edit/re-contribute flow).
+    // _refreshSimplifyOffer also initialises the simplify-offer tooltip.
+    _refreshSimplifyOffer();
+
+    // Initialise the submit-button wrapper tooltip (disabled state hint).
+    const submitWrap = document.getElementById('contribution-submit-btn-wrap');
+    if (submitWrap) $(submitWrap).tooltip();
   });
 
   // Build a Leaflet-addable layer from a place_names entry.
@@ -1402,25 +1579,30 @@
         const bounds = drawnItems.getBounds();
         if (bounds.isValid()) map.fitBounds(bounds, { padding: [30, 30] });
       } catch (_) {}
+      _refreshSimplifyOffer();
+      window._markContributionDirty?.('contribution-submit-btn');
     }
 
     const layerGeoJSON = layer.toGeoJSON();
     const sizeKB = Math.round(geometryByteSize(layerGeoJSON) / 1024);
+    const pts = countGeometryPoints(layerGeoJSON);
 
-    if (sizeKB > GEOMETRY_WARN_SIZE_KB) {
-      OPTIMAP_FLASH('warning',
-        `The suggested polygon is ${sizeKB} KB — too detailed for most use cases. ` +
-        `Use the simplification controls below to reduce detail before adding.`
-      );
+    if (pts > 5) {
       if (map) {
         try { map.fitBounds(layer.getBounds(), { padding: [30, 30] }); } catch (_) {}
       }
+      if (sizeKB > GEOMETRY_WARN_SIZE_KB) {
+        OPTIMAP_FLASH('warning',
+          `The suggested polygon is ${sizeKB} KB — consider simplifying to reduce processing time.`
+        );
+      }
       showSimplifyPanel(
         layerGeoJSON,
-        'Simplify polygon before adding to map',
+        'Simplify polygon before adding (optional)',
         'Apply and add to map',
         (simplified) => _doAdd(simplified),
-        () => _doAdd(layerGeoJSON)
+        () => _doAdd(layerGeoJSON),
+        'Add without simplifying'
       );
       return true;
     }
