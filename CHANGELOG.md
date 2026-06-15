@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Fix EarthArXiv OAI-PMH harvesting timeout**: the harvester now splits every harvest into per-calendar-year requests (`from`/`until`), starting with the most recent year and working backwards, so no single request asks the server for its full record history. Empty year ranges return `noRecordsMatch` and are skipped gracefully; existing records are skipped by the normal dedup logic. Sources whose stored URL already contains explicit `from=`/`until=` params are left unchanged (no chunking). The per-request timeout is also raised from 30 s to 90 s (configurable via `OPTIMAP_OAI_HTTP_TIMEOUT`).
+
 - **Fix UI tests** (closes #142): remove module-level code in `test_loginconfirm.py` that crashed test discovery; remove stale `@unittest.skip` and duplicate nested class from `test_article_landing.py` and move it to `tests/` (the URL it targets has been implemented); fix three stale assertions broken by prior renames (feeds→regions, BoK URL, login response wording).
 
 ### Changed

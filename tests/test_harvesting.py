@@ -9,6 +9,7 @@ from pathlib import Path
 import django
 import responses
 from django.test import Client, TestCase, tag
+from django.utils import timezone
 
 # bootstrap Django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "optimap.settings")
@@ -584,6 +585,129 @@ class HarvestingHttpHardeningTests(TestCase):
         harvest_oai_endpoint(src.id)
         sent_ua = responses.calls[0].request.headers.get("User-Agent", "")
         self.assertIn("OPTIMAP", sent_ua)
+
+
+class ChunkedHarvestingTests(TestCase):
+    """OAI-PMH year-chunk harvesting: every harvest iterates all calendar
+    years (latest first) via ``from``/``until`` so no single request asks
+    the server for its full history.  Existing records are skipped by the
+    normal dedup logic in ``parse_oai_xml_and_save_works``."""
+
+    _NO_RECORDS_XML = (
+        b'<?xml version="1.0" encoding="UTF-8"?>'
+        b'<OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/">'
+        b'<error code="noRecordsMatch">No matching records</error>'
+        b"</OAI-PMH>"
+    )
+
+    def _identify_xml(self):
+        """Minimal Identify with earliestDatestamp set to last year (2 chunks total)."""
+        prev = str(timezone.now().year - 1)
+        return (
+            b'<?xml version="1.0" encoding="UTF-8"?>'
+            b'<OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/">'
+            b"<Identify><earliestDatestamp>" + prev.encode() + b"-01-01T00:00:00Z</earliestDatestamp></Identify>"
+            b"</OAI-PMH>"
+        )
+
+    @responses.activate
+    def test_year_chunks_requested_latest_first(self):
+        oai_path = BASE_TEST_DIR / "harvesting" / "source_1" / "oai_dc.xml"
+
+        # Identify → current-year chunk (valid records) → previous-year chunk (empty)
+        responses.add(
+            responses.GET, "http://example.com/oai-chunk-order", body=self._identify_xml(), content_type="text/xml"
+        )
+        responses.add(
+            responses.GET,
+            "http://example.com/oai-chunk-order",
+            status=200,
+            content_type="text/xml",
+            body=oai_path.read_bytes(),
+        )
+        responses.add(
+            responses.GET,
+            "http://example.com/oai-chunk-order",
+            status=200,
+            content_type="text/xml",
+            body=self._NO_RECORDS_XML,
+        )
+
+        src = Source.objects.create(url_field="http://example.com/oai-chunk-order", harvest_interval_minutes=60)
+        harvest_oai_endpoint(src.id)
+
+        oai_calls = [c for c in responses.calls if "example.com/oai-chunk-order" in c.request.url]
+
+        # First call: Identify
+        self.assertIn("verb=Identify", oai_calls[0].request.url)
+
+        # Second call: current-year chunk
+        current_year = str(timezone.now().year)
+        self.assertIn(f"from={current_year}-01-01", oai_calls[1].request.url)
+        self.assertIn(f"until={current_year}-12-31", oai_calls[1].request.url)
+
+        # Third call: previous-year chunk
+        prev_year = str(timezone.now().year - 1)
+        self.assertIn(f"from={prev_year}-01-01", oai_calls[2].request.url)
+        self.assertIn(f"until={prev_year}-12-31", oai_calls[2].request.url)
+
+        event = HarvestingEvent.objects.filter(source=src).latest("started_at")
+        self.assertEqual(event.status, "completed")
+
+    @responses.activate
+    def test_no_records_match_skips_chunk(self):
+        oai_path = BASE_TEST_DIR / "harvesting" / "source_1" / "oai_dc.xml"
+
+        # Identify → current-year has no records → previous-year has records
+        responses.add(
+            responses.GET, "http://example.com/oai-nomatch", body=self._identify_xml(), content_type="text/xml"
+        )
+        responses.add(
+            responses.GET,
+            "http://example.com/oai-nomatch",
+            status=200,
+            content_type="text/xml",
+            body=self._NO_RECORDS_XML,
+        )
+        responses.add(
+            responses.GET,
+            "http://example.com/oai-nomatch",
+            status=200,
+            content_type="text/xml",
+            body=oai_path.read_bytes(),
+        )
+
+        src = Source.objects.create(url_field="http://example.com/oai-nomatch", harvest_interval_minutes=60)
+        harvest_oai_endpoint(src.id, max_records=2)
+
+        event = HarvestingEvent.objects.filter(source=src).latest("started_at")
+        self.assertEqual(event.status, "completed")
+        self.assertGreater(Work.objects.filter(job=event).count(), 0, "Records from the non-empty chunk must be saved")
+
+    @responses.activate
+    def test_explicit_date_in_url_skips_chunking(self):
+        # When the source URL already carries ``from=``, the harvester must
+        # use it as-is — no Identify call, no year splitting.
+        oai_path = BASE_TEST_DIR / "harvesting" / "source_1" / "oai_dc.xml"
+        responses.add(
+            responses.GET,
+            "http://example.com/oai-explicit",
+            status=200,
+            content_type="text/xml",
+            body=oai_path.read_bytes(),
+        )
+
+        src = Source.objects.create(
+            url_field="http://example.com/oai-explicit?verb=ListRecords&metadataPrefix=oai_dc&from=2020-01-01",
+            harvest_interval_minutes=60,
+        )
+        harvest_oai_endpoint(src.id)
+
+        oai_calls = [c for c in responses.calls if "example.com/oai-explicit" in c.request.url]
+        self.assertEqual(len(oai_calls), 1, "Exactly one request when URL has an explicit date filter")
+        self.assertNotIn("verb=Identify", oai_calls[0].request.url)
+        self.assertIn("from=2020-01-01", oai_calls[0].request.url)
+        self.assertEqual(oai_calls[0].request.url.count("from="), 1)
 
 
 class RSSFeedHarvestingTests(TestCase):

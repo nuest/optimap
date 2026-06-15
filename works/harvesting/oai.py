@@ -11,7 +11,7 @@ Public surface:
 
 import logging
 import re
-from urllib.parse import urlencode, urlparse, urlunparse
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 from xml.dom import minidom
 
 import requests
@@ -375,6 +375,51 @@ def _extract_resumption_url(content: bytes, base_url: str) -> str | None:
         return None
 
 
+def _get_earliest_year(base_url: str, session: requests.Session) -> int:
+    """Fetch OAI-PMH Identify to find the repository's earliest record year.
+    Falls back to 1970 if Identify is unreachable or the field is absent."""
+    try:
+        resp = session.get(f"{base_url}?verb=Identify", timeout=OAI_HTTP_TIMEOUT)
+        if resp.ok and _looks_like_oai_xml(resp.content):
+            dom = minidom.parseString(resp.content)
+            nodes = dom.documentElement.getElementsByTagName("earliestDatestamp")
+            if nodes and nodes[0].firstChild:
+                year = int(nodes[0].firstChild.nodeValue.strip()[:4])
+                logger.debug("Identify: earliestDatestamp year = %d", year)
+                return year
+    except Exception as exc:
+        logger.warning("Could not determine earliestDatestamp via Identify (%s); using 1970", exc)
+    return 1970
+
+
+def _is_no_records_match(content: bytes) -> bool:
+    """Return True when the OAI-PMH response is a noRecordsMatch error."""
+    try:
+        dom = minidom.parseString(content)
+        for err in dom.documentElement.getElementsByTagName("error"):
+            if err.getAttribute("code") == "noRecordsMatch":
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def _year_chunk_urls(base_url: str, list_params: dict, start_year: int, end_year: int):
+    """Yield one OAI-PMH ListRecords URL per calendar year, latest first.
+
+    Each URL covers exactly one year via ``from``/``until`` so the server
+    never has to generate a full-history response in a single request.
+    ``list_params`` carries ``metadataPrefix`` and any other params (e.g.
+    ``set``) that were present in the stored source URL.
+    """
+    for year in range(end_year, start_year - 1, -1):
+        yield (
+            base_url
+            + "?"
+            + urlencode({"verb": "ListRecords", **list_params, "from": f"{year}-01-01", "until": f"{year}-12-31"})
+        )
+
+
 def harvest_oai_endpoint(source_id, user=None, max_records=None, update_existing=False):
     user = resolve_user(user)
     source = Source.objects.get(id=source_id)
@@ -395,89 +440,131 @@ def harvest_oai_endpoint(source_id, user=None, max_records=None, update_existing
     logger.addHandler(warning_collector)
 
     try:
-        if "?" not in source.url_field:
-            oai_url = f"{source.url_field}?verb=ListRecords&metadataPrefix=oai_dc"
-        else:
-            oai_url = source.url_field
+        # Derive the bare endpoint URL (scheme + host + path, no query)
+        # and extract any operator-supplied params (metadataPrefix, set, …).
+        _parsed = urlparse(source.url_field)
+        base_oai_url = urlunparse((_parsed.scheme, _parsed.netloc, _parsed.path, "", "", ""))
+        existing_qs = {k: v[0] for k, v in parse_qs(_parsed.query).items()}
 
-        logger.info("Fetching from OAI-PMH URL: %s", oai_url)
+        # Params forwarded verbatim on every ListRecords request (strip OAI
+        # protocol keys that we control ourselves).
+        list_params = {k: v for k, v in existing_qs.items() if k not in ("verb", "resumptionToken", "from", "until")}
+        if "metadataPrefix" not in list_params:
+            list_params["metadataPrefix"] = "oai_dc"
+
         session = _oai_session()
         stats = HarvestStats()
-        current_url = oai_url
-        page = 0
 
-        while current_url:
-            page += 1
-            logger.info("Fetching OAI-PMH page %d: %s", page, current_url)
-            try:
-                response = session.get(current_url, timeout=OAI_HTTP_TIMEOUT)
-            except requests.exceptions.Timeout as e:
-                raise RuntimeError(
-                    f"OAI-PMH endpoint timed out after {OAI_HTTP_TIMEOUT}s (after {OAI_RETRY_TOTAL} retries): {current_url}"
-                ) from e
-            except requests.exceptions.ConnectionError as e:
-                raise RuntimeError(
-                    f"OAI-PMH endpoint unreachable (after {OAI_RETRY_TOTAL} retries): {current_url}: {e}"
-                ) from e
-
-            if not response.ok:
-                # Some repositories (e.g. GEO-LEO e-docs) sit behind a
-                # HAProxy/BunkerWeb SHA-256 Proof-of-Work challenge. Solve it
-                # once on the first page; the resulting cookie covers the rest
-                # of the session (cookie expires 2029-12-31).
-                if response.status_code == 403 and _try_solve_pow_challenge(session, response):
-                    logger.info("PoW challenge solved; retrying %s", current_url)
-                    try:
-                        response = session.get(current_url, timeout=OAI_HTTP_TIMEOUT)
-                    except requests.exceptions.Timeout as e:
-                        raise RuntimeError(
-                            f"OAI-PMH endpoint timed out after {OAI_HTTP_TIMEOUT}s (after {OAI_RETRY_TOTAL} retries): {current_url}"
-                        ) from e
-                    except requests.exceptions.ConnectionError as e:
-                        raise RuntimeError(
-                            f"OAI-PMH endpoint unreachable (after {OAI_RETRY_TOTAL} retries): {current_url}: {e}"
-                        ) from e
-
-                if not response.ok:
-                    content_type = response.headers.get("Content-Type", "?")
-                    raise RuntimeError(
-                        f"OAI-PMH endpoint returned HTTP {response.status_code} "
-                        f"({content_type}) for {current_url}. "
-                        f"This usually means the URL is outdated or the upstream is "
-                        f"down. Body preview: {_short_body(response)}"
-                    )
-
-            if not _looks_like_oai_xml(response.content):
-                content_type = response.headers.get("Content-Type", "?")
-                raise RuntimeError(
-                    f"OAI-PMH endpoint returned non-XML content "
-                    f"(HTTP {response.status_code}, Content-Type: {content_type}) "
-                    f"for {current_url}. Body preview: {_short_body(response)}"
-                )
-
-            # Calculate remaining records budget for this page
-            if max_records is not None:
-                records_so_far = stats.created + stats.updated + stats.skipped_same_source + stats.skipped_cross_source
-                remaining = max_records - records_so_far
-                if remaining <= 0:
-                    logger.info("Reached max_records limit (%d), stopping pagination", max_records)
-                    break
-                page_max = remaining
-            else:
-                page_max = None
-
-            parse_oai_xml_and_save_works(
-                response.content,
-                event,
-                max_records=page_max,
-                warning_collector=warning_collector,
-                update_existing=update_existing,
-                stats=stats,
-                session=session,
+        # If the stored URL already carries explicit date bounds, use it
+        # as-is (single request, no year chunking).  Otherwise chunk by
+        # calendar year starting from the most recent, so the server never
+        # has to generate a full-history response in a single round-trip.
+        has_date_filter = "from" in existing_qs or "until" in existing_qs
+        if has_date_filter:
+            logger.info("Source URL has explicit date filter — skipping year chunking: %s", source.url_field)
+            chunk_urls = [source.url_field]
+        else:
+            earliest_year = _get_earliest_year(base_oai_url, session)
+            current_year = timezone.now().year
+            chunk_urls = list(_year_chunk_urls(base_oai_url, list_params, earliest_year, current_year))
+            logger.info(
+                "Harvesting %s in %d year chunks (%d → %d, latest first)",
+                source.name,
+                len(chunk_urls),
+                current_year,
+                earliest_year,
             )
 
-            # Follow resumptionToken for next page
-            current_url = _extract_resumption_url(response.content, oai_url)
+        budget_exhausted = False
+
+        for chunk_url in chunk_urls:
+            if budget_exhausted:
+                break
+
+            logger.info("Fetching from OAI-PMH URL: %s", chunk_url)
+            current_url = chunk_url
+            page = 0
+
+            while current_url and not budget_exhausted:
+                page += 1
+                logger.info("Fetching OAI-PMH page %d: %s", page, current_url)
+                try:
+                    response = session.get(current_url, timeout=OAI_HTTP_TIMEOUT)
+                except requests.exceptions.Timeout as e:
+                    raise RuntimeError(
+                        f"OAI-PMH endpoint timed out after {OAI_HTTP_TIMEOUT}s (after {OAI_RETRY_TOTAL} retries): {current_url}"
+                    ) from e
+                except requests.exceptions.ConnectionError as e:
+                    raise RuntimeError(
+                        f"OAI-PMH endpoint unreachable (after {OAI_RETRY_TOTAL} retries): {current_url}: {e}"
+                    ) from e
+
+                if not response.ok:
+                    # Some repositories (e.g. GEO-LEO e-docs) sit behind a
+                    # HAProxy/BunkerWeb SHA-256 Proof-of-Work challenge. Solve it
+                    # once on the first page; the resulting cookie covers the rest
+                    # of the session (cookie expires 2029-12-31).
+                    if response.status_code == 403 and _try_solve_pow_challenge(session, response):
+                        logger.info("PoW challenge solved; retrying %s", current_url)
+                        try:
+                            response = session.get(current_url, timeout=OAI_HTTP_TIMEOUT)
+                        except requests.exceptions.Timeout as e:
+                            raise RuntimeError(
+                                f"OAI-PMH endpoint timed out after {OAI_HTTP_TIMEOUT}s (after {OAI_RETRY_TOTAL} retries): {current_url}"
+                            ) from e
+                        except requests.exceptions.ConnectionError as e:
+                            raise RuntimeError(
+                                f"OAI-PMH endpoint unreachable (after {OAI_RETRY_TOTAL} retries): {current_url}: {e}"
+                            ) from e
+
+                    if not response.ok:
+                        content_type = response.headers.get("Content-Type", "?")
+                        raise RuntimeError(
+                            f"OAI-PMH endpoint returned HTTP {response.status_code} "
+                            f"({content_type}) for {current_url}. "
+                            f"This usually means the URL is outdated or the upstream is "
+                            f"down. Body preview: {_short_body(response)}"
+                        )
+
+                if not _looks_like_oai_xml(response.content):
+                    content_type = response.headers.get("Content-Type", "?")
+                    raise RuntimeError(
+                        f"OAI-PMH endpoint returned non-XML content "
+                        f"(HTTP {response.status_code}, Content-Type: {content_type}) "
+                        f"for {current_url}. Body preview: {_short_body(response)}"
+                    )
+
+                # Empty year range — move to the next chunk without failing.
+                if _is_no_records_match(response.content):
+                    logger.debug("No records in chunk %s", chunk_url)
+                    break
+
+                # Calculate remaining records budget for this page
+                if max_records is not None:
+                    records_so_far = (
+                        stats.created + stats.updated + stats.skipped_same_source + stats.skipped_cross_source
+                    )
+                    remaining = max_records - records_so_far
+                    if remaining <= 0:
+                        logger.info("Reached max_records limit (%d), stopping pagination", max_records)
+                        budget_exhausted = True
+                        break
+                    page_max = remaining
+                else:
+                    page_max = None
+
+                parse_oai_xml_and_save_works(
+                    response.content,
+                    event,
+                    max_records=page_max,
+                    warning_collector=warning_collector,
+                    update_existing=update_existing,
+                    stats=stats,
+                    session=session,
+                )
+
+                # Follow resumptionToken for next page within this year chunk
+                current_url = _extract_resumption_url(response.content, base_oai_url)
 
         spatial_count, temporal_count = complete_harvest(event, stats, warning_collector)
         new_count = stats.created

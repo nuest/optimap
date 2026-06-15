@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 # OAI-PMH ---------------------------------------------------------------------
 
-OAI_HTTP_TIMEOUT = 30  # seconds; per-request, applies to both connect and read
+OAI_HTTP_TIMEOUT = settings.OPTIMAP_OAI_HTTP_TIMEOUT  # seconds; per-request, applies to both connect and read
 OAI_RETRY_TOTAL = 3
 OAI_USER_AGENT = f"{settings.OPTIMAP_USER_AGENT} oai-pmh"
 

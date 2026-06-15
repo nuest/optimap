@@ -396,6 +396,10 @@ import optimap
 OPTIMAP_USER_AGENT = f"OPTIMAP/{optimap.__version__} (+http://optimap.science; mailto:{CONTACT_EMAIL})"
 WIKIBASE_USER_AGENT = f"OPTIMAP/{optimap.__version__} (http://optimap.science; {CONTACT_EMAIL})"
 
+# OAI-PMH harvesting settings
+# 90s accommodates slow endpoints (e.g. EarthArXiv ListRecords takes >30s for full history)
+OPTIMAP_OAI_HTTP_TIMEOUT = int(os.getenv("OPTIMAP_OAI_HTTP_TIMEOUT", 90))
+
 
 # Geoextent API settings
 GEOEXTENT_MAX_FILE_SIZE_MB = int(os.getenv("OPTIMAP_GEOEXTENT_MAX_FILE_SIZE_MB", 100))
