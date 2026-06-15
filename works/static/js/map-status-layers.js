@@ -123,6 +123,21 @@
         this._unpublishedRegistered = true;
       }
     }
+
+    /**
+     * Update the layer-control labels with corrected counts after loading completes.
+     * Removes and re-adds each overlay so Leaflet picks up the new label text.
+     * @param {string} publishedLabel
+     * @param {string} unpublishedLabel
+     */
+    updateLabels(publishedLabel, unpublishedLabel) {
+      this.layerControl.removeLayer(this.publishedGroup);
+      this.layerControl.addOverlay(this.publishedGroup, publishedLabel);
+      if (this._unpublishedRegistered) {
+        this.layerControl.removeLayer(this.unpublishedGroup);
+        this.layerControl.addOverlay(this.unpublishedGroup, unpublishedLabel);
+      }
+    }
   }
 
   root.MapStatusLayersManager = MapStatusLayersManager;

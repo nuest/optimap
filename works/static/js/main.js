@@ -181,6 +181,17 @@ async function initMap() {
 
   if (loadingEl) loadingEl.style.display = 'none';
   console.log(`OPTIMAP: finished loading ${offset} works.`);
+
+  // Update layer-control labels with counts from the actually loaded layers,
+  // correcting any drift from the cached statistics used to pre-label them.
+  if (statusLayers) {
+    const nPub   = statusLayers.publishedGroup.getLayers().length;
+    const nUnpub = statusLayers.unpublishedGroup.getLayers().length;
+    statusLayers.updateLabels(
+      `Published works (${nPub.toLocaleString()})`,
+      `Unpublished works (${nUnpub.toLocaleString()})`,
+    );
+  }
 }
 
 // Note: publicationPopup and publicationStyle functions are imported from map-popup.js
