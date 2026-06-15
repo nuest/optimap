@@ -452,6 +452,7 @@ class CollectionSerializer(serializers.ModelSerializer):
             "name",
             "description",
             "homepage_url",
+            "logo_url",
             "is_published",
             "created_at",
             "updated_at",

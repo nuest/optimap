@@ -778,6 +778,7 @@ class CollectionAdmin(admin.ModelAdmin):
         "name",
         "description",
         "homepage_url",
+        "logo_url",
         "is_published",
         "curators",
         "created_at",

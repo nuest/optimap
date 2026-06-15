@@ -295,6 +295,122 @@ class CollectionDetailPageTests(TestCase):
         self.assertEqual(resp.status_code, 404)
 
 
+class CollectionLogoTests(TestCase):
+    """Curators and admins can set or clear a collection's logo_url inline."""
+
+    def setUp(self):
+        self.client = Client()
+        self.col = Collection.objects.create(
+            identifier="logo-col",
+            name="Logo Col",
+            is_published=True,
+        )
+        self.curator = User.objects.create_user(
+            username="curator@logo.com",
+            email="curator@logo.com",
+            password="p123",
+        )
+        self.col.curators.add(self.curator)
+        self.outsider = User.objects.create_user(
+            username="outsider@logo.com",
+            email="outsider@logo.com",
+            password="p123",
+        )
+        self.admin = User.objects.create_user(
+            username="admin@logo.com",
+            email="admin@logo.com",
+            password="p123",
+            is_staff=True,
+        )
+
+    def _post(self, logo_url):
+        return self.client.post(
+            f"/collections/{self.col.id}/logo/",
+            data={"logo_url": logo_url},
+        )
+
+    def test_anonymous_redirected(self):
+        resp = self._post("https://example.com/logo.png")
+        self.assertEqual(resp.status_code, 302)
+        self.col.refresh_from_db()
+        self.assertIsNone(self.col.logo_url)
+
+    def test_outsider_gets_403(self):
+        self.client.login(username="outsider@logo.com", password="p123")
+        resp = self._post("https://example.com/logo.png")
+        self.assertEqual(resp.status_code, 403)
+        self.col.refresh_from_db()
+        self.assertIsNone(self.col.logo_url)
+
+    def test_curator_can_set_logo(self):
+        self.client.login(username="curator@logo.com", password="p123")
+        resp = self._post("https://example.com/logo.png")
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()["success"])
+        self.col.refresh_from_db()
+        self.assertEqual(self.col.logo_url, "https://example.com/logo.png")
+
+    def test_admin_can_set_logo(self):
+        self.client.login(username="admin@logo.com", password="p123")
+        resp = self._post("https://example.com/banner.svg")
+        self.assertEqual(resp.status_code, 200)
+        self.col.refresh_from_db()
+        self.assertEqual(self.col.logo_url, "https://example.com/banner.svg")
+
+    def test_curator_can_clear_logo(self):
+        self.col.logo_url = "https://example.com/old.png"
+        self.col.save(update_fields=["logo_url"])
+        self.client.login(username="curator@logo.com", password="p123")
+        resp = self._post("")
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()["success"])
+        self.col.refresh_from_db()
+        self.assertIsNone(self.col.logo_url)
+
+    def test_invalid_url_returns_400(self):
+        self.client.login(username="curator@logo.com", password="p123")
+        resp = self._post("not-a-url")
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("error", resp.json())
+        self.col.refresh_from_db()
+        self.assertIsNone(self.col.logo_url)
+
+    def test_logo_url_in_api_serializer(self):
+        self.col.logo_url = "https://example.com/logo.png"
+        self.col.save(update_fields=["logo_url"])
+        resp = self.client.get(f"/api/v1/collections/{self.col.identifier}/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("logo_url", resp.json())
+        self.assertEqual(resp.json()["logo_url"], "https://example.com/logo.png")
+
+    def test_curator_sees_logo_edit_ui_on_page(self):
+        self.client.login(username="curator@logo.com", password="p123")
+        resp = self.client.get(reverse("optimap:collection-page", args=[self.col.identifier]))
+        self.assertEqual(resp.status_code, 200)
+        body = resp.content.decode()
+        self.assertIn('id="collection-logo-form"', body)
+        self.assertIn('id="collection-logo-edit-btn"', body)
+
+    def test_anonymous_does_not_see_logo_edit_ui(self):
+        resp = self.client.get(reverse("optimap:collection-page", args=[self.col.identifier]))
+        self.assertEqual(resp.status_code, 200)
+        body = resp.content.decode()
+        self.assertNotIn('id="collection-logo-form"', body)
+        self.assertNotIn('id="collection-logo-edit-btn"', body)
+
+    def test_logo_thumbnail_rendered_when_set(self):
+        self.col.logo_url = "https://example.com/logo.png"
+        self.col.save(update_fields=["logo_url"])
+        resp = self.client.get(reverse("optimap:collection-page", args=[self.col.identifier]))
+        self.assertContains(resp, "https://example.com/logo.png")
+
+    def test_logo_on_index_page(self):
+        self.col.logo_url = "https://example.com/idx-logo.png"
+        self.col.save(update_fields=["logo_url"])
+        resp = self.client.get(reverse("optimap:collections"))
+        self.assertContains(resp, "https://example.com/idx-logo.png")
+
+
 class CollectionDescriptionTests(TestCase):
     """Curator/admin can edit a collection's description inline; plain text only."""
 

@@ -563,6 +563,12 @@ class Collection(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, default="")
     homepage_url = models.URLField(max_length=512, blank=True, null=True)
+    logo_url = models.URLField(
+        max_length=512,
+        blank=True,
+        null=True,
+        help_text="Optional external URL for a collection logo (no file upload). Displayed as a thumbnail on the collection landing page and index.",
+    )
     is_published = models.BooleanField(
         default=False,
         help_text="Only published collections are visible to anonymous users and listed in sitemaps.",

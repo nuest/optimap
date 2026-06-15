@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Collection logo** (closes #258): admins and curators can set an external logo URL on a collection. The logo is displayed as a thumbnail on the collection landing page (in the metadata line) and on the `/collections/` index cards. The field is also exposed via the REST API (`/api/v1/collections/`). Curators can set, update, or clear the logo via an inline edit form on the collection page — no file upload, external URL only.
+
 ### Fixed
 
 - **Fix UI tests** (closes #142): remove module-level code in `test_loginconfirm.py` that crashed test discovery; remove stale `@unittest.skip` and duplicate nested class from `test_article_landing.py` and move it to `tests/` (the URL it targets has been implemented); fix three stale assertions broken by prior renames (feeds→regions, BoK URL, login response wording).

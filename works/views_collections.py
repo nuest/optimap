@@ -286,6 +286,27 @@ def update_collection_description(request, collection_id):
 
 @login_required
 @require_POST
+def update_collection_logo(request, collection_id):
+    """Curators (and staff) set or clear a collection's logo URL."""
+    collection = get_object_or_404(Collection, pk=collection_id)
+    if not _user_can_curate(request.user, collection):
+        return JsonResponse({"error": "Not a curator of this collection."}, status=403)
+    logo_url = request.POST.get("logo_url", "").strip()
+    if logo_url:
+        from django.core.exceptions import ValidationError
+        from django.core.validators import URLValidator
+
+        try:
+            URLValidator()(logo_url)
+        except ValidationError:
+            return JsonResponse({"error": "Invalid URL."}, status=400)
+    collection.logo_url = logo_url or None
+    collection.save(update_fields=["logo_url", "updated_at"])
+    return JsonResponse({"success": True, "logo_url": collection.logo_url or ""})
+
+
+@login_required
+@require_POST
 def add_work_to_collection(request, work_id, collection_id):
     """Curator adds a work to their collection. Idempotent — adding a work
     that's already in the collection is a no-op. A work can be in multiple

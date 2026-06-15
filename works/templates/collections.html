@@ -71,6 +71,15 @@
                   </small>
                 </div>
 
+                {% if collection.logo_url %}
+                  <div class="ml-3 flex-shrink-0 text-right" style="max-width: 160px;">
+                    <img src="{{ collection.logo_url }}"
+                         alt="{{ collection.name }} logo"
+                         style="max-height: 60px; width: auto; max-width: 100%;"
+                         onerror="this.parentElement.style.display='none'">
+                  </div>
+                {% endif %}
+
                 {% if is_admin %}
                   <div class="ml-3 collection-admin-controls" style="min-width: 280px;">
                     {% if collection.is_published %}

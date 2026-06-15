@@ -108,6 +108,11 @@ urlpatterns = [
         name="update-collection-description",
     ),
     path(
+        "collections/<int:collection_id>/logo/",
+        views_collections.update_collection_logo,
+        name="update-collection-logo",
+    ),
+    path(
         "collections/<int:collection_id>/curators/add/", views_collections.add_curator, name="collection-add-curator"
     ),
     path(
