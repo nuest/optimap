@@ -30,6 +30,7 @@ from works.tasks import (
     _crossref_item_to_work_kwargs,
     _strip_jats,
     fetch_copernicus_abstract,
+    harvest_crossref_book_list,
     harvest_crossref_prefix,
 )
 
@@ -371,3 +372,155 @@ class HarvestCrossrefPrefixEndToEndTests(TestCase):
         self.assertEqual(len(responses.calls), 1)
         called = responses.calls[0].request.url
         self.assertIn("container-title%3AEarth+System+Science+Data", called.replace(":", "%3A"))
+
+
+class BuildCrossrefFilterExtraTests(TestCase):
+    def test_extra_filters_appended(self):
+        out = _build_crossref_filter("10.1007", extra_filters=["isbn:9783030147457"])
+        self.assertIn("prefix:10.1007", out)
+        self.assertIn("isbn:9783030147457", out)
+
+    def test_extra_filters_combined_with_since(self):
+        out = _build_crossref_filter(
+            "10.1007",
+            since="2020-01-01",
+            extra_filters=["isbn:9783030147457"],
+        )
+        self.assertIn("from-update-date:2020-01-01", out)
+        self.assertIn("isbn:9783030147457", out)
+
+
+class HarvestCrossrefBookListTests(TestCase):
+    def setUp(self):
+        from works.models import Collection
+
+        self.collection, _ = Collection.objects.get_or_create(
+            identifier="agile-gis",
+            defaults={"name": "AGILE GIS", "is_published": True},
+        )
+        self.source = Source.objects.create(
+            name="AGILE: Springer LNCS Proceedings",
+            url_field="https://api.crossref.org/works?filter=prefix:10.1007",
+            source_type="crossref-prefix",
+            collection=self.collection,
+            doi_prefix="10.1007",
+            harvest_interval_minutes=0,
+            publisher_name="Springer",
+            is_oa=False,
+            default_work_type="proceedings-article",
+        )
+
+    def _crossref_response(self, items, next_cursor=None):
+        return {
+            "status": "ok",
+            "message": {
+                "total-results": len(items),
+                "items": items,
+                "next-cursor": next_cursor or "",
+            },
+        }
+
+    def _chapter(self, doi, title="A chapter"):
+        return {
+            "DOI": doi,
+            "URL": f"https://doi.org/{doi}",
+            "title": [title],
+            "abstract": "<jats:p>Chapter abstract.</jats:p>",
+            "published": {"date-parts": [[2019, 4, 16]]},
+        }
+
+    @responses.activate
+    def test_creates_works_for_each_isbn(self):
+        isbns = ["978-3-030-14745-7", "978-3-319-16787-9"]
+        # Return 2 chapters for first ISBN, 1 for second.
+        responses.add(
+            responses.GET,
+            "https://api.crossref.org/works",
+            json=self._crossref_response(
+                [
+                    self._chapter("10.1007/978-3-030-14745-7_1", "Chapter 1a"),
+                    self._chapter("10.1007/978-3-030-14745-7_2", "Chapter 1b"),
+                ]
+            ),
+        )
+        responses.add(
+            responses.GET,
+            "https://api.crossref.org/works",
+            json=self._crossref_response(
+                [
+                    self._chapter("10.1007/978-3-319-16787-9_1", "Chapter 2a"),
+                ]
+            ),
+        )
+        # DOI landing page fetches raise ConnectionError (unregistered URL),
+        # caught gracefully — abstract falls back to JATS.
+
+        harvest_crossref_book_list(
+            self.source.id,
+            book_isbns=isbns,
+        )
+
+        self.assertEqual(Work.objects.filter(source=self.source).count(), 3)
+        # All added to collection.
+        self.assertEqual(Work.objects.filter(source=self.source, collections=self.collection).count(), 3)
+        # Single HarvestingEvent covers all ISBNs.
+        self.assertEqual(HarvestingEvent.objects.filter(source=self.source).count(), 1)
+        event = HarvestingEvent.objects.get(source=self.source)
+        self.assertEqual(event.status, "completed")
+
+    @responses.activate
+    def test_isbn_filter_included_in_crossref_request(self):
+        responses.add(
+            responses.GET,
+            "https://api.crossref.org/works",
+            json=self._crossref_response([]),
+        )
+        harvest_crossref_book_list(
+            self.source.id,
+            book_isbns=["978-3-030-14745-7"],
+        )
+        self.assertEqual(len(responses.calls), 1)
+        called_url = responses.calls[0].request.url
+        self.assertIn("isbn", called_url)
+        self.assertIn("9783030147457", called_url.replace("-", "").replace("%2D", ""))
+
+    @responses.activate
+    def test_max_records_stops_early(self):
+        isbns = ["978-3-030-14745-7", "978-3-319-16787-9"]
+        responses.add(
+            responses.GET,
+            "https://api.crossref.org/works",
+            json=self._crossref_response(
+                [
+                    self._chapter("10.1007/978-3-030-14745-7_1"),
+                    self._chapter("10.1007/978-3-030-14745-7_2"),
+                ]
+            ),
+        )
+        # DOI landing page fetches raise ConnectionError — caught gracefully.
+
+        harvest_crossref_book_list(
+            self.source.id,
+            book_isbns=isbns,
+            max_records=2,
+        )
+        # Stopped after first ISBN (2 records = max_records); second ISBN not requested.
+        # At most 2 Crossref API calls (one for chapters, one abstract attempt).
+        api_calls = [c for c in responses.calls if "api.crossref.org" in c.request.url]
+        self.assertEqual(len(api_calls), 1)
+
+    @responses.activate
+    def test_provenance_records_correct_harvester_name(self):
+        responses.add(
+            responses.GET,
+            "https://api.crossref.org/works",
+            json=self._crossref_response([self._chapter("10.1007/978-3-030-14745-7_1")]),
+        )
+        # DOI landing page fetch raises ConnectionError — caught gracefully.
+
+        harvest_crossref_book_list(
+            self.source.id,
+            book_isbns=["978-3-030-14745-7"],
+        )
+        work = Work.objects.get(doi="10.1007/978-3-030-14745-7_1")
+        self.assertEqual(work.provenance["harvest"]["harvester"], "harvest_crossref_book_list")

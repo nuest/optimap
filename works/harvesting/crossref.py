@@ -57,7 +57,7 @@ def _strip_jats(jats_html):
     return soup.get_text(separator=" ", strip=True) or None
 
 
-def _build_crossref_filter(prefix, source_titles=None, since=None):
+def _build_crossref_filter(prefix, source_titles=None, since=None, extra_filters=None):
     """Assemble a Crossref ``filter=...`` parameter value."""
     parts = [f"prefix:{prefix}"]
     if source_titles:
@@ -68,6 +68,8 @@ def _build_crossref_filter(prefix, source_titles=None, since=None):
             parts.append(f"container-title:{title}")
     if since:
         parts.append(f"from-update-date:{since}")
+    if extra_filters:
+        parts.extend(extra_filters)
     return ",".join(parts)
 
 
@@ -141,7 +143,9 @@ def _split_crossref_page(page):
     return text, None
 
 
-def _crossref_item_to_work_kwargs(item, source, event, fetch_abstract_from_publisher, abstract_session):
+def _crossref_item_to_work_kwargs(
+    item, source, event, fetch_abstract_from_publisher, abstract_session, harvester_name=None
+):
     """Convert a Crossref `works` JSON item to ``Work.objects.create`` kwargs.
 
     Returns ``None`` if the item lacks the minimum identifier (DOI). Abstract
@@ -207,7 +211,7 @@ def _crossref_item_to_work_kwargs(item, source, event, fetch_abstract_from_publi
         "type": (source.default_work_type if source else None) or "article",
         "provenance": {
             "harvest": {
-                "harvester": "harvest_crossref_prefix",
+                "harvester": harvester_name or "harvest_crossref_prefix",
                 "source_url": "https://api.crossref.org/works",
                 "source_type": source.source_type if source else "crossref-prefix",
                 "source_name": source.name if source else None,
@@ -262,6 +266,8 @@ def parse_crossref_response_and_save_works(
     stats=None,
     sort=None,
     order=None,
+    extra_filters=None,
+    harvester_name=None,
 ):
     """Page through Crossref's ``works`` API and persist matched works.
 
@@ -274,6 +280,9 @@ def parse_crossref_response_and_save_works(
     parameters (e.g. ``sort='published', order='desc'``). Default is
     Crossref's default (relevance/score), which is fine for a steady-state
     crawl but useless for "most recent first" comparison runs.
+
+    ``extra_filters`` appends raw Crossref filter clauses (e.g.
+    ``["isbn:978-3-030-14745-7"]``) after the prefix/title filters.
     """
     session = _crossref_session()
     cursor = "*"
@@ -283,7 +292,7 @@ def parse_crossref_response_and_save_works(
         stats = HarvestStats()
     log_interval = 20 if (max_records or 0) <= 100 else 50
 
-    filter_value = _build_crossref_filter(prefix, source_titles=source_titles)
+    filter_value = _build_crossref_filter(prefix, source_titles=source_titles, extra_filters=extra_filters)
 
     while True:
         params = {
@@ -325,6 +334,7 @@ def parse_crossref_response_and_save_works(
                 event,
                 fetch_abstract_from_publisher,
                 session,
+                harvester_name=harvester_name,
             )
             if not kwargs:
                 continue
@@ -448,6 +458,123 @@ def harvest_crossref_prefix(
             "email/harvest_failure.en.txt",
             {
                 "subject_prefix": "Crossref ",
+                "source_label": source.name,
+                "source_type_label": "Crossref",
+                "source_name": source.name,
+                "source_url": None,
+                "collection_label": None,
+                "resolved_prefix": resolved_prefix,
+                "event_started": None,
+                "event_failed": None,
+                "error": str(e),
+                "warning_summary": "",
+            },
+        )
+        send_harvest_email(user, subject, body, fail_silently=True)
+        raise
+    finally:
+        logger.removeHandler(warning_collector)
+
+
+def harvest_crossref_book_list(
+    source_id,
+    user=None,
+    max_records=None,
+    book_isbns=None,
+    update_existing=False,
+):
+    """Harvest all chapters from a list of book ISBNs via Crossref.
+
+    Designed for proceedings published as separate books per year (e.g. AGILE
+    Springer LNCS), where each book has its own ISBN and all chapters share
+    the same DOI prefix. Calls ``parse_crossref_response_and_save_works`` once
+    per ISBN with ``filter=isbn:{isbn}`` appended, accumulating results into a
+    single ``HarvestingEvent``.
+
+    ``book_isbns`` overrides the per-call list; when omitted the caller is
+    expected to pass the list via the management command or schedule kwargs.
+    The prefix is read from ``source.doi_prefix``.
+    """
+    user = resolve_user(user)
+    source = Source.objects.get(id=source_id)
+    event = HarvestingEvent.objects.create(source=source, status="in_progress")
+
+    warning_collector = HarvestWarningCollector()
+    warning_collector.setLevel(logging.INFO)
+    logger.addHandler(warning_collector)
+
+    resolved_prefix = (source.doi_prefix if source else None) or "10.1007"
+    isbns = book_isbns or []
+
+    try:
+        logger.info(
+            "Starting Crossref book-list harvest: prefix=%s, %d ISBN(s)",
+            resolved_prefix,
+            len(isbns),
+        )
+        stats = HarvestStats()
+        total_seen = 0
+
+        for isbn in isbns:
+            # Crossref isbn filter requires the plain 13-digit form — hyphens
+            # cause zero results even though the ISBN is valid.
+            isbn_plain = isbn.replace("-", "")
+            logger.info("Harvesting ISBN %s", isbn)
+            _, seen = parse_crossref_response_and_save_works(
+                source,
+                event,
+                prefix=resolved_prefix,
+                extra_filters=[f"isbn:{isbn_plain}"],
+                fetch_abstract_from_publisher=True,
+                max_records=max_records,
+                warning_collector=warning_collector,
+                update_existing=update_existing,
+                stats=stats,
+                harvester_name="harvest_crossref_book_list",
+            )
+            total_seen += seen
+            if max_records and total_seen >= max_records:
+                break
+
+        spatial_count, temporal_count = complete_harvest(event, stats, warning_collector)
+
+        subject, body = render_harvest_email(
+            "email/harvest_success.en.txt",
+            {
+                "subject_prefix": "Crossref (book list) ",
+                "source_label": source.name,
+                "detail_header": "Crossref book-list harvest details:",
+                "source_name": source.name,
+                "source_url": None,
+                "url_label": None,
+                "collection_label": None,
+                "records_added_label": "New works saved",
+                "records_added": stats.created,
+                "records_updated_label": "Updated works",
+                "records_updated": stats.updated,
+                "spatial_label": "Chapters with spatial metadata",
+                "spatial_count": spatial_count,
+                "temporal_label": "Chapters with temporal metadata",
+                "temporal_count": temporal_count,
+                "event_started": f"{event.started_at:%Y-%m-%d %H:%M:%S}",
+                "event_completed": f"{event.completed_at:%Y-%m-%d %H:%M:%S}",
+                "warning_summary": warning_collector.get_summary(),
+                "resolved_prefix": resolved_prefix,
+                "container_title_filters": f"{len(isbns)} ISBN(s)",
+                "openalex_source_id": None,
+                "records_seen": total_seen,
+                "records_processed": None,
+            },
+        )
+        send_harvest_email(user, subject, body)
+
+    except Exception as e:
+        logger.error("Crossref book-list harvest failed for source %s: %s", source.name, str(e))
+        fail_harvest(event, e, warning_collector)
+        subject, body = render_harvest_email(
+            "email/harvest_failure.en.txt",
+            {
+                "subject_prefix": "Crossref (book list) ",
                 "source_label": source.name,
                 "source_type_label": "Crossref",
                 "source_name": source.name,

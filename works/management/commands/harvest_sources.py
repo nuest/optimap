@@ -34,6 +34,7 @@ from django.utils.text import slugify
 
 from works.models import Collection, HarvestingEvent, Source, Work
 from works.tasks import (
+    harvest_crossref_book_list,
     harvest_crossref_prefix,
     harvest_geoscienceworld,
     harvest_mountain_wetlands,
@@ -91,7 +92,7 @@ SOURCE_CONFIG = {
     "agile-giss": {
         "name": "AGILE-GISS",
         "url": "https://oai-pmh.copernicus.org/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=agile-giss",
-        "collection_name": "AGILE-GISS",
+        "collection_name": "AGILE GIS",
         "homepage_url": "https://www.agile-giscience-series.net/",
         "publisher_name": "Copernicus Publications",
         "source_type": "oai-pmh",
@@ -107,7 +108,16 @@ SOURCE_CONFIG = {
         # Crossref-prefix harvester ignores `url` (builds its own params), but
         # we keep a representative URL for the admin UI / --list display.
         "url": "https://api.crossref.org/works?filter=prefix:10.5194,container-title:AGILE%3A+GIScience+Series",
-        "collection_name": "AGILE-GISS",
+        "collection_name": "AGILE GIS",
+        "collection_description": (
+            "Full papers from the AGILE International Conference on Geographic Information Science, "
+            "the annual meeting of the Association of Geographic Information Laboratories in Europe "
+            "(AGILE, established 1998). "
+            "Peer-reviewed full papers published by Springer in the Lecture Notes in Geoinformation "
+            "and Cartography series (2004–2019) and in open access by Copernicus Publications "
+            "in the AGILE: GIScience Series (2020–present). "
+            "Short papers and poster abstracts are not included."
+        ),
         "homepage_url": "https://www.agile-giscience-series.net/articles/index.html",
         "publisher_name": "Copernicus Publications",
         "source_type": "crossref-prefix",
@@ -119,6 +129,47 @@ SOURCE_CONFIG = {
         "source_titles": ["AGILE: GIScience Series"],
         "fetch_abstract_from_publisher": True,
         "is_oa": True,
+        "default_work_type": "proceedings-article",
+    },
+    "agile-springer-lncs": {
+        "name": "AGILE: Springer LNCS Proceedings",
+        # Crossref-prefix harvester ignores `url` (builds its own params), but
+        # we keep a representative URL for the admin UI / --list display.
+        "url": "https://api.crossref.org/works?filter=prefix:10.1007",
+        "collection_name": "AGILE GIS",
+        "collection_description": (
+            "Full papers from the AGILE International Conference on Geographic Information Science, "
+            "the annual meeting of the Association of Geographic Information Laboratories in Europe "
+            "(AGILE, established 1998). "
+            "Peer-reviewed full papers published by Springer in the Lecture Notes in Geoinformation "
+            "and Cartography series (2004–2019) and in open access by Copernicus Publications "
+            "in the AGILE: GIScience Series (2020–present). "
+            "Short papers and poster abstracts are not included."
+        ),
+        "homepage_url": "https://agile-gi.eu/past-conferences/proceedings",
+        "publisher_name": "Springer",
+        "source_type": "crossref-prefix",
+        "crossref_prefix": "10.1007",
+        "doi_prefix": "10.1007",
+        # One ISBN per AGILE Springer volume (2008–2019). Earlier conferences
+        # (pre-2008) were not published in the Springer LNCS/LNGiC series.
+        # ISBNs verified from https://agile-gi.eu/past-conferences/proceedings.
+        "book_isbns": [
+            "978-3-540-78945-1",  # 2008 — The European Information Society
+            "978-3-642-00317-2",  # 2009 — Advances in GIScience
+            "978-3-642-12325-2",  # 2010 — Geospatial Thinking
+            "978-3-642-19788-8",  # 2011 — Advancing Geoinformation Science for a Changing World
+            "978-3-642-29062-6",  # 2012 — Bridging the Geographic Information Sciences
+            "978-3-319-00615-4",  # 2013 — Geographic Information Science at the Heart of Europe
+            "978-3-319-03610-6",  # 2014 — Connecting a Digital Europe Through Location and Place
+            "978-3-319-16787-9",  # 2015 — Geographic Information Science as an Enabler of Smarter Cities
+            "978-3-319-33782-1",  # 2016 — Geospatial Data in a Changing World
+            "978-3-319-56759-4",  # 2017 — Societal Geo-innovation
+            "978-3-319-78208-9",  # 2018 — Geospatial Technologies for All
+            "978-3-030-14745-7",  # 2019 — Geospatial Technologies for Local and Regional Development
+        ],
+        "fetch_abstract_from_publisher": True,
+        "is_oa": False,
         "default_work_type": "proceedings-article",
     },
     "geo-leo": {
@@ -144,11 +195,23 @@ SOURCE_CONFIG = {
     },
     "scientific-data": {
         "name": "Scientific Data",
-        "url": "https://www.nature.com/sdata.rss",
+        # Display URL only — harvester builds its own Crossref API params.
+        "url": "https://api.crossref.org/works?filter=prefix:10.1038,container-title:Scientific%20Data",
         "collection_name": "Scientific Data",
         "homepage_url": "https://www.nature.com/sdata/",
         "publisher_name": "Nature Publishing Group",
-        "source_type": "rss",
+        "source_type": "crossref-prefix",
+        "crossref_prefix": "10.1038",
+        # doi_prefix must also be set so _reconcile_source populates Source.doi_prefix;
+        # auto-scheduled Django-Q runs don't receive a prefix= argument and fall back
+        # to source.doi_prefix — without it they would use the hardcoded "10.5194" default.
+        "doi_prefix": "10.1038",
+        # Baked-in title filter; 10.1038 covers all of Springer Nature, so this
+        # is essential to restrict results to Scientific Data only.
+        "source_titles": ["Scientific Data"],
+        # Crossref carries complete abstracts for Springer Nature; scraping
+        # nature.com at scale risks Cloudflare blocks.
+        "fetch_abstract_from_publisher": False,
         "is_oa": True,
         "default_work_type": "dataset",
     },
@@ -482,20 +545,30 @@ def _is_enabled(config):
 
 
 def _get_or_create_collection(config):
-    """Return the Collection matching ``config['collection_name']``, creating it on first use."""
+    """Return the Collection matching ``config['collection_name']``, creating it on first use.
+
+    If ``collection_description`` is present in ``config`` it is written to
+    ``Collection.description`` both on creation and on every subsequent call
+    (e.g. ``--insert-sources`` re-runs), so the description stays current
+    without requiring a manual admin edit.
+    """
     name = config.get("collection_name")
     if not name:
         return None
     identifier = slugify(name)[:100] or "collection"
-    collection, _ = Collection.objects.get_or_create(
+    description = config.get("collection_description", "")
+    collection, created = Collection.objects.get_or_create(
         identifier=identifier,
         defaults={
             "name": name,
-            "description": "",
+            "description": description,
             "homepage_url": config.get("homepage_url") or None,
             "is_published": True,
         },
     )
+    if not created and description and collection.description != description:
+        collection.description = description
+        collection.save(update_fields=["description"])
     return collection
 
 
@@ -734,25 +807,41 @@ class Command(BaseCommand):
                         update_existing=update_existing,
                     )
                 elif source_type == "crossref-prefix":
-                    self.stdout.write("Source type: Crossref by DOI prefix")
-                    # CLI --source-title takes precedence; otherwise fall back
-                    # to titles baked into the config (e.g. agile-giss-crossref).
-                    effective_titles = source_titles or config.get("source_titles")
-                    if effective_titles:
-                        self.stdout.write(f"  Filtering to titles: {', '.join(effective_titles)}")
-                    fetch_abstract = config.get("fetch_abstract_from_publisher", True) and not no_publisher_abstract
-                    self.stdout.write(
-                        f"  Fetch abstract from publisher landing page: {'yes' if fetch_abstract else 'no'}"
-                    )
-                    harvest_crossref_prefix(
-                        source.id,
-                        user=user,
-                        max_records=max_records,
-                        source_titles=effective_titles,
-                        prefix=config.get("crossref_prefix"),
-                        fetch_abstract_from_publisher=fetch_abstract,
-                        update_existing=update_existing,
-                    )
+                    book_isbns = config.get("book_isbns")
+                    if book_isbns:
+                        # ISBN-per-book mode: each ISBN is one Crossref request.
+                        # Used for AGILE Springer LNCS (one book per year).
+                        self.stdout.write("Source type: Crossref by book ISBN list")
+                        self.stdout.write(f"  ISBNs: {len(book_isbns)} volume(s)")
+                        harvest_crossref_book_list(
+                            source.id,
+                            user=user,
+                            max_records=max_records,
+                            book_isbns=book_isbns,
+                            update_existing=update_existing,
+                        )
+                    else:
+                        self.stdout.write("Source type: Crossref by DOI prefix")
+                        # CLI --source-title takes precedence; otherwise fall back
+                        # to titles baked into the config (e.g. agile-giss-crossref).
+                        effective_titles = source_titles or config.get("source_titles")
+                        if effective_titles:
+                            self.stdout.write(f"  Filtering to titles: {', '.join(effective_titles)}")
+                        fetch_abstract = (
+                            config.get("fetch_abstract_from_publisher", True) and not no_publisher_abstract
+                        )
+                        self.stdout.write(
+                            f"  Fetch abstract from publisher landing page: {'yes' if fetch_abstract else 'no'}"
+                        )
+                        harvest_crossref_prefix(
+                            source.id,
+                            user=user,
+                            max_records=max_records,
+                            source_titles=effective_titles,
+                            prefix=config.get("crossref_prefix"),
+                            fetch_abstract_from_publisher=fetch_abstract,
+                            update_existing=update_existing,
+                        )
                 elif source_type == "geoscienceworld":
                     self.stdout.write("Source type: GeoScienceWorld (Crossref + geoextent)")
                     effective_prefix = config.get("doi_prefix") or (source.doi_prefix if source else None)

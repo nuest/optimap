@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **AGILE Springer LNCS harvester** (closes #259): new `agile-springer-lncs` Crossref source harvests full-paper chapters from the 12 AGILE conference volumes published by Springer in the *Lecture Notes in Geoinformation and Cartography* series (2008–2019). Each book is fetched via a per-ISBN Crossref filter (`isbn:978-…`), driven by a new `harvest_crossref_book_list` task. The underlying `_build_crossref_filter` gains an `extra_filters` parameter for appending raw Crossref filter clauses. Chapters are harvested without spatial/temporal metadata (Springer landing pages carry none); geometry can be contributed by users via the existing contribution workflow.
+
+### Changed
+
+- **AGILE GIS collection renamed** (closes #259): the collection previously identified as `agile-giss` (URL `/collections/agile-giss/`) is renamed to `agile-gis` (URL `/collections/agile-gis/`) and its display name changed from "AGILE-GISS" to "AGILE GIS". Both the Copernicus (2020–present, `agile-giss-crossref`) and Springer LNCS (2008–2019, `agile-springer-lncs`) harvesters now target this single shared collection. The collection description is updated to explain both publishing streams. A data migration (`0019_rename_agile_collection`) handles existing deployments.
+
 - **Collection logo** (closes #258): admins and curators can set an external logo URL on a collection. The logo is displayed as a thumbnail on the collection landing page (in the metadata line) and on the `/collections/` index cards. The field is also exposed via the REST API (`/api/v1/collections/`). Curators can set, update, or clear the logo via an inline edit form on the collection page — no file upload, external URL only.
 
 ### Fixed

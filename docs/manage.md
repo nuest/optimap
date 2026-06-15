@@ -87,7 +87,26 @@ The harvester (`works.tasks.harvest_openalex_source`) needs the OpenAlex Source 
 
 The public Source API exposes a derived `openalex_url` (`https://openalex.org/<S-id>`) computed from `openalex_id`; it is no longer a stored field, so there is no second OpenAlex field to keep in sync.
 
-Minimum-viable example for **AGILE GIScience Series**:
+#### AGILE GIS collection — two sources, one collection
+
+The **AGILE GIS** collection (`/collections/agile-gis/`) is fed by two `SOURCE_CONFIG` entries that share the same `collection_name`:
+
+| Key | Source name | Publisher | Years | harvest task |
+|-----|------------|-----------|-------|-------------|
+| `agile-giss-crossref` | AGILE: GIScience Series (Crossref) | Copernicus | 2020–present | `harvest_crossref_prefix` |
+| `agile-springer-lncs` | AGILE: Springer LNCS Proceedings | Springer | 2008–2019 | `harvest_crossref_book_list` |
+
+Run both with:
+```bash
+python manage.py harvest_sources --source agile-giss-crossref
+python manage.py harvest_sources --source agile-springer-lncs
+```
+
+The Springer source uses `harvest_crossref_book_list` — it iterates over 12 hardcoded ISBNs (one per conference year), calling `filter=prefix:10.1007,isbn:{isbn}` for each, and merges all results into a single `HarvestingEvent`. Springer chapters carry no spatial/temporal metadata from Crossref or from publisher landing pages; geometry can be contributed by users via the contribution workflow at `/contribute/`.
+
+> **Note on the `doi_prefix` field**: the Springer source requires `doi_prefix = "10.1007"` on the `Source` row. `harvest_sources --insert-sources` sets this automatically; if you create the source manually in admin, set it explicitly.
+
+Minimum-viable example for **AGILE GIScience Series (Copernicus via OpenAlex)**:
 
 | Field | Value |
 |-------|-------|
@@ -98,11 +117,11 @@ Minimum-viable example for **AGILE GIScience Series**:
 | `default_work_type` | `proceedings-article` |
 | `is_oa` | ✓ *(display flag)* |
 | `harvest_interval_minutes` | `0` *(start manual, raise once a smoke run succeeds)* |
-| `collection` | optional — pick or create `agile-giss` |
+| `collection` | optional — pick or create `agile-gis` |
 | `publisher_name`, `homepage_url` | optional display fields |
 
-> **Common error:** if you create the source with `source_type=oai-pmh` and the AGILE-GISS OAI URL (`https://oai-pmh.copernicus.org/oai.php?…&set=agile-giss`), the harvester will fail with HTTP 404 — Copernicus's OAI-PMH endpoint has been dark since 2025-12. Switch `source_type` to `openalex` and fill the OpenAlex fields above.
-> **Faster than typing it in:** `python manage.py harvest_sources --insert-sources` creates this exact AGILE-GISS-OpenAlex row (and every other built-in entry from `SOURCE_CONFIG`) idempotently — see "Bootstrap the admin from the source config" below. Only do the manual admin route when you need a source that's not in `SOURCE_CONFIG`.
+> **Common error:** if you create the source with `source_type=oai-pmh` and the AGILE-GISS OAI URL (`https://oai-pmh.copernicus.org/oai.php?…&set=agile-giss`), the harvester will fail with HTTP 404 — Copernicus's OAI-PMH endpoint has been dark since 2025-12. Switch `source_type` to `crossref-prefix` with `doi_prefix=10.5194` and `source_titles=["AGILE: GIScience Series"]`, or use the `agile-giss-crossref` built-in entry.
+> **Faster than typing it in:** `python manage.py harvest_sources --insert-sources` creates both AGILE source rows (and every other built-in entry from `SOURCE_CONFIG`) idempotently — see "Bootstrap the admin from the source config" below. Only do the manual admin route when you need a source that's not in `SOURCE_CONFIG`.
 
 > **Source.collection is optional at create time, but always populated by the time the first harvest finishes.** Leaving the collection field blank when you create a Source is **not** an error:
 > - **OAI-PMH / OJS / Janeway sources** auto-create a Collection on first harvest, slugged from the source name (e.g. `"Earth System Science Data"` → identifier `earth-system-science-data`). The new Collection starts **unpublished** so it does not show up on `/collections/` until you review the auto-derived name and description and flip `is_published`. Review auto-created collections at `/admin/works/collection/?is_published__exact=0` before publishing.
