@@ -41,9 +41,12 @@ main .works-page {
   word-break: break-word !important;
 }
 
+/* z-index creates a stacking context so every navbar popup (burger dropdown,
+   user menu) paints above the Leaflet map controls at z-index 999 */
 .navbar {
   height: 50px;
   background-color: #158F9B;
+  z-index: 1100;
 }
 
 @media (max-width: 720px) {
@@ -180,7 +183,7 @@ main .works-page {
   text-decoration: underline;
 }
 
-/* have top-right map UI below the login/user menu */
+/* keep Leaflet controls below the navbar stacking context (z-index 1100) */
 .leaflet-top {
   z-index: 999;
 }
