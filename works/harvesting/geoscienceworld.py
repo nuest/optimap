@@ -109,6 +109,7 @@ def parse_gsw_response_and_save_works(
     cursor = "*"
     saved = 0
     seen = 0
+    log_interval = 20 if (max_records or 0) <= 100 else 50
 
     while True:
         params = {
@@ -133,6 +134,9 @@ def parse_gsw_response_and_save_works(
 
         for item in items:
             seen += 1
+            if seen % log_interval == 0:
+                suffix = f"/{max_records}" if max_records else ""
+                logger.info("Processed %d%s records", seen, suffix)
             doi = item.get("DOI")
             if not doi:
                 continue

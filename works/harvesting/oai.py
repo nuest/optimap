@@ -110,13 +110,17 @@ def parse_oai_xml_and_save_works(
     processed_count = 0
 
     total_records = len(records) if hasattr(records, "__len__") else None
-    log_interval = max(1, total_records // 10) if total_records else 10
+    _size_hint = total_records or max_records or 0
+    log_interval = 20 if _size_hint <= 100 else 50
 
     for rec in records:
         try:
             processed_count += 1
             if processed_count % log_interval == 0:
-                logger.debug("Processing record %d of %d", processed_count, total_records if total_records else "?")
+                if total_records:
+                    logger.info("Processed %d of %d records", processed_count, total_records)
+                else:
+                    logger.info("Processed %d records", processed_count)
 
             if hasattr(rec, "metadata"):
                 identifiers = rec.metadata.get("identifier", []) + rec.metadata.get("relation", [])

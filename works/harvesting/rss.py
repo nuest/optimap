@@ -79,13 +79,13 @@ def parse_rss_feed_and_save_publications(
         saved_count = 0
 
         total_entries = len(entries)
-        log_interval = max(1, total_entries // 10)
+        log_interval = 20 if total_entries <= 100 else 50
 
         for entry in entries:
             try:
                 processed_count += 1
                 if processed_count % log_interval == 0:
-                    logger.debug("Processing entry %d of %d", processed_count, total_entries)
+                    logger.info("Processed %d of %d records", processed_count, total_entries)
 
                 title = entry.get("title", "").strip()
                 link = entry.get("link", entry.get("id", "")).strip()

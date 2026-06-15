@@ -258,6 +258,7 @@ def parse_openalex_response_and_save_works(
     seen = 0
     if stats is None:
         stats = HarvestStats()
+    log_interval = 20 if (max_records or 0) <= 100 else 50
 
     filter_value = f"primary_location.source.id:{openalex_source_id}"
     select_value = (
@@ -291,6 +292,9 @@ def parse_openalex_response_and_save_works(
 
         for item in results:
             seen += 1
+            if seen % log_interval == 0:
+                suffix = f"/{max_records}" if max_records else ""
+                logger.info("Processed %d%s records", seen, suffix)
             kwargs = _openalex_item_to_work_kwargs(item, source, event)
             if not kwargs:
                 continue

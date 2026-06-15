@@ -160,11 +160,16 @@ def parse_mountain_wetlands_response_and_save_works(
     admin_user = get_or_create_admin_command_user()
     if stats is None:
         stats = HarvestStats()
+    log_interval = 20 if (max_records or 0) <= 100 else 50
 
     for item in items:
         if max_records and (processed_so_far + processed) >= max_records:
             break
         processed += 1
+        total_so_far = processed_so_far + processed
+        if total_so_far % log_interval == 0:
+            suffix = f"/{max_records}" if max_records else ""
+            logger.info("Processed %d%s records", total_so_far, suffix)
 
         item_id = item.get("id")
         title = (item.get("title") or "").strip()
