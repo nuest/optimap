@@ -78,6 +78,7 @@ SOURCE_CONFIG = {
         "source_type": "oai-pmh",
         "is_oa": True,
         "default_work_type": "dataset",
+        "openalex_id": "S106909380",
         # Disabled: oai-pmh.copernicus.org/oai.php has been HTTP 404 since
         # at least Dec 2025 (last Wayback success: 2025-12-15). Use the
         # `copernicus` source above (Crossref prefix 10.5194) to reach the
@@ -89,22 +90,11 @@ SOURCE_CONFIG = {
             'Use --source copernicus --source-title "Earth System Science Data" instead.'
         ),
     },
+    # AGILE GIS — two publishing streams for one collection.
+    # Use --source-prefix agile-gis to harvest both in one run.
     "agile-giss": {
-        "name": "AGILE-GISS",
-        "url": "https://oai-pmh.copernicus.org/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=agile-giss",
-        "collection_name": "AGILE GIS",
-        "homepage_url": "https://www.agile-giscience-series.net/",
-        "publisher_name": "Copernicus Publications",
-        "source_type": "oai-pmh",
-        "is_oa": True,
-        "default_work_type": "proceedings-article",
-        "enabled": False,
-        "disabled_reason": (
-            "Upstream OAI-PMH endpoint returns HTTP 404 since 2025-12. Use agile-giss-crossref instead."
-        ),
-    },
-    "agile-giss-crossref": {
         "name": "AGILE: GIScience Series (Crossref)",
+        "openalex_id": "S4210203054",
         # Crossref-prefix harvester ignores `url` (builds its own params), but
         # we keep a representative URL for the admin UI / --list display.
         "url": "https://api.crossref.org/works?filter=prefix:10.5194,container-title:AGILE%3A+GIScience+Series",
@@ -131,7 +121,7 @@ SOURCE_CONFIG = {
         "is_oa": True,
         "default_work_type": "proceedings-article",
     },
-    "agile-springer-lncs": {
+    "agile-gis-lncs": {
         "name": "AGILE: Springer LNCS Proceedings",
         # Crossref-prefix harvester ignores `url` (builds its own params), but
         # we keep a representative URL for the admin UI / --list display.
@@ -192,6 +182,9 @@ SOURCE_CONFIG = {
         "is_oa": True,
         "is_preprint": True,
         "default_work_type": "preprint",
+        # OpenAlex tracks EarthArXiv under two entries due to its platform migration from
+        # OSF to CDL; S4306401273 (OSF Preprints) has indexed works, S4306402614 (CDL) has 0.
+        "openalex_id": "S4306401273",
     },
     "scientific-data": {
         "name": "Scientific Data",
@@ -201,6 +194,7 @@ SOURCE_CONFIG = {
         "homepage_url": "https://www.nature.com/sdata/",
         "publisher_name": "Nature Publishing Group",
         "source_type": "crossref-prefix",
+        "openalex_id": "S2607323502",
         "crossref_prefix": "10.1038",
         # doi_prefix must also be set so _reconcile_source populates Source.doi_prefix;
         # auto-scheduled Django-Q runs don't receive a prefix= argument and fall back
@@ -335,6 +329,7 @@ SOURCE_CONFIG = {
         "publisher_name": "Pensoft Publishers",
         "source_type": "oai-pmh",
         "issn_l": "1314-2828",
+        "openalex_id": "S2764367193",
         "is_oa": True,
         "default_work_type": "article",
     },
@@ -346,6 +341,7 @@ SOURCE_CONFIG = {
         "publisher_name": "Pensoft Publishers",
         "source_type": "oai-pmh",
         "issn_l": "1313-2970",
+        "openalex_id": "S199213172",
         "is_oa": True,
         "default_work_type": "article",
     },
@@ -357,6 +353,7 @@ SOURCE_CONFIG = {
         "publisher_name": "Pensoft Publishers",
         "source_type": "oai-pmh",
         "issn_l": "1314-2003",
+        "openalex_id": "S138605562",
         "is_oa": True,
         "default_work_type": "article",
     },
@@ -368,6 +365,7 @@ SOURCE_CONFIG = {
         "publisher_name": "Pensoft Publishers",
         "source_type": "oai-pmh",
         "issn_l": "1314-2488",
+        "openalex_id": "S4210189550",
         "is_oa": True,
         "default_work_type": "article",
     },
@@ -379,6 +377,7 @@ SOURCE_CONFIG = {
         "publisher_name": "Pensoft Publishers",
         "source_type": "oai-pmh",
         "issn_l": "1314-4049",
+        "openalex_id": "S4210227917",
         "is_oa": True,
         "default_work_type": "article",
     },
@@ -390,6 +389,7 @@ SOURCE_CONFIG = {
         "publisher_name": "Pensoft Publishers",
         "source_type": "oai-pmh",
         "issn_l": "2682-955X",
+        "openalex_id": "S4210228833",
         "is_oa": True,
         "default_work_type": "article",
     },
@@ -401,6 +401,7 @@ SOURCE_CONFIG = {
         "publisher_name": "Pensoft Publishers",
         "source_type": "oai-pmh",
         "issn_l": "1314-3301",
+        "openalex_id": "S2764730374",
         "is_oa": True,
         "default_work_type": "article",
     },
@@ -412,6 +413,7 @@ SOURCE_CONFIG = {
         "publisher_name": "Pensoft Publishers",
         "source_type": "oai-pmh",
         "issn_l": "2535-0889",
+        "openalex_id": "S4210217666",
         "is_oa": True,
         "default_work_type": "article",
     },
@@ -423,6 +425,7 @@ SOURCE_CONFIG = {
         "publisher_name": "Pensoft Publishers",
         "source_type": "oai-pmh",
         "issn_l": "2367-8194",
+        "openalex_id": "S4210213968",
         "is_oa": True,
         "default_work_type": "article",
     },
@@ -434,6 +437,7 @@ SOURCE_CONFIG = {
         "publisher_name": "Pensoft Publishers",
         "source_type": "oai-pmh",
         "issn_l": "2535-0730",
+        "openalex_id": "S4210215492",
         "is_oa": True,
         "default_work_type": "article",
     },
@@ -445,6 +449,7 @@ SOURCE_CONFIG = {
         "publisher_name": "Pensoft Publishers",
         "source_type": "oai-pmh",
         "issn_l": "2534-9708",
+        "openalex_id": "S4210182883",
         "is_oa": True,
         "default_work_type": "article",
     },
@@ -456,6 +461,7 @@ SOURCE_CONFIG = {
         "publisher_name": "Pensoft Publishers",
         "source_type": "oai-pmh",
         "issn_l": "2236-3777",
+        "openalex_id": "S4210214477",
         "is_oa": True,
         "default_work_type": "article",
     },
@@ -467,6 +473,7 @@ SOURCE_CONFIG = {
         "publisher_name": "Pensoft Publishers",
         "source_type": "oai-pmh",
         "issn_l": "2667-9809",
+        "openalex_id": "S4210198213",
         "is_oa": True,
         "default_work_type": "article",
     },
@@ -478,6 +485,7 @@ SOURCE_CONFIG = {
         "publisher_name": "Pensoft Publishers",
         "source_type": "oai-pmh",
         "issn_l": "2531-4033",
+        "openalex_id": "S4210221877",
         "is_oa": True,
         "default_work_type": "article",
     },
@@ -489,6 +497,7 @@ SOURCE_CONFIG = {
         "publisher_name": "Pensoft Publishers",
         "source_type": "oai-pmh",
         "issn_l": "2412-1908",
+        "openalex_id": "S2737068255",
         "is_oa": True,
         "default_work_type": "article",
     },
@@ -500,6 +509,7 @@ SOURCE_CONFIG = {
         "publisher_name": "Pensoft Publishers",
         "source_type": "oai-pmh",
         "issn_l": "2603-431X",
+        "openalex_id": "S4210212065",
         "is_oa": True,
         "default_work_type": "article",
     },
@@ -511,6 +521,7 @@ SOURCE_CONFIG = {
         "publisher_name": "Austrian Academy of Sciences",
         "source_type": "oai-pmh",
         "issn_l": "1026-4949",
+        "openalex_id": "S4389157932",
         "is_oa": True,
         "default_work_type": "article",
     },
@@ -522,6 +533,7 @@ SOURCE_CONFIG = {
         "publisher_name": "University of Bologna",
         "source_type": "oai-pmh",
         "issn_l": "1721-8861",
+        "openalex_id": "S13822188",
         "is_oa": True,
         "default_work_type": "article",
     },
@@ -533,6 +545,7 @@ SOURCE_CONFIG = {
         "publisher_name": "Pensoft Publishers",
         "source_type": "oai-pmh",
         "issn_l": "3033-0955",
+        "openalex_id": "S5407045911",
         "is_oa": True,
         "default_work_type": "article",
     },
@@ -823,7 +836,7 @@ class Command(BaseCommand):
                     else:
                         self.stdout.write("Source type: Crossref by DOI prefix")
                         # CLI --source-title takes precedence; otherwise fall back
-                        # to titles baked into the config (e.g. agile-giss-crossref).
+                        # to titles baked into the config (e.g. agile-giss).
                         effective_titles = source_titles or config.get("source_titles")
                         if effective_titles:
                             self.stdout.write(f"  Filtering to titles: {', '.join(effective_titles)}")
@@ -876,12 +889,19 @@ class Command(BaseCommand):
                 pub_count = Work.objects.filter(job=event).count()
                 skipped_count = event.records_skipped or 0
                 spatial_count = Work.objects.filter(job=event).exclude(geometry__isnull=True).count()
-                temporal_count = Work.objects.filter(job=event).exclude(timeperiod_startdate=[]).count()
+                temporal_count = (
+                    Work.objects.filter(job=event)
+                    .exclude(timeperiod_startdate__isnull=True)
+                    .exclude(timeperiod_startdate=[])
+                    .count()
+                )
 
                 duration = (timezone.now() - harvest_start).total_seconds()
 
                 if event.status == "completed":
                     total_harvested += pub_count
+                    source.refresh_from_db(fields=["statistics"])
+                    src_stats = source.statistics or {}
                     result = {
                         "source": config["name"],
                         "status": "success",
@@ -892,6 +912,12 @@ class Command(BaseCommand):
                         "duration": duration,
                         "visited_years": [],
                         "partial_year": None,
+                        "openalex_works_count": src_stats.get("openalex_works_count"),
+                        "openalex_fetched_at": (src_stats.get("openalex_fetched_at") or "")[:10],
+                        "oai_works_count": src_stats.get("oai_works_count"),
+                        "oai_fetched_at": (src_stats.get("oai_fetched_at") or "")[:10],
+                        "crossref_works_count": src_stats.get("crossref_works_count"),
+                        "crossref_fetched_at": (src_stats.get("crossref_fetched_at") or "")[:10],
                     }
                     if source_type in ("oai-pmh", "ojs", "janeway") and oai_result:
                         result["visited_years"] = oai_result.get("visited_years", [])
@@ -949,6 +975,18 @@ class Command(BaseCommand):
                     self.style.SUCCESS(f"✓ {result['source']}  —  {pub} new, {skipped} skipped  ({dur:.1f}s)")
                 )
                 self.stdout.write(f"  Spatial: {spatial}/{pub}  |  Temporal: {temporal}/{pub}")
+                oa_count = result.get("openalex_works_count")
+                if oa_count is not None:
+                    oa_date = result.get("openalex_fetched_at", "")
+                    self.stdout.write(f"  OpenAlex: {oa_count:,} total works (as of {oa_date})")
+                oai_count = result.get("oai_works_count")
+                if oai_count is not None:
+                    oai_date = result.get("oai_fetched_at", "")
+                    self.stdout.write(f"  OAI-PMH:  {oai_count:,} total records (as of {oai_date})")
+                crossref_count = result.get("crossref_works_count")
+                if crossref_count is not None:
+                    crossref_date = result.get("crossref_fetched_at", "")
+                    self.stdout.write(f"  Crossref: {crossref_count:,} total works (as of {crossref_date})")
                 visited = result.get("visited_years", [])
                 partial = result.get("partial_year")
                 if visited:
@@ -1027,7 +1065,9 @@ class Command(BaseCommand):
                 is_preprint=config.get("is_preprint", False),
                 default_work_type=config.get("default_work_type", "article"),
                 openalex_id=config.get("openalex_id"),
+                doi_prefix=config.get("doi_prefix") or config.get("crossref_prefix"),
                 issn_l=config.get("issn_l"),
+                source_titles=config.get("source_titles") or None,
                 harvest_interval_minutes=0,
             )
             self.stdout.write(self.style.SUCCESS(f"+ {key:15} created (id={source.id}, name={source.name!r})"))
@@ -1079,8 +1119,9 @@ class Command(BaseCommand):
             is_preprint=config.get("is_preprint", False),
             default_work_type=config.get("default_work_type", "article"),
             openalex_id=config.get("openalex_id"),
-            doi_prefix=config.get("doi_prefix"),
+            doi_prefix=config.get("doi_prefix") or config.get("crossref_prefix"),
             issn_l=config.get("issn_l"),
+            source_titles=config.get("source_titles") or None,
             harvest_interval_minutes=0,
         )
 
@@ -1111,13 +1152,28 @@ class Command(BaseCommand):
                 source.collection = col
                 update_fields.append("collection")
 
-        for field in ("homepage_url", "publisher_name", "default_work_type", "openalex_id", "doi_prefix", "issn_l"):
+        for field in (
+            "homepage_url",
+            "publisher_name",
+            "default_work_type",
+            "openalex_id",
+            "doi_prefix",
+            "issn_l",
+            "source_titles",
+        ):
             new_value = config.get(field)
             if not new_value or getattr(source, field):
                 continue
             self.stdout.write(f"  Filled blank {field}: {new_value!r}")
             setattr(source, field, new_value)
             update_fields.append(field)
+
+        # Populate doi_prefix from crossref_prefix when not set explicitly.
+        if not source.doi_prefix and config.get("crossref_prefix"):
+            source.doi_prefix = config["crossref_prefix"]
+            self.stdout.write(f"  Filled blank doi_prefix from crossref_prefix: {source.doi_prefix!r}")
+            if "doi_prefix" not in update_fields:
+                update_fields.append("doi_prefix")
 
         if update_fields:
             source.save(update_fields=update_fields)

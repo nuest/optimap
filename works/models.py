@@ -697,6 +697,18 @@ class Source(models.Model):
             "Overrides the hardcoded fallback in harvest_crossref_prefix."
         ),
     )
+    source_titles = models.JSONField(
+        blank=True,
+        null=True,
+        help_text=(
+            "Optional list of Crossref container-title filter values "
+            '(e.g. ["Scientific Data"] or ["AGILE: GIScience Series"]). '
+            "Required when doi_prefix covers multiple journals (e.g. 10.1038 = all Springer Nature) "
+            "to restrict Crossref harvesting and stats to the target journal only. "
+            "Leave blank for prefix-only sources (e.g. Copernicus 10.5194). "
+            "Auto-populated from SOURCE_CONFIG; manual edits are preserved."
+        ),
+    )
     publisher_name = models.CharField(
         max_length=255,
         blank=True,
@@ -707,6 +719,17 @@ class Source(models.Model):
         blank=True,
         null=True,
         help_text="Auto-populated statistic (display only).",
+    )
+    statistics = models.JSONField(
+        blank=True,
+        null=True,
+        help_text=(
+            "Auto-populated harvest statistics. Stored as JSON; holds: "
+            "`openalex_works_count` / `openalex_fetched_at` (OpenAlex, when openalex_id is set), "
+            "`oai_works_count` / `oai_fetched_at` (OAI-PMH completeListSize, OAI source types only), "
+            "`crossref_works_count` / `crossref_fetched_at` (Crossref rows=0 count, crossref-prefix type only). "
+            "All timestamps are ISO-8601. Populated automatically after each harvest."
+        ),
     )
     homepage_url = models.URLField(
         max_length=512,

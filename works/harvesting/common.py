@@ -14,7 +14,10 @@ This module contains:
 
 import logging
 import re
+import xml.etree.ElementTree as ET
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
+import requests
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
@@ -402,8 +405,202 @@ def resolve_user(user):
 def count_spatial_temporal(event):
     """Return ``(spatial_count, temporal_count)`` for works attached to ``event``."""
     spatial = Work.objects.filter(job=event).exclude(geometry__isnull=True).count()
-    temporal = Work.objects.filter(job=event).exclude(timeperiod_startdate=[]).count()
+    temporal = (
+        Work.objects.filter(job=event)
+        .exclude(timeperiod_startdate__isnull=True)
+        .exclude(timeperiod_startdate=[])
+        .count()
+    )
     return spatial, temporal
+
+
+_OPENALEX_SOURCES_URL = "https://api.openalex.org/sources/{source_id}"
+_OPENALEX_SOURCE_STATS_TIMEOUT = 15
+
+_OAI_TYPES = frozenset(("oai-pmh", "ojs", "janeway"))
+_OAI_STATS_TIMEOUT = 30
+_OAI_NS = {"oai": "http://www.openarchives.org/OAI/2.0/"}
+
+_CROSSREF_WORKS_URL = "https://api.crossref.org/works"
+_CROSSREF_STATS_TIMEOUT = 60  # matches _crossref_session() default; broad-prefix queries can be slow
+_CROSSREF_TYPES = frozenset(("crossref-prefix",))
+
+
+def fetch_and_store_openalex_source_stats(source) -> str | None:
+    """Fetch `works_count` from OpenAlex for *source* and persist it in ``source.statistics``.
+
+    No-op (returns ``None``) when ``source`` is ``None`` or has no ``openalex_id``.
+    Network errors are logged at WARNING level and swallowed so a stats-fetch
+    failure never aborts a harvest.
+
+    Returns a one-line human-readable summary of what happened (suitable for
+    appending to a ``HarvestingEvent.log_text``) or ``None`` when no action
+    was taken.
+    """
+    if not source or not source.openalex_id:
+        return None
+    raw_id = source.openalex_id.strip().rstrip("/")
+    source_id = raw_id.rsplit("/", 1)[-1] if "/" in raw_id else raw_id
+    if not source_id:
+        return None
+    url = _OPENALEX_SOURCES_URL.format(source_id=source_id)
+    try:
+        resp = requests.get(
+            url,
+            timeout=_OPENALEX_SOURCE_STATS_TIMEOUT,
+            headers={"User-Agent": settings.OPTIMAP_USER_AGENT, "Accept": "application/json"},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as exc:  # noqa: BLE001
+        msg = f"Could not fetch OpenAlex source stats for {source.name} ({source_id}): {exc}"
+        logger.info(msg)
+        return f"🟡 WARNING: OpenAlex stats — {msg}"
+
+    works_count = data.get("works_count")
+    if works_count is None:
+        return None
+
+    from works.models import Source  # local import avoids circular import at module level
+
+    current_stats = Source.objects.filter(pk=source.pk).values_list("statistics", flat=True).first() or {}
+    fetched_at = timezone.now()
+    updated = {**current_stats, "openalex_works_count": works_count, "openalex_fetched_at": fetched_at.isoformat()}
+    Source.objects.filter(pk=source.pk).update(statistics=updated)
+    logger.info("Stored OpenAlex works_count=%d for source %s", works_count, source.name)
+    return (
+        f"🔵 INFO: OpenAlex stats — {source.name}: "
+        f"{works_count:,} total works in OpenAlex (fetched {fetched_at:%Y-%m-%d})"
+    )
+
+
+def fetch_and_store_oai_works_count(source) -> str | None:
+    """Fetch the total record count from an OAI-PMH endpoint via ``ListIdentifiers``
+    and persist it in ``source.statistics`` as ``oai_works_count``.
+
+    Uses the ``completeListSize`` attribute of the ``<resumptionToken>`` element
+    from the first response page — a single lightweight request, no pagination.
+    Falls back to counting ``<header>`` elements when all records fit in one page.
+
+    Uses the same bot-protection-aware session as the OAI harvester so that
+    endpoints behind Cloudflare / BunkerWeb PoW challenges (e.g. GEO-LEO) are
+    handled correctly.
+
+    No-op for non-OAI source types or when ``source`` is ``None``.
+    Network / parse errors are logged at INFO and swallowed.
+    """
+    if not source or source.source_type not in _OAI_TYPES:
+        return None
+
+    parsed = urlparse(source.url_field or "")
+    if not parsed.scheme:
+        return None
+
+    orig_params = parse_qs(parsed.query, keep_blank_values=False)
+    new_params: dict = {"verb": "ListIdentifiers", "metadataPrefix": "oai_dc"}
+    if "set" in orig_params:
+        new_params["set"] = orig_params["set"][0]
+
+    url = urlunparse(parsed._replace(query=urlencode(new_params)))
+
+    from works.harvesting.sessions import (  # local import avoids circular at module level
+        _oai_session,
+        _try_solve_pow_challenge,
+    )
+
+    session = _oai_session()
+    try:
+        resp = session.get(url, timeout=_OAI_STATS_TIMEOUT)
+        if resp.status_code == 403 and _try_solve_pow_challenge(session, resp):
+            resp = session.get(url, timeout=_OAI_STATS_TIMEOUT)
+        resp.raise_for_status()
+        root = ET.fromstring(resp.content)
+    except Exception as exc:  # noqa: BLE001
+        msg = f"Could not fetch OAI-PMH record count for {source.name}: {exc}"
+        logger.info(msg)
+        return f"🟡 WARNING: OAI stats — {msg}"
+
+    token = root.find(".//oai:resumptionToken", _OAI_NS)
+    if token is not None:
+        size_str = token.get("completeListSize")
+        if not size_str:
+            return None
+        try:
+            count = int(size_str)
+        except ValueError:
+            return None
+    else:
+        # All records fit in one page — count the headers directly.
+        headers = root.findall(".//oai:header", _OAI_NS)
+        count = len(headers)
+        if count == 0:
+            return None
+
+    from works.models import Source  # local import avoids circular import at module level
+
+    current_stats = Source.objects.filter(pk=source.pk).values_list("statistics", flat=True).first() or {}
+    fetched_at = timezone.now()
+    updated = {**current_stats, "oai_works_count": count, "oai_fetched_at": fetched_at.isoformat()}
+    Source.objects.filter(pk=source.pk).update(statistics=updated)
+    logger.info("Stored OAI works_count=%d for source %s", count, source.name)
+    return (
+        f"🔵 INFO: OAI stats — {source.name}: "
+        f"{count:,} total records in OAI-PMH endpoint (fetched {fetched_at:%Y-%m-%d})"
+    )
+
+
+def fetch_and_store_crossref_works_count(source) -> str | None:
+    """Fetch total works count from Crossref for a ``crossref-prefix`` source.
+
+    Builds a ``filter=prefix:{doi_prefix}`` query (plus optional
+    ``container-title`` clauses from ``source.source_titles``) with ``rows=0``
+    so Crossref returns only the ``message.total-results`` count — a single
+    lightweight request.
+
+    No-op for non-Crossref source types, sources without ``doi_prefix``, or
+    when ``source`` is ``None``. Network errors are logged at INFO and swallowed.
+    """
+    if not source or source.source_type not in _CROSSREF_TYPES:
+        return None
+    doi_prefix = getattr(source, "doi_prefix", None)
+    if not doi_prefix:
+        return None
+
+    filter_parts = [f"prefix:{doi_prefix}"]
+    for title in getattr(source, "source_titles", None) or []:
+        filter_parts.append(f"container-title:{title}")
+    filter_str = ",".join(filter_parts)
+
+    from works.harvesting.sessions import _crossref_session  # local import avoids circular
+
+    session = _crossref_session()
+    try:
+        resp = session.get(
+            _CROSSREF_WORKS_URL,
+            params={"filter": filter_str, "rows": "0"},
+            timeout=_CROSSREF_STATS_TIMEOUT,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as exc:  # noqa: BLE001
+        msg = f"Could not fetch Crossref works count for {source.name}: {exc}"
+        logger.info(msg)
+        return f"🟡 WARNING: Crossref stats — {msg}"
+
+    count = (data.get("message") or {}).get("total-results")
+    if count is None:
+        return None
+
+    from works.models import Source  # local import avoids circular import at module level
+
+    current_stats = Source.objects.filter(pk=source.pk).values_list("statistics", flat=True).first() or {}
+    fetched_at = timezone.now()
+    updated = {**current_stats, "crossref_works_count": count, "crossref_fetched_at": fetched_at.isoformat()}
+    Source.objects.filter(pk=source.pk).update(statistics=updated)
+    logger.info("Stored Crossref works_count=%d for source %s", count, source.name)
+    return (
+        f"🔵 INFO: Crossref stats — {source.name}: {count:,} total works in Crossref (fetched {fetched_at:%Y-%m-%d})"
+    )
 
 
 def complete_harvest(event, stats, warning_collector, spatial_count=None, temporal_count=None):
@@ -432,6 +629,20 @@ def complete_harvest(event, stats, warning_collector, spatial_count=None, tempor
     event.records_with_temporal = temporal_count
     event.log_text = warning_collector.get_summary()
     event.save()
+    source = event.source if event else None
+    stat_lines = list(
+        filter(
+            None,
+            [
+                fetch_and_store_openalex_source_stats(source),
+                fetch_and_store_oai_works_count(source),
+                fetch_and_store_crossref_works_count(source),
+            ],
+        )
+    )
+    if stat_lines:
+        event.log_text = (event.log_text or "") + "\n\n" + "\n".join(stat_lines)
+        event.save(update_fields=["log_text"])
     return spatial_count, temporal_count
 
 

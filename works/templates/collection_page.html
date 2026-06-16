@@ -104,6 +104,70 @@
               </a>
             </div>
           </div>
+          {% if source_stats %}
+          <div class="mt-2 pt-2 border-top small" id="collection-source-stats">
+            <a class="text-body"
+               data-toggle="collapse"
+               href="#collection-source-stats-list"
+               role="button"
+               aria-expanded="false"
+               aria-controls="collection-source-stats-list">
+              <strong>Sources ({{ source_stats|length }})</strong>
+              <span class="text-muted ml-1">&#9660;</span>
+            </a>
+            <div class="collapse mt-1" id="collection-source-stats-list">
+              <table class="table table-sm table-borderless mb-0" style="font-size:0.85em">
+                <thead class="thead-light">
+                  <tr>
+                    <th scope="col">Source</th>
+                    <th scope="col" class="text-right"><abbr title="Works from this source in OPTIMAP that are not yet published (Draft, Harvested, or Contributed)">Pending</abbr></th>
+                    <th scope="col" class="text-right"><abbr title="Works from this source published in OPTIMAP">Published</abbr></th>
+                    <th scope="col" class="text-right"><abbr title="Total records in OAI-PMH set / Crossref / OpenAlex (upstream, not in OPTIMAP)">Upstream total</abbr></th>
+                    <th scope="col" class="text-muted">As of</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for stat in source_stats %}
+                  <tr>
+                    <td>{{ stat.name }}</td>
+                    <td class="text-right">
+                      {% with hc=stat.harvested_count|add:stat.contributed_count|add:stat.draft_count %}
+                        {% if hc %}{{ hc }}{% else %}<span class="text-muted">—</span>{% endif %}
+                      {% endwith %}
+                    </td>
+                    <td class="text-right">
+                      {% if stat.published_count %}{{ stat.published_count }}{% else %}<span class="text-muted">—</span>{% endif %}
+                    </td>
+                    <td class="text-right">
+                      {% if stat.has_oai_count %}
+                        <abbr title="Total records in OAI-PMH set (may be lower than OpenAlex when older volumes are on another platform)">{{ stat.oai_works_count }} <small class="text-muted">OAI</small></abbr>
+                      {% elif stat.is_oai %}
+                        <span class="text-muted">OAI pending</span>
+                      {% endif %}
+                      {% if stat.has_openalex_count %}
+                        {% if stat.has_oai_count or stat.is_oai %}&thinsp;{% endif %}
+                        <abbr title="Total works indexed by OpenAlex (may include older volumes not in the OAI set)">{{ stat.openalex_works_count }} <small class="text-muted">OA</small></abbr>
+                      {% elif stat.openalex_id %}
+                        <span class="text-muted">OA pending</span>
+                      {% endif %}
+                      {% if stat.has_crossref_count %}
+                        <abbr title="Total DOIs in Crossref matching this source's prefix{% if stat.source_type == 'crossref-prefix' %} and title filter{% endif %}">{{ stat.crossref_works_count }} <small class="text-muted">CR</small></abbr>
+                      {% elif stat.is_crossref %}
+                        <span class="text-muted">CR pending</span>
+                      {% endif %}
+                    </td>
+                    <td class="text-muted">
+                      {% if stat.oai_fetched_at %}{{ stat.oai_fetched_at }}{% endif %}
+                      {% if stat.openalex_fetched_at and stat.openalex_fetched_at != stat.oai_fetched_at %}{% if stat.oai_fetched_at %} / {% endif %}{{ stat.openalex_fetched_at }}{% endif %}
+                      {% if stat.crossref_fetched_at and stat.crossref_fetched_at != stat.oai_fetched_at and stat.crossref_fetched_at != stat.openalex_fetched_at %}{% if stat.oai_fetched_at or stat.openalex_fetched_at %} / {% endif %}{{ stat.crossref_fetched_at }}{% endif %}
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          {% endif %}
           {% if can_curate %}
           <form id="collection-logo-form"
                 style="display: none;"

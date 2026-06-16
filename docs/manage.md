@@ -29,9 +29,10 @@ The change form is grouped into five fieldsets, mirrored below. **Only the three
 | | `default_work_type` | Defaulted to `article` | Default `Work.type` for harvested works (overridden by OpenAlex metadata when present). |
 | **OpenAlex / external IDs** | `openalex_id` | **Yes for `source_type=openalex`**, optional otherwise | OpenAlex Source identifier (`S<digits>`, or the full `https://openalex.org/S<id>` URL). The display URL exposed by the public Source API as `openalex_url` is derived from this field on the fly. |
 | | `doi_prefix` | **Yes for `crossref-prefix` and `geoscienceworld`**, ignored otherwise | DOI prefix used by Crossref-based harvesters, e.g. `10.1190` (SEG) or `10.5194` (Copernicus). Replaces the old hardcoded Copernicus fallback. |
+| | `source_titles` | Optional, `crossref-prefix` only | JSON list of Crossref `container-title` filter values (e.g. `["Scientific Data"]`). Required when `doi_prefix` covers a broad prefix (e.g. `10.1038` = all Springer Nature) to restrict both harvesting and Crossref stats to the target journal. Auto-populated from `SOURCE_CONFIG`. |
 | | `issn_l`, `abbreviated_title` | Optional | Display only. |
 | **Display metadata** | `publisher_name`, `homepage_url`, `is_oa`, `is_preprint`, `tags` | Optional | Display only — none of these affect harvesting. |
-| **Statistics (auto-populated)** | `works_count`, `cited_by_count`, `last_harvest` | Read-only | Auto-populated. |
+| **Statistics (auto-populated)** | `works_count`, `cited_by_count`, `last_harvest`, `statistics` | Read-only | Auto-populated. `statistics` is a JSON field holding `openalex_works_count` / `openalex_fetched_at` (when `openalex_id` is set), `oai_works_count` / `oai_fetched_at` (OAI sources), and `crossref_works_count` / `crossref_fetched_at` (`crossref-prefix` sources). |
 
 > **Auto-scheduling rule:** A `Source` runs on a Django-Q schedule only when *both* `source_type` is a schedulable kind (i.e. listed in `Source.SOURCE_TYPE_TASKS`, which today covers all current types) *and* `harvest_interval_minutes > 0`. Saving the source creates / updates the `Schedule` named `Harvest Source <id>`. Setting the interval back to `0` removes the schedule. The change page also lists the five most recent `HarvestingEvent`s inline.
 
@@ -53,6 +54,7 @@ For each type, only mandatory and type-specific fields are listed; defaults / di
 
 - **`url_field`** — display only. Set it to something representative, e.g. `https://api.crossref.org/works?filter=prefix:10.5194`.
 - **`doi_prefix`** — the DOI prefix to filter on (e.g. `10.5194`). Falls back to `10.5194` if blank for backwards compatibility.
+- **`source_titles`** — optional JSON list of Crossref `container-title` filter values. Required for broad prefixes (e.g. `["Scientific Data"]` for 10.1038). Auto-populated from `SOURCE_CONFIG`; manual edits are preserved. Also drives the per-harvest Crossref total-works-count stat.
 - Harvest with `python manage.py harvest_sources --source copernicus [--source-title "<title>"]` to filter to a specific container title.
 
 ##### GeoScienceWorld (`geoscienceworld`)
@@ -93,13 +95,18 @@ The **AGILE GIS** collection (`/collections/agile-gis/`) is fed by two `SOURCE_C
 
 | Key | Source name | Publisher | Years | harvest task |
 |-----|------------|-----------|-------|-------------|
-| `agile-giss-crossref` | AGILE: GIScience Series (Crossref) | Copernicus | 2020–present | `harvest_crossref_prefix` |
-| `agile-springer-lncs` | AGILE: Springer LNCS Proceedings | Springer | 2008–2019 | `harvest_crossref_book_list` |
+| `agile-giss` | AGILE: GIScience Series (Crossref) | Copernicus | 2020–present | `harvest_crossref_prefix` |
+| `agile-gis-lncs` | AGILE: Springer LNCS Proceedings | Springer | 2008–2019 | `harvest_crossref_book_list` |
 
 Run both with:
 ```bash
-python manage.py harvest_sources --source agile-giss-crossref
-python manage.py harvest_sources --source agile-springer-lncs
+python manage.py harvest_sources --source-prefix agile-gis
+```
+
+Or individually:
+```bash
+python manage.py harvest_sources --source agile-giss
+python manage.py harvest_sources --source agile-gis-lncs
 ```
 
 The Springer source uses `harvest_crossref_book_list` — it iterates over 12 hardcoded ISBNs (one per conference year), calling `filter=prefix:10.1007,isbn:{isbn}` for each, and merges all results into a single `HarvestingEvent`. Springer chapters carry no spatial/temporal metadata from Crossref or from publisher landing pages; geometry can be contributed by users via the contribution workflow at `/contribute/`.
@@ -120,7 +127,7 @@ Minimum-viable example for **AGILE GIScience Series (Copernicus via OpenAlex)**:
 | `collection` | optional — pick or create `agile-gis` |
 | `publisher_name`, `homepage_url` | optional display fields |
 
-> **Common error:** if you create the source with `source_type=oai-pmh` and the AGILE-GISS OAI URL (`https://oai-pmh.copernicus.org/oai.php?…&set=agile-giss`), the harvester will fail with HTTP 404 — Copernicus's OAI-PMH endpoint has been dark since 2025-12. Switch `source_type` to `crossref-prefix` with `doi_prefix=10.5194` and `source_titles=["AGILE: GIScience Series"]`, or use the `agile-giss-crossref` built-in entry.
+> **Common error:** if you create the source with `source_type=oai-pmh` and the AGILE-GISS OAI URL (`https://oai-pmh.copernicus.org/oai.php?…&set=agile-giss`), the harvester will fail with HTTP 404 — Copernicus's OAI-PMH endpoint has been dark since 2025-12. Switch `source_type` to `crossref-prefix` with `doi_prefix=10.5194` and `source_titles=["AGILE: GIScience Series"]`, or use the `agile-giss` built-in entry.
 > **Faster than typing it in:** `python manage.py harvest_sources --insert-sources` creates both AGILE source rows (and every other built-in entry from `SOURCE_CONFIG`) idempotently — see "Bootstrap the admin from the source config" below. Only do the manual admin route when you need a source that's not in `SOURCE_CONFIG`.
 
 > **Source.collection is optional at create time, but always populated by the time the first harvest finishes.** Leaving the collection field blank when you create a Source is **not** an error:

@@ -216,10 +216,9 @@ def parse_oai_xml_and_save_works(
                         )
                         if created:
                             logger.debug("Created new source with ISSN %s", issn_text)
-            elif publisher_value:
-                src_obj, created = Source.objects.get_or_create(name=publisher_value)
-                if created:
-                    logger.debug("Created new source by name: %s", publisher_value)
+            # Publisher-name-only auto-creation removed: bare publisher strings are
+            # unreliable identifiers (platform names, not journal names) and override
+            # the explicitly configured source. ISSN-based matching above is sufficient.
 
             geom_obj = GeometryCollection()
             period_start, period_end = [], []

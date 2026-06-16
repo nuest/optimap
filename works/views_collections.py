@@ -17,7 +17,7 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
@@ -25,7 +25,7 @@ from django.utils.cache import add_never_cache_headers
 from django.utils.html import strip_tags
 from django.views.decorators.http import require_POST
 
-from .models import STATUS_CHOICES, Collection, Work
+from .models import STATUS_CHOICES, Collection, Source, Work
 
 User = get_user_model()
 from .seo import coins_title
@@ -133,6 +133,7 @@ def collection_page(request, collection_slug):
     publishable_count = Work.objects.filter(collections=collection, status__in=["h", "c"]).count() if is_admin else 0
     # Count of the above that also have at least one real geometry or temporal value.
     publishable_geo_count = 0
+    source_stats = []
     if is_admin:
         candidate_qs = Work.objects.filter(collections=collection, status__in=["h", "c"]).only(
             "geometry", "timeperiod_startdate", "timeperiod_enddate"
@@ -144,6 +145,52 @@ def collection_page(request, collection_slug):
             or any(d is not None for d in (w.timeperiod_startdate or []))
             or any(d is not None for d in (w.timeperiod_enddate or []))
         )
+        oai_types = {"oai-pmh", "ojs", "janeway"}
+        # Include sources whose default collection is this one (FK) AND any
+        # source that actually has works here — the two sets can diverge (e.g.
+        # an intermediary platform harvested under a different Source record).
+        sources = list(
+            Source.objects.filter(
+                Q(collection=collection) | Q(works__collections=collection)
+            ).distinct()
+        )
+        # Per-source work counts in OPTIMAP — single query, avoid N+1.
+        status_counts = (
+            Work.objects.filter(collections=collection, source__in=sources)
+            .values("source_id", "status")
+            .annotate(n=Count("id"))
+        )
+        counts_by_source: dict[int, dict[str, int]] = {}
+        for row in status_counts:
+            counts_by_source.setdefault(row["source_id"], {})[row["status"]] = row["n"]
+        for src in sources:
+            stats_data = src.statistics or {}
+            oa_count = stats_data.get("openalex_works_count")
+            oai_count = stats_data.get("oai_works_count")
+            crossref_count = stats_data.get("crossref_works_count")
+            sc = counts_by_source.get(src.pk, {})
+            source_stats.append(
+                {
+                    "name": src.name,
+                    "source_type": src.source_type,
+                    "openalex_id": src.openalex_id,
+                    "has_openalex_count": oa_count is not None,
+                    "openalex_works_count": oa_count,
+                    "openalex_fetched_at": stats_data.get("openalex_fetched_at", "")[:10],
+                    "is_oai": src.source_type in oai_types,
+                    "has_oai_count": oai_count is not None,
+                    "oai_works_count": oai_count,
+                    "oai_fetched_at": stats_data.get("oai_fetched_at", "")[:10],
+                    "is_crossref": src.source_type == "crossref-prefix",
+                    "has_crossref_count": crossref_count is not None,
+                    "crossref_works_count": crossref_count,
+                    "crossref_fetched_at": stats_data.get("crossref_fetched_at", "")[:10],
+                    "harvested_count": sc.get("h", 0),
+                    "contributed_count": sc.get("c", 0),
+                    "draft_count": sc.get("d", 0),
+                    "published_count": sc.get("p", 0),
+                }
+            )
 
     context = {
         "collection": collection,
@@ -158,6 +205,8 @@ def collection_page(request, collection_slug):
         "can_edit_description": is_admin or is_curator,
         "publishable_count": publishable_count,
         "publishable_geo_count": publishable_geo_count,
+        "work_count_total": page_obj.paginator.count,
+        "source_stats": source_stats,
         "canonical_url": request.build_absolute_uri(collection.get_absolute_url()),
         "curators": list(collection.curators.all()),
     }

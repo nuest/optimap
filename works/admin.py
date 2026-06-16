@@ -443,6 +443,55 @@ class RecentHarvestingEventInline(admin.TabularInline):
         return False
 
 
+class OpenAlexIdFilter(admin.SimpleListFilter):
+    title = "OpenAlex ID"
+    parameter_name = "has_openalex_id"
+
+    def lookups(self, request, model_admin):
+        return [
+            ("yes", "Has OpenAlex ID"),
+            ("no", "No OpenAlex ID"),
+        ]
+
+    def queryset(self, request, queryset):
+        from django.db.models import Q
+
+        if self.value() == "yes":
+            return queryset.exclude(openalex_id__isnull=True).exclude(openalex_id="")
+        if self.value() == "no":
+            return queryset.filter(Q(openalex_id__isnull=True) | Q(openalex_id=""))
+        return queryset
+
+
+class OpenAlexStatsFilter(admin.SimpleListFilter):
+    title = "OpenAlex stats"
+    parameter_name = "openalex_stats"
+
+    def lookups(self, request, model_admin):
+        return [
+            ("fetched", "Count fetched"),
+            ("pending", "ID set, no count yet"),
+            ("none", "No OpenAlex ID"),
+        ]
+
+    def queryset(self, request, queryset):
+        from django.db.models import Q
+
+        if self.value() == "fetched":
+            return queryset.exclude(statistics__isnull=True).exclude(
+                **{"statistics__openalex_works_count__isnull": True}
+            )
+        if self.value() == "pending":
+            return (
+                queryset.exclude(openalex_id__isnull=True)
+                .exclude(openalex_id="")
+                .filter(Q(statistics__isnull=True) | Q(**{"statistics__openalex_works_count__isnull": True}))
+            )
+        if self.value() == "none":
+            return queryset.filter(Q(openalex_id__isnull=True) | Q(openalex_id=""))
+        return queryset
+
+
 @admin.register(Source)
 class SourceAdmin(admin.ModelAdmin):
     list_display = (
@@ -455,8 +504,11 @@ class SourceAdmin(admin.ModelAdmin):
         "harvest_interval_minutes",
         "latest_event_status",
         "events_count",
+        "openalex_works_count_display",
+        "oai_works_count_display",
+        "crossref_works_count_display",
     )
-    list_filter = ("source_type", "is_oa", "is_preprint", "default_work_type", "collection")
+    list_filter = ("source_type", "is_oa", "is_preprint", "default_work_type", "collection", OpenAlexStatsFilter)
     search_fields = ("name", "url_field", "issn_l", "publisher_name", "openalex_id", "collection__name")
     actions = [trigger_harvesting_for_specific, trigger_harvesting_for_all, schedule_harvesting]
     inlines = [RecentHarvestingEventInline]
@@ -513,12 +565,12 @@ class SourceAdmin(admin.ModelAdmin):
         (
             "Statistics (auto-populated)",
             {
-                "fields": ("works_count", "cited_by_count", "last_harvest"),
+                "fields": ("works_count", "cited_by_count", "last_harvest", "statistics"),
                 "classes": ("collapse",),
             },
         ),
     )
-    readonly_fields = ("last_harvest",)
+    readonly_fields = ("last_harvest", "statistics")
 
     @admin.display(description="Latest event")
     def latest_event_status(self, obj):
@@ -532,6 +584,44 @@ class SourceAdmin(admin.ModelAdmin):
     @admin.display(description="# events")
     def events_count(self, obj):
         return obj.harvesting_events.count()
+
+    @admin.display(description="OA works (total)")
+    def openalex_works_count_display(self, obj):
+        has_id = bool(obj.openalex_id and obj.openalex_id.strip())
+        if not has_id:
+            return format_html("<span style='color:#bbb'>no ID</span>")
+        stats = obj.statistics or {}
+        count = stats.get("openalex_works_count")
+        if count is None:
+            return format_html("<span style='color:#aaa'>pending</span>")
+        fetched_at = stats.get("openalex_fetched_at", "")
+        date_part = fetched_at[:10] if fetched_at else ""
+        return format_html("{} <small style='color:#888'>({})</small>", f"{count:,}", date_part)
+
+    @admin.display(description="OAI records (total)")
+    def oai_works_count_display(self, obj):
+        oai_types = ("oai-pmh", "ojs", "janeway")
+        if obj.source_type not in oai_types:
+            return format_html("<span style='color:#bbb'>n/a</span>")
+        stats = obj.statistics or {}
+        count = stats.get("oai_works_count")
+        if count is None:
+            return format_html("<span style='color:#aaa'>pending</span>")
+        fetched_at = stats.get("oai_fetched_at", "")
+        date_part = fetched_at[:10] if fetched_at else ""
+        return format_html("{} <small style='color:#888'>({})</small>", f"{count:,}", date_part)
+
+    @admin.display(description="Crossref works (total)")
+    def crossref_works_count_display(self, obj):
+        if obj.source_type != "crossref-prefix":
+            return format_html("<span style='color:#bbb'>n/a</span>")
+        stats = obj.statistics or {}
+        count = stats.get("crossref_works_count")
+        if count is None:
+            return format_html("<span style='color:#aaa'>pending</span>")
+        fetched_at = stats.get("crossref_fetched_at", "")
+        date_part = fetched_at[:10] if fetched_at else ""
+        return format_html("{} <small style='color:#888'>({})</small>", f"{count:,}", date_part)
 
 
 @admin.register(HarvestingEvent)
@@ -767,7 +857,16 @@ class GlobalRegionAdmin(admin.ModelAdmin):
 class CollectionAdmin(admin.ModelAdmin):
     """Curated grouping of Works (e.g. mountain-wetlands, agile-gi)."""
 
-    list_display = ("name", "identifier", "short_slug", "is_published", "work_count", "curator_count", "source_count")
+    list_display = (
+        "name",
+        "identifier",
+        "short_slug",
+        "is_published",
+        "work_count",
+        "curator_count",
+        "source_count",
+        "openalex_total_works_display",
+    )
     list_filter = ("is_published",)
     search_fields = ("name", "identifier", "short_slug", "description")
     prepopulated_fields = {"identifier": ("name",)}
@@ -798,6 +897,17 @@ class CollectionAdmin(admin.ModelAdmin):
     @admin.display(description="# sources")
     def source_count(self, obj):
         return obj.sources.count()
+
+    @admin.display(description="OA works (total)")
+    def openalex_total_works_display(self, obj):
+        total = 0
+        has_any = False
+        for src in obj.sources.all():
+            count = (src.statistics or {}).get("openalex_works_count")
+            if count is not None:
+                total += count
+                has_any = True
+        return total if has_any else "—"
 
     @admin.action(description="Publish selected collections")
     def publish_collections(self, request, queryset):

@@ -1207,6 +1207,114 @@ class CollectionCuratorManagementTests(TestCase):
         self.assertNotContains(resp, "add-curator-form")
 
 
+class CollectionAdminSourceStatsTests(TestCase):
+    """Admin section on the collection landing page shows per-source OpenAlex counts."""
+
+    def setUp(self):
+        self.client = Client()
+        self.col = Collection.objects.create(
+            identifier="stat-col",
+            name="Stat Collection",
+            is_published=True,
+        )
+        self.admin = User.objects.create_user(
+            username="admin@stat.com",
+            email="admin@stat.com",
+            password="p",
+            is_staff=True,
+        )
+        self.curator = User.objects.create_user(
+            username="curator@stat.com",
+            email="curator@stat.com",
+            password="p",
+        )
+        self.col.curators.add(self.curator)
+
+        self.src_with_stats = Source.objects.create(
+            name="Journal With Stats",
+            url_field="https://example.com/oai",
+            collection=self.col,
+            openalex_id="S1234567",
+            statistics={"openalex_works_count": 842, "openalex_fetched_at": "2026-06-15T10:00:00+00:00"},
+        )
+        self.src_no_stats = Source.objects.create(
+            name="Journal Without Stats",
+            url_field="https://example.com/oai2",
+            collection=self.col,
+            openalex_id="S9999999",
+            statistics=None,
+        )
+        self.src_no_openalex = Source.objects.create(
+            name="Journal No OpenAlex",
+            url_field="https://example.com/oai3",
+            collection=self.col,
+        )
+
+    def _url(self):
+        return reverse("optimap:collection-page", args=[self.col.identifier])
+
+    def test_admin_sees_source_stats_section(self):
+        self.client.force_login(self.admin)
+        resp = self.client.get(self._url())
+        self.assertEqual(resp.status_code, 200)
+        body = resp.content.decode()
+        self.assertIn("collection-source-stats", body)
+
+    def test_admin_sees_count_for_source_with_stats(self):
+        self.client.force_login(self.admin)
+        body = self.client.get(self._url()).content.decode()
+        self.assertIn("Journal With Stats", body)
+        self.assertIn("842", body)
+        self.assertIn(">OA<", body)
+        self.assertIn("2026-06-15", body)
+
+    def test_admin_sees_no_count_placeholder_for_source_without_stats(self):
+        self.client.force_login(self.admin)
+        body = self.client.get(self._url()).content.decode()
+        self.assertIn("Journal Without Stats", body)
+        self.assertIn("OA pending", body)
+
+    def test_admin_sees_all_three_sources(self):
+        self.client.force_login(self.admin)
+        body = self.client.get(self._url()).content.decode()
+        self.assertIn("Journal With Stats", body)
+        self.assertIn("Journal Without Stats", body)
+        self.assertIn("Journal No OpenAlex", body)
+        self.assertIn("Sources (3)", body)
+
+    def test_anonymous_does_not_see_source_stats_section(self):
+        body = self.client.get(self._url()).content.decode()
+        self.assertNotIn("collection-source-stats", body)
+        self.assertNotIn(">OA<", body)
+
+    def test_curator_does_not_see_source_stats_section(self):
+        self.client.force_login(self.curator)
+        body = self.client.get(self._url()).content.decode()
+        self.assertNotIn("collection-source-stats", body)
+        self.assertNotIn(">OA<", body)
+
+    def test_no_source_stats_section_when_collection_has_no_sources(self):
+        Collection.objects.create(identifier="empty-stat", name="Empty", is_published=True)
+        self.client.force_login(self.admin)
+        body = self.client.get(reverse("optimap:collection-page", args=["empty-stat"])).content.decode()
+        self.assertNotIn("collection-source-stats", body)
+
+    def test_work_count_total_shown_in_admin_section(self):
+        Work.objects.create(
+            title="W1",
+            status="p",
+            doi="10.1234/stat-w1",
+        ).collections.add(self.col)
+        Work.objects.create(
+            title="W2",
+            status="h",
+            doi="10.1234/stat-w2",
+        ).collections.add(self.col)
+        self.client.force_login(self.admin)
+        body = self.client.get(self._url()).content.decode()
+        self.assertIn("2 works total", body)
+
+
 class SourceCollectionPropagationTests(TestCase):
     """When ``Source.collection`` is set, every harvested Work is auto-added to it.
 

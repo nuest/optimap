@@ -479,8 +479,10 @@ class HarvestCrossrefBookListTests(TestCase):
             self.source.id,
             book_isbns=["978-3-030-14745-7"],
         )
-        self.assertEqual(len(responses.calls), 1)
-        called_url = responses.calls[0].request.url
+        # Harvest call has isbn in URL; stats call (rows=0) does not — filter to harvest calls only.
+        harvest_calls = [c for c in responses.calls if "isbn" in c.request.url]
+        self.assertEqual(len(harvest_calls), 1)
+        called_url = harvest_calls[0].request.url
         self.assertIn("isbn", called_url)
         self.assertIn("9783030147457", called_url.replace("-", "").replace("%2D", ""))
 
@@ -505,8 +507,8 @@ class HarvestCrossrefBookListTests(TestCase):
             max_records=2,
         )
         # Stopped after first ISBN (2 records = max_records); second ISBN not requested.
-        # At most 2 Crossref API calls (one for chapters, one abstract attempt).
-        api_calls = [c for c in responses.calls if "api.crossref.org" in c.request.url]
+        # Count only harvest calls (isbn filter); exclude trailing stats request (rows=0).
+        api_calls = [c for c in responses.calls if "api.crossref.org" in c.request.url and "isbn" in c.request.url]
         self.assertEqual(len(api_calls), 1)
 
     @responses.activate

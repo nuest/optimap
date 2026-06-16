@@ -361,8 +361,13 @@ def parse_crossref_response_and_save_works(
                 return saved, seen
 
         next_cursor = data.get("next-cursor")
-        if not next_cursor or next_cursor == cursor:
+        if not next_cursor:
             break
+        # Crossref sometimes returns the same cursor string for consecutive pages
+        # (observed for prefix:10.1038,container-title:Scientific Data) — the
+        # server-side result window still advances, so different items are returned.
+        # We must NOT break on cursor equality; rely on empty items or absent
+        # next-cursor to detect the true end of results.
         cursor = next_cursor
 
     return saved, seen

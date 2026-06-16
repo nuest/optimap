@@ -703,11 +703,17 @@ class ChunkedHarvestingTests(TestCase):
         )
         harvest_oai_endpoint(src.id)
 
-        oai_calls = [c for c in responses.calls if "example.com/oai-explicit" in c.request.url]
-        self.assertEqual(len(oai_calls), 1, "Exactly one request when URL has an explicit date filter")
-        self.assertNotIn("verb=Identify", oai_calls[0].request.url)
-        self.assertIn("from=2020-01-01", oai_calls[0].request.url)
-        self.assertEqual(oai_calls[0].request.url.count("from="), 1)
+        # Filter to ListRecords harvest calls only; a separate ListIdentifiers stats
+        # probe runs after harvest completion and must not be counted here.
+        harvest_calls = [
+            c
+            for c in responses.calls
+            if "example.com/oai-explicit" in c.request.url and "ListRecords" in c.request.url
+        ]
+        self.assertEqual(len(harvest_calls), 1, "Exactly one harvest request when URL has an explicit date filter")
+        self.assertNotIn("verb=Identify", harvest_calls[0].request.url)
+        self.assertIn("from=2020-01-01", harvest_calls[0].request.url)
+        self.assertEqual(harvest_calls[0].request.url.count("from="), 1)
 
 
 class RSSFeedHarvestingTests(TestCase):

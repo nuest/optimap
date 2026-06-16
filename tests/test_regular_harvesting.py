@@ -35,7 +35,10 @@ class HarvestRegularMetadataTestCase(TestCase):
         # auto-create has just produced a same-named Collection.
         self.source = Source.objects.create(
             name="Test Source",
-            url_field="https://example.com/oai?verb=ListRecords&metadataPrefix=oai_dc",
+            # Explicit date bounds bypass year-chunking; without them the
+            # harvester would generate one chunk per year since 1970 and call
+            # the mocked parser 57 times, creating duplicate DOIs.
+            url_field="https://example.com/oai?verb=ListRecords&metadataPrefix=oai_dc&from=2024-01-01&until=2024-12-31",
             tags="test,harvest",
         )
 

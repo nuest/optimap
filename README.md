@@ -339,47 +339,12 @@ This is the fastest way to bootstrap a fresh deployment so the source list shows
 python manage.py harvest_sources --all --user-email admin@optimap.science
 ```
 
-**Currently configured sources**:
+The command supports OAI-PMH, Crossref-prefix, GeoScienceWorld, MaRESS API, and OpenAlex sources,
+automatically dispatching to the correct harvester for each source.
 
-- `essd` - Earth System Science Data (OAI-PMH) ([Issue #59](https://github.com/GeoinformationSystems/optimap/issues/59))
-- `agile-giss` - AGILE-GISS conference series (OAI-PMH) ([Issue #60](https://github.com/GeoinformationSystems/optimap/issues/60))
-- `geo-leo` - GEO-LEO e-docs repository (OAI-PMH) ([Issue #13](https://github.com/GeoinformationSystems/optimap/issues/13))
-- `eartharxiv` - EarthArXiv preprint repository (OAI-PMH, ~6,000+ preprints)
-- `scientific-data` - Scientific Data (RSS/Atom) ([Issue #58](https://github.com/GeoinformationSystems/optimap/issues/58))
+**Full source list**: see [docs/sources.md](docs/sources.md) for all configured sources grouped by publisher,
+with keys, names, harvest types, and ISSN/OpenAlex identifiers.
 
-The command supports OAI-PMH, RSS/Atom, Crossref-prefix, and OpenAlex sources, automatically dispatching to the correct harvester for each source.
-
-**Harvesting EarthArxiv preprints**:
-
-EarthArxiv is a preprint server for Earth Sciences hosted by the California Digital Library. All harvested articles automatically receive metadata enrichment from OpenAlex, including author names, keywords, and topics.
-
-```bash
-# Harvest first 100 preprints for testing
-python manage.py harvest_sources --source eartharxiv --max-records 100 --create-sources
-
-# Harvest all EarthArxiv preprints (6,000+)
-python manage.py harvest_sources --source eartharxiv --create-sources
-
-# Harvest EarthArxiv along with other sources
-python manage.py harvest_sources --source eartharxiv --source essd --source geo-leo
-```
-
-EarthArxiv provides comprehensive coverage of Earth Science preprints via its OAI-PMH API endpoint. Each publication is automatically matched with OpenAlex to retrieve:
-
-- Author information
-- Keywords and subject classification
-- Citation data
-- Open access status
-- Publication topics
-
-The command provides detailed progress reporting including:
-
-- Number of publications harvested
-- Harvesting duration
-- Spatial and temporal metadata statistics
-- Success/failure status for each source
-
-When the command runs mutiple times, it will only add new publications that are not already in the database as part of the regular harvesting process.
 
 ### Create Superusers/Admin
 
