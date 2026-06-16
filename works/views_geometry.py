@@ -61,7 +61,19 @@ def contribute_geometry_by_id(request, work_id):
 
         logger.info("Received contribution request for work ID: %s, data: %s", work_id, data)
 
-        if not geojson and not temporal_extent:
+        # Normalise temporal input: accept either a single-period object
+        # (legacy ``temporal_extent``) or a list of periods
+        # (``temporal_extents``).  The list form takes precedence when both
+        # are present.
+        temporal_extents = data.get("temporal_extents")
+        if temporal_extents is not None:
+            periods = temporal_extents if isinstance(temporal_extents, list) else [temporal_extents]
+        elif temporal_extent:
+            periods = [temporal_extent]
+        else:
+            periods = []
+
+        if not geojson and not periods:
             logger.warning("No geometry or temporal extent provided in request")
             return JsonResponse({"error": "No geometry or temporal extent provided"}, status=400)
 
@@ -80,18 +92,30 @@ def contribute_geometry_by_id(request, work_id):
             )
             spatial_contributed = True
 
-        if temporal_extent:
-            start_date = temporal_extent.get("start_date")
-            end_date = temporal_extent.get("end_date")
+        if periods:
+            starts = [p.get("start_date") or None for p in periods]
+            ends = [p.get("end_date") or None for p in periods]
 
-            if start_date:
-                work.timeperiod_startdate = [start_date]
-                changes_made.append(f"Set start date to {start_date}")
+            any_start = any(s for s in starts)
+            any_end = any(e for e in ends)
+
+            if any_start:
+                work.timeperiod_startdate = starts if any_start else None
+                changes_made.append(f"Set start date(s) to {', '.join(s for s in starts if s)}")
                 temporal_contributed = True
-            if end_date:
-                work.timeperiod_enddate = [end_date]
-                changes_made.append(f"Set end date to {end_date}")
+            else:
+                work.timeperiod_startdate = None
+
+            if any_end:
+                work.timeperiod_enddate = ends if any_end else None
+                changes_made.append(f"Set end date(s) to {', '.join(e for e in ends if e)}")
                 temporal_contributed = True
+            else:
+                work.timeperiod_enddate = None
+
+            if not temporal_contributed:
+                # All fields blank — treat as no temporal input
+                periods = []
 
         # Recognition Board dedup decisions taken BEFORE we record this
         # event, so the new event doesn't count against itself.

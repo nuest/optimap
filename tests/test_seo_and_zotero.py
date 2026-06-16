@@ -381,6 +381,127 @@ class WorkLandingSEOTests(TestCase):
         self.assertEqual(resp.status_code, 404)
 
 
+@override_settings(GEOCODE_WORKS_ON_SAVE=False)
+class TemporalCoverageMetadataTests(TestCase):
+    """Verify that single and multiple time periods are emitted correctly
+    in every HTML-header metadata channel: schema.org JSON-LD
+    (temporalCoverage), and DC.temporal meta tags (issue #26)."""
+
+    def setUp(self):
+        self.client = Client()
+
+    def _soup(self, work):
+        url = reverse("optimap:work-landing", args=[work.get_identifier()])
+        return BeautifulSoup(self.client.get(url).content, "html.parser")
+
+    def _article_jsonld(self, soup):
+        blobs = _find_jsonld(soup)
+        return next((b for b in blobs if b.get("@type") == "ScholarlyArticle"), None)
+
+    def _dc_temporal(self, soup):
+        return [t["content"] for t in soup.find_all("meta", attrs={"name": "DC.temporal"})]
+
+    def test_single_period_temporalcoverage_is_string(self):
+        """Single period → temporalCoverage string (not an array)."""
+        work = _make_published_work(
+            doi="10.1234/temporal.single",
+            url="https://example.test/temporal-single",
+            timeperiod_startdate=["2010"],
+            timeperiod_enddate=["2020"],
+        )
+        article = self._article_jsonld(self._soup(work))
+        self.assertIsNotNone(article)
+        self.assertEqual(article["temporalCoverage"], "2010/2020")
+
+    def test_multiple_periods_temporalcoverage_is_array(self):
+        """Multiple periods → temporalCoverage JSON-LD array."""
+        work = _make_published_work(
+            doi="10.1234/temporal.multi",
+            url="https://example.test/temporal-multi",
+            timeperiod_startdate=["2010", "2018"],
+            timeperiod_enddate=["2015", "2020"],
+        )
+        article = self._article_jsonld(self._soup(work))
+        self.assertIsNotNone(article)
+        tc = article["temporalCoverage"]
+        self.assertIsInstance(tc, list, "multiple periods must produce a JSON-LD array")
+        self.assertEqual(tc, ["2010/2015", "2018/2020"])
+
+    def test_open_interval_period(self):
+        """Open-start interval uses '..' per ISO 8601."""
+        work = _make_published_work(
+            doi="10.1234/temporal.open",
+            url="https://example.test/temporal-open",
+            timeperiod_startdate=[None],
+            timeperiod_enddate=["2024-12-31"],
+        )
+        article = self._article_jsonld(self._soup(work))
+        self.assertIsNotNone(article)
+        self.assertEqual(article["temporalCoverage"], "../2024-12-31")
+
+    def test_no_temporal_omits_temporalcoverage(self):
+        """Works with no time period omit temporalCoverage entirely."""
+        work = _make_published_work(
+            doi="10.1234/temporal.none",
+            url="https://example.test/temporal-none",
+            timeperiod_startdate=None,
+            timeperiod_enddate=None,
+        )
+        article = self._article_jsonld(self._soup(work))
+        self.assertIsNotNone(article)
+        self.assertNotIn("temporalCoverage", article)
+
+    def test_single_period_dc_temporal_tag(self):
+        """Single period → one DC.temporal meta tag."""
+        work = _make_published_work(
+            doi="10.1234/temporal.dc.single",
+            url="https://example.test/temporal-dc-single",
+            timeperiod_startdate=["2010"],
+            timeperiod_enddate=["2020"],
+        )
+        tags = self._dc_temporal(self._soup(work))
+        self.assertEqual(tags, ["2010/2020"])
+
+    def test_multiple_periods_dc_temporal_tags(self):
+        """Multiple periods → one DC.temporal meta tag per period."""
+        work = _make_published_work(
+            doi="10.1234/temporal.dc.multi",
+            url="https://example.test/temporal-dc-multi",
+            timeperiod_startdate=["2010", "2018"],
+            timeperiod_enddate=["2015", "2020"],
+        )
+        tags = self._dc_temporal(self._soup(work))
+        self.assertEqual(tags, ["2010/2015", "2018/2020"])
+
+    def test_no_temporal_omits_dc_temporal_tag(self):
+        """Works with no time period emit no DC.temporal tags."""
+        work = _make_published_work(
+            doi="10.1234/temporal.dc.none",
+            url="https://example.test/temporal-dc-none",
+            timeperiod_startdate=None,
+            timeperiod_enddate=None,
+        )
+        tags = self._dc_temporal(self._soup(work))
+        self.assertEqual(tags, [])
+
+    def test_html_body_shows_all_periods(self):
+        """All periods appear in the #work-timeperiods element in the page body."""
+        work = _make_published_work(
+            doi="10.1234/temporal.body",
+            url="https://example.test/temporal-body",
+            timeperiod_startdate=["2010", "2018"],
+            timeperiod_enddate=["2015", "2020"],
+        )
+        soup = self._soup(work)
+        container = soup.find(id="work-timeperiods")
+        self.assertIsNotNone(container, "#work-timeperiods element missing")
+        text = container.get_text(" ", strip=True)
+        self.assertIn("2010", text)
+        self.assertIn("2015", text)
+        self.assertIn("2018", text)
+        self.assertIn("2020", text)
+
+
 class HomepageSEOTests(TestCase):
     def test_homepage_jsonld_website_with_searchaction(self):
         resp = self.client.get(reverse("optimap:main"))

@@ -10,6 +10,7 @@ from django.contrib.gis.geos import GeometryCollection, Point
 from django.test import TestCase
 
 from works.models import Source, Work
+from works.views.work_views import _format_timeperiod
 
 User = get_user_model()
 
@@ -280,3 +281,89 @@ class ContributePageFilterTests(TestCase):
         response = self.client.get("/contribute/")
         self.assertEqual(response.status_code, 200)
         self.assertNotIn(pub, response.context["works"])
+
+
+class MultipleTimePeriodsTests(TestCase):
+    """Tests for multiple time-period support (issue #26)."""
+
+    def setUp(self):
+        self.source = Source.objects.create(name="Test Source", is_oa=True, is_preprint=False)
+        self.user = get_user_model().objects.create_user(
+            username="contributor@example.com",
+            email="contributor@example.com",
+            password="testpass123",
+        )
+        self.work = Work.objects.create(
+            title="Multi-period Work",
+            status="h",
+            doi="10.1234/multi-period",
+            geometry=GeometryCollection(),
+            source=self.source,
+        )
+
+    def _post(self, payload):
+        self.client.login(username="contributor@example.com", password="testpass123")
+        url = f"/work/{self.work.doi}/contribute-geometry/"
+        return self.client.post(url, data=json.dumps(payload), content_type="application/json")
+
+    def test_contribute_multiple_periods_via_temporal_extents(self):
+        """temporal_extents list stores all periods in the parallel ArrayFields."""
+        response = self._post(
+            {
+                "temporal_extents": [
+                    {"start_date": "2010", "end_date": "2015"},
+                    {"start_date": "2018", "end_date": "2020"},
+                ]
+            }
+        )
+        self.assertEqual(response.status_code, 200)
+        self.work.refresh_from_db()
+        self.assertEqual(self.work.timeperiod_startdate, ["2010", "2018"])
+        self.assertEqual(self.work.timeperiod_enddate, ["2015", "2020"])
+
+    def test_format_timeperiod_multiple(self):
+        """_format_timeperiod joins all pairs with '; '."""
+        self.work.timeperiod_startdate = ["2010", "2018"]
+        self.work.timeperiod_enddate = ["2015", "2020"]
+        label = _format_timeperiod(self.work)
+        self.assertEqual(label, "2010 – 2015; 2018 – 2020")
+
+    def test_format_timeperiod_open_interval(self):
+        """Open-ended period uses 'from' / 'until' prefix."""
+        self.work.timeperiod_startdate = ["2010", None]
+        self.work.timeperiod_enddate = [None, "2020"]
+        label = _format_timeperiod(self.work)
+        self.assertEqual(label, "from 2010; until 2020")
+
+    def test_format_timeperiod_single(self):
+        """Single period still returns the simple 'start – end' form (no trailing ';')."""
+        self.work.timeperiod_startdate = ["2010"]
+        self.work.timeperiod_enddate = ["2020"]
+        self.assertEqual(_format_timeperiod(self.work), "2010 – 2020")
+
+    def test_format_timeperiod_empty(self):
+        """Returns None when both arrays are empty or null."""
+        self.work.timeperiod_startdate = None
+        self.work.timeperiod_enddate = None
+        self.assertIsNone(_format_timeperiod(self.work))
+
+    def test_legacy_temporal_extent_still_works(self):
+        """Legacy single-object temporal_extent key is still accepted."""
+        response = self._post({"temporal_extent": {"start_date": "2005", "end_date": "2010"}})
+        self.assertEqual(response.status_code, 200)
+        self.work.refresh_from_db()
+        self.assertEqual(self.work.timeperiod_startdate, ["2005"])
+        self.assertEqual(self.work.timeperiod_enddate, ["2010"])
+
+    def test_temporal_extents_wins_over_temporal_extent(self):
+        """When both keys present, temporal_extents takes precedence."""
+        response = self._post(
+            {
+                "temporal_extent": {"start_date": "1999", "end_date": "2000"},
+                "temporal_extents": [{"start_date": "2010", "end_date": "2015"}],
+            }
+        )
+        self.assertEqual(response.status_code, 200)
+        self.work.refresh_from_db()
+        self.assertEqual(self.work.timeperiod_startdate, ["2010"])
+        self.assertEqual(self.work.timeperiod_enddate, ["2015"])

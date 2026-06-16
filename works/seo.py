@@ -236,9 +236,9 @@ def _build_schema_org(work, request, canonical, image, authors, keywords, descri
         if getattr(work, "country_code", None):
             place["addressCountry"] = work.country_code
         payload["spatialCoverage"] = place
-    temporal = _format_temporal_iso(work)
-    if temporal:
-        payload["temporalCoverage"] = temporal
+    temporal_intervals = _temporal_iso_intervals(work)
+    if temporal_intervals:
+        payload["temporalCoverage"] = temporal_intervals[0] if len(temporal_intervals) == 1 else temporal_intervals
     payload["inLanguage"] = "en"
     return payload
 
@@ -310,17 +310,41 @@ def geo_meta_tags(work) -> list[dict]:
     return tags
 
 
-def _format_temporal_iso(work) -> str | None:
-    """Format the work's ArrayField temporal extent as an ISO 8601 interval —
-    ``start/end``, ``start/..``, or ``../end``. Returns ``None`` when both
-    sides are empty."""
+def _temporal_iso_intervals(work) -> list[str]:
+    """Return a list of ISO 8601 interval strings for all temporal periods.
+    Each entry: ``start/end``, ``start/..``, or ``../end``.
+    Returns an empty list when both arrays are empty."""
     s_list = work.timeperiod_startdate or []
     e_list = work.timeperiod_enddate or []
-    s = (s_list[0] if s_list else None) or None
-    e = (e_list[0] if e_list else None) or None
-    if not s and not e:
-        return None
-    return f"{s or '..'}/{e or '..'}"
+    n = max(len(s_list), len(e_list), 0)
+    intervals = []
+    for i in range(n):
+        s = (s_list[i] if i < len(s_list) else None) or None
+        e = (e_list[i] if i < len(e_list) else None) or None
+        if s or e:
+            intervals.append(f"{s or '..'}/{e or '..'}")
+    return intervals
+
+
+def _format_temporal_iso(work) -> str | None:
+    """Comma-separated ISO 8601 intervals — kept for backwards compat with
+    any callers that expect a single string. The JSON-LD builder uses
+    ``_temporal_iso_intervals`` directly to emit an array when needed."""
+    intervals = _temporal_iso_intervals(work)
+    return ", ".join(intervals) or None
+
+
+def dc_coverage_tags(work) -> list[dict]:
+    """Return one ``DC.temporal`` meta-tag dict per time period.
+
+    Each entry follows the ISO 8601 interval convention already used for
+    ``temporalCoverage`` in the schema.org JSON-LD payload, mirroring what
+    the OAI-PMH harvester reads from source HTML (``DC.temporal`` /
+    ``DC.PeriodOfTime``).  One tag per period lets consumers that parse
+    repeated ``DC.temporal`` tags (e.g. Zotero's Dublin Core translator)
+    ingest multi-period coverage without splitting on delimiters.
+    """
+    return [{"name": "DC.temporal", "content": iv} for iv in _temporal_iso_intervals(work)]
 
 
 def _derive_pdf_url(work) -> str | None:

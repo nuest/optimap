@@ -30,7 +30,7 @@ const _TMPL = {
   sourceAccess:  '<div><strong>Access:</strong> {access}</div>',
   sourceCited:   '<div>Cited by {count} works</div>',
   sourceWorks:   '<div>{count} works hosted</div>',
-  timeperiod:    '<div><strong>Timeperiod:</strong> from {start} to {end}</div>',
+  // timeperiod is rendered by _renderTimeperiods() — not a string template.
   workUrl:
     '<div><a href="{url}" target="_blank"><i class="fas fa-external-link-alt"></i> Visit work</a></div>',
   openalexUrl:
@@ -79,6 +79,39 @@ window.fetchWorkDetails = async function(featureId) {
 };
 
 /**
+ * Render time periods compactly for the popup (max 300 px wide).
+ * Shows up to 2 periods inline; appends "(+N more ↗)" linking to the work
+ * page when there are more than 2.
+ * @param {string[]|null} starts - timeperiod_startdate array (may be null/empty)
+ * @param {string[]|null} ends   - timeperiod_enddate array (may be null/empty)
+ * @param {string} workPath      - URL path segment for the work detail link
+ * @returns {string} HTML string.
+ */
+function _renderTimeperiods(starts, ends, workPath) {
+  const s = Array.isArray(starts) ? starts : [];
+  const e = Array.isArray(ends)   ? ends   : [];
+  const n = Math.max(s.length, e.length);
+  if (n === 0) return '';
+
+  const labels = [];
+  for (let i = 0; i < n; i++) {
+    const start = (s[i] || '').trim();
+    const end   = (e[i] || '').trim();
+    if (start && end)   labels.push(`${start} – ${end}`);
+    else if (start)     labels.push(`from ${start}`);
+    else if (end)       labels.push(`until ${end}`);
+  }
+  if (labels.length === 0) return '';
+
+  const shown = labels.slice(0, 2).join(', ');
+  const extra = labels.length - 2;
+  const overflow = extra > 0
+    ? ` <a href="/work/${workPath}/" style="color:#888;font-size:11px;">(+${extra} more &#x2197;)</a>`
+    : '';
+  return `<div><strong>Time periods:</strong> ${shown}${overflow}</div>`;
+}
+
+/**
  * Render the rich detail section of a popup (source, abstract, dates, links).
  * Exported on window so map-interaction.js can reuse it for the paginated popup.
  * @param {Object} p - Work properties object (from the full serializer).
@@ -116,8 +149,10 @@ window.renderPublicationContent = function(p, featureId) {
     }
   }
 
-  if (p.timeperiod_startdate && p.timeperiod_enddate) {
-    html += L.Util.template(_TMPL.timeperiod, { start: p.timeperiod_startdate, end: p.timeperiod_enddate });
+  if (p.timeperiod_startdate || p.timeperiod_enddate) {
+    const doi = p.doi;
+    const workPath = doi ? encodeURIComponent(doi) : featureId;
+    html += _renderTimeperiods(p.timeperiod_startdate, p.timeperiod_enddate, workPath);
   }
 
   if (p.abstract) {

@@ -149,11 +149,7 @@ def collection_page(request, collection_slug):
         # Include sources whose default collection is this one (FK) AND any
         # source that actually has works here — the two sets can diverge (e.g.
         # an intermediary platform harvested under a different Source record).
-        sources = list(
-            Source.objects.filter(
-                Q(collection=collection) | Q(works__collections=collection)
-            ).distinct()
-        )
+        sources = list(Source.objects.filter(Q(collection=collection) | Q(works__collections=collection)).distinct())
         # Per-source work counts in OPTIMAP — single query, avoid N+1.
         status_counts = (
             Work.objects.filter(collections=collection, source__in=sources)

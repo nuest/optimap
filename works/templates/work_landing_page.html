@@ -10,6 +10,9 @@
 {# Google Scholar citation_* tags. Built in works/seo.py:citation_meta_tags. #}
 {% for t in citation_tags %}<meta name="{{ t.name }}" content="{{ t.content }}" />
 {% endfor %}
+{# Dublin Core temporal coverage — one DC.temporal tag per period. Built in works/seo.py:dc_coverage_tags. #}
+{% for t in dc_coverage_tags %}<meta name="{{ t.name }}" content="{{ t.content }}" />
+{% endfor %}
 {# HTML geotagging (geo.position, ICBM, geo.placename, geo.region) — issue #222. Built in works/seo.py:geo_meta_tags. #}
 {% for t in geo_tags %}<meta name="{{ t.name }}" content="{{ t.content }}" />
 {% endfor %}{% endblock %}
@@ -192,9 +195,6 @@
   {% if authors_list %}
     <strong>Authors:</strong> {{ authors_list|join:", " }} ·
   {% endif %}
-  {% if timeperiod_label %}
-    <strong>Time period:</strong> {{ timeperiod_label }} ·
-  {% endif %}
   {% if work.placename %}
     <strong>Placename:</strong> {{ work.placename }}
     <i class="fas fa-info-circle text-muted" title="This information was derived from the geometries of the work based on the Nominatim gazetteer." aria-label="This information was derived from the geometries of the work based on the Nominatim gazetteer."></i> ·
@@ -281,6 +281,33 @@
       </li>
     {% endfor %}
   </ul>
+</div>
+{% endif %}
+
+{% if existing_periods %}
+<div class="meta muted mt-2" id="work-timeperiods">
+  <i class="fas fa-calendar-alt"></i>
+  <strong>Time period{% if existing_periods|length > 1 %}s{% endif %}:</strong>
+  {% if existing_periods|length == 1 %}
+    {% with p=existing_periods.0 %}
+      {% if p.start and p.end %}{{ p.start }} – {{ p.end }}
+      {% elif p.start %}from {{ p.start }}
+      {% elif p.end %}until {{ p.end }}
+      {% endif %}
+    {% endwith %}
+  {% else %}
+    <ul class="list-unstyled mb-0 mt-1 ml-3">
+      {% for p in existing_periods %}
+        <li>
+          <i class="fas fa-circle" style="font-size:0.4em;vertical-align:middle;color:#aaa;"></i>
+          {% if p.start and p.end %}{{ p.start }} – {{ p.end }}
+          {% elif p.start %}from {{ p.start }}
+          {% elif p.end %}until {{ p.end }}
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
 </div>
 {% endif %}
 
@@ -478,19 +505,82 @@
             <i class="fas fa-info-circle"></i> This publication already has temporal extent data. You can update it if needed.
           </div>
         {% endif %}
-        <p class="text-muted small">Provide the time period this research data covers (not the publication date).</p>
-        <div class="form-row">
-          <div class="form-group col-md-6">
-            <label for="start-date">Start date</label>
-            <input type="text" class="form-control" id="start-date" placeholder="e.g., 2010, 2010-01, 2010-01-15">
-            <small class="form-text text-muted">Formats: YYYY, YYYY-MM, or YYYY-MM-DD</small>
-          </div>
-          <div class="form-group col-md-6">
-            <label for="end-date">End date</label>
-            <input type="text" class="form-control" id="end-date" placeholder="e.g., 2020, 2020-12, 2020-12-31">
-            <small class="form-text text-muted">Formats: YYYY, YYYY-MM, or YYYY-MM-DD</small>
-          </div>
+        <p class="text-muted small">Provide the time period(s) this research data covers (not the publication date). You can add multiple periods.</p>
+        <div id="temporal-periods-list">
+          {# Rows are injected by JS on page load using existing_periods_json #}
         </div>
+        <button type="button" class="btn btn-outline-secondary btn-sm mt-1" id="add-period-btn">
+          <i class="fas fa-plus"></i> Add time period
+        </button>
+        <small class="form-text text-muted mt-1">Formats: YYYY, YYYY-MM, or YYYY-MM-DD</small>
+        <script>
+          var EXISTING_PERIODS = {{ existing_periods_json|safe }};
+
+          document.addEventListener('DOMContentLoaded', function () {
+            var list = document.getElementById('temporal-periods-list');
+            var addBtn = document.getElementById('add-period-btn');
+            if (!list || !addBtn) return;
+
+            function buildRow(start, end) {
+              var row = document.createElement('div');
+              row.className = 'form-row align-items-end period-row mb-2';
+              row.innerHTML =
+                '<div class="form-group col-md-5 mb-0">'
+                + '<label class="small text-muted">Start date</label>'
+                + '<input type="text" class="form-control period-start" placeholder="e.g., 2010" value="' + (start || '') + '">'
+                + '</div>'
+                + '<div class="form-group col-md-5 mb-0">'
+                + '<label class="small text-muted">End date</label>'
+                + '<input type="text" class="form-control period-end" placeholder="e.g., 2020" value="' + (end || '') + '">'
+                + '</div>'
+                + '<div class="form-group col-md-2 mb-0">'
+                + '<button type="button" class="btn btn-outline-danger btn-sm period-remove-btn" aria-label="Remove time period">×</button>'
+                + '</div>';
+              row.querySelector('.period-remove-btn').addEventListener('click', function () {
+                if (list.querySelectorAll('.period-row').length > 1) {
+                  row.remove();
+                } else {
+                  row.querySelectorAll('input').forEach(function (i) { i.value = ''; });
+                }
+              });
+              // Trigger submit-button state refresh on input change.
+              row.querySelectorAll('input').forEach(function (inp) {
+                inp.addEventListener('input', function () {
+                  if (typeof window._markContributionDirty === 'function') {
+                    window._markContributionDirty('contribution-submit-btn');
+                  }
+                });
+              });
+              return row;
+            }
+
+            // Expose helpers for use by the form-submit and NER handlers.
+            window._addPeriodRow = function (start, end) {
+              list.appendChild(buildRow(start, end));
+            };
+            window._getTemporalPeriods = function () {
+              var periods = [];
+              list.querySelectorAll('.period-row').forEach(function (row) {
+                var s = row.querySelector('.period-start').value.trim();
+                var e = row.querySelector('.period-end').value.trim();
+                if (s || e) periods.push({ start_date: s || null, end_date: e || null });
+              });
+              return periods;
+            };
+            window._hasTemporalRows = function () {
+              return window._getTemporalPeriods().length > 0;
+            };
+
+            // Initialise from server-rendered existing periods (or blank row).
+            var initial = (typeof EXISTING_PERIODS !== 'undefined' && EXISTING_PERIODS.length > 0)
+              ? EXISTING_PERIODS : [{ start: '', end: '' }];
+            initial.forEach(function (p) { list.appendChild(buildRow(p.start, p.end)); });
+
+            addBtn.addEventListener('click', function () {
+              window._addPeriodRow('', '');
+            });
+          });
+        </script>
       </div>
 
       <div class="text-center">
@@ -844,9 +934,9 @@
       contributionForm.addEventListener('submit', function(e) {
         e.preventDefault();
 
-        // Collect temporal extent data
-        const startDate = document.getElementById('start-date').value.trim();
-        const endDate = document.getElementById('end-date').value.trim();
+        // Collect temporal extent data (one or more periods).
+        const temporalPeriods = typeof window._getTemporalPeriods === 'function'
+          ? window._getTemporalPeriods() : [];
 
         // Collect geometry data — anything the user has drawn (re-edits
         // replace the existing geometry; the server-side endpoint
@@ -910,21 +1000,23 @@
         _forceSubmit = false;
 
         // Validate that at least something is being contributed
-        if (!geometryCollection && !startDate && !endDate) {
+        if (!geometryCollection && temporalPeriods.length === 0) {
           OPTIMAP_FLASH('error',
             'Please provide at least spatial extent (draw on map) or temporal extent (enter dates).');
           return;
         }
 
-        // Validate date formats if provided
+        // Validate date formats for all periods
         const datePattern = /^\d{4}(-\d{2})?(-\d{2})?$/;
-        if (startDate && !datePattern.test(startDate)) {
-          OPTIMAP_FLASH('error', 'Invalid start date format. Please use YYYY, YYYY-MM, or YYYY-MM-DD.');
-          return;
-        }
-        if (endDate && !datePattern.test(endDate)) {
-          OPTIMAP_FLASH('error', 'Invalid end date format. Please use YYYY, YYYY-MM, or YYYY-MM-DD.');
-          return;
+        for (const p of temporalPeriods) {
+          if (p.start_date && !datePattern.test(p.start_date)) {
+            OPTIMAP_FLASH('error', `Invalid start date "${p.start_date}". Please use YYYY, YYYY-MM, or YYYY-MM-DD.`);
+            return;
+          }
+          if (p.end_date && !datePattern.test(p.end_date)) {
+            OPTIMAP_FLASH('error', `Invalid end date "${p.end_date}". Please use YYYY, YYYY-MM, or YYYY-MM-DD.`);
+            return;
+          }
         }
 
         // No confirm dialog — contributions go to status 'c' (Contributed)
@@ -941,10 +1033,8 @@
         if (geometryCollection) {
           submissionData.geometry = geometryCollection;
         }
-        if (startDate || endDate) {
-          submissionData.temporal_extent = {};
-          if (startDate) submissionData.temporal_extent.start_date = startDate;
-          if (endDate) submissionData.temporal_extent.end_date = endDate;
+        if (temporalPeriods.length > 0) {
+          submissionData.temporal_extents = temporalPeriods;
         }
         // Mark game-mode contributions for the provenance log.
         const gameNextEl = document.getElementById('game-next-url');
@@ -1508,9 +1598,7 @@
     // Wire draw/edit/delete events from within this IIFE so _refreshSimplifyOffer
     // stays in scope (script block 1 is a separate script and cannot reach into here).
     function _hasTemporalContent() {
-      const s = document.getElementById('start-date');
-      const e = document.getElementById('end-date');
-      return (s && s.value.trim()) || (e && e.value.trim());
+      return typeof window._hasTemporalRows === 'function' && window._hasTemporalRows();
     }
     function _onDrawChange() {
       _refreshSimplifyOffer();
@@ -1669,8 +1757,10 @@
         + `<button type="button" class="btn btn-xs btn-outline-primary ml-2" id="ner-use-dates-btn">`
         + `Use these dates</button>`;
       document.getElementById('ner-use-dates-btn').addEventListener('click', function () {
-        const startEl = document.getElementById('start-date');
-        const endEl = document.getElementById('end-date');
+        const list = document.getElementById('temporal-periods-list');
+        const firstRow = list && list.querySelector('.period-row');
+        const startEl = firstRow && firstRow.querySelector('.period-start');
+        const endEl = firstRow && firstRow.querySelector('.period-end');
         if (startEl && start) startEl.value = start;
         if (endEl && end) endEl.value = end;
         this.textContent = 'Applied';

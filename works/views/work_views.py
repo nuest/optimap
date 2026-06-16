@@ -28,7 +28,14 @@ from django.utils.cache import add_never_cache_headers, patch_response_headers
 from django.views.decorators.http import require_GET
 
 from works.models import Collection, Work
-from works.seo import build_schema_org_for_work, build_work_meta, citation_meta_tags, coins_title, geo_meta_tags
+from works.seo import (
+    build_schema_org_for_work,
+    build_work_meta,
+    citation_meta_tags,
+    coins_title,
+    dc_coverage_tags,
+    geo_meta_tags,
+)
 from works.serializers import get_available_gazetteers as _ner_available_gazetteers
 from works.services.preview_image import (
     cache_path_for as _preview_cache_path,
@@ -176,21 +183,23 @@ def contribute_next(request):
 
 def _format_timeperiod(work):
     """
-    Work stores timeperiod as arrays of strings.
-    We show the first start/end if present, in a compact human form.
+    Format all index-aligned (start, end) pairs from the ArrayField columns.
+    Returns a "; "-separated string, or None when both arrays are empty.
     """
     s_list = work.timeperiod_startdate or []
     e_list = work.timeperiod_enddate or []
-    s = s_list[0] if s_list else None
-    e = e_list[0] if e_list else None
-
-    if s and e:
-        return f"{s} – {e}"
-    if s:
-        return f"from {s}"
-    if e:
-        return f"until {e}"
-    return None
+    n = max(len(s_list), len(e_list), 0)
+    labels = []
+    for i in range(n):
+        s = (s_list[i] if i < len(s_list) else None) or None
+        e = (e_list[i] if i < len(e_list) else None) or None
+        if s and e:
+            labels.append(f"{s} – {e}")
+        elif s:
+            labels.append(f"from {s}")
+        elif e:
+            labels.append(f"until {e}")
+    return "; ".join(labels) or None
 
 
 def _normalize_authors(work):
@@ -355,9 +364,22 @@ def _build_work_landing_cacheable(request, work, identifier_type):
     else:
         bok_resolved = []
 
+    # Build index-aligned list of existing (start, end) pairs for the UI.
+    s_list = work.timeperiod_startdate or []
+    e_list = work.timeperiod_enddate or []
+    existing_periods = [
+        {
+            "start": (s_list[i] if i < len(s_list) else None) or "",
+            "end": (e_list[i] if i < len(e_list) else None) or "",
+        }
+        for i in range(max(len(s_list), len(e_list)))
+    ]
+
     return {
         "feature_json": feature_json,
         "timeperiod_label": _format_timeperiod(work),
+        "existing_periods": existing_periods,
+        "existing_periods_json": json.dumps(existing_periods),
         "authors_list": _normalize_authors(work),
         "has_geometry": bool(work.geometry and not work.geometry.empty),
         "has_temporal": (
@@ -368,6 +390,7 @@ def _build_work_landing_cacheable(request, work, identifier_type):
         "identifier_type": identifier_type,
         "schema_org": build_schema_org_for_work(work, request),
         "citation_tags": citation_meta_tags(work, request),
+        "dc_coverage_tags": dc_coverage_tags(work),
         "geo_tags": geo_meta_tags(work),
         "coins_ctx": coins_title(work),
         "canonical_url": request.build_absolute_uri(reverse("optimap:work-landing", args=[work.get_identifier()])),
