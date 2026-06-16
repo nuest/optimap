@@ -348,6 +348,12 @@ SESSION_ENGINE = "django.contrib.sessions.backends.cached_db"  # store session d
 CACHE_MIDDLEWARE_ALIAS = env("OPTIMAP_CACHE", default="default")
 CACHE_MIDDLEWARE_SECONDS = env("OPTIMAP_CACHE_SECONDS", default=3600)
 
+# Per-view cache TTLs for the in-process `memory` cache backend.
+# Long: truly static pages (privacy, about, sitemap XML).
+# Short: low-change pages that vary slightly over time (robots, feeds, geoextent).
+PAGE_CACHE_LONG = env("OPTIMAP_PAGE_CACHE_LONG", default=86400)  # 24 h
+PAGE_CACHE_SHORT = env("OPTIMAP_PAGE_CACHE_SHORT", default=3600)  # 1 h
+
 # for testing email sending EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_BACKEND = env("OPTIMAP_EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
 EMAIL_HOST = env("OPTIMAP_EMAIL_HOST", default="optimap.dev")

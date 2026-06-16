@@ -21,6 +21,7 @@ from django.conf import settings
 from django.contrib import admin
 from django.contrib.sitemaps import views as sitemaps_views
 from django.urls import include, path, re_path
+from django.views.decorators.cache import cache_page
 
 from optimap.sitemaps import (
     CollectionDownloadsSitemap,
@@ -45,13 +46,13 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path(
         "sitemap.xml",
-        sitemaps_views.index,
+        cache_page(settings.PAGE_CACHE_LONG, cache="memory")(sitemaps_views.index),
         {"sitemaps": sitemaps},
         name="django.contrib.sitemaps.views.index",
     ),
     path(
         "sitemap-<section>.xml",
-        sitemaps_views.sitemap,
+        cache_page(settings.PAGE_CACHE_LONG, cache="memory")(sitemaps_views.sitemap),
         {"sitemaps": sitemaps},
         name="django.contrib.sitemaps.views.sitemap",
     ),

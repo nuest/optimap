@@ -4,13 +4,18 @@
 import gzip
 from http import HTTPStatus
 
+from django.conf import settings
 from django.contrib.gis.geos import MultiPolygon, Polygon
+from django.core.cache import caches
 from django.test import TestCase
 
 from works.models import GlobalRegion
 
 
 class SitemapTest(TestCase):
+    def setUp(self):
+        caches["memory"].clear()
+
     def test_index(self):
         response = self.client.get("/sitemap.xml")
         self.assertEqual(response.status_code, HTTPStatus.OK)
@@ -110,3 +115,19 @@ class SitemapTest(TestCase):
         self.assertEqual(response["content-type"], "application/gzip")
         content = gzip.decompress(response.content).decode("utf-8")
         self.assertIn("<urlset", content)
+
+    def test_index_cache_control(self):
+        response = self.client.get("/sitemap.xml")
+        self.assertIn(f"max-age={settings.PAGE_CACHE_LONG}", response.get("Cache-Control", ""))
+
+    def test_section_cache_control(self):
+        response = self.client.get("/sitemap-static.xml")
+        self.assertIn(f"max-age={settings.PAGE_CACHE_LONG}", response.get("Cache-Control", ""))
+
+    def test_index_gz_cache_control(self):
+        response = self.client.get("/sitemap.xml.gz")
+        self.assertIn(f"max-age={settings.PAGE_CACHE_SHORT}", response.get("Cache-Control", ""))
+
+    def test_section_gz_cache_control(self):
+        response = self.client.get("/sitemap-static.xml.gz")
+        self.assertIn(f"max-age={settings.PAGE_CACHE_SHORT}", response.get("Cache-Control", ""))

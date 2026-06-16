@@ -56,17 +56,17 @@ def main(request):
     )
 
 
-@cache_page(24 * 3600, cache="memory")
+@cache_page(settings.PAGE_CACHE_LONG, cache="memory")
 def about(request):
     return render(request, "about.html")
 
 
-@cache_page(24 * 3600, cache="memory")
+@cache_page(settings.PAGE_CACHE_LONG, cache="memory")
 def accessibility(request):
     return render(request, "accessibility.html")
 
 
-@cache_page(24 * 3600, cache="memory")
+@cache_page(settings.PAGE_CACHE_LONG, cache="memory")
 def privacy(request):
     return render(request, "privacy.html")
 
@@ -135,6 +135,7 @@ def feeds_list(request):
     return render(request, "feeds.html", {"regions": regions})
 
 
+@cache_page(settings.PAGE_CACHE_SHORT, cache="memory")
 def geoextent(request):
     """Geoextent extraction UI page."""
     from geoextent.lib.features import get_supported_features
@@ -188,22 +189,23 @@ def _as_gz(response):
     return gz
 
 
+@cache_page(settings.PAGE_CACHE_SHORT, cache="memory")
 def sitemap_index_gz(request, sitemaps, **kwargs):
     """Serve the sitemap index as a gzip-compressed file (sitemap.xml.gz)."""
     return _as_gz(sitemaps_views.index(request, sitemaps, **kwargs))
 
 
+@cache_page(settings.PAGE_CACHE_SHORT, cache="memory")
 def sitemap_section_gz(request, sitemaps, **kwargs):
     """Serve a section sitemap as a gzip-compressed file (sitemap-<section>.xml.gz)."""
     return _as_gz(sitemaps_views.sitemap(request, sitemaps, **kwargs))
 
 
-@method_decorator(cache_page(3600, cache="memory"), name="dispatch")
+@method_decorator(cache_page(settings.PAGE_CACHE_SHORT, cache="memory"), name="dispatch")
 class RobotsView(View):
     http_method_names = ["get"]
 
     def get(self, request):
-
         # Build robots.txt content
         lines = [
             "User-Agent: *",
@@ -256,9 +258,8 @@ def custom_500(request):
     return render(request, "500.html", status=500)
 
 
-@cache_page(3600, cache="memory")
+@cache_page(settings.PAGE_CACHE_SHORT, cache="memory")
 def feeds(request):
-
     global_feeds = [
         {"title": "Geo RSS", "url": reverse("optimap:api-feed-georss")},
         {"title": "Atom", "url": reverse("optimap:api-feed-atom")},
@@ -283,7 +284,7 @@ def feeds(request):
     )
 
 
-@cache_page(3600, cache="memory")
+@cache_page(settings.PAGE_CACHE_SHORT, cache="memory")
 def sitemap_page(request):
     """Human-readable sitemap page"""
     return render(
