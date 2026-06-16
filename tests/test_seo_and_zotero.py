@@ -115,8 +115,9 @@ class WorkLandingSEOTests(TestCase):
         preview_url = reverse("optimap:work-preview", args=[self.work.get_identifier()])
         self.assertIn(preview_url, og_image["content"])
 
-    def test_og_image_omitted_for_work_without_geometry(self):
-        # Q3 in the plan: works without geometry skip og:image entirely.
+    def test_og_image_uses_fallback_for_work_without_geometry(self):
+        # Works without geometry use the static branded fallback so social
+        # link previews always render with an image (closes #226).
         no_geom = Work.objects.create(
             title="No-extent work",
             abstract="An abstract with no spatial coverage.",
@@ -129,7 +130,9 @@ class WorkLandingSEOTests(TestCase):
         )
         resp = self.client.get(reverse("optimap:work-landing", args=[no_geom.get_identifier()]))
         soup = BeautifulSoup(resp.content, "html.parser")
-        self.assertIsNone(soup.find("meta", attrs={"property": "og:image"}))
+        og_image = soup.find("meta", attrs={"property": "og:image"})
+        self.assertIsNotNone(og_image, "og:image must be present even for geometry-less works")
+        self.assertIn("og-fallback.png", og_image["content"])
 
     def test_canonical_link_present(self):
         resp = self.client.get(self.url)
@@ -513,6 +516,13 @@ class HomepageSEOTests(TestCase):
         self.assertIn("potentialAction", site)
         self.assertEqual(site["potentialAction"]["@type"], "SearchAction")
 
+    def test_homepage_og_image_uses_fallback(self):
+        resp = self.client.get(reverse("optimap:main"))
+        soup = BeautifulSoup(resp.content, "html.parser")
+        og_image = soup.find("meta", attrs={"property": "og:image"})
+        self.assertIsNotNone(og_image, "homepage must have og:image for social previews")
+        self.assertIn("og-fallback.png", og_image["content"])
+
 
 class WorkPreviewImageTests(TestCase):
     """The renderer fetches OSM tiles, so we patch ``StaticMap.render`` and
@@ -619,3 +629,13 @@ class FeedPageSEOTests(TestCase):
         self.assertEqual(coll["about"]["name"], "Africa")
         # Bounding box should round-trip from the GlobalRegion geometry.
         self.assertIn("box", coll["about"]["geo"])
+
+    def test_feed_page_og_image_uses_fallback(self):
+        from django.core.cache import cache
+
+        cache.clear()
+        resp = self.client.get("/regions/continent/africa/")
+        soup = BeautifulSoup(resp.content, "html.parser")
+        og_image = soup.find("meta", attrs={"property": "og:image"})
+        self.assertIsNotNone(og_image, "feed page must have og:image for social previews")
+        self.assertIn("og-fallback.png", og_image["content"])

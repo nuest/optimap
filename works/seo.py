@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""SEO helpers for OPTIMAP — issue #22.
+"""SEO helpers for OPTIMAP — issues #22, #226.
 
 Builds ``django-meta`` ``Meta`` objects and Google Scholar ``citation_*``
 lists for work landing pages, the homepage, and feed pages. Templates emit
@@ -20,6 +20,12 @@ from django.urls import reverse
 from meta.views import Meta
 
 _WS = re.compile(r"\s+")
+
+# Static fallback used as og:image / twitter:image when a work has no geometry
+# (and on the homepage / feed pages which have no per-item preview image).
+# The file lives at works/static/img/og-fallback.png; Django's staticfiles
+# system serves it at /static/img/og-fallback.png.
+_OG_FALLBACK_IMAGE = "/static/img/og-fallback.png"
 
 
 def _abs(request, path: str) -> str:
@@ -83,8 +89,9 @@ def build_schema_org_for_work(work, request) -> dict:
 
 def build_work_meta(request, work, *, kwargs_schema: dict | None = None) -> Meta:
     """``Meta`` for a work landing page. Includes Open Graph, Twitter Card,
-    and schema.org ``ScholarlyArticle`` JSON-LD. Image is omitted when the
-    work has no geometry (per Q3).
+    and schema.org ``ScholarlyArticle`` JSON-LD. When the work has geometry
+    the map preview PNG (1200×630) is used as ``og:image``; otherwise the
+    static OPTIMAP branded fallback (``og-fallback.png``) is used instead.
 
     ``kwargs_schema``: when set, used in place of recomputing the
     schema.org dict. Callers caching the heavy schema between requests
@@ -94,12 +101,13 @@ def build_work_meta(request, work, *, kwargs_schema: dict | None = None) -> Meta
     canonical = _abs(request, reverse("optimap:work-landing", args=[work.get_identifier()]))
 
     has_geom = bool(work.geometry and not work.geometry.empty)
-    image = None
     if has_geom:
         image = _abs(
             request,
             reverse("optimap:work-preview", args=[work.get_identifier()]),
         )
+    else:
+        image = _abs(request, _OG_FALLBACK_IMAGE)
 
     keywords: list[str] = []
     if work.keywords:
@@ -465,6 +473,7 @@ def build_homepage_meta(request) -> Meta:
         description=description,
         keywords=["OPTIMAP", "geospatial search", "open access", "research articles", "KOMET"],
         url=canonical,
+        image=_abs(request, _OG_FALLBACK_IMAGE),
         site_name="OPTIMAP",
         object_type="website",
         schemaorg_title="OPTIMAP",
@@ -504,6 +513,7 @@ def build_feed_page_meta(
         title=title,
         description=description,
         url=canonical,
+        image=_abs(request, _OG_FALLBACK_IMAGE),
         site_name="OPTIMAP",
         object_type="website",
         schemaorg_title=title,
