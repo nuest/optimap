@@ -14,6 +14,7 @@ This module handles:
 - Feeds list
 """
 
+import gzip as _gzip
 import logging
 
 logger = logging.getLogger(__name__)
@@ -25,6 +26,7 @@ from pathlib import Path
 import geoextent.lib.features
 import humanize
 from django.conf import settings
+from django.contrib.sitemaps import views as sitemaps_views
 from django.http import HttpResponse
 from django.shortcuts import render
 from django.urls import reverse
@@ -176,6 +178,26 @@ def geoextent(request):
     return render(request, "geoextent.html", context)
 
 
+def _as_gz(response):
+    """Compress a sitemap TemplateResponse to a gzip HttpResponse."""
+    response.render()
+    compressed = _gzip.compress(response.content)
+    gz = HttpResponse(compressed, content_type="application/gzip")
+    if "Last-Modified" in response:
+        gz["Last-Modified"] = response["Last-Modified"]
+    return gz
+
+
+def sitemap_index_gz(request, sitemaps, **kwargs):
+    """Serve the sitemap index as a gzip-compressed file (sitemap.xml.gz)."""
+    return _as_gz(sitemaps_views.index(request, sitemaps, **kwargs))
+
+
+def sitemap_section_gz(request, sitemaps, **kwargs):
+    """Serve a section sitemap as a gzip-compressed file (sitemap-<section>.xml.gz)."""
+    return _as_gz(sitemaps_views.sitemap(request, sitemaps, **kwargs))
+
+
 @method_decorator(cache_page(3600, cache="memory"), name="dispatch")
 class RobotsView(View):
     http_method_names = ["get"]
@@ -189,6 +211,7 @@ class RobotsView(View):
             "",
             "# Sitemaps",
             f"Sitemap: {request.scheme}://{request.site.domain}/sitemap.xml",
+            f"Sitemap: {request.scheme}://{request.site.domain}/sitemap.xml.gz",
             "",
             "# Feed URLs for indexing",
             "# Global feeds",

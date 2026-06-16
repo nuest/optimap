@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: 2023 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import gzip
 from http import HTTPStatus
 
 from django.contrib.gis.geos import MultiPolygon, Polygon
@@ -95,3 +96,17 @@ class SitemapTest(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.OK)
         # Verify the feeds sitemap is listed in the index
         self.assertIn("sitemap-feeds.xml", content)
+
+    def test_index_gz(self):
+        response = self.client.get("/sitemap.xml.gz")
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertEqual(response["content-type"], "application/gzip")
+        content = gzip.decompress(response.content).decode("utf-8")
+        self.assertIn("<sitemapindex", content)
+
+    def test_section_gz(self):
+        response = self.client.get("/sitemap-static.xml.gz")
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertEqual(response["content-type"], "application/gzip")
+        content = gzip.decompress(response.content).decode("utf-8")
+        self.assertIn("<urlset", content)

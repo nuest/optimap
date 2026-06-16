@@ -30,7 +30,7 @@ from optimap.sitemaps import (
     StaticViewSitemap,
     WorksSitemap,
 )
-from optimap.views import RobotsView
+from optimap.views import RobotsView, sitemap_index_gz, sitemap_section_gz
 
 sitemaps = {
     "static": StaticViewSitemap,
@@ -54,6 +54,18 @@ urlpatterns = [
         sitemaps_views.sitemap,
         {"sitemaps": sitemaps},
         name="django.contrib.sitemaps.views.sitemap",
+    ),
+    path(
+        "sitemap.xml.gz",
+        sitemap_index_gz,
+        {"sitemaps": sitemaps},
+        name="sitemap-index-gz",
+    ),
+    path(
+        "sitemap-<section>.xml.gz",
+        sitemap_section_gz,
+        {"sitemaps": sitemaps},
+        name="sitemap-section-gz",
     ),
     re_path(r"^robots.txt", RobotsView.as_view(), name="robots_file"),
 ]
