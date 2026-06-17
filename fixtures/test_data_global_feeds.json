@@ -3127,5 +3127,73 @@
       "openalex_open_access_status": "bronze",
       "type": "article"
     }
+  },
+  {
+    "model": "works.work",
+    "pk": 2079,
+    "fields": {
+      "status": "p",
+      "title": "Dual-Polygon Study: Europe and Asia",
+      "abstract": "Comparative spatial analysis with two disjoint polygons stored as separate GEOMETRYCOLLECTION members, one in Europe and one in Asia.",
+      "publicationDate": "2022-02-10",
+      "doi": "10.5555/global-2079-2199",
+      "url": "https://example.org/publications/2079",
+      "geometry": "SRID=4326;GEOMETRYCOLLECTION(POLYGON ((10 45, 20 45, 20 55, 10 55, 10 45)), POLYGON ((80 35, 95 35, 95 50, 80 50, 80 35)))",
+      "creationDate": "2022-02-17T00:00:00Z",
+      "lastUpdate": "2022-02-18T05:00:00Z",
+      "source": 2002,
+      "timeperiod_startdate": "[\"2021\"]",
+      "timeperiod_enddate": "[\"2022\"]",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2002 (URL: https://example.org/oai/source-2002) on 2022-02-17T00:00:00Z.\nHarvestingEvent ID: 3079.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "authors": [
+        "Dr. Single Author"
+      ],
+      "keywords": [],
+      "topics": [
+        "Environmental Science",
+        "Ecology"
+      ],
+      "openalex_id": "https://openalex.org/W3002079",
+      "openalex_match_info": null,
+      "openalex_fulltext_origin": null,
+      "openalex_is_retracted": false,
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2079-2199\", \"pmid\": \"38002079\"}",
+      "openalex_open_access_status": "bronze",
+      "type": "article"
+    }
+  },
+  {
+    "model": "works.work",
+    "pk": 2080,
+    "fields": {
+      "status": "p",
+      "title": "Dual-Polygon Study: North Atlantic and Arctic",
+      "abstract": "Comparative spatial analysis with two disjoint polygons stored as separate GEOMETRYCOLLECTION members, one in the North Atlantic and one in the Arctic Ocean.",
+      "publicationDate": "2022-02-11",
+      "doi": "10.5555/global-2080-2200",
+      "url": "https://example.org/publications/2080",
+      "geometry": "SRID=4326;GEOMETRYCOLLECTION(POLYGON ((-40 30, -20 30, -20 50, -40 50, -40 30)), POLYGON ((-20 78, 20 78, 20 85, -20 85, -20 78)))",
+      "creationDate": "2022-02-18T00:00:00Z",
+      "lastUpdate": "2022-02-19T05:00:00Z",
+      "source": 2002,
+      "timeperiod_startdate": "[\"2021\"]",
+      "timeperiod_enddate": "[\"2022\"]",
+      "provenance": "Harvested via RSS/Atom feed from Global Source 2002 (URL: https://example.org/oai/source-2002) on 2022-02-18T00:00:00Z.\nHarvestingEvent ID: 3080.\n\nMetadata Sources:\n  - authors: openalex\n  - keywords: original_source\n  - topics: openalex\n  - openalex_metadata: openalex",
+      "authors": [
+        "Dr. Single Author"
+      ],
+      "keywords": [],
+      "topics": [
+        "Environmental Science",
+        "Ecology"
+      ],
+      "openalex_id": "https://openalex.org/W3002080",
+      "openalex_match_info": null,
+      "openalex_fulltext_origin": null,
+      "openalex_is_retracted": false,
+      "openalex_ids": "{\"doi\": \"https://doi.org/10.5555/global-2080-2200\", \"pmid\": \"38002080\"}",
+      "openalex_open_access_status": "bronze",
+      "type": "article"
+    }
   }
 ]

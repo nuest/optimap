@@ -35,24 +35,25 @@ FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures" / "global_regions"
 
 
 # Expected work counts per region against the *tiny* simplified geometries in
-# tests/fixtures/global_regions/. Regenerate with scripts/recompute_expected_counts.py
-# (or by hand) whenever the fixture geometries or test_data_global_feeds change.
+# tests/fixtures/global_regions/. Regenerate by hand or by running the test suite
+# and reading the failure messages whenever the fixture or tests/fixtures/global_regions/
+# geometries change.
 EXPECTED_COUNTS = {
     # Continents
     "africa": 12,
     "antarctica": 1,
-    "asia": 22,
+    "asia": 23,
     "australia": 7,
-    "europe": 18,
-    "north-america": 12,
+    "europe": 20,
+    "north-america": 13,
     "oceania": 2,
     "south-america": 8,
     # Oceans
-    "arctic-ocean": 9,
-    "baltic-sea": 5,
+    "arctic-ocean": 10,
+    "baltic-sea": 6,
     "indian-ocean": 18,
-    "mediterranean-region": 13,
-    "north-atlantic-ocean": 20,
+    "mediterranean-region": 14,
+    "north-atlantic-ocean": 22,
     "north-pacific-ocean": 18,
     "south-atlantic-ocean": 13,
     "south-china-and-easter-archipelagic-seas": 10,
@@ -340,3 +341,87 @@ class GlobalFeedsAndLandingPageTests(TestCase):
         url = reverse("optimap:feed-ocean-page", kwargs={"ocean_slug": "invalid-ocean"})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 404)
+
+
+class GeometryTypeFeedTests(TestCase):
+    """Explicit, named-work assertions per geometry type (issue #179).
+
+    test_georss_feed_per_region above already verifies feed contents against
+    a DB query for every region; these tests pin specific titles/geometry
+    types so a spatial-filter regression points directly at the broken case.
+    """
+
+    fixtures = ["test_data_global_feeds"]
+
+    @classmethod
+    def setUpClass(cls):
+        cls._regions_tmp = tempfile.mkdtemp(prefix="optimap_global_regions_")
+        _install_global_region_fixtures(cls._regions_tmp)
+        cls._settings_override = override_settings(GLOBAL_REGIONS_DATA_DIR=cls._regions_tmp)
+        cls._settings_override.enable()
+        super().setUpClass()
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        cls._settings_override.disable()
+        shutil.rmtree(cls._regions_tmp, ignore_errors=True)
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("flush", "--no-input")
+        call_command("load_global_regions")
+        call_command("loaddata", "test_data_global_feeds")
+
+    def slugify(self, name):
+        return name.lower().replace(" ", "-")
+
+    def _continent_titles(self, slug):
+        url = reverse("optimap:api-continent-georss", kwargs={"continent_slug": slug})
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200, f"{slug} GeoRSS feed failed")
+        root = ET.fromstring(resp.content)
+        return [item.find("title").text for item in root.findall(".//item")]
+
+    def _ocean_titles(self, slug):
+        url = reverse("optimap:api-ocean-georss", kwargs={"ocean_slug": slug})
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200, f"{slug} GeoRSS feed failed")
+        root = ET.fromstring(resp.content)
+        return [item.find("title").text for item in root.findall(".//item")]
+
+    def test_point_work_in_correct_region_feed(self):
+        """A POINT-geometry work appears in the feed for the region it falls in."""
+        titles = self._continent_titles("africa")
+        self.assertIn("Field Site: Central Africa", titles)
+
+    def test_linestring_work_in_correct_region_feeds(self):
+        """A LINESTRING-geometry work crossing two continents appears in both feeds."""
+        title = "Migration Route: Africa to Europe"
+        self.assertIn(title, self._continent_titles("africa"))
+        self.assertIn(title, self._continent_titles("europe"))
+
+    def test_multi_polygon_collection_in_both_continent_feeds(self):
+        """GEOMETRYCOLLECTION(POLYGON, POLYGON) appears in feeds for both member polygons."""
+        title = "Dual-Polygon Study: Europe and Asia"
+        self.assertIn(title, self._continent_titles("europe"))
+        self.assertIn(title, self._continent_titles("asia"))
+
+    def test_multi_polygon_collection_in_both_ocean_feeds(self):
+        """GEOMETRYCOLLECTION(POLYGON, POLYGON) appears in feeds for both member polygons."""
+        title = "Dual-Polygon Study: North Atlantic and Arctic"
+        self.assertIn(title, self._ocean_titles("north-atlantic-ocean"))
+        self.assertIn(title, self._ocean_titles("arctic-ocean"))
+
+    def test_multi_ocean_multipolygon_work_in_all_ocean_feeds(self):
+        """A MULTIPOLYGON work spanning three oceans appears in all three feeds."""
+        title = "Global Ocean Survey"
+        self.assertIn(title, self._ocean_titles("south-atlantic-ocean"))
+        self.assertIn(title, self._ocean_titles("indian-ocean"))
+        self.assertIn(title, self._ocean_titles("south-pacific-ocean"))
+
+    def test_ocean_continent_spanning_work(self):
+        """A work whose polygon straddles an ocean and a continent appears in both feeds."""
+        title = "Cross-Regional Study: North America-Atlantic"
+        self.assertIn(title, self._continent_titles("north-america"))
+        self.assertIn(title, self._ocean_titles("north-atlantic-ocean"))

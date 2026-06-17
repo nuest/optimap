@@ -115,6 +115,15 @@ To load the test data into your database, run the following command choosing one
 python manage.py loaddata fixtures/test_data_{optimap, partners, global_feeds}.json
 ```
 
+`fixtures/test_data_global_feeds.json` backs [tests/test_feeds_global_landing_pages.py](tests/test_feeds_global_landing_pages.py)
+and exercises the spatial queries behind the global/regional GeoRSS and Atom feeds. It intentionally
+covers a wide range of geometry shapes — single points, linestrings, single polygons, `MULTIPOLYGON`
+geometries, `GEOMETRYCOLLECTION`s containing multiple separate polygons, and works whose geometry spans
+multiple continents, multiple oceans, or one ocean and one continent — so that `geometry__intersects`
+filtering is checked against each case, not just simple single-polygon works. If you add or modify
+entries in this fixture, re-run `python manage.py test tests.test_feeds_global_landing_pages` and update
+the `EXPECTED_COUNTS` dict in that test file to match the new per-region work counts.
+
 #### Adding New Test Data
 
 If additional test data is required, you can:
