@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Crossref-prefix harvests silently truncated on transient empty pages**: a deep Crossref cursor crawl (e.g. Scientific Data, prefix 10.1038 — 8387 works) could stop hundreds of records short because the pagination loop treated the first empty `items` page — or a momentarily missing `next-cursor` — as definitive end-of-results. Crossref intermittently returns an empty page mid-walk under load, so the harvest ended early (observed: ~8000 of 8387) and still reported a clean `completed`. The loop now reads Crossref's `total-results`, retries the same cursor up to three times when a short page arrives, and logs a `stopped early: N of M records` **warning** (visible in the `HarvestingEvent` log and harvest summary email) if it still cannot reach the advertised total. Affects all `crossref-prefix` sources (Scientific Data, Copernicus, AGILE GIScience Series).
+
 ### Changed
 
 - **Copernicus harvesting reframed from "Crossref fallback" to primary route**: the Copernicus OAI-PMH endpoint (`oai-pmh.copernicus.org/oai.php`) has been HTTP 404 since December 2025 with no recovery, so Crossref (DOI prefix 10.5194) is now documented and labelled as the established primary harvest route rather than a temporary fallback. The `copernicus` source is renamed from "Copernicus Publications (Crossref fallback)" to "Copernicus Publications". The disabled `essd` (Earth System Science Data) OAI-PMH source entry is removed from `SOURCE_CONFIG` — its content is reachable via `harvest_sources --source copernicus --source-title "Earth System Science Data"`. Docstrings and `docs/sources.md` / `docs/deployment-plain.md` examples updated to match. (The separate runtime fallback — using the Crossref-supplied abstract when a publisher landing-page fetch fails — is unchanged.)

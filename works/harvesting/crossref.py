@@ -20,6 +20,7 @@ the landing-page fetch fails.
 """
 
 import logging
+import time
 from datetime import datetime
 
 import requests
@@ -299,6 +300,17 @@ def parse_crossref_response_and_save_works(
 
     filter_value = _build_crossref_filter(prefix, source_titles=source_titles, extra_filters=extra_filters)
 
+    # Crossref intermittently returns an empty `items` page (or drops the
+    # `next-cursor`) part-way through a deep cursor crawl — server load,
+    # rate-limiting, or eventual consistency of the cursor window. Treating
+    # that as end-of-results silently truncates the harvest, so we re-request
+    # the same cursor a few times before believing the crawl is done. The
+    # authoritative end signal is `seen >= total_results` (Crossref echoes
+    # `total-results` on every page).
+    total_results = None
+    empty_retries = 0
+    EMPTY_PAGE_RETRIES = 3
+
     while True:
         params = {
             "filter": filter_value,
@@ -324,9 +336,35 @@ def parse_crossref_response_and_save_works(
             )
 
         data = resp.json().get("message", {})
+        if total_results is None:
+            total_results = data.get("total-results")
         items = data.get("items", [])
         if not items:
+            # Transient empty page mid-walk? Retry the same cursor before
+            # concluding the crawl is finished — but only while Crossref still
+            # claims more results than we've seen.
+            if total_results and seen < total_results and empty_retries < EMPTY_PAGE_RETRIES:
+                empty_retries += 1
+                logger.info(
+                    "Crossref returned an empty page at %d/%d records; retry %d/%d on the same cursor",
+                    seen,
+                    total_results,
+                    empty_retries,
+                    EMPTY_PAGE_RETRIES,
+                )
+                time.sleep(2 * empty_retries)
+                continue
+            if total_results and seen < total_results:
+                logger.warning(
+                    "Crossref harvest stopped early: %d of %d records fetched "
+                    "(empty page after %d retries) for filter %r",
+                    seen,
+                    total_results,
+                    EMPTY_PAGE_RETRIES,
+                    filter_value,
+                )
             break
+        empty_retries = 0
 
         for item in items:
             seen += 1
@@ -367,6 +405,13 @@ def parse_crossref_response_and_save_works(
 
         next_cursor = data.get("next-cursor")
         if not next_cursor:
+            if total_results and seen < total_results:
+                logger.warning(
+                    "Crossref harvest stopped early: %d of %d records fetched (no next-cursor) for filter %r",
+                    seen,
+                    total_results,
+                    filter_value,
+                )
             break
         # Crossref sometimes returns the same cursor string for consecutive pages
         # (observed for prefix:10.1038,container-title:Scientific Data) — the

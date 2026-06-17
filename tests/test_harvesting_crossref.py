@@ -20,6 +20,7 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "optimap.settings")
 django.setup()
 
 from datetime import date
+from unittest.mock import patch
 
 import responses
 from django.test import TestCase
@@ -372,6 +373,79 @@ class HarvestCrossrefPrefixEndToEndTests(TestCase):
         self.assertEqual(len(responses.calls), 1)
         called = responses.calls[0].request.url
         self.assertIn("container-title%3AEarth+System+Science+Data", called.replace(":", "%3A"))
+
+    def _page(self, items, total_results, next_cursor):
+        """Build a Crossref message page with an explicit total-results.
+
+        `_crossref_response` derives total-results from len(items), which is
+        wrong for the transient-empty-page scenarios below — the empty page
+        must still report the full total so the harvester knows to keep going.
+        """
+        return {
+            "status": "ok",
+            "message": {
+                "total-results": total_results,
+                "items": items,
+                "next-cursor": next_cursor,
+            },
+        }
+
+    @responses.activate
+    @patch("works.harvesting.crossref.time.sleep", lambda *_: None)
+    def test_recovers_from_transient_empty_page(self):
+        # Crossref occasionally returns an empty `items` page mid-walk under
+        # load. The harvester must retry the same cursor instead of treating
+        # it as end-of-results and silently truncating (issue: 8000/8387 bug).
+        item_a = {
+            "DOI": "10.1038/sdata-a",
+            "URL": "https://doi.org/10.1038/sdata-a",
+            "title": ["A"],
+            "abstract": "<jats:p>a</jats:p>",
+            "published": {"date-parts": [[2024, 1, 1]]},
+        }
+        item_b = {
+            "DOI": "10.1038/sdata-b",
+            "URL": "https://doi.org/10.1038/sdata-b",
+            "title": ["B"],
+            "abstract": "<jats:p>b</jats:p>",
+            "published": {"date-parts": [[2024, 2, 1]]},
+        }
+        # page 1: A + next-cursor; page 2: EMPTY (transient); retry: B + end.
+        responses.add(responses.GET, "https://api.crossref.org/works", json=self._page([item_a], 2, "c1"), status=200)
+        responses.add(responses.GET, "https://api.crossref.org/works", json=self._page([], 2, "c1"), status=200)
+        responses.add(responses.GET, "https://api.crossref.org/works", json=self._page([item_b], 2, ""), status=200)
+
+        harvest_crossref_prefix(self.source.id, fetch_abstract_from_publisher=False)
+
+        # Both works must be saved — the transient empty page must not truncate.
+        self.assertEqual(Work.objects.filter(source=self.source).count(), 2)
+        self.assertTrue(Work.objects.filter(doi="10.1038/sdata-b").exists())
+
+    @responses.activate
+    @patch("works.harvesting.crossref.time.sleep", lambda *_: None)
+    def test_warns_when_crossref_truncates_below_total(self):
+        # If Crossref keeps returning empty pages past the retry budget, the
+        # harvest gives up but must record a visible warning rather than report
+        # a clean completion (the original silent-truncation behaviour).
+        item_a = {
+            "DOI": "10.1038/sdata-a",
+            "URL": "https://doi.org/10.1038/sdata-a",
+            "title": ["A"],
+            "abstract": "<jats:p>a</jats:p>",
+            "published": {"date-parts": [[2024, 1, 1]]},
+        }
+        responses.add(
+            responses.GET, "https://api.crossref.org/works", json=self._page([item_a], 100, "c1"), status=200
+        )
+        # Every subsequent request returns an empty page; total-results=100 so
+        # the harvester knows it is short. responses reuses the last match.
+        responses.add(responses.GET, "https://api.crossref.org/works", json=self._page([], 100, "c1"), status=200)
+
+        harvest_crossref_prefix(self.source.id, fetch_abstract_from_publisher=False)
+
+        event = HarvestingEvent.objects.filter(source=self.source).latest("started_at")
+        self.assertEqual(event.status, "completed")
+        self.assertIn("stopped early", (event.log_text or "").lower())
 
 
 class BuildCrossrefFilterExtraTests(TestCase):
