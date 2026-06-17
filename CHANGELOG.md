@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-06-17
+
 ### Added
 
 - **W3C Spatial Data on the Web Best Practices** (closes #161): OPTIMAP now follows the [W3C SDW-BP](https://www.w3.org/TR/sdw-bp/) recommendations that are applicable to a non-linked-data publisher. Key changes: (1) GeoJSON coordinates are capped at **5 decimal places** (≈ 1.1 m at the equator) throughout — REST API responses, bulk GeoJSON/GeoPackage/CSV exports, schema.org JSON-LD on work landing pages, geo meta tags, and GeoRSS/Atom feeds — so coordinates no longer imply sub-centimetre accuracy that harvested metadata cannot support (BP 6 / BP 16); (2) GeoJSON responses now carry `Content-Type: application/geo+json` instead of `application/json` (BP 5); (3) work landing pages with geometry emit a `Link: rel="alternate"; type="application/geo+json"` HTTP header pointing to the REST API endpoint (BP 5); (4) the bulk GeoJSON download includes top-level `crs` and `coordinate_precision` fields (BP 15 / BP 16); (5) schema.org JSON-LD adds a `sameAs` link to the Wikidata item when the work has been exported to Wikidata (BP 3); (6) the API schema documents coordinate axis order and precision cap (BP 8). A compliance matrix is at [`docs/w3c-sdwbp-compliance.md`](docs/w3c-sdwbp-compliance.md).
