@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Copernicus harvesting reframed from "Crossref fallback" to primary route**: the Copernicus OAI-PMH endpoint (`oai-pmh.copernicus.org/oai.php`) has been HTTP 404 since December 2025 with no recovery, so Crossref (DOI prefix 10.5194) is now documented and labelled as the established primary harvest route rather than a temporary fallback. The `copernicus` source is renamed from "Copernicus Publications (Crossref fallback)" to "Copernicus Publications". The disabled `essd` (Earth System Science Data) OAI-PMH source entry is removed from `SOURCE_CONFIG` — its content is reachable via `harvest_sources --source copernicus --source-title "Earth System Science Data"`. Docstrings and `docs/sources.md` / `docs/deployment-plain.md` examples updated to match. (The separate runtime fallback — using the Crossref-supplied abstract when a publisher landing-page fetch fails — is unchanged.)
+
 ## [0.26.0] - 2026-06-17
 
 ### Added

@@ -6,10 +6,11 @@
 """
 Django management command to harvest publications from real sources.
 
-Supports OAI-PMH, RSS/Atom and (since the Copernicus OAI-PMH endpoint went
-404 between Dec 2025 and Apr 2026) Crossref-prefix harvesting. Sources can
-be marked ``enabled: False`` to keep their config visible but skip them on
-``--all`` runs — useful for documenting upstream outages.
+Supports OAI-PMH, RSS/Atom and Crossref-prefix harvesting. Crossref is the
+primary route for Copernicus, whose OAI-PMH endpoint has been HTTP 404 since
+December 2025. Sources can be marked ``enabled: False`` to keep their config
+visible but skip them on ``--all`` runs — useful for documenting upstream
+outages.
 
 Usage:
     # all currently-enabled sources
@@ -54,9 +55,12 @@ User = get_user_model()
 # to explain why for `--list`.
 SOURCE_CONFIG = {
     "copernicus": {
-        "name": "Copernicus Publications (Crossref fallback)",
-        # The DOI prefix is the source-of-truth filter; the URL is just a
-        # display value because the Crossref task builds its own params.
+        "name": "Copernicus Publications",
+        # Crossref (DOI prefix 10.5194) is the primary route: the Copernicus
+        # OAI-PMH endpoint at oai-pmh.copernicus.org/oai.php has been HTTP 404
+        # since December 2025. The DOI prefix is the source-of-truth filter;
+        # the URL is just a display value because the Crossref task builds its
+        # own params.
         "url": "https://api.crossref.org/works?filter=prefix:10.5194",
         "collection_name": "Copernicus Publications",
         "homepage_url": "https://publications.copernicus.org/",
@@ -68,27 +72,6 @@ SOURCE_CONFIG = {
         "fetch_abstract_from_publisher": True,
         "is_oa": True,
         "default_work_type": "article",
-    },
-    "essd": {
-        "name": "Earth System Science Data",
-        "url": "https://oai-pmh.copernicus.org/oai.php?verb=ListRecords&metadataPrefix=oai_dc&set=essd",
-        "collection_name": "ESSD",
-        "homepage_url": "https://essd.copernicus.org/",
-        "publisher_name": "Copernicus Publications",
-        "source_type": "oai-pmh",
-        "is_oa": True,
-        "default_work_type": "dataset",
-        "openalex_id": "S106909380",
-        # Disabled: oai-pmh.copernicus.org/oai.php has been HTTP 404 since
-        # at least Dec 2025 (last Wayback success: 2025-12-15). Use the
-        # `copernicus` source above (Crossref prefix 10.5194) to reach the
-        # same content while the upstream is dark, and narrow with
-        # `--source-title "Earth System Science Data"` if needed.
-        "enabled": False,
-        "disabled_reason": (
-            "Upstream OAI-PMH endpoint returns HTTP 404 since 2025-12. "
-            'Use --source copernicus --source-title "Earth System Science Data" instead.'
-        ),
     },
     # AGILE GIS — two publishing streams for one collection.
     # Use --source-prefix agile-gis to harvest both in one run.

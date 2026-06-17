@@ -42,14 +42,15 @@ class InsertSourcesTest(TestCase):
         out = StringIO()
         call_command("harvest_sources", "--insert-sources", stdout=out)
 
-        for key, config in SOURCE_CONFIG.items():
-            if _is_enabled(config):
-                continue
+        disabled = [k for k, c in SOURCE_CONFIG.items() if not _is_enabled(c)]
+        for key in disabled:
             self.assertFalse(
-                Source.objects.filter(name=config["name"]).exists(),
+                Source.objects.filter(name=SOURCE_CONFIG[key]["name"]).exists(),
                 f"Disabled source {key} should not be inserted by default",
             )
-        self.assertIn("skipped (disabled", out.getvalue())
+        # The skip message only appears when at least one source is disabled.
+        if disabled:
+            self.assertIn("skipped (disabled", out.getvalue())
 
     def test_insert_sources_with_include_disabled_inserts_everything(self):
         out = StringIO()

@@ -67,14 +67,14 @@ python manage.py harvest_sources --all --max-records 50
 sudo -u optimap bash -c '
 source /opt/optimap/venv/bin/activate
 cd /opt/optimap/app
-python manage.py harvest_sources --source essd --source geo-leo
+python manage.py harvest_sources --source copernicus --source geo-leo
 '
 
 # Harvest from specific sources by prefix
 sudo -u optimap bash -c '
 source /opt/optimap/venv/bin/activate
 cd /opt/optimap/app
-python manage.py harvest_sources --source essd --source-prefix agile-gis --max-records 500
+python manage.py harvest_sources --source copernicus --source-prefix agile-gis --max-records 500
 '
 
 # Rebuild recurring Django-Q "Harvest Source <id>" schedules

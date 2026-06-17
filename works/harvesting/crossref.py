@@ -1,17 +1,22 @@
 # SPDX-FileCopyrightText: 2026 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Crossref-prefix harvester (fallback for Copernicus, see issue tracker).
+"""Crossref-prefix harvester.
 
-The OAI-PMH endpoint at https://oai-pmh.copernicus.org/oai.php went 404
-sometime between the 2025-12-15 Wayback snapshot and 2026-04-29. While the
-upstream is dark, we can reach the same metadata through Crossref using
-Copernicus's DOI prefix 10.5194 (publisher = "Copernicus GmbH"). The
-trade-off: Crossref supplies <jats:p> abstracts that are usually OK, but
-the publisher-side article landing pages serve the canonical, fully-
-punctuated abstract. This task fetches abstracts directly from the
-journal subdomain by default, falling back to the Crossref payload only
-when the landing-page fetch fails.
+Enumerates a publisher's output from the Crossref REST API by DOI prefix
+(optionally narrowed by container title). This is the primary harvest route
+for Copernicus Publications (DOI prefix 10.5194, publisher = "Copernicus
+GmbH"): the OAI-PMH endpoint at https://oai-pmh.copernicus.org/oai.php went
+404 sometime between the 2025-12-15 Wayback snapshot and 2026-04-29 and has
+not recovered, so Crossref is now the established source rather than a
+stop-gap. The same harvester also backs Scientific Data (10.1038) and the
+AGILE GIScience Series (10.5194).
+
+Trade-off on abstracts: Crossref supplies <jats:p> abstracts that are
+usually OK, but the publisher-side article landing pages serve the canonical,
+fully-punctuated abstract. This task fetches abstracts directly from the
+journal subdomain by default, falling back to the Crossref payload only when
+the landing-page fetch fails.
 """
 
 import logging
@@ -386,7 +391,9 @@ def harvest_crossref_prefix(
 ):
     """Harvest publications from Crossref by DOI prefix.
 
-    Used as a fallback for Copernicus while their OAI-PMH endpoint is down.
+    Primary harvest route for Copernicus (DOI prefix 10.5194, OAI-PMH endpoint
+    dead since 2025-12); also used for Scientific Data and the AGILE GIScience
+    Series.
     """
     user = resolve_user(user)
     source = Source.objects.get(id=source_id)

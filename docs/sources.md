@@ -49,16 +49,17 @@ python manage.py harvest_sources --source agile-springer-lncs
 
 ## Copernicus Publications
 
+Copernicus runs an OAI-PMH endpoint, but it has returned HTTP 404 since December 2025.
+Crossref (DOI prefix 10.5194) is therefore the primary harvest route for all Copernicus journals.
+
 | Key | Name | Publisher | Type |
 |-----|------|-----------|------|
 | `copernicus` | Copernicus Publications | Copernicus Publications | Crossref (DOI prefix 10.5194) |
-| `essd` ⚠️ | Earth System Science Data | Copernicus Publications | OAI-PMH *(disabled — endpoint 404 since 2025-12)* |
-
-`essd` is disabled because the Copernicus OAI-PMH endpoint has returned HTTP 404 since December 2025.
-Use `--source copernicus --source-title "Earth System Science Data"` to reach the same content via Crossref.
 
 ```bash
 python manage.py harvest_sources --source copernicus
+# narrow to a single journal, e.g. Earth System Science Data:
+python manage.py harvest_sources --source copernicus --source-title "Earth System Science Data"
 ```
 
 ---
@@ -190,9 +191,6 @@ python manage.py harvest_sources --source scientific-data
 
 ## Disabled sources
 
-These entries remain in `SOURCE_CONFIG` so the config stays self-documenting,
-but they are skipped by `--all`. Use `--include-disabled` to attempt them anyway.
-
-| Key | Reason |
-|-----|--------|
-| `essd` | Copernicus OAI-PMH endpoint HTTP 404 since 2025-12. Use `--source copernicus` instead. |
+Entries can be marked `enabled: False` in `SOURCE_CONFIG` so the config stays
+self-documenting while being skipped by `--all` (use `--include-disabled` to
+attempt them anyway). There are currently no disabled sources.
