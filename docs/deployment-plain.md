@@ -41,6 +41,57 @@ sudo systemctl reload nginx
 sudo systemctl restart postgresql optimap optimap-worker nginx
 ```
 
+### Trigger harvesting
+
+Harvesting normally runs on its own Django-Q schedule (`optimap-worker`), but
+these `manage.py` commands are useful to kick off a run on demand or check
+what's configured. Run them as the `optimap` user from the app directory with
+the venv active:
+
+```bash
+# List all configured sources and their identifiers
+sudo -u optimap bash -c '
+source /opt/optimap/venv/bin/activate
+cd /opt/optimap/app
+python manage.py harvest_sources --list
+'
+
+# Harvest from every configured source (capped per source for a quick check)
+sudo -u optimap bash -c '
+source /opt/optimap/venv/bin/activate
+cd /opt/optimap/app
+python manage.py harvest_sources --all --max-records 50
+'
+
+# Harvest from specific sources by identifier
+sudo -u optimap bash -c '
+source /opt/optimap/venv/bin/activate
+cd /opt/optimap/app
+python manage.py harvest_sources --source essd --source geo-leo
+'
+
+# Harvest from specific sources by prefix
+sudo -u optimap bash -c '
+source /opt/optimap/venv/bin/activate
+cd /opt/optimap/app
+python manage.py harvest_sources --source essd --source-prefix agile-gis --max-records 500
+'
+
+# Rebuild recurring Django-Q "Harvest Source <id>" schedules
+# (recovers from a state where every source fires at once)
+sudo -u optimap bash -c '
+source /opt/optimap/venv/bin/activate
+cd /opt/optimap/app
+python manage.py reset_harvest_schedules
+'
+
+# Watch the worker process a harvest as it runs
+sudo journalctl -u optimap-worker -f
+```
+
+See [docs/manage.md](manage.md) for the full list of harvesting management
+commands and source identifiers.
+
 ## Overview
 
 This deployment approach runs all components directly on the host system:
