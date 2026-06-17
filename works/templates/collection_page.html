@@ -34,14 +34,14 @@
               <i class="fas fa-external-link-alt" aria-hidden="true" style="display:none"></i>
               <img src="{{ collection.logo_url }}"
                    alt="{{ collection.name }} logo"
-                   style="height: 80px; width: auto; max-width: 200px; display: block;"
+                   style="height: 80px; width: auto; max-width: 200px; object-fit: contain; display: block;"
                    onerror="this.parentElement.style.display='none'">
             </a>
           {% else %}
             <img src="{{ collection.logo_url }}"
                  alt="{{ collection.name }} logo"
                  class="ml-3 flex-shrink-0"
-                 style="height: 80px; width: auto; max-width: 200px; margin-top: 0;"
+                 style="height: 80px; width: auto; max-width: 200px; object-fit: contain; margin-top: 0;"
                  onerror="this.style.display='none'">
           {% endif %}
         {% endif %}

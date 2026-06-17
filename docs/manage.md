@@ -188,6 +188,21 @@ Every harvester (OAI-PMH, RSS, Crossref, MaRESS) routes its inserts through a sh
 
 > **OPTIMAP does not currently merge metadata across sources.** When the same DOI/URL is exposed by two different sources (e.g. a journal article also surfaced via a preprint server), the second source's harvest is logged and skipped — the first source "owns" the Work. There is no automatic union of fields, no cross-source provenance trail, and no way to switch ownership without manual admin intervention. If this becomes a frequent need, open a follow-up issue.
 
+**Retire a deprecated Source and move its Works to a replacement:** when a source moves platforms (e.g. EarthArXiv migrating off eScholarship to its own CDL-backed OAI-PMH endpoint) and you end up with an old `Source` row whose Works should really belong to the new one, use `python manage.py migrate_source_works`:
+
+```bash
+# Preview only
+python manage.py migrate_source_works --from-source eScholarship --to-source EarthArXiv --dry-run
+
+# Reassign all Works (source FK, collection membership, provenance audit event)
+python manage.py migrate_source_works --from-source eScholarship --to-source EarthArXiv
+
+# Reassign, then delete the old Source if it's left with zero Works
+python manage.py migrate_source_works --from-source eScholarship --to-source EarthArXiv --delete-empty
+```
+
+`--from-source`/`--to-source` accept a numeric `Source` id or an exact (case-insensitive) `name`. For each migrated Work the command: re-points `source`, swaps `collections` membership from the old source's default collection to the new one's, detaches `job` if it pointed at one of the old source's `HarvestingEvent`s (required so a later `Source.delete()` cascade can't cascade-delete the Work through `Work.job`), and appends a `source_migration` event to `provenance.events` (see [Work provenance](#work-provenance)). `--delete-empty` only deletes the old `Source` (and its now-orphaned `HarvestingEvent`s) when zero Works remain attached — it never deletes a Source with Works still on it.
+
 #### Careful update (`--update` flag)
 
 `python manage.py harvest_sources --update` (or `update_existing=True` on the task functions) refreshes existing same-source works in place. The update is deliberately conservative:
@@ -440,7 +455,8 @@ Staff users additionally see the full provenance (including `original_record`, W
   "events": [                              // chronological audit log
     { "type": "harvest",      "at": "..." },
     { "type": "contribution", "at": "...", "user_id": 42, "kind": "spatial" },
-    { "type": "publish",      "at": "...", "user_id": 1 }
+    { "type": "publish",      "at": "...", "user_id": 1 },
+    { "type": "source_migration", "at": "...", "from_source": "eScholarship", "to_source": "EarthArXiv" }
   ],
 }
 ```

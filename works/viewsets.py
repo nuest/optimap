@@ -225,7 +225,8 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
             "| `doi_backfill` | `doi`, `harvesting_event_id` | DOI was added to a previously DOI-less work |\n"
             "| `contribution` | `kinds` (array: `spatial`, `temporal`, `bok`), `user_id`\\*, `user_email`\\*, `game` (bool, optional) | User added spatial/temporal/BoK metadata; `game: true` when submitted via the georeferencing game |\n"
             "| `publish` | `status_from`, `status_to`, `user_id`\\*, `user_email`\\* | Work was published |\n"
-            "| `unpublish` | `status_from`, `user_id`\\*, `user_email`\\* | Work was unpublished |\n\n"
+            "| `unpublish` | `status_from`, `user_id`\\*, `user_email`\\* | Work was unpublished |\n"
+            "| `source_migration` | `from_source`, `to_source` | Work was reassigned to a different `Source` by the `migrate_source_works` management command |\n\n"
             "\\* `user_id` and `user_email` are present for staff and curators only.\n\n"
             "**Other top-level keys:**\n"
             "| Key | Type | Description |\n"
@@ -276,7 +277,8 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
                         required=False,
                         help_text=(
                             "Chronological audit log. Each event has type (string) and at (ISO timestamp). "
-                            "Event types: harvest_update, doi_backfill, contribution, publish, unpublish. "
+                            "Event types: harvest_update, doi_backfill, contribution, publish, unpublish, "
+                            "source_migration. "
                             "user_id and user_email are present for staff/curators only."
                         ),
                     ),
