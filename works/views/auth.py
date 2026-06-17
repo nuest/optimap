@@ -28,7 +28,9 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model, login, logout
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from django.core.mail import EmailMessage, get_connection, send_mail
+from django.core.validators import EmailValidator
 from django.db.models import Count, Q
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -57,11 +59,27 @@ ACCOUNT_DELETE_TOKEN_TIMEOUT_SECONDS = 10 * 60
 USER_DELETE_TOKEN_PREFIX = "user_delete_token"
 EMAIL_CONFIRMATION_TOKEN_PREFIX = "email_confirmation"
 
+email_validator = EmailValidator()
+
 
 def loginres(request):
     if request.method != "POST":
         return redirect("/")
     email = request.POST.get("email", "").lower().strip()
+    try:
+        email_validator(email)
+    except ValidationError:
+        return render(
+            request,
+            "error.html",
+            {
+                "error": {
+                    "class": "danger",
+                    "title": "Login failed!",
+                    "text": "The email address you entered is not valid. Please enter a valid email address.",
+                }
+            },
+        )
     if is_email_blocked(email):
         logger.warning("Attempted login with blocked email: %s", email)
         return render(
@@ -439,6 +457,20 @@ def change_useremail(request):
     email_new = request.POST.get("email_new", "").lower().strip()
     currentuser = request.user
     email_old = currentuser.email
+    try:
+        email_validator(email_new)
+    except ValidationError:
+        return render(
+            request,
+            "error.html",
+            {
+                "error": {
+                    "class": "danger",
+                    "title": "Invalid Email Change!",
+                    "text": "The email address you entered is not valid. Please enter a valid email address.",
+                }
+            },
+        )
     if is_email_blocked(email_new):
         logger.warning("Attempted login with blocked email: %s", email_new)
         return render(

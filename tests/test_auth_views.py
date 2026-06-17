@@ -51,6 +51,11 @@ class LoginresViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Login failed")
 
+    def test_post_invalid_email_returns_error_page(self):
+        response = self.client.post(self.url, {"email": "notanemail"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Login failed")
+
     def tearDown(self):
         BlockedEmail.objects.all().delete()
 
@@ -141,6 +146,11 @@ class ChangeUserEmailViewTests(TestCase):
         response = self.client.post(self.url, {"email_new": "other@example.com"})
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Already In Use")
+
+    def test_invalid_email_returns_error_page(self):
+        response = self.client.post(self.url, {"email_new": "notanemail"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Invalid Email Change")
 
     def tearDown(self):
         BlockedEmail.objects.all().delete()
