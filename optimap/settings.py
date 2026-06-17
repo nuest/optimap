@@ -49,7 +49,12 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 ALLOWED_HOSTS = [i.strip("[]") for i in env("OPTIMAP_ALLOWED_HOST", default="*").split(",")]
 
-OPTIMAP_SUPERUSER_EMAILS = [i.strip("[]") for i in env("OPTIMAP_SUPERUSER_EMAILS", default="").split(",")]
+# Filter out empties: an unset/blank value must yield [] (not [""]), otherwise
+# every account with a blank email would match and be promoted to superuser
+# (see works/signals.py::update_user_callback).
+OPTIMAP_SUPERUSER_EMAILS = [
+    e for e in (i.strip("[]").strip() for i in env("OPTIMAP_SUPERUSER_EMAILS", default="").split(",")) if e
+]
 
 TEST_HARVESTING_ONLINE = env("OPTIMAP_TEST_HARVESTING_ONLINE", default=False)
 

@@ -20,9 +20,9 @@ from works.models import UserProfile
 
 @receiver(pre_save, sender=User)
 def update_user_callback(sender, instance, **kwargs):
-    logging.info("New user added: ", instance.email)
+    logging.info("New user added: %s", instance.email)
 
-    if instance.email in settings.OPTIMAP_SUPERUSER_EMAILS and not instance.is_superuser:
+    if instance.email and instance.email in settings.OPTIMAP_SUPERUSER_EMAILS and not instance.is_superuser:
         logging.warning("Registering user %s as admin", instance.email)
         instance.is_staff = True
         instance.is_superuser = True
