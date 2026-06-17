@@ -189,7 +189,7 @@ python manage.py load_global_regions
 
 # Generate the OGC API - Features OpenAPI document (required once to activate /ogcapi/)
 # Re-run with --force whenever etc/pygeoapi-config.yml changes.
-# Uses the OPTIMAP_DB_* env vars; make sure they match your DATABASE_URL.
+# Connects to the same database as Django (derived from DATABASE_URL).
 python manage.py generate_pygeoapi_openapi
 
 # Harvest works from real sources

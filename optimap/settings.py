@@ -679,7 +679,11 @@ if _PYGEOAPI_CONFIG_PATH.exists() and _PYGEOAPI_OPENAPI_PATH.exists():
         from pygeoapi.openapi import load_openapi_document as _load_openapi_document
         from pygeoapi.util import get_api_rules as _get_api_rules
 
-        PYGEOAPI_CONFIG = _get_pygeoapi_config()
+        from optimap.pygeoapi_db import apply_db_connection as _apply_db_connection
+
+        # DATABASE_URL is the single source of truth; inject Django's parsed DB
+        # connection into pygeoapi's PostgreSQL provider(s).
+        PYGEOAPI_CONFIG = _apply_db_connection(_get_pygeoapi_config(), DATABASES["default"])
         OPENAPI_DOCUMENT = _load_openapi_document()
         API_RULES = _get_api_rules(PYGEOAPI_CONFIG)
         # Inject absolute templates path so custom templates are found regardless of cwd

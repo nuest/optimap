@@ -59,11 +59,14 @@ resources:
       - type: feature
         name: PostgreSQL
         data:
-          host: ${OPTIMAP_DB_HOST:-localhost}
-          port: ${OPTIMAP_DB_PORT:-5432}
-          dbname: ${OPTIMAP_DB_NAME:-optimap}
-          user: ${OPTIMAP_DB_USER:-optimap}
-          password: ${OPTIMAP_DB_PASS:-optimap}
+          # The real connection is injected from Django's DATABASE_URL at load
+          # time (optimap/pygeoapi_db.apply_db_connection). The values below are
+          # only a fallback for running pygeoapi standalone against a local DB.
+          host: localhost
+          port: 5432
+          dbname: optimap
+          user: optimap
+          password: optimap
           search_path: [public]
         id_field: id
         table: works_published

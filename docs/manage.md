@@ -753,7 +753,7 @@ python manage.py generate_pygeoapi_openapi
 
 This is run automatically with `--force` by `etc/manage-and-run.sh` on every Docker startup.
 
-**Database credentials.** pygeoapi reads the database connection from `OPTIMAP_DB_*` env vars (host, port, dbname, user, pass) — the same vars shown in `.env.example`. These default to the local dev values (`localhost:5432/optimap`). In production these must match the actual database.
+**Database credentials.** pygeoapi connects to the same database as Django: the connection is derived from `DATABASE_URL` and injected into the pygeoapi config at load time (`optimap/pygeoapi_db.apply_db_connection`). There is no separate database configuration for the OGC API — set `DATABASE_URL` correctly and a reachable database is all that is required (the works collection is introspected at generation time).
 
 **Verify the endpoint is active:**
 

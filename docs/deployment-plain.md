@@ -909,13 +909,13 @@ BACKUP_FILE="${BACKUP_DIR}/optimap_${DATE}.sql.gz"
 # Load environment
 source /opt/optimap/app/optimap/.env
 
-# Create backup
-PGPASSWORD="${OPTIMAP_DB_PASS}" pg_dump \
-    -h "${OPTIMAP_DB_HOST}" \
-    -U "${OPTIMAP_DB_USER}" \
-    -d "${OPTIMAP_DB_NAME}" \
+# Create backup (DATABASE_URL is the single source of truth; pg_dump needs the
+# postgresql:// scheme, so rewrite the postgis:// prefix Django/GeoDjango uses).
+PGURL="${DATABASE_URL/postgis:\/\//postgresql://}"
+pg_dump \
     --format=custom \
     --compress=9 \
+    "${PGURL}" \
     > "${BACKUP_FILE}"
 
 # Keep only last 7 days of backups
@@ -1001,6 +1001,8 @@ python manage.py load_global_regions
 python manage.py harvest_sources --insert-sources
 
 # Regenerate OGC API OpenAPI document (required for /ogcapi/ endpoint).
+# The DB connection is derived from DATABASE_URL, so this connects to the same
+# database as Django (a reachable DB is required for the works collection).
 python manage.py generate_pygeoapi_openapi --force || echo "WARNING: OGC API setup failed (non-fatal)"
 ' #end of bash command
 
@@ -1146,6 +1148,26 @@ cd /opt/optimap/app
 python manage.py dbshell
 '
 ```
+
+**OGC API works collection 500s, or `generate_pygeoapi_openapi` warned
+"Resource not added to OpenAPI: Could not connect to …":**
+
+The OGC API derives its database connection from `DATABASE_URL` (the single
+source of truth). Ensure `DATABASE_URL` is set correctly in
+`/opt/optimap/app/optimap/.env` and the database is reachable, then regenerate
+and restart:
+
+```bash
+sudo -u optimap bash -c '
+source /opt/optimap/venv/bin/activate
+cd /opt/optimap/app
+python manage.py generate_pygeoapi_openapi --force
+'
+sudo systemctl restart optimap
+```
+
+(Older deployments referenced separate `OPTIMAP_DB_*` variables; these are no
+longer used and can be removed from `.env`.)
 
 **Static files not loading (403 Permission denied in nginx error log):**
 

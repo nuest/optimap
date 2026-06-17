@@ -9,6 +9,10 @@ Run once after install and whenever etc/pygeoapi-config.yml changes:
 
 The output is written to etc/pygeoapi-openapi.yml (next to the config).
 Django's OGC API endpoint (/ogcapi/) will not activate until this file exists.
+
+The PostgreSQL connection is taken from Django's DATABASES / DATABASE_URL (not
+from the YAML), so a reachable database is required at generation time for the
+``works`` collection to be introspected and included in the OpenAPI document.
 """
 
 import os
@@ -45,18 +49,21 @@ class Command(BaseCommand):
         os.environ.setdefault("PYGEOAPI_OPENAPI", str(openapi_path))
 
         try:
-            from pygeoapi.models.openapi import SupportedFormats
-            from pygeoapi.openapi import generate_openapi_document
+            import yaml
+            from pygeoapi.config import get_config
+            from pygeoapi.openapi import get_oas
         except ImportError as exc:
             raise CommandError(f"pygeoapi not installed: {exc}") from exc
 
+        from optimap.pygeoapi_db import apply_db_connection
+
         self.stdout.write(f"Generating OpenAPI document from {config_path} ...")
         try:
-            doc = generate_openapi_document(
-                config_path,
-                SupportedFormats.YAML,
-                fail_on_invalid_collection=False,
-            )
+            # DATABASE_URL is the single source of truth: inject Django's parsed
+            # DB connection so pygeoapi can introspect the works collection.
+            cfg = apply_db_connection(get_config(), settings.DATABASES["default"])
+            oas = get_oas(cfg, fail_on_invalid_collection=False)
+            doc = yaml.safe_dump(oas, default_flow_style=False)
         except Exception as exc:
             raise CommandError(f"OpenAPI generation failed: {exc}") from exc
 
