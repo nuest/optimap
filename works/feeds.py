@@ -17,6 +17,7 @@ from django.shortcuts import get_object_or_404
 from django.utils.feedgenerator import Atom1Feed, Rss201rev2Feed
 
 from .models import Collection, GlobalRegion, Work
+from .utils.geometry import COORDINATE_PRECISION
 
 logger = logging.getLogger(__name__)
 
@@ -119,15 +120,20 @@ def _format_georss_geometry(geometry):
     georss_data = []
 
     if geometry.geom_type == "Point":
-        lat, lon = geometry.y, geometry.x
+        lat = round(geometry.y, COORDINATE_PRECISION)
+        lon = round(geometry.x, COORDINATE_PRECISION)
         georss_data.append(("georss_point", f"{lat} {lon}"))
 
     elif geometry.geom_type == "LineString":
-        coords = " ".join(f"{pt[1]} {pt[0]}" for pt in geometry.coords)
+        coords = " ".join(
+            f"{round(pt[1], COORDINATE_PRECISION)} {round(pt[0], COORDINATE_PRECISION)}" for pt in geometry.coords
+        )
         georss_data.append(("georss_line", coords))
 
     elif geometry.geom_type == "Polygon":
-        coords = " ".join(f"{pt[1]} {pt[0]}" for pt in geometry.coords[0])
+        coords = " ".join(
+            f"{round(pt[1], COORDINATE_PRECISION)} {round(pt[0], COORDINATE_PRECISION)}" for pt in geometry.coords[0]
+        )
         georss_data.append(("georss_polygon", coords))
 
     elif geometry.geom_type == "GeometryCollection":

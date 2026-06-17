@@ -3,6 +3,18 @@
 
 import json
 
+from works.utils.geometry import COORDINATE_PRECISION, round_geojson_coordinates
+
+# W3C SDW-BP 15: include CRS and precision metadata in every FeatureCollection.
+_GEOJSON_METADATA = {
+    "crs": {"type": "name", "properties": {"name": "urn:ogc:def:crs:OGC:1.3:CRS84"}},
+    "coordinate_precision": {
+        "decimal_places": COORDINATE_PRECISION,
+        "approximate_accuracy_m": 1.1,
+        "note": "W3C SDW-BP 6 — coordinates are capped at 5 decimal places (~1.1 m at equator)",
+    },
+}
+
 
 def publications_to_geojson(publications) -> str:
     """Serialize a list (or queryset) of Work objects to a GeoJSON FeatureCollection string."""
@@ -30,7 +42,7 @@ def publications_to_geojson(publications) -> str:
         features.append(
             {
                 "type": "Feature",
-                "geometry": json.loads(work.geometry.geojson),
+                "geometry": round_geojson_coordinates(json.loads(work.geometry.geojson)),
                 "properties": {
                     "id": work.id,
                     "title": work.title,
@@ -57,4 +69,4 @@ def publications_to_geojson(publications) -> str:
             }
         )
 
-    return json.dumps({"type": "FeatureCollection", "features": features})
+    return json.dumps({"type": "FeatureCollection", **_GEOJSON_METADATA, "features": features})

@@ -568,6 +568,10 @@ def work_landing(request, identifier):
         "game_skip_url": game_skip_url,
     }
     response = render(request, "work_landing_page.html", context)
+    # W3C SDW-BP 5: link to machine-readable GeoJSON representation.
+    if work.geometry and not work.geometry.empty:
+        api_url = request.build_absolute_uri(reverse("optimap:works:work-detail", args=[work.id]))
+        response["Link"] = f'<{api_url}>; rel="alternate"; type="application/geo+json"'
     if is_anonymous:
         # Mirror the server-side TTL into ``Cache-Control: max-age=…`` and
         # ``Expires`` so browsers and intermediaries can co-cache. Saves

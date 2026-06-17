@@ -19,6 +19,8 @@ from django.conf import settings
 from django.urls import reverse
 from meta.views import Meta
 
+from works.utils.geometry import COORDINATE_PRECISION
+
 _WS = re.compile(r"\s+")
 
 # Static fallback used as og:image / twitter:image when a work has no geometry
@@ -183,6 +185,14 @@ def _build_schema_org(work, request, canonical, image, authors, keywords, descri
     if work.openalex_id:
         oa = work.openalex_id
         same_as.append(oa if oa.startswith("http") else f"https://openalex.org/{oa}")
+    wikidata_log = (
+        work.wikidata_exports.filter(action__in=["created", "updated"], wikidata_url__isnull=False)
+        .order_by("-export_date")
+        .values_list("wikidata_url", flat=True)
+        .first()
+    )
+    if wikidata_log:
+        same_as.append(wikidata_log)
     if same_as:
         payload["sameAs"] = same_as if len(same_as) > 1 else same_as[0]
     if work.publicationDate:
@@ -274,13 +284,14 @@ def _format_geo_for_schema_org(work) -> dict:
     if inner.geom_type == "Point":
         return {
             "@type": "GeoCoordinates",
-            "latitude": inner.y,
-            "longitude": inner.x,
+            "latitude": round(inner.y, COORDINATE_PRECISION),
+            "longitude": round(inner.x, COORDINATE_PRECISION),
         }
     west, south, east, north = geom.extent
+    s, w, n, e = (round(v, COORDINATE_PRECISION) for v in (south, west, north, east))
     return {
         "@type": "GeoShape",
-        "box": f"{south} {west} {north} {east}",
+        "box": f"{s} {w} {n} {e}",
     }
 
 
@@ -305,6 +316,8 @@ def geo_meta_tags(work) -> list[dict]:
     if not center:
         return []
     lon, lat = center
+    lon = round(lon, COORDINATE_PRECISION)
+    lat = round(lat, COORDINATE_PRECISION)
     tags: list[dict] = [
         {"name": "geo.position", "content": f"{lat};{lon}"},
         {"name": "ICBM", "content": f"{lat}, {lon}"},

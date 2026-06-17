@@ -128,6 +128,8 @@ from works.harvesting.sessions import (  # noqa: F401
 )
 from works.models import EmailLog, Subscription, Work
 from works.utils.email import render_email
+from works.utils.geojson import _GEOJSON_METADATA
+from works.utils.geometry import round_geojson_coordinates
 
 logger = logging.getLogger(__name__)
 BASE_URL = settings.BASE_URL
@@ -636,11 +638,12 @@ def regenerate_geojson_cache():
         fields=_DUMP_FIELDS,
     )
     data = json.loads(raw)
+    data.update(_GEOJSON_METADATA)
     for feat in data.get("features", []):
         info = extra.get(feat.get("id"), {})
         props = feat.setdefault("properties", {})
         props.update(info)
-        feat["geometry"] = _unwrap_geometry_collection(feat.get("geometry"))
+        feat["geometry"] = round_geojson_coordinates(_unwrap_geometry_collection(feat.get("geometry")))
     with open(json_path, "w") as f:
         json.dump(data, f)
 

@@ -256,7 +256,7 @@ class CollectionDownloadTests(_CollectionFixtureMixin, TestCase):
     # --- content type ---
 
     def test_geojson_content_type(self):
-        self.assertIn("application/json", self.client.get(self._url("geojson"))["Content-Type"])
+        self.assertIn("application/geo+json", self.client.get(self._url("geojson"))["Content-Type"])
 
     def test_gpkg_content_type(self):
         self.assertIn("geopackage", self.client.get(self._url("gpkg"))["Content-Type"])

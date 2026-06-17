@@ -345,7 +345,6 @@ automatically dispatching to the correct harvester for each source.
 **Full source list**: see [docs/sources.md](docs/sources.md) for all configured sources grouped by publisher,
 with keys, names, harvest types, and ISSN/OpenAlex identifiers.
 
-
 ### Create Superusers/Admin
 
 Superusers or administrators can be created using the `createsuperuser` command. This user will have access to the Django admin interface.
@@ -586,7 +585,7 @@ The app is deployed in the TUD Enterprise Cloud via Docker Compose; see [docs/de
 Containerized deployment using Docker Compose with nginx, Gunicorn, and PostgreSQL/PostGIS.
 
 | File | Purpose |
-|------|---------|
+| ------ | --------- |
 | `docker-compose.yml` | Development configuration |
 | `docker-compose.deploy.yml` | Production configuration with SSL |
 | `etc/nginx.deploy.conf` | nginx reverse proxy with HTTPS |
@@ -604,7 +603,7 @@ HTTPS certificates are managed via certbot container.
 Run OPTIMAP directly on the host system with systemd services, nginx, and a native PostgreSQL/PostGIS database.
 
 | File | Purpose |
-|------|---------|
+| ------ | --------- |
 | `docs/deployment-plain.md` | Comprehensive deployment guide |
 | `etc/deploy-plain/` | Configuration templates (systemd, nginx, Gunicorn) |
 | `etc/deploy-plain/install.sh` | Automated installation script |

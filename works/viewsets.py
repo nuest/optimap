@@ -28,6 +28,7 @@ from rest_framework import serializers as drf_serializers
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticatedOrReadOnly
+from rest_framework.renderers import BrowsableAPIRenderer, JSONRenderer
 from rest_framework.response import Response
 from rest_framework_gis import filters
 
@@ -61,6 +62,13 @@ _ERROR_RESPONSE = inline_serializer(
         "details": drf_serializers.CharField(required=False),
     },
 )
+
+
+class _GeoJSONRenderer(JSONRenderer):
+    """Sets Content-Type: application/geo+json per W3C SDW-BP 5."""
+
+    media_type = "application/geo+json"
+    format = "geo+json"
 
 
 @extend_schema_view(
@@ -115,6 +123,7 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
     filter_backends = (filters.InBBoxFilter,)
     serializer_class = WorkSerializer
     permission_classes = [IsAuthenticatedOrReadOnly]
+    renderer_classes = [_GeoJSONRenderer, JSONRenderer, BrowsableAPIRenderer]
 
     def get_serializer_class(self):
         if self.request.query_params.get("minimal") == "true":

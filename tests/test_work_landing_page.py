@@ -206,7 +206,7 @@ class WorkLandingPageTest(TestCase):
         # Now test the API endpoint
         api_response = self.client.get(f"/api/v1/works/{self.pub_with_doi.id}/")
         self.assertEqual(api_response.status_code, 200)
-        self.assertIn("application/json", api_response["Content-Type"])
+        self.assertIn("application/geo+json", api_response["Content-Type"])
 
         # Check that the JSON contains expected fields
         data = api_response.json()

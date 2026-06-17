@@ -3,8 +3,12 @@
 
 """publications serializers."""
 
+import copy
+import json
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.gis.geos import GEOSGeometry
 from django.urls import reverse
 from drf_spectacular.utils import extend_schema_field, inline_serializer
 from rest_framework import serializers
@@ -12,6 +16,7 @@ from rest_framework import serializers as drf_serializers
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from .models import Collection, GlobalRegion, Source, Subscription, Work
+from .utils.geometry import round_geojson_coordinates
 
 User = get_user_model()
 
@@ -157,6 +162,13 @@ class WorkSerializer(GeoFeatureModelSerializer):
             "openalex_open_access_status",
         ]
 
+    def to_representation(self, instance):
+        if instance.geometry and not instance.geometry.empty:
+            rounded = round_geojson_coordinates(json.loads(instance.geometry.geojson))
+            instance = copy.copy(instance)
+            instance.geometry = GEOSGeometry(json.dumps(rounded))
+        return super().to_representation(instance)
+
     @extend_schema_field(SourceSerializer)
     def get_source_details(self, obj):
         source = obj.source
@@ -192,6 +204,13 @@ class WorkMinimalSerializer(GeoFeatureModelSerializer):
         geo_field = "geometry"
         auto_bbox = False
         fields = ["id", "title", "doi", "status", "status_display"]
+
+    def to_representation(self, instance):
+        if instance.geometry and not instance.geometry.empty:
+            rounded = round_geojson_coordinates(json.loads(instance.geometry.geojson))
+            instance = copy.copy(instance)
+            instance.geometry = GEOSGeometry(json.dumps(rounded))
+        return super().to_representation(instance)
 
 
 class SubscriptionSerializer(GeoFeatureModelSerializer):

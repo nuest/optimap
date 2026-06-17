@@ -66,7 +66,7 @@ class PublicationsApiTest(TestCase):
     def test_api_root(self):
         response = self.client.get("/api/v1/works/")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.get("Content-Type"), "application/json")
+        self.assertEqual(response.get("Content-Type"), "application/geo+json")
 
         results = response.json()["results"]
 

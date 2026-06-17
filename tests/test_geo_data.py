@@ -123,7 +123,9 @@ class GeoDataAlternativeTestCase(TestCase):
         response = self.client.get(url, HTTP_ACCEPT_ENCODING="gzip")
         self.assertEqual(response.status_code, 200, "Gzip download should return status 200")
         self.assertEqual(response["Content-Encoding"], "gzip", "Response should be gzipped when requested")
-        self.assertEqual(response["Content-Type"], "application/json", "Content-Type should be application/json")
+        self.assertEqual(
+            response["Content-Type"], "application/geo+json", "Content-Type should be application/geo+json"
+        )
         self.assertRegex(response["Content-Disposition"], r"optimap_data_dump_.*\.geojson\.gz")
 
     def test_download_geopackage_endpoint(self):

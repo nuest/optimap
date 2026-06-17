@@ -181,7 +181,13 @@ without auth). The UI is rendered by [Redoc](https://github.com/Redocly/redoc) f
 - **Spatial filtering:** list endpoints with a geometry field accept `?in_bbox=west,south,east,north`
   (longitude/latitude in EPSG:4326).
 - **GeoJSON envelope:** `Works` responses are valid GeoJSON `FeatureCollection`s; the OPTIMAP
-  fields live under `properties` of each `Feature`.
+  fields live under `properties` of each `Feature`. The `Content-Type` is `application/geo+json`
+  per [W3C SDW-BP 5](https://www.w3.org/TR/sdw-bp/#BP5).
+- **Coordinates** follow [GeoJSON RFC 7946](https://www.rfc-editor.org/rfc/rfc7946) axis order
+  (longitude, latitude) in WGS 84 / EPSG:4326. Coordinate values are capped at **5 decimal places**
+  (≈ 1.1 m at the equator) to reflect the actual accuracy of harvested spatial metadata
+  ([W3C SDW-BP 6](https://www.w3.org/TR/sdw-bp/#BP6) and
+  [BP 16](https://www.w3.org/TR/sdw-bp/#BP16)).
 - **CSRF:** browser POST/PUT/DELETE requests need the `X-CSRFToken` header. Server-side scripts
   with session cookies should also fetch a CSRF token first.
 

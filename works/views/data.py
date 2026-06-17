@@ -61,14 +61,14 @@ ogr.UseExceptions()
         "regenerates on demand if the cache is missing."
     ),
     tags=["Downloads"],
-    responses={(200, "application/json"): OpenApiTypes.BINARY},
+    responses={(200, "application/geo+json"): OpenApiTypes.BINARY},
 )
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def download_geojson(request):
     """
     Returns the latest GeoJSON dump file, gzipped if the client accepts it,
-    but always with Content-Type: application/json.
+    with Content-Type: application/geo+json (W3C SDW-BP 5).
     """
     cache_dir = Path(tempfile.gettempdir()) / "optimap_cache"
     cache_dir.mkdir(exist_ok=True)
@@ -78,14 +78,16 @@ def download_geojson(request):
 
     if "gzip" in accept_enc and gzip_path.exists():
         response = FileResponse(
-            open(gzip_path, "rb"), content_type="application/json", as_attachment=True, filename=gzip_path.name
+            open(gzip_path, "rb"), content_type="application/geo+json", as_attachment=True, filename=gzip_path.name
         )
         response["Content-Encoding"] = "gzip"
         response["Content-Disposition"] = f'attachment; filename="{gzip_path.name}"'
     else:
-        # Serve the plain JSON
         response = FileResponse(
-            open(json_path, "rb"), content_type="application/json", as_attachment=True, filename=Path(json_path).name
+            open(json_path, "rb"),
+            content_type="application/geo+json",
+            as_attachment=True,
+            filename=Path(json_path).name,
         )
         response["Content-Disposition"] = f'attachment; filename="{Path(json_path).name}"'
     return response
@@ -299,7 +301,7 @@ def _generate_collection_converted_bytes(collection, ogr_fmt, layer_creation_opt
     ),
     tags=["Collections"],
     responses={
-        (200, "application/json"): OpenApiTypes.BINARY,
+        (200, "application/geo+json"): OpenApiTypes.BINARY,
         404: _COLLECTION_404,
     },
 )
@@ -313,7 +315,7 @@ def download_collection_geojson(request, collection_slug):
     if data is None:
         data = _serialize_collection_geojson(collection)
         cache.set(cache_key, data, settings.FEED_CACHE_HOURS * 3600)
-    response = HttpResponse(data, content_type="application/json")
+    response = HttpResponse(data, content_type="application/geo+json")
     response["Content-Disposition"] = f'attachment; filename="optimap_collection_{collection_slug}.geojson"'
     return response
 
