@@ -141,10 +141,11 @@ class Command(BaseCommand):
             self.stdout.write(f'{prefix}Would delete Source "{old_source.name}" (id={old_source.pk}).')
             return
 
+        old_source_id, old_source_name = old_source.pk, old_source.name
         event_count = old_source.harvesting_events.count()
         old_source.delete()
         self.stdout.write(
             self.style.SUCCESS(
-                f'Deleted Source "{old_source.name}" (id={old_source.pk}) and its {event_count} HarvestingEvent(s).'
+                f'Deleted Source "{old_source_name}" (id={old_source_id}) and its {event_count} HarvestingEvent(s).'
             )
         )
