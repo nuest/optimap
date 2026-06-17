@@ -47,6 +47,7 @@ from works.tasks import (
     regenerate_geojson_cache,
     regenerate_geopackage_cache,
 )
+from works.utils.geometry import annotate_rounded_geometry
 
 ogr.UseExceptions()
 
@@ -230,7 +231,7 @@ _COLLECTION_404 = OpenApiResponse(
 
 
 def _collection_qs(collection):
-    return Work.objects.filter(collections=collection, status="p")
+    return annotate_rounded_geometry(Work.objects.filter(collections=collection, status="p"))
 
 
 def _unwrap_geometry_collection(geom):
@@ -265,11 +266,24 @@ def _unwrap_geometry_collection(geom):
 
 def _serialize_collection_geojson(collection):
     """Return a GeoJSON FeatureCollection string for published works in *collection*,
-    with GeometryCollection wrappers unwrapped to primitive / Multi* types."""
-    raw = serialize("geojson", _collection_qs(collection), geometry_field="geometry", srid=4326)
+    with GeometryCollection wrappers unwrapped to primitive / Multi* types and
+    coordinates capped at 5 decimal places (W3C SDW-BP 6).
+
+    Properties are serialized via Django's full-field "geojson" format (no
+    `fields=` restriction, so every Work model field is exposed) — geometry is
+    swapped afterwards for the DB-precomputed, already-rounded text from
+    `annotate_rounded_geometry`. Coordinate rounding was previously missing
+    entirely on this path (a gap in the original BP6 implementation); this
+    also fixes that, for free, as a side effect of the DB-side migration.
+    """
+    works_qs = _collection_qs(collection)
+    rounded_by_id = {w.pk: w._rounded_geojson for w in works_qs}
+    raw = serialize("geojson", works_qs, geometry_field="geometry", srid=4326)
     data = json.loads(raw)
     for feat in data.get("features", []):
-        feat["geometry"] = _unwrap_geometry_collection(feat.get("geometry"))
+        rounded = rounded_by_id.get(feat.get("id"))
+        geometry = json.loads(rounded) if rounded else feat.get("geometry")
+        feat["geometry"] = _unwrap_geometry_collection(geometry)
     return json.dumps(data)
 
 

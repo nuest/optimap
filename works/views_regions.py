@@ -16,13 +16,14 @@ from .feeds import get_region_from_slug
 from .models import GlobalRegion, Work
 from .seo import build_feed_page_meta
 from .utils.geojson import publications_to_geojson
+from .utils.geometry import annotate_rounded_geometry
 
 logger = logging.getLogger(__name__)
 
 
 def _get_regional_publications(region):
     """Get published works whose geometry intersects the region."""
-    candidates = (
+    candidates = annotate_rounded_geometry(
         Work.objects.filter(
             status="p",
             geometry__isnull=False,

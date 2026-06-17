@@ -30,6 +30,7 @@ from .models import STATUS_CHOICES, Collection, Source, Work
 User = get_user_model()
 from .seo import coins_title
 from .utils.geojson import publications_to_geojson
+from .utils.geometry import annotate_rounded_geometry
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +104,7 @@ def collection_page(request, collection_slug):
     works_qs = Work.objects.filter(collections=collection).select_related("source")
     if not can_curate:
         works_qs = works_qs.filter(status="p")
-    works_qs = works_qs.order_by("-creationDate", "-id")
+    works_qs = annotate_rounded_geometry(works_qs.order_by("-creationDate", "-id"))
 
     page_size = request.GET.get("size", settings.PAGE_MAX_ITEMS)
     try:
@@ -217,7 +218,9 @@ def collection_page(request, collection_slug):
 def collection_geojson(request, collection_slug):
     """GeoJSON of all published works in a collection — used by the map 'show all' toggle."""
     collection = _collection_for_request(request, collection_slug)
-    works_qs = Work.objects.filter(collections=collection, status="p").select_related("source")
+    works_qs = annotate_rounded_geometry(
+        Work.objects.filter(collections=collection, status="p").select_related("source")
+    )
     return HttpResponse(publications_to_geojson(list(works_qs)), content_type="application/geo+json")
 
 

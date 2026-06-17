@@ -30,7 +30,7 @@ from pathlib import Path
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.mail import EmailMessage, send_mail
-from django.core.serializers import serialize
+from django.core.serializers.json import DjangoJSONEncoder
 from django.urls import reverse
 from django.utils import timezone
 from django_q.models import Schedule
@@ -129,7 +129,7 @@ from works.harvesting.sessions import (  # noqa: F401
 from works.models import EmailLog, Subscription, Work
 from works.utils.email import render_email
 from works.utils.geojson import _GEOJSON_METADATA
-from works.utils.geometry import round_geojson_coordinates
+from works.utils.geometry import annotate_rounded_geometry, round_geojson_coordinates
 
 logger = logging.getLogger(__name__)
 BASE_URL = settings.BASE_URL
@@ -618,34 +618,38 @@ def regenerate_geojson_cache():
     json_filename = generate_data_dump_filename("geojson")
     json_path = os.path.join(cache_dir, json_filename)
 
-    works_qs = Work.objects.filter(status="p").select_related("source").prefetch_related("collections")
+    works_qs = annotate_rounded_geometry(
+        Work.objects.filter(status="p").select_related("source").prefetch_related("collections")
+    )
 
     base_url = settings.BASE_URL.rstrip("/")
-    extra = {
-        w.pk: {
-            "source_name": w.source.name if w.source else None,
-            "source_url": f"{base_url}/api/v1/sources/{w.source.pk}/" if w.source else None,
-            "collections": [c.identifier for c in w.collections.all()],
-        }
-        for w in works_qs
-    }
+    features = []
+    for w in works_qs:
+        props = {field: getattr(w, field) for field in _DUMP_FIELDS}
+        props.update(
+            {
+                "source_name": w.source.name if w.source else None,
+                "source_url": f"{base_url}/api/v1/sources/{w.source.pk}/" if w.source else None,
+                "collections": [c.identifier for c in w.collections.all()],
+            }
+        )
+        geometry = (
+            json.loads(w._rounded_geojson)
+            if w._rounded_geojson
+            else round_geojson_coordinates(json.loads(w.geometry.geojson))
+        )
+        features.append(
+            {
+                "type": "Feature",
+                "id": w.pk,
+                "properties": props,
+                "geometry": _unwrap_geometry_collection(geometry),
+            }
+        )
 
-    raw = serialize(
-        "geojson",
-        works_qs,
-        geometry_field="geometry",
-        srid=4326,
-        fields=_DUMP_FIELDS,
-    )
-    data = json.loads(raw)
-    data.update(_GEOJSON_METADATA)
-    for feat in data.get("features", []):
-        info = extra.get(feat.get("id"), {})
-        props = feat.setdefault("properties", {})
-        props.update(info)
-        feat["geometry"] = round_geojson_coordinates(_unwrap_geometry_collection(feat.get("geometry")))
+    data = {"type": "FeatureCollection", **_GEOJSON_METADATA, "features": features}
     with open(json_path, "w") as f:
-        json.dump(data, f)
+        json.dump(data, f, cls=DjangoJSONEncoder)
 
     gzip_filename = generate_data_dump_filename("geojson.gz")
     gzip_path = os.path.join(cache_dir, gzip_filename)

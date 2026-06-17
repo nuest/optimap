@@ -46,6 +46,7 @@ from .serializers import (
     WorkMinimalSerializer,
     WorkSerializer,
 )
+from .utils.geometry import annotate_rounded_geometry
 from .utils.provenance import public_subset
 
 logger = logging.getLogger(__name__)
@@ -155,12 +156,12 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
                 ).order_by("_status_priority", "-creationDate", "-id")
             else:
                 qs = qs.order_by("-creationDate", "-id")
-            return qs
+            return annotate_rounded_geometry(qs)
         if getattr(self, "action", None) == "provenance" and self.request.user.is_authenticated:
             curated = Work.objects.filter(collections__curators=self.request.user)
             public = Work.objects.filter(status="p")
-            return (curated | public).distinct()
-        return Work.objects.filter(status="p").order_by("-creationDate", "-id").distinct()
+            return annotate_rounded_geometry((curated | public).distinct())
+        return annotate_rounded_geometry(Work.objects.filter(status="p").order_by("-creationDate", "-id").distinct())
 
     @extend_schema(
         summary="Retrieve provenance for a work",

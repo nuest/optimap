@@ -3,22 +3,68 @@
 
 """publications serializers."""
 
-import copy
 import json
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.contrib.gis.geos import GEOSGeometry
 from django.urls import reverse
 from drf_spectacular.utils import extend_schema_field, inline_serializer
 from rest_framework import serializers
 from rest_framework import serializers as drf_serializers
+from rest_framework_gis.fields import GeoJsonDict
+from rest_framework_gis.fields import GeometryField as _BaseGeometryField
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from .models import Collection, GlobalRegion, Source, Subscription, Work
-from .utils.geometry import round_geojson_coordinates
+from .utils.geometry import COORDINATE_PRECISION, round_geojson_coordinates
 
 User = get_user_model()
+
+
+class _GeometryWithPrecomputedJSON:
+    """Wraps a real GEOSGeometry together with a DB-precomputed, already
+    rounded GeoJSON string, so a custom field can hand back the precomputed
+    text while ``GeoFeatureModelSerializer``'s ``auto_bbox`` logic (which
+    needs ``.extent`` and truthiness on whatever ``get_attribute`` returns)
+    keeps working unmodified."""
+
+    __slots__ = ("geometry", "rounded_geojson")
+
+    def __init__(self, geometry, rounded_geojson):
+        self.geometry = geometry
+        self.rounded_geojson = rounded_geojson
+
+    def __bool__(self):
+        return bool(self.geometry)
+
+    @property
+    def extent(self):
+        return self.geometry.extent
+
+
+class PrecomputedGeometryField(_BaseGeometryField):
+    """GeometryField that prefers a DB-precomputed, already-rounded GeoJSON
+    string (``instance._rounded_geojson``, produced by
+    ``works.utils.geometry.annotate_rounded_geometry``) over re-serializing
+    the GEOSGeometry in Python — PostGIS does the rounding during
+    serialization instead of Python re-parsing/rounding/re-dumping the
+    full-precision GeoJSON (~30x faster for complex geometries).
+
+    Falls back to the original GEOS-based rounding for any instance not
+    sourced from an annotated queryset (e.g. ad hoc instances in tests)."""
+
+    def get_attribute(self, instance):
+        return _GeometryWithPrecomputedJSON(instance.geometry, getattr(instance, "_rounded_geojson", None))
+
+    def to_representation(self, value):
+        geometry = value.geometry
+        if geometry is None:
+            return None
+        if value.rounded_geojson is not None:
+            return GeoJsonDict(value.rounded_geojson)
+        if geometry.geojson:
+            return GeoJsonDict(round_geojson_coordinates(json.loads(geometry.geojson)))
+        return GeoJsonDict({"type": geometry.geom_type, "coordinates": []})
 
 
 class SourceSerializer(serializers.ModelSerializer):
@@ -122,6 +168,7 @@ class SourceSerializer(serializers.ModelSerializer):
 
 
 class WorkSerializer(GeoFeatureModelSerializer):
+    geometry = PrecomputedGeometryField()
     source_details = serializers.SerializerMethodField(
         help_text="Embedded source row (same shape as `/api/v1/sources/<id>/`)."
     )
@@ -163,11 +210,14 @@ class WorkSerializer(GeoFeatureModelSerializer):
         ]
 
     def to_representation(self, instance):
-        if instance.geometry and not instance.geometry.empty:
-            rounded = round_geojson_coordinates(json.loads(instance.geometry.geojson))
-            instance = copy.copy(instance)
-            instance.geometry = GEOSGeometry(json.dumps(rounded))
-        return super().to_representation(instance)
+        feature = super().to_representation(instance)
+        # auto_bbox computes the bbox from the real (full-precision) geometry's
+        # .extent — round it to match the geometry coordinates, which the
+        # PrecomputedGeometryField already serves pre-rounded from the DB.
+        bbox = feature.get("bbox")
+        if bbox is not None:
+            feature["bbox"] = tuple(round(v, COORDINATE_PRECISION) for v in bbox)
+        return feature
 
     @extend_schema_field(SourceSerializer)
     def get_source_details(self, obj):
@@ -197,6 +247,7 @@ class WorkSerializer(GeoFeatureModelSerializer):
 class WorkMinimalSerializer(GeoFeatureModelSerializer):
     """Slim serializer for chunked map loading — geometry + identifiers only."""
 
+    geometry = PrecomputedGeometryField()
     status_display = serializers.CharField(source="get_status_display", read_only=True)
 
     class Meta:
@@ -204,13 +255,6 @@ class WorkMinimalSerializer(GeoFeatureModelSerializer):
         geo_field = "geometry"
         auto_bbox = False
         fields = ["id", "title", "doi", "status", "status_display"]
-
-    def to_representation(self, instance):
-        if instance.geometry and not instance.geometry.empty:
-            rounded = round_geojson_coordinates(json.loads(instance.geometry.geojson))
-            instance = copy.copy(instance)
-            instance.geometry = GEOSGeometry(json.dumps(rounded))
-        return super().to_representation(instance)
 
 
 class SubscriptionSerializer(GeoFeatureModelSerializer):

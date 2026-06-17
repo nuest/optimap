@@ -25,7 +25,7 @@ from django.urls import reverse
 
 from works.models import GlobalRegion, Work
 
-NSPS = {"atom": "http://www.w3.org/2005/Atom"}
+NSPS = {"atom": "http://www.w3.org/2005/Atom", "georss": "http://www.georss.org/georss"}
 
 
 # Tiny fixture geojson files (committed under tests/fixtures/global_regions/)
@@ -153,6 +153,19 @@ class GlobalFeedsAndLandingPageTests(TestCase):
             "Atom feed for Australia returned unexpected title",
         )
 
+        # The fixture geometry for this entry is stored at 10-decimal precision
+        # (110.0000123456 -30.0000987654, ...); the feed must round every
+        # coordinate to COORDINATE_PRECISION (5) regardless.
+        entries = root.findall(".//atom:entry", namespaces=NSPS)
+        polygon_text = entries[0].find("georss:polygon", namespaces=NSPS).text
+        self.assertEqual(
+            polygon_text,
+            "-30.0001 110.00001 -30.00003 130.00001 10.00008 130.00006 10.00002 110.0001 -30.0001 110.00001",
+        )
+        for value in polygon_text.split():
+            decimals = value.split(".")[-1]
+            self.assertLessEqual(len(decimals), 5, f"coordinate {value} has more than 5 decimal digits")
+
     def test_georss_feed_south_atlantic(self):
         # Use new API v1 GeoRSS endpoint
         url = reverse("optimap:api-ocean-georss", kwargs={"ocean_slug": "south-atlantic-ocean"})
@@ -160,7 +173,8 @@ class GlobalFeedsAndLandingPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
 
         root = ET.fromstring(response.content)
-        titles = [item.find("title").text for item in root.findall(".//item", namespaces=NSPS)]
+        items = root.findall(".//item", namespaces=NSPS)
+        titles = [item.find("title").text for item in items]
 
         self.assertEqual(len(titles), 13, "GeoRSS feed for South Atlantic Ocean should return 13 entries")
         self.assertEqual(
@@ -171,6 +185,18 @@ class GlobalFeedsAndLandingPageTests(TestCase):
             "Seismic Survey: Mid-Atlantic Ridge",
             "GeoRSS feed for South Atlantic Ocean returned unexpected last title",
         )
+
+        # The fixture geometry for this entry is stored at 10-decimal precision
+        # (-35.0000123456 -30.0000987654, ...); the feed must round every
+        # coordinate to COORDINATE_PRECISION (5) regardless.
+        line_text = items[-1].find("georss:line", namespaces=NSPS).text
+        self.assertEqual(
+            line_text,
+            "-30.0001 -35.00001 -10.00003 -30.00001 10.00008 -25.00006 30.00002 -20.0001 50.00007 -15.00004",
+        )
+        for value in line_text.split():
+            decimals = value.split(".")[-1]
+            self.assertLessEqual(len(decimals), 5, f"coordinate {value} has more than 5 decimal digits")
 
     def test_all_continent_pages_display_correct_work_counts(self):
         """Test that all continent feed pages display the correct number of works."""

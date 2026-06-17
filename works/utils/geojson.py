@@ -42,7 +42,9 @@ def publications_to_geojson(publications) -> str:
         features.append(
             {
                 "type": "Feature",
-                "geometry": round_geojson_coordinates(json.loads(work.geometry.geojson)),
+                "geometry": json.loads(work._rounded_geojson)
+                if getattr(work, "_rounded_geojson", None)
+                else round_geojson_coordinates(json.loads(work.geometry.geojson)),
                 "properties": {
                     "id": work.id,
                     "title": work.title,
