@@ -18,9 +18,9 @@ of those events via ``job``. So migrated Works also get detached from their
 old ``job`` (set to NULL) before the old Source is removed.
 
 Usage:
-    python manage.py migrate_source_works --from-source eScholarship --to-source EarthArXiv --dry-run
-    python manage.py migrate_source_works --from-source eScholarship --to-source EarthArXiv
-    python manage.py migrate_source_works --from-source eScholarship --to-source EarthArXiv --delete-empty
+    python manage.py migrate_source_works --from-source "eScholarship Publishing" --to-source EarthArXiv --dry-run
+    python manage.py migrate_source_works --from-source "eScholarship Publishing" --to-source EarthArXiv
+    python manage.py migrate_source_works --from-source "eScholarship Publishing" --to-source EarthArXiv --delete-empty
 """
 
 from django.core.management.base import BaseCommand, CommandError
