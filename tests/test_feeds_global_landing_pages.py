@@ -298,6 +298,20 @@ class GlobalFeedsAndLandingPageTests(TestCase):
                         response, "No works found", msg_prefix=f"{region.name} should show empty message"
                     )
 
+    def test_continent_page_has_show_on_map_buttons(self):
+        """Cards on a region feed page (which has a map above the list) offer the
+        'Show on map' button — every listed work is geometry-filtered."""
+        region = (
+            GlobalRegion.objects.filter(region_type=GlobalRegion.CONTINENT, name__iexact="Europe").first()
+            or GlobalRegion.objects.filter(region_type=GlobalRegion.CONTINENT).first()
+        )
+        slug = self.slugify(region.name)
+        url = reverse("optimap:feed-continent-page", kwargs={"continent_slug": slug})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        if response.context["works"]:
+            self.assertContains(response, "show-on-map-btn")
+
     def test_continent_page_shows_region_metadata(self):
         """Test that continent pages show correct region metadata."""
         region = GlobalRegion.objects.filter(region_type=GlobalRegion.CONTINENT).first()

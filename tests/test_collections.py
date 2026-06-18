@@ -294,6 +294,33 @@ class CollectionDetailPageTests(TestCase):
         resp = self.client.get(reverse("optimap:collection-page", args=["mw"]))
         self.assertEqual(resp.status_code, 404)
 
+    def test_show_on_map_button_for_work_with_geometry(self):
+        # The card for a geometry-bearing work carries the "Show on map" button
+        # (the page has a map above the list).
+        resp = self.client.get(reverse("optimap:collection-page", args=["mw"]))
+        self.assertEqual(resp.status_code, 200)
+        body = resp.content.decode()
+        self.assertIn("show-on-map-btn", body)
+        self.assertIn(f'data-work-id="{self.work.id}"', body)
+
+    def test_no_show_on_map_button_for_work_without_geometry(self):
+        # A published work that has no spatial extent is not on the map, so its
+        # card must not offer the "Show on map" button.
+        no_geo = Work.objects.create(
+            title="No location study",
+            status="p",
+            doi="10.1234/mw-nogeo",
+            source=self.source,
+        )
+        no_geo.collections.add(self.col)
+        # Isolate this work so the geometry-bearing setUp work doesn't add a button.
+        self.work.collections.remove(self.col)
+        resp = self.client.get(reverse("optimap:collection-page", args=["mw"]))
+        self.assertEqual(resp.status_code, 200)
+        body = resp.content.decode()
+        self.assertIn("No location study", body)
+        self.assertNotIn("show-on-map-btn", body)
+
 
 class CollectionLogoTests(TestCase):
     """Curators and admins can set or clear a collection's logo_url inline."""
@@ -520,6 +547,27 @@ class CollectionDescriptionTests(TestCase):
         self.assertIn("add-curator-form", body)
 
 
+class WorksListPageNoMapButtonTests(TestCase):
+    """The plain works list (/works/) has no map above it, so its cards must
+    not render the 'Show on map' button."""
+
+    def setUp(self):
+        self.client = Client()
+        self.work = Work.objects.create(
+            title="Listed study",
+            status="p",
+            doi="10.1234/list1",
+            geometry=GeometryCollection(Point(1.0, 2.0)),
+        )
+
+    def test_works_list_has_no_show_on_map_button(self):
+        resp = self.client.get(reverse("optimap:works"))
+        self.assertEqual(resp.status_code, 200)
+        body = resp.content.decode()
+        self.assertIn("Listed study", body)
+        self.assertNotIn("show-on-map-btn", body)
+
+
 class CollectionByIdRedirectTests(TestCase):
     def setUp(self):
         self.client = Client()
@@ -697,11 +745,22 @@ class PublishCollectionWorksTests(TestCase):
         self.outsider_work.refresh_from_db()
         self.assertEqual(self.outsider_work.status, "h")
 
-    def test_curator_is_rejected(self):
+    def test_curator_can_publish(self):
+        # Curators of the collection may bulk-publish its Harvested/Contributed works.
         self.client.force_login(self.curator)
         resp = self.client.post(self._url())
-        # staff_member_required redirects to admin login for non-staff.
-        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json(), {"success": True, "published_count": 2})
+        for w in (self.harvested, self.contributed):
+            w.refresh_from_db()
+            self.assertEqual(w.status, "p")
+
+    def test_non_curator_is_rejected(self):
+        # An authenticated user who is not a curator of this collection gets 403.
+        outsider = User.objects.create_user(username="out@x.com", email="out@x.com", password="p123")
+        self.client.force_login(outsider)
+        resp = self.client.post(self._url())
+        self.assertEqual(resp.status_code, 403)
         self.harvested.refresh_from_db()
         self.assertEqual(self.harvested.status, "h")
 
@@ -738,10 +797,39 @@ class PublishCollectionWorksTests(TestCase):
         resp = self.client.get(reverse("optimap:collection-page", args=[self.col.identifier]))
         self.assertNotIn("Publish all", resp.content.decode())
 
-    def test_button_hidden_for_curator(self):
+    def test_button_visible_to_curator(self):
+        # Curators now publish works, so the publish-works button must render for them.
         self.client.force_login(self.curator)
         resp = self.client.get(reverse("optimap:collection-page", args=[self.col.identifier]))
-        self.assertNotIn("Publish all", resp.content.decode())
+        self.assertIn("Publish all 2 unpublished works", resp.content.decode())
+
+    def test_filter_link_visible_to_curator(self):
+        self.client.force_login(self.curator)
+        resp = self.client.get(reverse("optimap:collection-page", args=[self.col.identifier]))
+        body = resp.content.decode()
+        # Both h/c works carry geometry → both are "ready to publish".
+        self.assertIn("filter=publishable-extent", body)
+        self.assertIn("Show 2 works ready to publish", body)
+
+    def test_filter_narrows_list_but_keeps_total(self):
+        # The harvested + contributed works (with extent) are in the filtered list;
+        # the published work is not. The unfiltered total stays at 3 (h, c, p).
+        self.client.force_login(self.curator)
+        url = reverse("optimap:collection-page", args=[self.col.identifier])
+        resp = self.client.get(url, {"filter": "publishable-extent"})
+        self.assertEqual(resp.status_code, 200)
+        page_obj = resp.context["page_obj"]
+        ids = {w.pk for w in page_obj.object_list}
+        self.assertEqual(ids, {self.harvested.pk, self.contributed.pk})
+        # Unfiltered total of works visible to a curator (h, c, d, w, p) is unchanged.
+        self.assertEqual(resp.context["work_count_total"], 5)
+
+    def test_filter_ignored_for_anonymous(self):
+        # Anonymous users only ever see published works regardless of the filter param.
+        url = reverse("optimap:collection-page", args=[self.col.identifier])
+        resp = self.client.get(url, {"filter": "publishable-extent"})
+        ids = {w.pk for w in resp.context["page_obj"].object_list}
+        self.assertEqual(ids, {self.already_published.pk})
 
 
 class CuratorAddRemoveTests(TestCase):

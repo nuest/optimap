@@ -318,10 +318,17 @@ Bulk actions on the changelist: **Publish selected collections** and **Unpublish
 Staff users see admin chrome integrated into the public pages:
 
 - on `/collections/` — a status badge per row (Published / Unpublished) plus a one-click Publish/Unpublish button and a deep-link to the admin change page;
-- on `/collections/<identifier>/` — a top-of-page banner with the same controls;
+- on `/collections/<identifier>/` — an **admin** banner (staff only) with the collection-wide Publish/Unpublish, Edit logo, and Edit in Admin controls;
 - on every work landing page — for users who curate at least one collection, an "Add to / Remove from" button per applicable collection.
 
 These mirror the per-work admin controls on the work landing page (Publish / Unpublish / Edit in Admin), keeping the workflow consistent for both admins and curators.
+
+#### Curation box on the collection page
+
+Curators **and** admins of a collection see a **Curation** card on `/collections/<identifier>/` with two parts:
+
+- **Review & publish** — bulk-publish the collection's unpublished works (status Harvested `h` or Contributed `c`; Draft/Testing/Withdrawn are left untouched). Two buttons: **Publish all N unpublished works** and **Publish N with extent** (only those that already have a spatial or temporal extent). Both POST to `/collections/<id>/publish-works/` (`extent_only=1` for the latter) and are now allowed for **curators**, not just staff — only publishing/unpublishing the *whole collection* stays admin-only (in the admin banner). A **"Show N works ready to publish"** filter link (`?filter=publishable-extent`) narrows the work list below to exactly the "Publish N with extent" set so a curator can eyeball them before publishing; "show all works" clears it. The collection's total work count in the admin banner is unaffected by the filter.
+- **Curators** — add a curator by email or remove an existing one (the same membership managed by the admin `filter_horizontal` widget).
 
 ### Unpublished works on the maps
 

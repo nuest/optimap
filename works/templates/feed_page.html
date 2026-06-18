@@ -97,15 +97,18 @@
                   {% endif %}
                 </small>
 
-                {% if work.doi %}
-                  <a href="{% url 'optimap:work-landing' work.doi %}" class="btn btn-primary btn-sm">
-                    <i class="fas fa-map-marked-alt"></i> View work's page
-                  </a>
-                {% elif work.url %}
-                  <a href="{{ work.url }}" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer">
-                    View work (external)
-                  </a>
-                {% endif %}
+                <div class="d-flex" style="gap: .5rem;">
+                  {% if work.doi %}
+                    <a href="{% url 'optimap:work-landing' work.doi %}" class="btn btn-primary btn-sm" style="flex: 2 1 0;">
+                      <i class="fas fa-map-marked-alt"></i> View work's page
+                    </a>
+                  {% elif work.url %}
+                    <a href="{{ work.url }}" class="btn btn-primary btn-sm" style="flex: 2 1 0;" target="_blank" rel="noopener noreferrer">
+                      View work (external)
+                    </a>
+                  {% endif %}
+                  {% include "_show_on_map_button.html" %}
+                </div>
               </div>
             </div>
           {% endfor %}
@@ -150,6 +153,7 @@
 <script src="{% static 'js/map-gazetteer.js' %}"></script>
 <script src="{% static 'js/map-zoom-to-all.js' %}"></script>
 <script src="{% static 'js/map-base.js' %}"></script>
+<script src="{% static 'js/map-locate-card.js' %}"></script>
 <script type="text/javascript">
   $(document).ready(function() {
     if (!document.getElementById('feed-map')) { return; }
@@ -192,7 +196,7 @@
         onEachFeature: publicationPopup,
       }).addTo(map);
 
-      if (typeof MapInteractionManager !== 'undefined') { new MapInteractionManager(map, pubLayer); }
+      if (typeof MapInteractionManager !== 'undefined') { window.__optimapInteraction = new MapInteractionManager(map, pubLayer); }
       if (typeof MapZoomToAllControl !== 'undefined') { zoomCtrl = new MapZoomToAllControl(map, pubLayer); }
 
       if (pubLayer.getBounds().isValid()) {
@@ -226,6 +230,10 @@
       setScope('all');
     } else {
       buildMap(pageData);
+    }
+
+    if (typeof MapLocateCardManager !== 'undefined') {
+      new MapLocateCardManager(map, function () { return pubLayer; }, function () { return window.__optimapInteraction; });
     }
 
     if (btnAll) {

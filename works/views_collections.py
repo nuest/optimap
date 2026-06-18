@@ -105,6 +105,37 @@ def collection_page(request, collection_slug):
     if not can_curate:
         works_qs = works_qs.filter(status="p")
     works_qs = annotate_rounded_geometry(works_qs.order_by("-creationDate", "-id"))
+    # Unfiltered total of works visible to this user — stays stable even when the
+    # curation filter below narrows the displayed list.
+    work_count_total = works_qs.count()
+
+    # Counts for the curation publish helpers (shown to curators and admins):
+    # only Harvested ('h') and Contributed ('c') — Draft / Testing / Withdrawn
+    # are deliberate states and never auto-published.
+    publishable_count = 0
+    publishable_geo_count = 0
+    publishable_geo_ids = []
+    if can_curate:
+        publishable_count = Work.objects.filter(collections=collection, status__in=["h", "c"]).count()
+        candidate_qs = Work.objects.filter(collections=collection, status__in=["h", "c"]).only(
+            "id", "geometry", "timeperiod_startdate", "timeperiod_enddate"
+        )
+        # Same extent predicate the "Publish N with extent" button uses, so the
+        # filter below matches that button's target set 1:1.
+        publishable_geo_ids = [
+            w.pk
+            for w in candidate_qs
+            if (w.geometry and not w.geometry.empty)
+            or any(d is not None for d in (w.timeperiod_startdate or []))
+            or any(d is not None for d in (w.timeperiod_enddate or []))
+        ]
+        publishable_geo_count = len(publishable_geo_ids)
+
+    # Optional curation filter: narrow the list to exactly the works the
+    # "Publish N with extent" button acts on (Harvested/Contributed with extent).
+    active_filter = request.GET.get("filter")
+    if can_curate and active_filter == "publishable-extent":
+        works_qs = works_qs.filter(pk__in=publishable_geo_ids)
 
     page_size = request.GET.get("size", settings.PAGE_MAX_ITEMS)
     try:
@@ -128,24 +159,9 @@ def collection_page(request, collection_slug):
             d is not None for d in (w.timeperiod_enddate or [])
         )
 
-    # Count of works that the bulk "Publish all" admin button would publish:
-    # only Harvested ('h') and Contributed ('c') — Draft / Testing / Withdrawn
-    # are deliberate admin states and never auto-published.
-    publishable_count = Work.objects.filter(collections=collection, status__in=["h", "c"]).count() if is_admin else 0
-    # Count of the above that also have at least one real geometry or temporal value.
-    publishable_geo_count = 0
+    # Per-source analytics — admin only.
     source_stats = []
     if is_admin:
-        candidate_qs = Work.objects.filter(collections=collection, status__in=["h", "c"]).only(
-            "geometry", "timeperiod_startdate", "timeperiod_enddate"
-        )
-        publishable_geo_count = sum(
-            1
-            for w in candidate_qs
-            if (w.geometry and not w.geometry.empty)
-            or any(d is not None for d in (w.timeperiod_startdate or []))
-            or any(d is not None for d in (w.timeperiod_enddate or []))
-        )
         oai_types = {"oai-pmh", "ojs", "janeway"}
         # Include sources whose default collection is this one (FK) AND any
         # source that actually has works here — the two sets can diverge (e.g.
@@ -202,7 +218,8 @@ def collection_page(request, collection_slug):
         "can_edit_description": is_admin or is_curator,
         "publishable_count": publishable_count,
         "publishable_geo_count": publishable_geo_count,
-        "work_count_total": page_obj.paginator.count,
+        "active_filter": active_filter,
+        "work_count_total": work_count_total,
         "source_stats": source_stats,
         "canonical_url": request.build_absolute_uri(collection.get_absolute_url()),
         "curators": list(collection.curators.all()),
@@ -273,10 +290,19 @@ def unpublish_collection(request, collection_id):
     return JsonResponse({"success": True, "is_published": False})
 
 
-@staff_member_required
+def _user_can_curate(user, collection):
+    """A user is a curator of X iff they're listed in collection.curators (or are staff)."""
+    if not user.is_authenticated:
+        return False
+    if user.is_staff:
+        return True
+    return collection.curators.filter(pk=user.pk).exists()
+
+
+@login_required
 @require_POST
 def publish_collection_works(request, collection_id):
-    """Admins only: bulk-set Harvested/Contributed works in the collection to Published.
+    """Curators and admins: bulk-set Harvested/Contributed works to Published.
 
     POST param ``extent_only=1``: restrict to works that have at least one real
     geometry point or a non-null temporal value (skips empty GeometryCollections
@@ -286,6 +312,8 @@ def publish_collection_works(request, collection_id):
     admin-managed states and are deliberately left untouched.
     """
     collection = get_object_or_404(Collection, pk=collection_id)
+    if not _user_can_curate(request.user, collection):
+        return JsonResponse({"error": "Not a curator of this collection."}, status=403)
     if request.POST.get("extent_only") == "1":
         qs = Work.objects.filter(collections=collection, status__in=["h", "c"]).only(
             "geometry", "timeperiod_startdate", "timeperiod_enddate"
@@ -301,15 +329,6 @@ def publish_collection_works(request, collection_id):
     else:
         count = Work.objects.filter(collections=collection, status__in=["h", "c"]).update(status="p")
     return JsonResponse({"success": True, "published_count": count})
-
-
-def _user_can_curate(user, collection):
-    """A user is a curator of X iff they're listed in collection.curators (or are staff)."""
-    if not user.is_authenticated:
-        return False
-    if user.is_staff:
-        return True
-    return collection.curators.filter(pk=user.pk).exists()
 
 
 @login_required

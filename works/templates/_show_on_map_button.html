@@ -1,0 +1,12 @@
+{% comment %}
+  Secondary work-card button that zooms the map above the card list to the
+  work's geometry instead of navigating away. Only include this on pages that
+  render a map above the list (collection_page.html, feed_page.html); the
+  behaviour is wired up by works/static/js/map-locate-card.js. Requires `work`
+  in context with a numeric `work.id`.
+{% endcomment %}
+<button type="button" class="btn btn-light btn-sm show-on-map-btn" style="flex: 1 1 0;"
+        data-work-id="{{ work.id }}"
+        title="Zoom the map above to this work's location">
+  <i class="fas fa-search-location"></i> Show on map
+</button>
