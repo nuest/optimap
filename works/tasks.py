@@ -662,13 +662,16 @@ def regenerate_geojson_cache():
     return json_path
 
 
-def convert_geojson_via_ogr(geojson_path, *, fmt, ext, layer_creation_options=None):
+def convert_geojson_via_ogr(geojson_path, *, fmt, ext, layer_creation_options=None, field_type_map=None):
     """Convert an existing GeoJSON dump to ``fmt`` via ``ogr2ogr``.
 
     ``fmt`` is the OGR driver name (e.g. ``"GPKG"``, ``"CSV"``); ``ext`` is the
     file extension used for the output dump filename (e.g. ``"gpkg"``,
     ``"csv"``); ``layer_creation_options`` is a list of ``KEY=VALUE`` strings
-    passed via ``-lco``. Returns the output path or ``None`` if ogr2ogr fails.
+    passed via ``-lco``; ``field_type_map`` is a list of ``SRC=DST`` strings
+    passed via ``-mapFieldType`` (used to pin field-type conversions the driver
+    would otherwise do implicitly, e.g. ``StringList=String(JSON)`` for GPKG).
+    Returns the output path or ``None`` if ogr2ogr fails.
     """
     cache_dir = os.path.dirname(geojson_path)
     out_filename = generate_data_dump_filename(ext)
@@ -676,6 +679,8 @@ def convert_geojson_via_ogr(geojson_path, *, fmt, ext, layer_creation_options=No
     cmd = ["ogr2ogr", "-f", fmt, out_path, geojson_path]
     for opt in layer_creation_options or []:
         cmd.extend(["-lco", opt])
+    for spec in field_type_map or []:
+        cmd.extend(["-mapFieldType", spec])
     try:
         output = subprocess.check_output(cmd, stderr=subprocess.STDOUT, text=True)
         logger.info("ogr2ogr output (%s):\n%s", fmt, output)
@@ -686,7 +691,17 @@ def convert_geojson_via_ogr(geojson_path, *, fmt, ext, layer_creation_options=No
 
 
 def convert_geojson_to_geopackage(geojson_path):
-    return convert_geojson_via_ogr(geojson_path, fmt="GPKG", ext="gpkg")
+    # GPKG has no native list column type. Without an explicit mapping, ogr2ogr
+    # auto-downgrades the GeoJSON array fields (authors/keywords/topics/
+    # bok_concepts/collections, all StringList) to String(JSON) and warns about
+    # it on every run. Pin that same conversion so the output is unchanged but
+    # the benign warnings disappear.
+    return convert_geojson_via_ogr(
+        geojson_path,
+        fmt="GPKG",
+        ext="gpkg",
+        field_type_map=["StringList=String(JSON)"],
+    )
 
 
 def convert_geojson_to_csv(geojson_path):

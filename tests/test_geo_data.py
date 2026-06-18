@@ -16,6 +16,7 @@ from django.urls import reverse
 
 from works.models import Collection, Source, Work
 from works.tasks import (
+    convert_geojson_to_geopackage,
     regenerate_all_data_dumps,
     regenerate_csv_cache,
     regenerate_geojson_cache,
@@ -262,6 +263,40 @@ class GeoDataAlternativeTestCase(TestCase):
         for fmt, path in result.items():
             self.assertIsNotNone(path, f"{fmt} dump should be produced")
             self.assertTrue(Path(path).exists(), f"{fmt} dump file should exist on disk")
+
+    def test_geopackage_list_fields_no_stringlist_warning(self):
+        # GeoJSON array fields become OGR StringList, which GPKG has no native
+        # type for. We pin the conversion to String(JSON) so ogr2ogr no longer
+        # warns on every run -- assert that benign warning is gone while the
+        # values still round-trip as clean JSON arrays (not the lossy "(n:..)"
+        # form a plain String cast would produce).
+        pub = Work.objects.first()
+        pub.status = "p"
+        pub.authors = ["Doe, Jane", "Roe, Max"]
+        pub.keywords = ["geo", "maps"]
+        pub.save()
+
+        with self.assertLogs("works.tasks", level="INFO") as cm:
+            gpkg_path = convert_geojson_to_geopackage(regenerate_geojson_cache())
+        self.assertIsNotNone(gpkg_path, "ogr2ogr GPKG conversion should succeed")
+        self.assertNotIn(
+            "does not seem to natively support StringList",
+            "\n".join(cm.output),
+            "GPKG conversion should not emit the StringList downgrade warning",
+        )
+
+        # ogr2ogr names the layer after the source filename, so open the default layer.
+        with fiona.open(gpkg_path) as layer:
+            authors = next(feat["properties"]["authors"] for feat in layer if feat["properties"].get("authors"))
+        # The JSON subtype lets readers parse the column; fiona returns it as a
+        # list. Accept a raw JSON string too in case a reader leaves it as text.
+        if isinstance(authors, str):
+            authors = json.loads(authors)
+        self.assertEqual(
+            authors,
+            ["Doe, Jane", "Roe, Max"],
+            "GPKG list columns should round-trip as JSON arrays, not the lossy '(n:..)' form",
+        )
 
     def test_dump_has_source_and_collections_fields(self):
         """GeoJSON dump replaces FK integer source with source_name + source_url + collections."""
