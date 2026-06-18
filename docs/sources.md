@@ -30,7 +30,7 @@ These statistics are refreshed after each successful harvest and displayed:
 
 ---
 
-## AGILE GIS
+## AGILE GI
 
 Conference proceedings of the [AGILE International Conference on Geographic Information Science](https://agile-gi.eu/).
 Two sources cover different publication periods and publishers; both feed the same collection.
@@ -38,11 +38,14 @@ Two sources cover different publication periods and publishers; both feed the sa
 | Key | Name | Publisher | Years | Type |
 |-----|------|-----------|-------|------|
 | `agile-giss` | AGILE: GIScience Series | Copernicus Publications | 2020–present | Crossref |
-| `agile-springer-lncs` | AGILE: Springer LNCS Proceedings | Springer | 2008–2019 | Crossref |
+| `agile-gi-lncs` | AGILE: Springer LNCS Proceedings | Springer | 2008–2019 | Crossref |
 
 ```bash
+# both streams in one run (both keys start with agile-gi)
+python manage.py harvest_sources --source-prefix agile-gi
+# or individually
 python manage.py harvest_sources --source agile-giss
-python manage.py harvest_sources --source agile-springer-lncs
+python manage.py harvest_sources --source agile-gi-lncs
 ```
 
 ---

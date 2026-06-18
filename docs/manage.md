@@ -89,24 +89,24 @@ The harvester (`works.tasks.harvest_openalex_source`) needs the OpenAlex Source 
 
 The public Source API exposes a derived `openalex_url` (`https://openalex.org/<S-id>`) computed from `openalex_id`; it is no longer a stored field, so there is no second OpenAlex field to keep in sync.
 
-#### AGILE GIS collection — two sources, one collection
+#### AGILE GI collection — two sources, one collection
 
-The **AGILE GIS** collection (`/collections/agile-gis/`) is fed by two `SOURCE_CONFIG` entries that share the same `collection_name`:
+The **AGILE GI** collection (`/collections/agile-gi/`) is fed by two `SOURCE_CONFIG` entries that share the same `collection_name`:
 
 | Key | Source name | Publisher | Years | harvest task |
 |-----|------------|-----------|-------|-------------|
 | `agile-giss` | AGILE: GIScience Series (Crossref) | Copernicus | 2020–present | `harvest_crossref_prefix` |
-| `agile-gis-lncs` | AGILE: Springer LNCS Proceedings | Springer | 2008–2019 | `harvest_crossref_book_list` |
+| `agile-gi-lncs` | AGILE: Springer LNCS Proceedings | Springer | 2008–2019 | `harvest_crossref_book_list` |
 
 Run both with:
 ```bash
-python manage.py harvest_sources --source-prefix agile-gis
+python manage.py harvest_sources --source-prefix agile-gi
 ```
 
 Or individually:
 ```bash
 python manage.py harvest_sources --source agile-giss
-python manage.py harvest_sources --source agile-gis-lncs
+python manage.py harvest_sources --source agile-gi-lncs
 ```
 
 The Springer source uses `harvest_crossref_book_list` — it iterates over 12 hardcoded ISBNs (one per conference year), calling `filter=prefix:10.1007,isbn:{isbn}` for each, and merges all results into a single `HarvestingEvent`. Springer chapters carry no spatial/temporal metadata from Crossref or from publisher landing pages; geometry can be contributed by users via the contribution workflow at `/contribute/`.
@@ -124,7 +124,7 @@ Minimum-viable example for **AGILE GIScience Series (Copernicus via OpenAlex)**:
 | `default_work_type` | `proceedings-article` |
 | `is_oa` | ✓ *(display flag)* |
 | `harvest_interval_minutes` | `0` *(start manual, raise once a smoke run succeeds)* |
-| `collection` | optional — pick or create `agile-gis` |
+| `collection` | optional — pick or create `agile-gi` |
 | `publisher_name`, `homepage_url` | optional display fields |
 
 > **Common error:** if you create the source with `source_type=oai-pmh` and the AGILE-GISS OAI URL (`https://oai-pmh.copernicus.org/oai.php?…&set=agile-giss`), the harvester will fail with HTTP 404 — Copernicus's OAI-PMH endpoint has been dark since 2025-12. Switch `source_type` to `crossref-prefix` with `doi_prefix=10.5194` and `source_titles=["AGILE: GIScience Series"]`, or use the `agile-giss` built-in entry.

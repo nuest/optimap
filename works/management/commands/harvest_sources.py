@@ -73,15 +73,16 @@ SOURCE_CONFIG = {
         "is_oa": True,
         "default_work_type": "article",
     },
-    # AGILE GIS — two publishing streams for one collection.
-    # Use --source-prefix agile-gis to harvest both in one run.
+    # AGILE GI — two publishing streams for one collection.
+    # Both source keys start with `agile-gi`, so --source-prefix agile-gi
+    # harvests both in one run.
     "agile-giss": {
         "name": "AGILE: GIScience Series (Crossref)",
         "openalex_id": "S4210203054",
         # Crossref-prefix harvester ignores `url` (builds its own params), but
         # we keep a representative URL for the admin UI / --list display.
         "url": "https://api.crossref.org/works?filter=prefix:10.5194,container-title:AGILE%3A+GIScience+Series",
-        "collection_name": "AGILE GIS",
+        "collection_name": "AGILE GI",
         "collection_description": (
             "Full papers from the AGILE International Conference on Geographic Information Science, "
             "the annual meeting of the Association of Geographic Information Laboratories in Europe "
@@ -104,12 +105,12 @@ SOURCE_CONFIG = {
         "is_oa": True,
         "default_work_type": "proceedings-article",
     },
-    "agile-gis-lncs": {
+    "agile-gi-lncs": {
         "name": "AGILE: Springer LNCS Proceedings",
         # Crossref-prefix harvester ignores `url` (builds its own params), but
         # we keep a representative URL for the admin UI / --list display.
         "url": "https://api.crossref.org/works?filter=prefix:10.1007",
-        "collection_name": "AGILE GIS",
+        "collection_name": "AGILE GI",
         "collection_description": (
             "Full papers from the AGILE International Conference on Geographic Information Science, "
             "the annual meeting of the Association of Geographic Information Laboratories in Europe "

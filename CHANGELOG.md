@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **AGILE collection renamed "AGILE GIS" → "AGILE GI"**: the curated collection is renamed (display name "AGILE GI", identifier/slug `agile-gi`, canonical URL `/collections/agile-gi/`) to match the conference's branding. Both `SOURCE_CONFIG` `collection_name` values now read `"AGILE GI"`, and the Springer source key was renamed `agile-gis-lncs` → `agile-gi-lncs` for consistency (the Copernicus `agile-giss` key is unchanged — it abbreviates "GIScience Series"). Both keys still share the `agile-gi` prefix, so `--source-prefix agile-gi` harvests both streams in one run. Existing work membership is preserved (the `Work.collections` M2M is keyed by primary key, not slug); operators must rename the `Collection` row in place (`identifier`, `name`) on each deployment. The old `/collections/agile-gis/` URL (and its feeds/downloads) returns 404 after the rename; `short_slug` is intentionally left unset so the identifier is the only URL.
+
 - **Statistics "Calculate now" is now a background job** instead of a synchronous computation. The staff button on the `/statistics` page now POSTs to a new endpoint `POST /api/v1/statistics/recompute/`, which enqueues the `works.tasks.recompute_statistics_snapshot` Django-Q task and returns `202 Accepted` immediately; the refreshed numbers appear after the worker finishes. This keeps the request responsive as statistics computation grows in complexity and matches the data-dump button's approach. The legacy synchronous `GET /api/v1/statistics/?now` trigger is removed — that endpoint is now read-only.
 
 ## [0.27.0] - 2026-06-17
