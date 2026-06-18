@@ -93,6 +93,7 @@
                 <button type="button"
                         id="collection-logo-edit-btn"
                         class="btn btn-outline-secondary btn-sm"
+                        data-toggle="tooltip"
                         title="Set, change, or remove the collection logo image">
                   <i class="fas fa-image"></i>
                   {% if collection.logo_url %}Edit logo{% else %}Set logo{% endif %}
@@ -120,9 +121,9 @@
                 <thead class="thead-light">
                   <tr>
                     <th scope="col">Source</th>
-                    <th scope="col" class="text-right"><abbr title="Works from this source in OPTIMAP that are not yet published (Draft, Harvested, or Contributed)">Pending</abbr></th>
-                    <th scope="col" class="text-right"><abbr title="Works from this source published in OPTIMAP">Published</abbr></th>
-                    <th scope="col" class="text-right"><abbr title="Total records in OAI-PMH set / Crossref / OpenAlex (upstream, not in OPTIMAP)">Upstream total</abbr></th>
+                    <th scope="col" class="text-right"><abbr data-toggle="tooltip" title="Works from this source in OPTIMAP that are not yet published (Draft, Harvested, or Contributed)">Pending</abbr></th>
+                    <th scope="col" class="text-right"><abbr data-toggle="tooltip" title="Works from this source published in OPTIMAP">Published</abbr></th>
+                    <th scope="col" class="text-right"><abbr data-toggle="tooltip" title="Total records in OAI-PMH set / Crossref / OpenAlex (upstream, not in OPTIMAP)">Upstream total</abbr></th>
                     <th scope="col" class="text-muted">As of</th>
                   </tr>
                 </thead>
@@ -140,18 +141,18 @@
                     </td>
                     <td class="text-right">
                       {% if stat.has_oai_count %}
-                        <abbr title="Total records in OAI-PMH set (may be lower than OpenAlex when older volumes are on another platform)">{{ stat.oai_works_count }} <small class="text-muted">OAI</small></abbr>
+                        <abbr data-toggle="tooltip" title="Total records in OAI-PMH set (may be lower than OpenAlex when older volumes are on another platform)">{{ stat.oai_works_count }} <small class="text-muted">OAI</small></abbr>
                       {% elif stat.is_oai %}
                         <span class="text-muted">OAI pending</span>
                       {% endif %}
                       {% if stat.has_openalex_count %}
                         {% if stat.has_oai_count or stat.is_oai %}&thinsp;{% endif %}
-                        <abbr title="Total works indexed by OpenAlex (may include older volumes not in the OAI set)">{{ stat.openalex_works_count }} <small class="text-muted">OA</small></abbr>
+                        <abbr data-toggle="tooltip" title="Total works indexed by OpenAlex (may include older volumes not in the OAI set)">{{ stat.openalex_works_count }} <small class="text-muted">OA</small></abbr>
                       {% elif stat.openalex_id %}
                         <span class="text-muted">OA pending</span>
                       {% endif %}
                       {% if stat.has_crossref_count %}
-                        <abbr title="Total DOIs in Crossref matching this source's prefix{% if stat.source_type == 'crossref-prefix' %} and title filter{% endif %}">{{ stat.crossref_works_count }} <small class="text-muted">CR</small></abbr>
+                        <abbr data-toggle="tooltip" title="Total DOIs in Crossref matching this source's prefix{% if stat.source_type == 'crossref-prefix' %} and title filter{% endif %}">{{ stat.crossref_works_count }} <small class="text-muted">CR</small></abbr>
                       {% elif stat.is_crossref %}
                         <span class="text-muted">CR pending</span>
                       {% endif %}
@@ -209,6 +210,7 @@
           <button type="button"
                   id="collection-logo-edit-btn"
                   class="btn btn-outline-secondary btn-sm ml-3 flex-shrink-0"
+                  data-toggle="tooltip"
                   title="Set, change, or remove the collection logo image">
             <i class="fas fa-image"></i>
             {% if collection.logo_url %}Edit logo{% else %}Set logo{% endif %}
@@ -319,6 +321,7 @@
                           data-collection-id="{{ collection.id }}"
                           data-user-id="{{ curator.id }}"
                           data-csrf="{{ csrf_token }}"
+                          data-toggle="tooltip"
                           title="Remove {{ curator.email|default:curator.username }} as curator">
                     <i class="fas fa-user-minus"></i> Remove
                   </button>
@@ -363,11 +366,13 @@
       <p>
         <a href="{% url 'optimap:contribute' %}?collection={{ collection.identifier }}"
            class="btn btn-outline-primary btn-sm"
+           data-toggle="tooltip"
            title="Show only the harvested works of this collection that need geolocation or temporal extent.">
           <i class="fas fa-map-marked-alt"></i> Contribute metadata for this collection
         </a>
         <a href="{% url 'optimap:contribute-next' %}?collection={{ collection.identifier }}"
            class="btn btn-outline-primary btn-sm"
+           data-toggle="tooltip"
            title="Start georeferencing game with works from this collection">
           <i class="fas fa-gamepad"></i> <strong>Play</strong>
         </a>
@@ -379,8 +384,10 @@
         <div class="d-flex justify-content-end mb-3">
           <div class="btn-group btn-group-sm" id="map-scope-toggle" role="group" aria-label="Map scope">
             <button type="button" class="btn btn-outline-secondary active" id="map-scope-page"
+              data-toggle="tooltip"
               title="Show only the {{ page_obj.object_list|length }} work{{ page_obj.object_list|length|pluralize }} on the current page.">Show only page on map</button>
             <button type="button" class="btn btn-outline-secondary" id="map-scope-all"
+              data-toggle="tooltip"
               title="Load and show all {{ page_obj.paginator.count }} work{{ page_obj.paginator.count|pluralize }} in this collection. Current-page works are highlighted in orange. Loaded data is cached in the browser — switching pages is instant after the first load.">Show all on map</button>
           </div>
         </div>
@@ -411,6 +418,7 @@
                       {% elif work.status == 'h' %}badge-info
                       {% elif work.status == 'c' %}badge-primary
                       {% endif %}"
+                      data-toggle="tooltip"
                       title="Publication status (visible to curators and admins).">
                       {{ work.get_status_display }}
                     </span>
@@ -448,12 +456,14 @@
                     <div class="text-right ml-2 flex-shrink-0">
                       <div class="mb-1">
                         <span class="badge {% if work.has_geo %}badge-success{% else %}badge-secondary{% endif %}"
+                              data-toggle="tooltip"
                               title="{% if work.has_geo %}Has spatial extent{% else %}No spatial extent{% endif %}">
                           <i class="fas fa-map-marker-alt"></i> Spatial
                         </span>
                       </div>
                       <div>
                         <span class="badge {% if work.has_temporal %}badge-success{% else %}badge-secondary{% endif %}"
+                              data-toggle="tooltip"
                               title="{% if work.has_temporal %}Has temporal extent{% else %}No temporal extent{% endif %}">
                           <i class="fas fa-clock"></i> Temporal
                         </span>
@@ -514,11 +524,13 @@
       <div class="mt-4">
         <a href="{% url 'optimap:contribute' %}?collection={{ collection.identifier }}"
            class="btn btn-outline-primary"
+           data-toggle="tooltip"
            title="Show only the harvested works of this collection that need geolocation or temporal extent.">
           <i class="fas fa-map-marked-alt"></i> Contribute metadata for this collection
         </a>
         <a href="{% url 'optimap:contribute-next' %}?collection={{ collection.identifier }}"
            class="btn btn-outline-primary"
+           data-toggle="tooltip"
            title="Start georeferencing game with works from this collection">
           <i class="fas fa-gamepad"></i> <strong>Play</strong>
         </a>

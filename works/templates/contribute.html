@@ -104,12 +104,14 @@
                   <div class="text-right ml-2 flex-shrink-0">
                     <div class="mb-1">
                       <span class="badge {% if work.has_geo %}badge-success{% else %}badge-secondary{% endif %}"
+                            data-toggle="tooltip"
                             title="{% if work.has_geo %}Has spatial extent{% else %}No spatial extent{% endif %}">
                         <i class="fas fa-map-marker-alt" aria-hidden="true"></i> Spatial
                       </span>
                     </div>
                     <div>
                       <span class="badge {% if work.has_temporal %}badge-success{% else %}badge-secondary{% endif %}"
+                            data-toggle="tooltip"
                             title="{% if work.has_temporal %}Has temporal extent{% else %}No temporal extent{% endif %}">
                         <i class="fas fa-clock" aria-hidden="true"></i> Temporal
                       </span>

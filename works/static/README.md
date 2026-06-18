@@ -25,9 +25,13 @@ This script downloads all dependencies listed below.
   - Source: https://cdn.jsdelivr.net/npm/bootstrap@4.4.1/dist/js/
   - Files: `js/bootstrap.min.js`, `js/bootstrap.min.js.map`
 
-- **Popper.js 2.x** - MIT License (required for Bootstrap tooltips)
-  - Source: https://unpkg.com/@popperjs/core@2/dist/umd/
+- **Popper.js 1.16.1** - MIT License (required by Bootstrap 4 tooltips/popovers/dropdowns)
+  - Source: https://unpkg.com/popper.js@1.16.1/dist/umd/
   - Files: `js/popper.min.js`
+  - Note: Bootstrap 4 only works with Popper.js **v1.x** (the `popper.js` package).
+    Popper **v2** (`@popperjs/core`) removed the `new Popper()` constructor and throws
+    "Popper is not a constructor" when a tooltip is shown. Keep this at v1 until/unless
+    Bootstrap is upgraded to v5.
 
 ### Leaflet and Plugins
 

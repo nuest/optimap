@@ -248,7 +248,7 @@
                     <h5 class="mb-0">
                         <i class="fas fa-chevron-right" id="extraction-options-icon"></i> Extraction options
                     </h5>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="reset-options-btn" title="Reset all extraction options to their default values">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="reset-options-btn" data-toggle="tooltip" title="Reset all extraction options to their default values">
                         <i class="fas fa-undo"></i> Reset to defaults
                     </button>
                 </div>
@@ -257,7 +257,7 @@
                         <div class="form-group col-md-6">
                             <label for="response_format">
                                 Output format
-                                <i class="fas fa-question-circle tooltip-icon"
+                                <i class="fas fa-question-circle tooltip-icon" data-toggle="tooltip"
                                    title="Choose the format for the extracted spatial extent: GeoJSON (standard), WKT (text), or WKB (binary)"></i>
                             </label>
                             <select class="form-control" id="response_format" name="response_format">
@@ -269,7 +269,7 @@
                         <div class="form-group col-md-6">
                             <label for="gazetteer">
                                 Gazetteer service
-                                <i class="fas fa-question-circle tooltip-icon"
+                                <i class="fas fa-question-circle tooltip-icon" data-toggle="tooltip"
                                    title="Choose which geocoding service to use for place name lookups (when placename option is enabled)"></i>
                             </label>
                             <select class="form-control" id="gazetteer" name="gazetteer">
@@ -285,7 +285,7 @@
                                 <input class="form-check-input" type="checkbox" id="bbox" name="bbox" checked>
                                 <label class="form-check-label" for="bbox">
                                     Bounding box
-                                    <i class="fas fa-question-circle tooltip-icon"
+                                    <i class="fas fa-question-circle tooltip-icon" data-toggle="tooltip"
                                        title="Extract the minimum bounding rectangle (bbox) that encompasses all spatial features"></i>
                                 </label>
                             </div>
@@ -295,7 +295,7 @@
                                 <input class="form-check-input" type="checkbox" id="tbox" name="tbox">
                                 <label class="form-check-label" for="tbox">
                                     Time box
-                                    <i class="fas fa-question-circle tooltip-icon"
+                                    <i class="fas fa-question-circle tooltip-icon" data-toggle="tooltip"
                                        title="Extract temporal extent (start and end time) from the data"></i>
                                 </label>
                             </div>
@@ -305,7 +305,7 @@
                                 <input class="form-check-input" type="checkbox" id="convex_hull" name="convex_hull">
                                 <label class="form-check-label" for="convex_hull">
                                     Convex hull
-                                    <i class="fas fa-question-circle tooltip-icon"
+                                    <i class="fas fa-question-circle tooltip-icon" data-toggle="tooltip"
                                        title="Calculate the smallest convex polygon that contains all points (more accurate than bbox, but computationally expensive)"></i>
                                 </label>
                             </div>
@@ -315,7 +315,7 @@
                                 <input class="form-check-input" type="checkbox" id="placename" name="placename" checked>
                                 <label class="form-check-label" for="placename">
                                     Place name
-                                    <i class="fas fa-question-circle tooltip-icon"
+                                    <i class="fas fa-question-circle tooltip-icon" data-toggle="tooltip"
                                        title="Reverse geocode the extent to find associated place names using the selected gazetteer service"></i>
                                 </label>
                             </div>
@@ -327,7 +327,7 @@
                                 <input class="form-check-input" type="checkbox" id="external_metadata" name="external_metadata" checked>
                                 <label class="form-check-label" for="external_metadata">
                                     External metadata
-                                    <i class="fas fa-question-circle tooltip-icon"
+                                    <i class="fas fa-question-circle tooltip-icon" data-toggle="tooltip"
                                        title="Retrieve additional metadata from CrossRef/DataCite for DOIs (only applies to remote resources)"></i>
                                 </label>
                             </div>
@@ -352,15 +352,16 @@
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">Extracted extents (<span id="extent-count">0</span>)</h5>
                 <div>
-                    <button class="btn btn-sm btn-outline-primary" id="zoom-all-btn" title="Zoom map to show all extents">
+                    <button class="btn btn-sm btn-outline-primary" id="zoom-all-btn" data-toggle="tooltip" title="Zoom map to show all extents">
                         <i class="fas fa-expand"></i> Zoom to all
                     </button>
                     <button class="btn btn-sm btn-outline-primary ml-2" id="copy-extents-btn"
                             data-ttl-seconds="{{ copy_ttl_seconds }}"
+                            data-toggle="tooltip"
                             title="Copy all extracted geometries to your browser so they can be pasted into a work's contribution form. Kept for {{ copy_ttl_minutes }} minute{{ copy_ttl_minutes|pluralize }}, then discarded.">
                         <i class="fas fa-copy"></i> Copy extents
                     </button>
-                    <button class="btn btn-sm btn-danger ml-2" id="clear-map-btn" title="Remove all extents from the map">
+                    <button class="btn btn-sm btn-danger ml-2" id="clear-map-btn" data-toggle="tooltip" title="Remove all extents from the map">
                         <i class="fas fa-trash"></i> Clear map
                     </button>
                 </div>
@@ -470,8 +471,9 @@ $(document).ready(function() {
     let colorIndex = 0;
     const colors = ['#158F9B', '#dc3545', '#28a745', '#ffc107', '#6f42c1', '#fd7e14', '#20c997', '#e83e8c'];
 
-    // Initialize tooltips with native title attribute (no Bootstrap tooltip)
-    // Using browser's native tooltips to avoid Popper.js dependency
+    // Static help icons and toolbar buttons use data-toggle="tooltip" and are
+    // initialized by the global Bootstrap tooltip initializer in base.html.
+    // Dynamically rendered extraction rows are re-initialized in displayExtractions().
 
     // Get CSRF token from cookie
     function getCookie(name) {
@@ -686,10 +688,10 @@ $(document).ready(function() {
             html += '    </div>';
             html += '  </div>';
             html += '  <div class="extraction-item-actions">';
-            html += '    <button class="btn btn-sm btn-outline-primary" onclick="zoomToExtraction(\'' + extraction.id + '\')" title="Zoom to this extent on the map"><i class="fas fa-search-location"></i></button>';
-            html += '    <button class="btn btn-sm btn-outline-secondary" onclick="toggleDetails(\'' + extraction.id + '\')" title="View raw JSON output"><i class="fas fa-eye"></i></button>';
-            html += '    <button class="btn btn-sm btn-outline-secondary" onclick="downloadExtraction(\'' + extraction.id + '\')" title="Download extraction result"><i class="fas fa-download"></i></button>';
-            html += '    <button class="btn btn-sm btn-outline-danger" onclick="removeExtraction(\'' + extraction.id + '\')" title="Remove this extent from the map"><i class="fas fa-trash"></i></button>';
+            html += '    <button class="btn btn-sm btn-outline-primary" onclick="zoomToExtraction(\'' + extraction.id + '\')" data-toggle="tooltip" title="Zoom to this extent on the map"><i class="fas fa-search-location"></i></button>';
+            html += '    <button class="btn btn-sm btn-outline-secondary" onclick="toggleDetails(\'' + extraction.id + '\')" data-toggle="tooltip" title="View raw JSON output"><i class="fas fa-eye"></i></button>';
+            html += '    <button class="btn btn-sm btn-outline-secondary" onclick="downloadExtraction(\'' + extraction.id + '\')" data-toggle="tooltip" title="Download extraction result"><i class="fas fa-download"></i></button>';
+            html += '    <button class="btn btn-sm btn-outline-danger" onclick="removeExtraction(\'' + extraction.id + '\')" data-toggle="tooltip" title="Remove this extent from the map"><i class="fas fa-trash"></i></button>';
             html += '  </div>';
             html += '</div>';
             html += '<div class="extraction-details" id="details-' + extraction.id + '">';
@@ -698,6 +700,9 @@ $(document).ready(function() {
         });
 
         container.html(html);
+        // Activate Bootstrap tooltips on the freshly rendered action buttons
+        // (the global initializer in base.html only covers elements present at load).
+        container.find('[data-toggle="tooltip"]').tooltip();
     }
 
     // Global functions for onclick handlers

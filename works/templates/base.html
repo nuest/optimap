@@ -32,6 +32,13 @@
     <script src="{% static 'js/jquery-3.4.1.min.js' %}"></script>
     <script src="{% static 'js/popper.min.js' %}"></script>
     <script src="{% static 'js/bootstrap.min.js' %}"></script>
+    <script>
+      // Global Bootstrap tooltip initializer (Popper-backed). Any element with
+      // data-toggle="tooltip" gets a styled tooltip — no per-page init needed.
+      // Pages that inject tooltip elements dynamically must still call
+      // .tooltip() on the new nodes themselves.
+      $(function () { $('[data-toggle="tooltip"]').tooltip(); });
+    </script>
 
     {{ block.super }}
     

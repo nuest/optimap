@@ -197,11 +197,11 @@
   {% endif %}
   {% if work.placename %}
     <strong>Placename:</strong> {{ work.placename }}
-    <i class="fas fa-info-circle text-muted" title="This information was derived from the geometries of the work based on the Nominatim gazetteer." aria-label="This information was derived from the geometries of the work based on the Nominatim gazetteer."></i> ·
+    <i class="fas fa-info-circle text-muted" data-toggle="tooltip" title="This information was derived from the geometries of the work based on the Nominatim gazetteer." aria-label="This information was derived from the geometries of the work based on the Nominatim gazetteer."></i> ·
   {% endif %}
   {% if work.country_code %}
     <strong>Region:</strong> {{ work.country_code }}
-    <i class="fas fa-info-circle text-muted" title="This information was derived from the geometries of the work based on the Nominatim gazetteer." aria-label="This information was derived from the geometries of the work based on the Nominatim gazetteer."></i> ·
+    <i class="fas fa-info-circle text-muted" data-toggle="tooltip" title="This information was derived from the geometries of the work based on the Nominatim gazetteer." aria-label="This information was derived from the geometries of the work based on the Nominatim gazetteer."></i> ·
   {% endif %}
   {% if work.doi %}<strong>DOI:</strong> <a href="https://doi.org/{{ work.doi }}" target="_blank" rel="noopener">{{ work.doi }}</a> ·{% endif %}
   {% if work.publicationDate %}<strong>Published:</strong> {{ work.publicationDate }} ·{% endif %}
@@ -226,7 +226,7 @@
   <p class="meta muted" id="work-collections">
     <i class="fas fa-layer-group"></i>
     <strong>{% if visible_collections|length == 1 %}Collection:{% else %}Collections:{% endif %}</strong>
-    {% for c in visible_collections %}<a href="{% url 'optimap:collection-page' c.identifier %}">{{ c.name }}</a>{% if is_admin and not c.is_published %} <span class="badge badge-warning" title="Unpublished — visible to admins only">unpublished</span>{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}
+    {% for c in visible_collections %}<a href="{% url 'optimap:collection-page' c.identifier %}">{{ c.name }}</a>{% if is_admin and not c.is_published %} <span class="badge badge-warning" data-toggle="tooltip" title="Unpublished — visible to admins only">unpublished</span>{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}
   </p>
 {% endif %}
 
@@ -270,11 +270,11 @@
           </small>
         {% endif %}
         {% if c.orphan %}
-          <span class="bok-chip bok-chip-orphan" title="No longer in current GeoSpaceBoK">
+          <span class="bok-chip bok-chip-orphan" data-toggle="tooltip" title="No longer in current GeoSpaceBoK">
             {{ c.code }}
           </span>
         {% else %}
-          <a class="bok-chip" href="{{ c.uri }}" target="_blank" rel="noopener" title="{{ c.description|truncatechars:160 }}">
+          <a class="bok-chip" href="{{ c.uri }}" target="_blank" rel="noopener" data-toggle="tooltip" title="{{ c.description|truncatechars:160 }}">
             {{ c.name }} <small class="bok-chip-code">{{ c.code }}</small>
           </a>
         {% endif %}
@@ -639,7 +639,7 @@
       {% for c in bok_concepts_resolved %}
         <li data-code="{{ c.code }}">
           {% if c.orphan %}
-            <span class="bok-chip bok-chip-orphan" title="No longer in current GeoSpaceBoK">{{ c.code }}</span>
+            <span class="bok-chip bok-chip-orphan" data-toggle="tooltip" title="No longer in current GeoSpaceBoK">{{ c.code }}</span>
           {% else %}
             <a class="bok-chip" href="{{ c.uri }}" target="_blank" rel="noopener">
               {{ c.name }} <small class="bok-chip-code">{{ c.code }}</small>

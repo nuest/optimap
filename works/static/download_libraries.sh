@@ -20,8 +20,12 @@ echo "  - Bootstrap 4.4.1 JS"
 wget -q https://cdn.jsdelivr.net/npm/bootstrap@4.4.1/dist/js/bootstrap.min.js -O js/bootstrap.min.js
 wget -q https://cdn.jsdelivr.net/npm/bootstrap@4.4.1/dist/js/bootstrap.min.js.map -O js/bootstrap.min.js.map
 
-echo "  - Popper.js 2.x (for Bootstrap tooltips)"
-wget -q https://unpkg.com/@popperjs/core@2/dist/umd/popper.min.js -O js/popper.min.js
+echo "  - Popper.js 1.16.1 (required by Bootstrap 4 tooltips/popovers/dropdowns)"
+# Bootstrap 4 calls `new Popper(...)` and is ONLY compatible with Popper.js v1.x
+# (the `popper.js` package). Popper v2 (`@popperjs/core`) removed the constructor
+# and throws "Popper is not a constructor" when a tooltip is shown. Do not upgrade
+# this to @popperjs/core@2 unless Bootstrap itself is upgraded to v5.
+wget -q https://unpkg.com/popper.js@1.16.1/dist/umd/popper.min.js -O js/popper.min.js
 
 # Leaflet core (upgraded to 1.9.4)
 echo "  - Leaflet 1.9.4"

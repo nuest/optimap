@@ -195,37 +195,6 @@
     color: #007bff;
   }
 
-  .save-button-wrapper[data-disabled="true"]:hover::after {
-    content: attr(data-tooltip);
-    position: absolute;
-    bottom: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    margin-bottom: 10px;
-    padding: 8px 14px;
-    background-color: #333;
-    color: white;
-    border-radius: 5px;
-    white-space: nowrap;
-    font-size: 13px;
-    font-weight: 400;
-    z-index: 1000;
-    pointer-events: none;
-  }
-
-  .save-button-wrapper[data-disabled="true"]:hover::before {
-    content: '';
-    position: absolute;
-    bottom: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    margin-bottom: 4px;
-    border: 6px solid transparent;
-    border-top-color: #333;
-    z-index: 1000;
-    pointer-events: none;
-  }
-
   /* Status alert */
   .subscription-status {
     margin-top: 25px;
@@ -404,7 +373,7 @@
 
       <!-- Action Buttons -->
       <div class="action-buttons">
-        <div class="save-button-wrapper" id="save-button-wrapper" data-disabled="true" data-tooltip="No changes to save">
+        <div class="save-button-wrapper" id="save-button-wrapper" data-toggle="tooltip" title="No changes to save">
           <button type="submit" class="btn btn-primary" id="save-button" disabled>
             Save Changes
           </button>
@@ -474,13 +443,14 @@
       const hasChanged = hasFormChanged();
       saveButton.disabled = !hasChanged;
 
-      // Update wrapper attributes for tooltip display
+      // Show the Bootstrap tooltip only while the button is disabled (no changes).
+      // Disabled buttons don't fire hover events, so the tooltip lives on the wrapper.
       if (hasChanged) {
-        saveButtonWrapper.setAttribute('data-disabled', 'false');
-        saveButtonWrapper.removeAttribute('data-tooltip');
+        saveButtonWrapper.removeAttribute('title');
+        $(saveButtonWrapper).tooltip('dispose');
       } else {
-        saveButtonWrapper.setAttribute('data-disabled', 'true');
-        saveButtonWrapper.setAttribute('data-tooltip', 'No changes to save');
+        saveButtonWrapper.setAttribute('title', 'No changes to save');
+        $(saveButtonWrapper).tooltip('dispose').tooltip();
       }
     }
 
