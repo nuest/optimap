@@ -124,6 +124,32 @@ class ContributionReviewNotificationTests(TestCase):
         recipients = sorted(addr for m in mail.outbox for addr in m.to)
         self.assertNotIn("admin-actor@optimap.example", recipients)
 
+    def test_inactive_staff_and_curator_are_not_notified(self):
+        # A deactivated (is_active=False) staff account and curator must not
+        # receive contribution-review emails.
+        inactive_admin = User.objects.create_user(
+            username="inactive_admin",
+            email="inactive-admin@optimap.example",
+            password="x",
+            is_staff=True,
+            is_active=False,
+        )
+        inactive_curator = User.objects.create_user(
+            username="inactive_curator",
+            email="inactive-curator@example.org",
+            password="x",
+            is_active=False,
+        )
+        self.col_mw.curators.add(inactive_curator)
+        with patch("django_q.tasks.async_task", side_effect=_run_async_synchronously):
+            notify_work_event(self.work, "contribution", actor=self.actor)
+
+        recipients = sorted(addr for m in mail.outbox for addr in m.to)
+        self.assertNotIn(inactive_admin.email, recipients)
+        self.assertNotIn(inactive_curator.email, recipients)
+        # Active recipients are unaffected.
+        self.assertIn("admin1@optimap.example", recipients)
+
 
 @override_settings(
     EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
@@ -472,3 +498,41 @@ class CuratorChangeNotificationTests(TestCase):
         log = EmailLog.objects.filter(subject__icontains="curator removed").last()
         self.assertIsNotNone(log)
         self.assertEqual(log.status, "success")
+
+    # --- active + opt-out gating ---
+
+    def test_inactive_curator_and_admin_are_not_notified(self):
+        inactive_admin = User.objects.create_user(
+            username="inactive-cc-admin",
+            email="inactive-cc-admin@example.org",
+            password="x",
+            is_staff=True,
+            is_active=False,
+        )
+        inactive_curator = User.objects.create_user(
+            username="inactive-cc-curator",
+            email="inactive-cc-curator@example.org",
+            password="x",
+            is_active=False,
+        )
+        self.col.curators.add(inactive_curator)
+        self._add_and_notify()
+        recipients = sorted(addr for m in mail.outbox for addr in m.to)
+        self.assertNotIn(inactive_admin.email, recipients)
+        self.assertNotIn(inactive_curator.email, recipients)
+
+    def test_opted_out_admin_is_not_notified(self):
+        # notify_work_events opt-out now gates curator-change emails too.
+        opted_out_admin = User.objects.create_user(
+            username="optout-cc-admin",
+            email="optout-cc-admin@example.org",
+            password="x",
+            is_staff=True,
+        )
+        opted_out_admin.userprofile.notify_work_events = False
+        opted_out_admin.userprofile.save()
+        self._add_and_notify()
+        recipients = sorted(addr for m in mail.outbox for addr in m.to)
+        self.assertNotIn(opted_out_admin.email, recipients)
+        # An opted-in admin still receives it.
+        self.assertIn("curator-admin@example.org", recipients)

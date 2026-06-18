@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Admin-routed emails linked to `http://127.0.0.1:8000/...` in production**: `BASE_URL` was assigned twice in `optimap/settings.py`, and the second assignment read the unprefixed `BASE_URL` environment variable (which deployments do not set — they set `OPTIMAP_BASE_URL`), clobbering the correct value and falling back to `http://127.0.0.1:8000`. Magic-link emails were unaffected because they build URLs from the live request, but task-sent emails (contribution-to-review, curator-change, etc.) used `settings.BASE_URL` and got the wrong host. The duplicate assignment is removed; `OPTIMAP_BASE_URL` is now the single source of truth, matching `etc/pygeoapi-config.yml` and the deploy env examples.
+
+- **Admin/curator notification emails now respect account state and the opt-out uniformly**: contribution-to-review, curator-change, and new-user-registration emails are now sent only to **active** accounts (`is_active=True`) — a deactivated staff/curator account no longer receives operational notifications — and all three uniformly honor the `UserProfile.notify_work_events` opt-out (previously only contribution-to-review did; curator-change and new-user emails ignored it). All active, opted-in staff receive these emails.
+
 - **Silenced benign GDAL `StringList` warnings during GeoPackage data-dump generation**: every `regenerate_all_data_dumps` run logged five `Warning 1: The output driver does not seem to natively support StringList type for field … Converting it to String(JSON) instead` messages (for `authors`, `keywords`, `topics`, `bok_concepts`, `collections`). These were pure log noise — ogr2ogr already wrote the GeoPackage correctly. The GPKG conversion now pins the conversion explicitly via `-mapFieldType StringList=String(JSON)`, so GDAL no longer warns; the GPKG output (clean JSON arrays in `String(JSON)` columns) is unchanged.
 
 ### Changed

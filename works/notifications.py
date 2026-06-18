@@ -91,13 +91,18 @@ def _curators_for_work(work):
         User.objects.filter(
             curated_collections__in=work.collections.all(),
             email__gt="",
+            is_active=True,
         ).distinct()
     )
 
 
 def _admins():
-    """Return a queryset of staff users with an email address."""
-    return _opted_in(User.objects.filter(is_staff=True).exclude(email__exact="").distinct())
+    """Return a queryset of active staff users with an email address.
+
+    Inactive (deactivated) staff accounts are excluded — a disabled account
+    must not receive any operational notification.
+    """
+    return _opted_in(User.objects.filter(is_staff=True, is_active=True).exclude(email__exact="").distinct())
 
 
 def _format_role_summary(admins_count: int, curator_collections: list[str]) -> str:
@@ -134,7 +139,7 @@ def _enqueue_contribution_review(work, actor) -> None:
     curator_ids_by_collection = {}
     for collection in work.collections.all():
         ids = list(
-            _opted_in(collection.curators.filter(email__gt=""))
+            _opted_in(collection.curators.filter(email__gt="", is_active=True))
             .exclude(pk=getattr(actor, "pk", None))
             .values_list("id", flat=True)
         )
@@ -195,7 +200,9 @@ def send_contribution_review_email(
     )
 
     recipients = list(
-        User.objects.filter(pk__in=list(recipient_ids)).exclude(email__exact="").values_list("email", flat=True)
+        User.objects.filter(pk__in=list(recipient_ids), is_active=True)
+        .exclude(email__exact="")
+        .values_list("email", flat=True)
     )
     for email in recipients:
         try:
@@ -224,7 +231,7 @@ def _enqueue_publication_to_contributors(work, actor) -> None:
     from works.models import Contribution
 
     contributor_ids = list(
-        Contribution.objects.filter(work=work)
+        Contribution.objects.filter(work=work, user__is_active=True)
         .exclude(user__pk=getattr(actor, "pk", None))
         # Honour the per-user opt-out — same exclude-False pattern as
         # ``_opted_in`` so users without a UserProfile row stay opted-in by
@@ -256,7 +263,7 @@ def send_publication_to_contributor_emails(contributor_ids: Iterable[int], work_
     work_url = _absolute_work_url(work)
 
     for contributor_id in contributor_ids:
-        contributor = User.objects.filter(pk=contributor_id).exclude(email__exact="").first()
+        contributor = User.objects.filter(pk=contributor_id, is_active=True).exclude(email__exact="").first()
         if not contributor:
             continue
         # Per-contributor body so we can list the specific contribution kinds.
@@ -311,7 +318,7 @@ def notify_admins_new_user_registered(user) -> None:
         from django_q.tasks import async_task
 
         admin_ids = list(
-            User.objects.filter(is_staff=True)
+            _opted_in(User.objects.filter(is_staff=True, is_active=True))
             .exclude(email__exact="")
             .exclude(pk=getattr(user, "pk", None))  # the new user *could* be staff, e.g. a fixture seed
             .values_list("id", flat=True)
@@ -338,9 +345,9 @@ def notify_admins_new_user_registered(user) -> None:
 def send_new_user_admin_email(recipient_ids: Iterable[int], user_id: int) -> None:
     """Django-Q task: tell each admin that a new user just confirmed registration.
 
-    Bypasses ``notify_work_events`` — the per-user flag is opt-out for *work*
-    events; user-management notifications go to every staff member with an
-    email address.
+    Recipients are resolved in ``notify_admins_new_user_registered`` to active
+    staff who have not opted out via ``notify_work_events``; this task only
+    re-checks the address (and active flag, defensively) before sending.
     """
     from works.models import EmailLog
 
@@ -365,7 +372,9 @@ def send_new_user_admin_email(recipient_ids: Iterable[int], user_id: int) -> Non
     )
 
     admin_emails = list(
-        User.objects.filter(pk__in=list(recipient_ids)).exclude(email__exact="").values_list("email", flat=True)
+        User.objects.filter(pk__in=list(recipient_ids), is_active=True)
+        .exclude(email__exact="")
+        .values_list("email", flat=True)
     )
     for admin_email in admin_emails:
         try:
@@ -401,7 +410,11 @@ def notify_curator_change(collection, changed_user, action: str, actor) -> None:
     Recipients: all curators currently on the collection (post-change state)
     + all admins + the actor + the changed user. Everyone in one email —
     no separate "you were added" message.
-    Never crashes the calling request.
+
+    Recipients are gated like the other admin-routed work emails: only active
+    accounts are emailed, and the ``notify_work_events`` opt-out is honored
+    (so an opted-out user — even the actor or the changed curator — is not
+    notified). Never crashes the calling request.
     """
     try:
         from django_q.tasks import async_task
@@ -414,9 +427,12 @@ def notify_curator_change(collection, changed_user, action: str, actor) -> None:
         if getattr(changed_user, "pk", None):
             candidate_ids.add(changed_user.pk)
 
-        # Filter to users that actually have a valid email address.
+        # Keep only active users with an email address who have not opted out
+        # of work-event notifications (``_opted_in`` keeps profile-less users in).
         recipient_ids = list(
-            User.objects.filter(pk__in=candidate_ids).exclude(email__exact="").values_list("id", flat=True)
+            _opted_in(User.objects.filter(pk__in=candidate_ids, is_active=True))
+            .exclude(email__exact="")
+            .values_list("id", flat=True)
         )
         if not recipient_ids:
             logger.info(
@@ -487,7 +503,9 @@ def send_curator_change_email(
     from works.models import EmailLog  # local: avoid circular import
 
     recipients = list(
-        User.objects.filter(pk__in=list(recipient_ids)).exclude(email__exact="").values_list("email", flat=True)
+        User.objects.filter(pk__in=list(recipient_ids), is_active=True)
+        .exclude(email__exact="")
+        .values_list("email", flat=True)
     )
     for email in recipients:
         try:

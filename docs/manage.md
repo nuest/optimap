@@ -228,10 +228,17 @@ Separate from harvest emails, OPTIMAP sends notification emails when a user-visi
 
 | Event | Recipients | Body highlights |
 | --- | --- | --- |
-| `contribution` | all `is_staff` users + every curator of every `Collection` the work is in (minus the contributor) | work title + DOI + link to `/work/<identifier>/`; *transparency block* with **roles + counts** of the other notified parties (`Notified: 1 admin and 2 curators of 'Mountain Wetlands', 'AGILE-GISS'`); heads-up that any of them can publish the work concurrently. |
-| `publish` | every distinct `Contribution.user` for the work (minus the actor doing the publish) | "thank you, your work is now public" + title + DOI + their contribution kinds + the public landing-page URL. |
+| `contribution` | all active `is_staff` users + every active curator of every `Collection` the work is in (minus the contributor) | work title + DOI + link to `/work/<identifier>/`; *transparency block* with **roles + counts** of the other notified parties (`Notified: 1 admin and 2 curators of 'Mountain Wetlands', 'AGILE-GISS'`); heads-up that any of them can publish the work concurrently. |
+| `publish` | every distinct active `Contribution.user` for the work (minus the actor doing the publish) | "thank you, your work is now public" + title + DOI + their contribution kinds + the public landing-page URL. |
 
 Both events route through Django-Q (`async_task`) so the request that triggered the state change stays fast. Recipient resolution happens synchronously in the caller's transaction — the queue payload is just a list of user IDs.
+
+**Recipient gating (applies to all admin-routed emails — contribution-to-review, curator-change, and new-user-registration):**
+
+- **Active accounts only.** A deactivated account (`is_active=False`) is never emailed, even if it is staff or a curator.
+- **Opt-out honored uniformly.** The `UserProfile.notify_work_events` flag (opt-out, default on) gates all three of these emails — a staff member who turns it off receives none of them. (Earlier, only `contribution` honored it; `curator-change` and the new-user email did not.) An opted-out user is not notified even when they are the actor or the curator being added/removed.
+
+The link in every task-sent email is built from `settings.BASE_URL` (= `OPTIMAP_BASE_URL`), so set that environment variable to the public host on each deployment or the links will point at the development default.
 
 Republish suppression: `notify_work_event(work, "publish", …)` stamps `provenance.publication_notified_at` after the first fan-out and returns early on subsequent calls, so a publish→unpublish→republish cycle does not re-notify contributors.
 

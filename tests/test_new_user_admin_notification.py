@@ -148,6 +148,37 @@ class NewUserAdminNotificationTests(TestCase):
         self.assertNotIn("", recipients)
         self.assertEqual(len(mail.outbox), 2)  # admin1 + admin2 only
 
+    def test_inactive_staff_skipped(self):
+        """A deactivated (is_active=False) staff account is not a recipient."""
+        User.objects.create_user(
+            username="inactive-admin",
+            email="inactive-admin@optimap.example",
+            password="x",
+            is_staff=True,
+            is_active=False,
+        )
+        token = self._prime_magic_link("fresh-active@example.org")
+
+        with patch("django_q.tasks.async_task", side_effect=_run_async_synchronously):
+            self.client.get(reverse("optimap:magic_link", args=[token]) + "?confirmed=true")
+
+        recipients = sorted(addr for m in mail.outbox for addr in m.to)
+        self.assertNotIn("inactive-admin@optimap.example", recipients)
+        self.assertEqual(len(mail.outbox), 2)  # admin1 + admin2 only
+
+    def test_opted_out_staff_skipped(self):
+        """A staff user with notify_work_events=False does not get the email."""
+        self.admin2.userprofile.notify_work_events = False
+        self.admin2.userprofile.save()
+        token = self._prime_magic_link("fresh-optout@example.org")
+
+        with patch("django_q.tasks.async_task", side_effect=_run_async_synchronously):
+            self.client.get(reverse("optimap:magic_link", args=[token]) + "?confirmed=true")
+
+        recipients = sorted(addr for m in mail.outbox for addr in m.to)
+        self.assertNotIn("admin2@optimap.example", recipients)
+        self.assertEqual(recipients, ["admin1@optimap.example"])
+
     def test_notification_failure_does_not_block_login(self):
         """If async_task raises, the user must still be created and logged in
         (notify_* is wrapped in defensive try/except)."""
