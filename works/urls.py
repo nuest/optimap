@@ -26,6 +26,11 @@ urlpatterns = [
     path("accessibility/", general_views.accessibility, name="accessibility"),
     path("privacy/", general_views.privacy, name="privacy"),
     path("data/", general_views.data, name="data"),
+    path(
+        "data/regenerate/",
+        general_views.schedule_data_dump_regeneration,
+        name="schedule-data-dump",
+    ),
     path("pages/", general_views.sitemap_page, name="sitemap-page"),
     path("regions/", general_views.feeds, name="feeds"),
     path("feeds/", RedirectView.as_view(pattern_name="optimap:feeds", permanent=True)),

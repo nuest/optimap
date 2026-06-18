@@ -26,14 +26,18 @@ from pathlib import Path
 import geoextent.lib.features
 import humanize
 from django.conf import settings
+from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.sitemaps import views as sitemaps_views
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.utils.timezone import get_default_timezone
 from django.views.decorators.cache import cache_page, never_cache
+from django.views.decorators.http import require_POST
 from django.views.generic import View
+from django_q.humanhash import humanize as humanize_task_id
+from django_q.tasks import async_task
 
 from works.feeds import normalize_region_slug
 from works.models import Collection, GlobalRegion
@@ -127,6 +131,21 @@ def data(request):
             "pygeoapi_enabled": getattr(settings, "PYGEOAPI_ENABLED", False),
         },
     )
+
+
+@staff_member_required
+@require_POST
+def schedule_data_dump_regeneration(request):
+    """Enqueue a one-time background regeneration of all data dumps.
+
+    Staff-only. Queues ``works.tasks.regenerate_all_data_dumps`` via Django-Q
+    (the same task used by the scheduled job and the Work admin action) so the
+    heavy GeoJSON + GeoPackage + CSV regeneration runs off the request thread.
+    """
+    task_id = async_task("works.tasks.regenerate_all_data_dumps")
+    task_name = humanize_task_id(task_id)
+    logger.info("User %s scheduled data dump regeneration (task %s)", request.user, task_name)
+    return JsonResponse({"success": True, "task_id": task_id, "task_name": task_name})
 
 
 def feeds_list(request):

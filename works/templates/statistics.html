@@ -14,11 +14,28 @@
 <div class="container py-5">
   <h1>Statistics</h1>
 
+  {% if request.user.is_staff %}
+  <div class="alert alert-info">
+    <div class="d-flex justify-content-between align-items-center">
+      <div>
+        <strong><i class="fas fa-user-shield"></i> Admin view:</strong>
+        Statistics are recomputed automatically by a nightly job.
+      </div>
+      <div>
+        <button id="calcNowBtn" class="btn btn-primary btn-sm" data-csrf="{{ csrf_token }}">
+          <i class="fas fa-sync-alt"></i> Schedule one-time recomputation of statistics now
+        </button>
+      </div>
+    </div>
+    <span id="calcNowStatus" class="small d-none mt-2 d-block"></span>
+  </div>
+  {% endif %}
+
   {% if not snapshot %}
   <div class="alert alert-info">
     No statistics snapshot available yet. The nightly job will generate the first one soon.
     {% if request.user.is_staff %}
-    You can trigger an immediate computation using the button below.
+    You can schedule an immediate computation using the button above.
     {% endif %}
   </div>
   {% else %}
@@ -28,15 +45,6 @@
     {% if snapshot.next_update %}— next update: {{ snapshot.next_update|date:"Y-m-d H:i" }} UTC{% endif %}.
     Machine-readable data: <a href="/api/v1/statistics/">/api/v1/statistics/</a>.
   </p>
-  {% endif %}
-
-  {% if request.user.is_staff %}
-  <div class="mb-4">
-    <button id="calcNowBtn" class="btn btn-sm btn-outline-secondary">
-      <i class="fas fa-sync-alt"></i> Calculate statistics now
-    </button>
-    <span id="calcNowStatus" class="ml-2 small text-muted d-none"></span>
-  </div>
   {% endif %}
 
   {% if snapshot %}
@@ -395,23 +403,30 @@ $(function () { $('[data-toggle="tooltip"]').tooltip(); });
   const btn = document.getElementById('calcNowBtn');
   if (!btn) return;
   const status = document.getElementById('calcNowStatus');
+  const label = btn.innerHTML;
   btn.addEventListener('click', function () {
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Calculating…';
+    btn.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Scheduling…';
     status.textContent = '';
     status.classList.add('d-none');
-    fetch('/api/v1/statistics/?now', {
-      method: 'GET',
-      headers: { 'X-CSRFToken': document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '' },
+    fetch('/api/v1/statistics/recompute/', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': btn.dataset.csrf },
       credentials: 'same-origin',
     })
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
-      .then(() => { window.location.href = window.location.pathname; })
+      .then(data => {
+        btn.innerHTML = label;
+        status.textContent = 'Recomputation scheduled (task ' + data.task_name + ') — the updated statistics will appear here in a few minutes once the background worker finishes.';
+        status.classList.remove('d-none', 'text-danger');
+        status.classList.add('text-success');
+      })
       .catch(err => {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-sync-alt"></i> Calculate statistics now';
+        btn.innerHTML = label;
         status.textContent = 'Error: ' + err;
-        status.classList.remove('d-none');
+        status.classList.remove('d-none', 'text-success');
+        status.classList.add('text-danger');
       });
   });
 })();

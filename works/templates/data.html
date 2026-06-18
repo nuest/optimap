@@ -15,6 +15,24 @@
       (<a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank">CC-0</a>) license.
     </p>
 
+    {% if request.user.is_staff %}
+    <div class="alert alert-info">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <strong><i class="fas fa-user-shield"></i> Admin view:</strong>
+          Data dumps regenerate automatically every {{ interval }} hour{{ interval|pluralize }}.
+        </div>
+        <div>
+          <button id="scheduleDumpBtn" class="btn btn-primary btn-sm"
+                  data-csrf="{{ csrf_token }}">
+            <i class="fas fa-sync-alt"></i> Schedule one-time generation of data dumps now
+          </button>
+        </div>
+      </div>
+      <span id="scheduleDumpStatus" class="small d-none mt-2 d-block"></span>
+    </div>
+    {% endif %}
+
     {% if pygeoapi_enabled %}
     <h2 class="py-2">OGC API — Features</h2>
     <p>
@@ -62,11 +80,11 @@ curl -X GET {{ site|addstr:"/api" }}/api/optimap/ | jq
     <ul class="list-unstyled mb-4">
       {% if last_geojson %}
       <li class="mb-3">
-        <div class="d-flex align-items-center">
-          <a class="btn btn-primary btn-sm" href="{% url 'optimap:download_geojson' %}">
-            Download GeoJSON
-          </a>
-          &nbsp;(<a href="https://geojson.org/" target="_blank" class="ms-2 small">GeoJSON spec</a>)
+        <a class="btn btn-primary btn-sm" href="{% url 'optimap:download_geojson' %}">
+          Download GeoJSON
+        </a>
+        <div class="small mt-1">
+          <a href="https://geojson.org/" target="_blank">GeoJSON spec</a>
         </div>
         <div class="small text-muted mt-1">
           File: {{ last_geojson }}{% if geojson_size %} &middot; Size: {{ geojson_size }}{% endif %}
@@ -76,11 +94,11 @@ curl -X GET {{ site|addstr:"/api" }}/api/optimap/ | jq
 
       {% if last_gpkg %}
       <li class="mb-3">
-        <div class="d-flex align-items-center">
-          <a class="btn btn-primary btn-sm" href="{% url 'optimap:download_geopackage' %}">
-            Download GeoPackage
-          </a>
-          (<a href="https://www.geopackage.org/" target="_blank" class="ms-2 small">GeoPackage spec</a>)
+        <a class="btn btn-primary btn-sm" href="{% url 'optimap:download_geopackage' %}">
+          Download GeoPackage
+        </a>
+        <div class="small mt-1">
+          <a href="https://www.geopackage.org/" target="_blank">GeoPackage spec</a>
         </div>
         <div class="small text-muted mt-1">
           File: {{ last_gpkg }}{% if geopackage_size %} &middot; Size: {{ geopackage_size }}{% endif %}
@@ -90,12 +108,12 @@ curl -X GET {{ site|addstr:"/api" }}/api/optimap/ | jq
 
       {% if last_csv %}
       <li>
-        <div class="d-flex align-items-center">
-          <a class="btn btn-primary btn-sm" href="{% url 'optimap:download_csv' %}">
-            Download CSV
-          </a>
-          &nbsp;(<a href="https://datatracker.ietf.org/doc/html/rfc4180" target="_blank" class="ms-2 small">RFC 4180</a>,
-          geometry column <code>WKT</code> in <a href="https://www.ogc.org/standard/sfa/" target="_blank" class="small">OGC Simple Features</a>)
+        <a class="btn btn-primary btn-sm" href="{% url 'optimap:download_csv' %}">
+          Download CSV
+        </a>
+        <div class="small mt-1">
+          <a href="https://datatracker.ietf.org/doc/html/rfc4180" target="_blank">RFC 4180</a>,
+          geometry column <code>WKT</code> in <a href="https://www.ogc.org/standard/sfa/" target="_blank">OGC Simple Features</a>
         </div>
         <div class="small text-muted mt-1">
           File: {{ last_csv }}{% if csv_size %} &middot; Size: {{ csv_size }}{% endif %}
@@ -114,4 +132,41 @@ curl -X GET {{ site|addstr:"/api" }}/api/optimap/ | jq
 
   </div>
 </div>
+
+{% if request.user.is_staff %}
+<script>
+// "Schedule one-time generation of data dumps now" button — staff only
+(function () {
+  const btn = document.getElementById('scheduleDumpBtn');
+  if (!btn) return;
+  const status = document.getElementById('scheduleDumpStatus');
+  const label = btn.innerHTML;
+  btn.addEventListener('click', function () {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Scheduling…';
+    status.textContent = '';
+    status.classList.add('d-none');
+    fetch('{% url "optimap:schedule-data-dump" %}', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': btn.dataset.csrf },
+      credentials: 'same-origin',
+    })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(data => {
+        btn.innerHTML = label;
+        status.textContent = 'Generation scheduled (task ' + data.task_name + ') — the new dumps will appear here in a few minutes once the background worker finishes.';
+        status.classList.remove('d-none', 'text-danger');
+        status.classList.add('text-success');
+      })
+      .catch(err => {
+        btn.disabled = false;
+        btn.innerHTML = label;
+        status.textContent = 'Error: ' + err;
+        status.classList.remove('d-none', 'text-success');
+        status.classList.add('text-danger');
+      });
+  });
+})();
+</script>
+{% endif %}
 {% endblock %}

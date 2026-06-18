@@ -3,6 +3,8 @@
 
 """Tests for StatisticsSnapshot, SourceCoverageSnapshot, the API endpoint, and the statistics page."""
 
+from unittest import mock
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 
@@ -11,6 +13,7 @@ from works.models import Source, StatisticsSnapshot, Work
 User = get_user_model()
 
 STATS_URL = "/api/v1/statistics/"
+RECOMPUTE_URL = "/api/v1/statistics/recompute/"
 STATS_PAGE_URL = "/statistics/"
 
 _CACHES = {
@@ -220,23 +223,54 @@ class StatisticsAPITests(TestCase):
         resp = self.client.get(STATS_URL)
         self.assertIsNotNone(resp.json()["computed_at"])
 
-    def test_now_forbidden_for_anonymous(self):
-        resp = self.client.get(STATS_URL + "?now")
-        self.assertEqual(resp.status_code, 403)
-
-    def test_now_forbidden_for_non_staff(self):
-        user = User.objects.create_user(username="regular", password="pw")
-        self.client.force_login(user)
-        resp = self.client.get(STATS_URL + "?now")
-        self.assertEqual(resp.status_code, 403)
-
-    def test_now_allowed_for_staff(self):
+    def test_now_query_param_no_longer_computes(self):
+        # The legacy synchronous ?now trigger is removed: GET is read-only and
+        # never creates a snapshot, even for staff.
         staff = User.objects.create_user(username="admin", password="pw", is_staff=True)
         self.client.force_login(staff)
         resp = self.client.get(STATS_URL + "?now")
         self.assertEqual(resp.status_code, 200)
-        self.assertIsNotNone(resp.json()["computed_at"])
-        self.assertEqual(StatisticsSnapshot.objects.count(), 1)
+        self.assertEqual(StatisticsSnapshot.objects.count(), 0)
+
+    @mock.patch("works.viewsets.async_task")
+    def test_recompute_forbidden_for_anonymous(self, mock_async):
+        resp = self.client.post(RECOMPUTE_URL)
+        self.assertEqual(resp.status_code, 403)
+        mock_async.assert_not_called()
+
+    @mock.patch("works.viewsets.async_task")
+    def test_recompute_forbidden_for_non_staff(self, mock_async):
+        user = User.objects.create_user(username="regular", password="pw")
+        self.client.force_login(user)
+        resp = self.client.post(RECOMPUTE_URL)
+        self.assertEqual(resp.status_code, 403)
+        mock_async.assert_not_called()
+
+    @mock.patch("works.viewsets.async_task")
+    def test_recompute_schedules_task_for_staff(self, mock_async):
+        from django_q.humanhash import humanize
+
+        mock_async.return_value = "ab12cd34ef56ab12cd34ef56ab12cd34"
+        staff = User.objects.create_user(username="admin", password="pw", is_staff=True)
+        self.client.force_login(staff)
+        resp = self.client.post(RECOMPUTE_URL)
+        self.assertEqual(resp.status_code, 202)
+        data = resp.json()
+        self.assertTrue(data["scheduled"])
+        self.assertEqual(data["task_id"], "ab12cd34ef56ab12cd34ef56ab12cd34")
+        # Human-readable name is deterministically derived from the task id.
+        self.assertEqual(data["task_name"], humanize("ab12cd34ef56ab12cd34ef56ab12cd34"))
+        mock_async.assert_called_once_with("works.tasks.recompute_statistics_snapshot")
+        # The job is enqueued, not run synchronously.
+        self.assertEqual(StatisticsSnapshot.objects.count(), 0)
+
+    @mock.patch("works.viewsets.async_task")
+    def test_recompute_rejects_get(self, mock_async):
+        staff = User.objects.create_user(username="admin", password="pw", is_staff=True)
+        self.client.force_login(staff)
+        resp = self.client.get(RECOMPUTE_URL)
+        self.assertEqual(resp.status_code, 405)
+        mock_async.assert_not_called()
 
     def test_total_works_for_user_non_staff(self):
         _make_published_work()

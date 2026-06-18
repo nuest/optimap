@@ -614,6 +614,7 @@ Cached files in `/tmp/optimap_cache/`; retention controlled by `OPTIMAP_DATA_DUM
   python manage.py regenerate_data_dumps --dry-run        # report without writing
   ```
   Runs synchronously in-process — does not need the Q cluster, useful in deploy scripts and for ad-hoc debugging. The same operation is also available via Django-Q (`async_task('works.tasks.regenerate_all_data_dumps')`) and via the admin **Works → action "Regenerate all data exports now"**.
+- Staff users can also trigger a regeneration straight from the public **Data & API page** (`/data`): an "Admin view" section there exposes a **"Schedule one-time generation of data dumps now"** button that enqueues the same `regenerate_all_data_dumps` Django-Q task (requires the Q cluster to be running). The refreshed dumps appear on the page once the worker finishes.
 - Public download endpoints: `/download/geojson/` (gzipped variant served when the client sends `Accept-Encoding: gzip`), `/download/geopackage/`, `/download/csv/` (CSV with a `WKT` column carrying each work's geometry in OGC Simple Features WKT — useful for `pandas.read_csv` + `shapely.wkt.loads` pipelines).
 
 #### Django caches (`memory`, `default`)

@@ -16,6 +16,8 @@ import geoextent.lib.extent as geoextent
 from django.conf import settings
 from django.contrib.gis.geos import Point, Polygon
 from django.db.models import Case, Count, IntegerField, Q, Value, When
+from django_q.humanhash import humanize
+from django_q.tasks import async_task
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import (
     OpenApiExample,
@@ -1434,26 +1436,12 @@ class StatisticsViewSet(viewsets.ViewSet):
 
     def list(self, request):
         from works.models import StatisticsSnapshot
-        from works.utils.statistics import (
-            get_cached_statistics,
-            save_statistics_snapshot,
-            update_statistics_cache,
-        )
+        from works.utils.statistics import get_cached_statistics
 
-        force_now = "now" in request.query_params
-        if force_now:
-            if not (request.user.is_authenticated and request.user.is_staff):
-                return Response(
-                    {"detail": "?now requires staff authentication."},
-                    status=status.HTTP_403_FORBIDDEN,
-                )
-            snapshot = save_statistics_snapshot()
-            update_statistics_cache()
-        else:
-            try:
-                snapshot = StatisticsSnapshot.objects.latest()
-            except StatisticsSnapshot.DoesNotExist:
-                snapshot = None
+        try:
+            snapshot = StatisticsSnapshot.objects.latest()
+        except StatisticsSnapshot.DoesNotExist:
+            snapshot = None
 
         stats = get_cached_statistics()
         is_staff = request.user.is_authenticated and request.user.is_staff
@@ -1466,4 +1454,47 @@ class StatisticsViewSet(viewsets.ViewSet):
                 "computed_at": snapshot.computed_at if snapshot else None,
                 "next_update": snapshot.next_update if snapshot else None,
             }
+        )
+
+    @extend_schema(
+        summary="Schedule a one-time statistics recomputation (staff only)",
+        description=(
+            "Enqueues a background Django-Q job that recomputes the statistics snapshot "
+            "and refreshes the cache, then returns immediately. The updated numbers become "
+            "available from `GET /api/v1/statistics/` once the worker finishes — this "
+            "endpoint does **not** compute synchronously. Requires staff authentication "
+            "and the Django-Q cluster to be running."
+        ),
+        tags=["Statistics"],
+        request=None,
+        responses={
+            202: OpenApiResponse(
+                description="Recomputation scheduled.",
+                response=inline_serializer(
+                    name="StatisticsRecomputeResponse",
+                    fields={
+                        "scheduled": drf_serializers.BooleanField(),
+                        "task_id": drf_serializers.CharField(help_text="Django-Q task id (hex digest)."),
+                        "task_name": drf_serializers.CharField(
+                            help_text="Human-readable Django-Q task name, e.g. 'ceiling-mississippi-gee-delta'."
+                        ),
+                    },
+                ),
+            ),
+            403: OpenApiResponse(_ERROR_RESPONSE, description="Staff authentication required."),
+        },
+    )
+    @action(detail=False, methods=["post"], url_path="recompute")
+    def recompute(self, request):
+        if not (request.user.is_authenticated and request.user.is_staff):
+            return Response(
+                {"detail": "Recomputation requires staff authentication."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        task_id = async_task("works.tasks.recompute_statistics_snapshot")
+        task_name = humanize(task_id)
+        logger.info("User %s scheduled statistics recomputation (task %s)", request.user, task_name)
+        return Response(
+            {"scheduled": True, "task_id": task_id, "task_name": task_name},
+            status=status.HTTP_202_ACCEPTED,
         )

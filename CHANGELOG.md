@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Schedule a data dump regeneration from the `/data` page**: staff users now see an "Admin view" section on the public Data & API page with a **"Schedule one-time generation of data dumps now"** button. It enqueues the existing `works.tasks.regenerate_all_data_dumps` Django-Q task (the same one used by the scheduled job and the Work admin action) so the GeoJSON/GeoPackage/CSV dumps can be refreshed on demand without touching the admin. The new dumps appear on the page once the background worker finishes.
+
+### Changed
+
+- **Statistics "Calculate now" is now a background job** instead of a synchronous computation. The staff button on the `/statistics` page now POSTs to a new endpoint `POST /api/v1/statistics/recompute/`, which enqueues the `works.tasks.recompute_statistics_snapshot` Django-Q task and returns `202 Accepted` immediately; the refreshed numbers appear after the worker finishes. This keeps the request responsive as statistics computation grows in complexity and matches the data-dump button's approach. The legacy synchronous `GET /api/v1/statistics/?now` trigger is removed — that endpoint is now read-only.
+
+## [0.27.0] - 2026-06-17
+
 ### Fixed
 
 - **Accounts without an email were silently promoted to superuser when `OPTIMAP_SUPERUSER_EMAILS` was unset**: the setting parsed an unset/blank value into `[""]` instead of `[]`, so the `pre_save` promotion signal (connected in 0.26.0) matched every account whose email was blank (`"" in [""]`) and set `is_staff`/`is_superuser` on it. `OPTIMAP_SUPERUSER_EMAILS` now filters out empty entries (unset → `[]`), and the signal additionally ignores blank emails. This also fixes a CI test failure (`tests.test_statistics.test_now_forbidden_for_non_staff`) that surfaced the bug because the variable is unset in CI.

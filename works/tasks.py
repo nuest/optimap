@@ -730,3 +730,18 @@ def regenerate_all_data_dumps():
     csv_path = convert_geojson_to_csv(geojson_path)
     cleanup_old_data_dumps(cache_dir, settings.DATA_DUMP_RETENTION)
     return {"geojson": geojson_path, "gpkg": gpkg_path, "csv": csv_path}
+
+
+def recompute_statistics_snapshot():
+    """Recompute the statistics snapshot and refresh the cache.
+
+    Django-Q entry point for the staff-triggered "Calculate statistics now"
+    button (``POST /api/v1/statistics/recompute/``). Runs off the request
+    thread so the page stays responsive even as the computation grows. Returns
+    the saved ``StatisticsSnapshot``.
+    """
+    from works.utils.statistics import save_statistics_snapshot, update_statistics_cache
+
+    snapshot = save_statistics_snapshot()
+    update_statistics_cache()
+    return snapshot
