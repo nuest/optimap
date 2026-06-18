@@ -17,6 +17,7 @@ from django.views.decorators.http import require_POST
 
 from works.bok import client as bok_client
 from works.models import Contribution, Work
+from works.utils.geometry import sanitize_geojson_geometry
 from works.utils.identifiers import get_work_by_identifier
 from works.utils.provenance import append_event, user_has_contributed_kind
 
@@ -80,16 +81,39 @@ def contribute_geometry_by_id(request, work_id):
         changes_made = []
         spatial_contributed = False
         temporal_contributed = False
+        geometry_warning = None
 
         if geojson:
             had_geometry = bool(work.geometry and not work.geometry.empty)
             logger.info("Converting geometry: %s", geojson)
-            geometry = GEOSGeometry(json.dumps(geojson))
+            # Drop degenerate rings (e.g. tiny interior holes collapsed to a
+            # repeated point by client-side simplification) before handing the
+            # GeoJSON to GEOS, which rejects LinearRings with < 4 points.
+            geojson, dropped_rings = sanitize_geojson_geometry(geojson)
+            try:
+                geometry = GEOSGeometry(json.dumps(geojson))
+            except Exception as e:
+                logger.warning("Rejected invalid contributed geometry for work %s: %s", work_id, e)
+                return JsonResponse({"error": f"Invalid geometry: {e}"}, status=400)
+            if geometry.empty:
+                # Everything was degenerate and got dropped — nothing to save.
+                logger.warning("Contributed geometry for work %s was empty after sanitization", work_id)
+                return JsonResponse(
+                    {"error": "Invalid geometry: no valid geometry remained after removing degenerate parts."},
+                    status=400,
+                )
             work.geometry = geometry
             changes_made.append(
                 f"{'Replaced geometry with' if had_geometry else 'Changed geometry from empty to'} "
                 f"{geometry.geom_type}"
             )
+            if dropped_rings:
+                changes_made.append(f"Removed {dropped_rings} invalid geometry ring(s)")
+                geometry_warning = (
+                    f"{dropped_rings} invalid part(s) of your geometry "
+                    "(e.g. tiny holes that collapsed during simplification) "
+                    "were removed before saving."
+                )
             spatial_contributed = True
 
         if periods:
@@ -163,10 +187,18 @@ def contribute_geometry_by_id(request, work_id):
             request,
             "Thank you for your contribution! It is now visible to curators and admins for review.",
         )
+        if geometry_warning:
+            # Surfaced as a self-closing flash on the reloaded page, matching
+            # the rest of the app's communication flow.
+            messages.warning(request, geometry_warning)
 
-        return JsonResponse(
-            {"success": True, "message": "Thank you for your contribution! An administrator will review your changes."}
-        )
+        response_data = {
+            "success": True,
+            "message": "Thank you for your contribution! An administrator will review your changes.",
+        }
+        if geometry_warning:
+            response_data["warning"] = geometry_warning
+        return JsonResponse(response_data)
 
     except json.JSONDecodeError as e:
         logger.error("JSON decode error: %s", str(e))

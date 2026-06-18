@@ -6,7 +6,12 @@ import json
 from django.test import TestCase
 
 from works.models import Source, Work
-from works.utils.geometry import COORDINATE_PRECISION, annotate_rounded_geometry, round_geojson_coordinates
+from works.utils.geometry import (
+    COORDINATE_PRECISION,
+    annotate_rounded_geometry,
+    round_geojson_coordinates,
+    sanitize_geojson_geometry,
+)
 
 
 class RoundGeojsonCoordinatesTests(TestCase):
@@ -25,6 +30,78 @@ class RoundGeojsonCoordinatesTests(TestCase):
 
     def test_custom_precision(self):
         self.assertEqual(round_geojson_coordinates([1.123456], precision=2), [1.12])
+
+
+class SanitizeGeojsonGeometryTests(TestCase):
+    # A valid square exterior ring (>= 4 positions, closed).
+    EXTERIOR = [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0], [0.0, 0.0]]
+    # A degenerate "hole" collapsed to a repeated point (2 positions).
+    DEGENERATE_HOLE = [[0.5, 0.5], [0.5, 0.5]]
+
+    def test_drops_degenerate_interior_ring_keeps_exterior(self):
+        geojson = {"type": "Polygon", "coordinates": [self.EXTERIOR, self.DEGENERATE_HOLE]}
+        cleaned, dropped = sanitize_geojson_geometry(geojson)
+        self.assertEqual(dropped, 1)
+        self.assertEqual(cleaned["coordinates"], [self.EXTERIOR])
+
+    def test_drops_polygon_with_degenerate_exterior(self):
+        geojson = {"type": "Polygon", "coordinates": [self.DEGENERATE_HOLE]}
+        cleaned, dropped = sanitize_geojson_geometry(geojson)
+        self.assertEqual(dropped, 1)
+        self.assertEqual(cleaned["coordinates"], [])
+
+    def test_leaves_valid_geometry_untouched(self):
+        geojson = {"type": "Polygon", "coordinates": [self.EXTERIOR]}
+        cleaned, dropped = sanitize_geojson_geometry(geojson)
+        self.assertEqual(dropped, 0)
+        self.assertEqual(cleaned["coordinates"], [self.EXTERIOR])
+
+    def test_handles_nesting_inside_geometry_collection(self):
+        # Mirrors the Switzerland bug: one Polygon with a valid exterior and
+        # two degenerate enclave holes, wrapped in a GeometryCollection.
+        geojson = {
+            "type": "GeometryCollection",
+            "geometries": [
+                {
+                    "type": "Polygon",
+                    "coordinates": [
+                        self.EXTERIOR,
+                        [[8.658608, 47.691339], [8.658608, 47.691339]],
+                        [[8.958544, 45.964816], [8.958544, 45.964816]],
+                    ],
+                }
+            ],
+        }
+        cleaned, dropped = sanitize_geojson_geometry(geojson)
+        self.assertEqual(dropped, 2)
+        self.assertEqual(cleaned["geometries"][0]["coordinates"], [self.EXTERIOR])
+
+    def test_drops_collapsed_polygon_from_geometry_collection(self):
+        geojson = {
+            "type": "GeometryCollection",
+            "geometries": [{"type": "Polygon", "coordinates": [self.DEGENERATE_HOLE]}],
+        }
+        cleaned, dropped = sanitize_geojson_geometry(geojson)
+        self.assertEqual(dropped, 1)
+        self.assertEqual(cleaned["geometries"], [])
+
+    def test_sanitized_collection_constructs_valid_geos_geometry(self):
+        from django.contrib.gis.geos import GEOSGeometry
+
+        geojson = {
+            "type": "GeometryCollection",
+            "geometries": [
+                {
+                    "type": "Polygon",
+                    "coordinates": [self.EXTERIOR, self.DEGENERATE_HOLE],
+                }
+            ],
+        }
+        cleaned, dropped = sanitize_geojson_geometry(geojson)
+        self.assertEqual(dropped, 1)
+        # Would raise GEOSException before sanitization.
+        geom = GEOSGeometry(json.dumps(cleaned))
+        self.assertTrue(geom.valid)
 
 
 class AnnotateRoundedGeometryTests(TestCase):

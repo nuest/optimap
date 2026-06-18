@@ -27,6 +27,99 @@ def round_geojson_coordinates(obj, precision=COORDINATE_PRECISION):
     return obj
 
 
+def _sanitize_polygon_rings(rings):
+    """Drop degenerate rings from a single Polygon's coordinate list.
+
+    A valid GeoJSON LinearRing needs >= 4 positions (>= 3 distinct + the
+    closing point). Rings with fewer are removed. If the *exterior* ring
+    (index 0) is degenerate the whole polygon is unrepresentable, so return
+    an empty list and let the caller drop the polygon.
+
+    Returns ``(cleaned_rings, dropped_count)``.
+    """
+    if not isinstance(rings, list) or not rings:
+        return rings, 0
+
+    exterior = rings[0]
+    if not isinstance(exterior, list) or len(exterior) < 4:
+        # Exterior collapsed — the polygon as a whole is invalid.
+        return [], len(rings)
+
+    cleaned = [exterior]
+    dropped = 0
+    for hole in rings[1:]:
+        if isinstance(hole, list) and len(hole) >= 4:
+            cleaned.append(hole)
+        else:
+            dropped += 1
+    return cleaned, dropped
+
+
+def sanitize_geojson_geometry(obj):
+    """Recursively drop degenerate polygon rings from a parsed GeoJSON dict.
+
+    Removes LinearRings with fewer than 4 positions (which GEOS rejects with
+    ``Invalid number of points in LinearRing``). A common source is
+    client-side simplification collapsing a small interior ring (e.g. the
+    foreign enclaves inside Switzerland's boundary) down to its two repeated
+    endpoints. Interior holes that collapse are dropped; a Polygon whose
+    exterior ring collapses is dropped entirely. Already-valid input is
+    returned unchanged.
+
+    Walks Polygon, MultiPolygon, GeometryCollection, Feature and
+    FeatureCollection structures. Returns ``(cleaned_obj, dropped_count)``
+    where ``dropped_count`` is the number of rings/polygons removed.
+    """
+    if not isinstance(obj, dict):
+        return obj, 0
+
+    geom_type = obj.get("type")
+
+    if geom_type == "Polygon":
+        cleaned_rings, dropped = _sanitize_polygon_rings(obj.get("coordinates"))
+        return {**obj, "coordinates": cleaned_rings}, dropped
+
+    if geom_type == "MultiPolygon":
+        polygons = obj.get("coordinates") or []
+        cleaned_polys = []
+        dropped = 0
+        for poly in polygons:
+            cleaned_rings, d = _sanitize_polygon_rings(poly)
+            dropped += d
+            if cleaned_rings:
+                cleaned_polys.append(cleaned_rings)
+        return {**obj, "coordinates": cleaned_polys}, dropped
+
+    if geom_type == "GeometryCollection":
+        geometries = obj.get("geometries") or []
+        cleaned_geoms = []
+        dropped = 0
+        for g in geometries:
+            cg, d = sanitize_geojson_geometry(g)
+            dropped += d
+            # Drop polygons that lost their exterior ring entirely.
+            if cg.get("type") in ("Polygon", "MultiPolygon") and not cg.get("coordinates"):
+                continue
+            cleaned_geoms.append(cg)
+        return {**obj, "geometries": cleaned_geoms}, dropped
+
+    if geom_type == "Feature":
+        cleaned_geom, dropped = sanitize_geojson_geometry(obj.get("geometry"))
+        return {**obj, "geometry": cleaned_geom}, dropped
+
+    if geom_type == "FeatureCollection":
+        features = obj.get("features") or []
+        cleaned_features = []
+        dropped = 0
+        for f in features:
+            cf, d = sanitize_geojson_geometry(f)
+            dropped += d
+            cleaned_features.append(cf)
+        return {**obj, "features": cleaned_features}, dropped
+
+    return obj, 0
+
+
 def annotate_rounded_geometry(
     queryset, geo_field="geometry", precision=COORDINATE_PRECISION, out_field="_rounded_geojson"
 ):

@@ -393,11 +393,14 @@
         <div id="geometry-simplify-panel" class="border rounded p-3 bg-light mb-2" style="display:none;" role="region" aria-label="Simplification controls">
           <strong class="small d-block mb-2"><i class="fas fa-draw-polygon"></i> <span id="simplify-panel-title">Simplify geometry</span></strong>
           <p class="mb-1 small" id="simplify-size-info">Size: — | Points: —</p>
+          <p class="small text-warning mb-2" id="simplify-no-effect-warning" style="display:none;" role="status">
+            <i class="fas fa-exclamation-triangle"></i> <span id="simplify-no-effect-text"></span>
+          </p>
           <p class="small mb-2">
             <span style="display:inline-block;width:.8em;height:.8em;background:#3388ff;border-radius:2px;vertical-align:middle;" aria-hidden="true"></span> Current geometry &nbsp;
             <span style="display:inline-block;width:.8em;height:.8em;background:#e67e00;border-radius:2px;vertical-align:middle;" aria-hidden="true"></span> Simplified preview
           </p>
-          <p class="small text-muted mb-2"><i class="fas fa-info-circle"></i> Apply or discard simplification before editing geometry manually on the map.</p>
+          <p class="small text-muted mb-2"><i class="fas fa-info-circle"></i> The tolerance is a Ramer-Douglas-Peucker distance in degrees of latitude/longitude — vertices closer together than this are removed. The approximate metre values on the buttons (e.g. ~10 m) estimate the effect at the equator, where 1° ≈ 111 km; the real-world impact is smaller at higher latitudes. Apply or discard simplification before editing geometry manually on the map.</p>
           <div class="form-group mb-2">
             <label class="mb-1 small">Simplification tolerance: <strong id="simplify-tolerance-label">—</strong></label>
             <div class="d-flex align-items-center">
@@ -407,6 +410,8 @@
             </div>
           </div>
           <div class="btn-group btn-group-sm mb-3" role="group" aria-label="Simplification presets">
+            <button type="button" class="btn btn-outline-secondary" data-simplify-tolerance="0.0001">Minimal (~10 m)</button>
+            <button type="button" class="btn btn-outline-secondary" data-simplify-tolerance="0.001">Fine (~100 m)</button>
             <button type="button" class="btn btn-outline-secondary" data-simplify-tolerance="0.01">Light (~1 km)</button>
             <button type="button" class="btn btn-outline-secondary" data-simplify-tolerance="0.1">Medium (~11 km)</button>
             <button type="button" class="btn btn-outline-secondary" data-simplify-tolerance="0.5">Aggressive (~55 km)</button>
@@ -1411,17 +1416,39 @@
     return JSON.stringify(geojson).length;
   }
 
+  // Simplify a single LinearRing. RDP keeps a ring's two endpoints, which for
+  // a small closed ring are the same point — collapsing it to [p, p]. A valid
+  // ring needs >= 4 positions, so return null when the result is degenerate
+  // (the caller decides whether to drop it or keep the original).
   function _simplifyRing(coords, tolerance) {
     const pts = coords.map(([x, y]) => ({ x, y }));
-    return L.LineUtil.simplify(pts, tolerance).map(p => [p.x, p.y]);
+    const simplified = L.LineUtil.simplify(pts, tolerance).map(p => [p.x, p.y]);
+    if (simplified.length < 4) return null;
+    // Ensure the ring stays closed (defensive; RDP keeps endpoints).
+    const f = simplified[0], l = simplified[simplified.length - 1];
+    if (f[0] !== l[0] || f[1] !== l[1]) simplified.push([f[0], f[1]]);
+    return simplified;
+  }
+
+  // Simplify a polygon's rings, keeping the original exterior ring if it would
+  // collapse and dropping interior holes too small to survive the tolerance.
+  function _simplifyPolygonRings(rings, tolerance) {
+    const out = [];
+    rings.forEach((ring, i) => {
+      const s = _simplifyRing(ring, tolerance);
+      if (s) out.push(s);
+      else if (i === 0) out.push(ring); // keep original exterior rather than emit invalid
+      // else: drop a collapsed interior hole
+    });
+    return out;
   }
 
   function simplifyGeometry(g, tolerance) {
     if (!g) return g;
     if (g.type === 'Polygon') {
-      return { ...g, coordinates: g.coordinates.map(ring => _simplifyRing(ring, tolerance)) };
+      return { ...g, coordinates: _simplifyPolygonRings(g.coordinates, tolerance) };
     } else if (g.type === 'MultiPolygon') {
-      return { ...g, coordinates: g.coordinates.map(poly => poly.map(ring => _simplifyRing(ring, tolerance))) };
+      return { ...g, coordinates: g.coordinates.map(poly => _simplifyPolygonRings(poly, tolerance)) };
     } else if (g.type === 'GeometryCollection') {
       return { ...g, geometries: g.geometries.map(sub => simplifyGeometry(sub, tolerance)) };
     } else if (g.type === 'FeatureCollection') {
@@ -1430,6 +1457,30 @@
       return { ...g, geometry: simplifyGeometry(g.geometry, tolerance) };
     }
     return g;
+  }
+
+  // True if simplifying at `tolerance` would collapse the exterior ring of any
+  // polygon below a valid LinearRing (< 4 points). When that happens
+  // `_simplifyPolygonRings` keeps the original exterior, so the outline can't be
+  // reduced further at this tolerance — the stronger levels would have no effect.
+  function _simplifyWouldCollapseOutline(g, tolerance) {
+    if (!g) return false;
+    if (g.type === 'Polygon') {
+      return g.coordinates.length > 0 && _simplifyRing(g.coordinates[0], tolerance) === null;
+    }
+    if (g.type === 'MultiPolygon') {
+      return g.coordinates.some(poly => poly.length > 0 && _simplifyRing(poly[0], tolerance) === null);
+    }
+    if (g.type === 'GeometryCollection') {
+      return g.geometries.some(sub => _simplifyWouldCollapseOutline(sub, tolerance));
+    }
+    if (g.type === 'FeatureCollection') {
+      return g.features.some(f => _simplifyWouldCollapseOutline(f.geometry, tolerance));
+    }
+    if (g.type === 'Feature') {
+      return _simplifyWouldCollapseOutline(g.geometry, tolerance);
+    }
+    return false;
   }
 
   function countGeometryPoints(g) {
@@ -1444,9 +1495,9 @@
     return 0;
   }
 
-  // Logarithmic slider: 0 → 0.01°, 100 → 1° (degree-space RDP tolerance)
-  function sliderToTolerance(v) { return Math.pow(10, v * 0.02 - 2); }
-  function toleranceToSlider(t) { return Math.round((Math.log10(t) + 2) / 0.02); }
+  // Logarithmic slider: 0 → 0.0001°, 100 → 1° (degree-space RDP tolerance)
+  function sliderToTolerance(v) { return Math.pow(10, v * 0.04 - 4); }
+  function toleranceToSlider(t) { return Math.round((Math.log10(t) + 4) / 0.04); }
 
   // ---- Simplification panel state ----
   let _simplifyOriginal   = null;
@@ -1466,11 +1517,47 @@
     document.getElementById('simplify-size-info').textContent =
       `Points: ${_simplifyOrigPts.toLocaleString()} → ${pts.toLocaleString()} | ` +
       `Size: ${_simplifyOrigSizeKB} KB → ${sKB} KB`;
+
+    // Warn when this tolerance has no effect: either the outline would collapse
+    // (so its original, full-detail shape is kept) or the geometry is already
+    // as simple as it can be. Without this the slider/presets appear broken.
+    const warnEl = document.getElementById('simplify-no-effect-warning');
+    const warnTextEl = document.getElementById('simplify-no-effect-text');
+    if (warnEl && warnTextEl) {
+      if (pts >= _simplifyOrigPts) {
+        warnTextEl.textContent = _simplifyWouldCollapseOutline(_simplifyOriginal, tolerance)
+          ? 'This level is too strong for this geometry — the outline would break apart, so it is kept at full detail. Choose a lower tolerance to actually simplify it.'
+          : 'This level removes no points from this geometry — it has no effect.';
+        warnEl.style.display = '';
+      } else {
+        warnEl.style.display = 'none';
+      }
+    }
+
     if (_simplifyPreviewLyr && map) {
       map.removeLayer(_simplifyPreviewLyr);
       _simplifyPreviewLyr = L.geoJSON(simplified, { style: { color: '#e67e00', weight: 2, fillOpacity: 0.15 } });
       _simplifyPreviewLyr.addTo(map);
     }
+  }
+
+  // Disable preset buttons whose tolerance would not change this geometry (too
+  // strong → outline kept, or already minimal), with an explanatory tooltip.
+  function _refreshSimplifyPresets() {
+    if (!_simplifyOriginal) return;
+    document.querySelectorAll('[data-simplify-tolerance]').forEach(btn => {
+      const tol = parseFloat(btn.dataset.simplifyTolerance);
+      const pts = countGeometryPoints(simplifyGeometry(_simplifyOriginal, tol));
+      const noEffect = pts >= _simplifyOrigPts;
+      btn.disabled = noEffect;
+      if (noEffect) {
+        btn.setAttribute('title', _simplifyWouldCollapseOutline(_simplifyOriginal, tol)
+          ? 'Too strong for this geometry — the outline would collapse, so this has no effect'
+          : 'This level removes no points from this geometry — it has no effect');
+      } else {
+        btn.removeAttribute('title');
+      }
+    });
   }
 
   function showSimplifyPanel(originalGeoJSON, title, applyLabel, onApply, onKeep, keepLabel) {
@@ -1498,6 +1585,7 @@
     if (map) _simplifyPreviewLyr.addTo(map);
 
     document.getElementById('simplify-slider').value = toleranceToSlider(0.01);
+    _refreshSimplifyPresets();
     _updateSimplifyPreview();
 
     const panel = document.getElementById('geometry-simplify-panel');

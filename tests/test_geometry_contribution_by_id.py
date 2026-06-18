@@ -86,6 +86,64 @@ class GeometryContributionByIdTests(TestCase):
             f"contribution event not found in {events!r}",
         )
 
+    def test_contribute_simplified_switzerland_geometry_is_salvaged(self):
+        """Regression for the Switzerland NER bug: a GeometryCollection whose
+        Polygon has a valid exterior ring plus degenerate 2-point interior
+        rings (the collapsed enclaves) must be salvaged (200), not 500."""
+        self.client.login(username="contributor@example.com", password="testpass123")
+
+        switzerland = {
+            "type": "GeometryCollection",
+            "geometries": [
+                {
+                    "type": "Polygon",
+                    "coordinates": [
+                        [
+                            [5.955902, 46.132356],
+                            [6.640611, 46.454873],
+                            [7.064056, 45.90093],
+                            [8.442212, 46.463223],
+                            [9.330488, 46.505529],
+                            [9.566503, 47.491949],
+                            [8.590188, 47.800386],
+                            [7.00011, 47.49896],
+                            [6.171661, 46.612518],
+                            [5.955902, 46.132356],
+                        ],
+                        [[8.658608, 47.691339], [8.658608, 47.691339]],
+                        [[8.958544, 45.964816], [8.958544, 45.964816]],
+                    ],
+                }
+            ],
+        }
+
+        url = f"/work/{self.pub_without_doi.id}/contribute-geometry/"
+        response = self.client.post(url, data=json.dumps({"geometry": switzerland}), content_type="application/json")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["success"])
+        # User is told the geometry was auto-corrected.
+        self.assertIn("warning", data)
+
+        self.pub_without_doi.refresh_from_db()
+        self.assertFalse(self.pub_without_doi.geometry.empty)
+        self.assertTrue(self.pub_without_doi.geometry.valid)
+
+    def test_contribute_fully_invalid_geometry_returns_400_not_500(self):
+        """A geometry with no salvageable part returns a clean 400, never 500."""
+        self.client.login(username="contributor@example.com", password="testpass123")
+
+        bad = {
+            "type": "GeometryCollection",
+            "geometries": [{"type": "Polygon", "coordinates": [[[1.0, 1.0], [1.0, 1.0]]]}],
+        }
+        url = f"/work/{self.pub_without_doi.id}/contribute-geometry/"
+        response = self.client.post(url, data=json.dumps({"geometry": bad}), content_type="application/json")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("error", response.json())
+
     def test_contribute_geometry_by_id_requires_authentication(self):
         """Test that contribution by ID requires authentication."""
         url = f"/work/{self.pub_without_doi.id}/contribute-geometry/"
