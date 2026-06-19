@@ -35,6 +35,7 @@ Part of the KOMET project (<https://projects.tib.eu/komet>), continuing from OPT
     - `EmailLog` - Email notification tracking
     - `WikidataExportLog` - Wikidata/Wikibase export tracking
     - `BlockedEmail`/`BlockedDomain` - Anti-spam mechanisms
+    - `ServiceToken` - Generic per-service API credential store (refresh token + cached access token), editable in the Django admin. Currently used for the OpenAIRE refresh-token flow; registry of services in `works/utils/service_tokens.py`
   - **Views** ([views.py](works/views.py)) - Handles passwordless login, subscriptions, data downloads
   - **Harvesting** ([harvesting/](works/harvesting/)) — one module per source type (`oai.py`, `rss.py`, `crossref.py`, `mountain_wetlands.py`, `openalex_source.py`) plus shared helpers (`common.py`, `sessions.py`, `metadata_html.py`) and **enrichment** modules (`openalex.py` and `openaire.py`, coordinated via the fill-if-empty `enrichment.py::apply_enrichment` helper). Public entry points are re-exported from [tasks.py](works/tasks.py) so Django-Q dotted-path schedules keep working. OpenAIRE enrichment runs as an async post-harvest sweep enqueued from `common.py::complete_harvest` (all sources) and via the `enrich_openaire` backfill command.
   - **Other tasks** ([tasks.py](works/tasks.py)) — non-harvest Django-Q tasks: monthly email digest, subscription emails, GeoJSON / GeoPackage cache regeneration, schedule helpers.
@@ -310,8 +311,11 @@ python manage.py enrich_openaire
 # Records every decision in Work.provenance (openaire_enrich event, openaire_match).
 # Flags: --collection <id>, --doi-prefix <prefix>, --source <id|name>,
 # --limit N, --throttle SECONDS, --force, --dry-run.
-# Set OPTIMAP_OPENAIRE_TOKEN to raise the rate limit from 60 to 7200/hour.
-# See docs/manage.md → "OpenAIRE enrichment".
+# Set OPTIMAP_OPENAIRE_TOKEN to raise the rate limit from 60 to 7200/hour, or
+# store a monthly refresh token in the ServiceToken admin (no SSH; auto-exchanged
+# for access tokens by works.harvesting.openaire.get_openaire_access_token, with a
+# weekly staff renewal reminder via works.tasks.check_service_token_renewals).
+# See docs/manage.md → "OpenAIRE enrichment" / "Renewing the OpenAIRE refresh token".
 
 # Generate pygeoapi OpenAPI document (required for /ogcapi/ endpoint)
 python manage.py generate_pygeoapi_openapi
@@ -419,7 +423,7 @@ For harvest completion/failure emails use `render_harvest_email` from `works.har
 
 **4. Write a content assertion test.** Every email must have at least one test that checks a key substring in `mail.outbox[0].body` — not just that an email was sent. See `tests/test_auth_emails.py`, `tests/test_work_notifications.py`, and `tests/test_regular_harvesting.py` for examples. Use `@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")`.
 
-**Complete email inventory** (12 templates, 20 distinct sends):
+**Complete email inventory** (13 templates, 21 distinct sends):
 
 | Template | Trigger | Sender |
 |----------|---------|--------|
@@ -435,6 +439,7 @@ For harvest completion/failure emails use `render_harvest_email` from `works.har
 | `new_user_admin.en.txt` | New user confirmed first login | same |
 | `monthly_digest.en.txt` | Scheduled monthly digest | `works/tasks.py::send_monthly_email` |
 | `subscription_regional.en.txt` | Scheduled regional subscription digest | `works/tasks.py::send_subscription_based_email` |
+| `service_token_renewal.en.txt` | Service refresh token (OpenAIRE) nears monthly expiry — notifies staff | `works/tasks.py::check_service_token_renewals` (weekly) |
 
 **Opt-out**: work-event emails (contribution/publish) respect `UserProfile.notify_work_events` (opt-out, default True). Monthly digest respects `UserProfile.notify_new_manuscripts`. Blocked senders are checked via `BlockedEmail`/`BlockedDomain`. All sends are logged to `EmailLog` for audit (harvest emails are the exception).
 

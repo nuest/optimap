@@ -442,6 +442,17 @@ OPTIMAP_OPENAIRE_ENRICH_ON_HARVEST = env("OPTIMAP_OPENAIRE_ENRICH_ON_HARVEST", d
 # Seconds to sleep between OpenAIRE requests in the sweep / backfill. Default 60s
 # keeps anonymous runs under the 60/hour limit; lower it (e.g. 1) when a token is set.
 OPTIMAP_OPENAIRE_ENRICH_THROTTLE = float(os.getenv("OPTIMAP_OPENAIRE_ENRICH_THROTTLE", 60))
+# OpenAIRE refresh-token workflow (stored in the DB via the ServiceToken model,
+# editable in the Django admin — no SSH needed). A refresh token obtained from
+# https://develop.openaire.eu/personal-token expires after one month and is
+# exchanged for a ~1h access token at OPENAIRE_TOKEN_EXCHANGE_URL. See
+# works/utils/service_tokens.py and docs/manage.md → "Renewing the OpenAIRE refresh token".
+OPTIMAP_OPENAIRE_REFRESH_TOKEN_DAYS = int(os.getenv("OPTIMAP_OPENAIRE_REFRESH_TOKEN_DAYS", 30))
+OPTIMAP_OPENAIRE_ACCESS_TOKEN_TTL = int(os.getenv("OPTIMAP_OPENAIRE_ACCESS_TOKEN_TTL", 3600))
+# Days before refresh-token expiry that the weekly check emails staff to renew it.
+# The check runs weekly: within this window it sends a reminder (every run, so a
+# token may be flagged on 1-2 consecutive Mondays); outside it, it just logs and exits.
+OPTIMAP_OPENAIRE_RENEWAL_REMINDER_DAYS = int(os.getenv("OPTIMAP_OPENAIRE_RENEWAL_REMINDER_DAYS", 9))
 
 
 # Geoextent API settings

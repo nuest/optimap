@@ -965,3 +965,98 @@ class SourceCoverageSnapshot(models.Model):
     def __str__(self):
         pct = f"{self.coverage_pct:.1f}%" if self.coverage_pct is not None else "N/A"
         return f"Coverage {self.source_id} @ {self.computed_at:%Y-%m-%d}: {pct}"
+
+
+class ServiceToken(models.Model):
+    """Stored credential for an external-service connector (e.g. OpenAIRE).
+
+    Holds a manually-pasted **refresh token** — editable in the Django admin so
+    staff can rotate it without SSH access to the server — plus a cached,
+    short-lived **access token** exchanged from it. Generic by design: one row
+    per service, keyed by ``service``. Per-service constants (lifetime, reminder
+    lead-time, docs / token-page URLs) live in
+    ``works.utils.service_tokens.get_service_token_specs``, so the renewal
+    reminder works for any registered service without code changes here.
+    """
+
+    OPENAIRE = "openaire"
+    SERVICE_CHOICES = [(OPENAIRE, "OpenAIRE Graph API")]
+
+    # Refresh the cached access token slightly before it actually expires.
+    ACCESS_TOKEN_SKEW_SECONDS = 60
+
+    service = models.CharField(max_length=64, choices=SERVICE_CHOICES, unique=True)
+    refresh_token = models.TextField(
+        blank=True,
+        default="",
+        help_text="Long-lived refresh token pasted from the provider's token page. Rotating it resets the cached access token.",
+    )
+    refresh_token_set_at = models.DateTimeField(null=True, blank=True)
+    # Short-lived access token cache, shared across the web and qcluster processes.
+    access_token = models.TextField(blank=True, default="")
+    access_token_expires_at = models.DateTimeField(null=True, blank=True)
+    # Informational: when staff were last reminded to renew this token.
+    last_reminder_sent_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Service token"
+        verbose_name_plural = "Service tokens"
+        ordering = ["service"]
+
+    def __str__(self):
+        return f"{self.get_service_display()} token"
+
+    @property
+    def spec(self):
+        from works.utils.service_tokens import get_spec
+
+        return get_spec(self.service)
+
+    def set_refresh_token(self, value):
+        """Store a new refresh token and reset all derived state."""
+        self.refresh_token = (value or "").strip()
+        self.refresh_token_set_at = now() if self.refresh_token else None
+        self.access_token = ""
+        self.access_token_expires_at = None
+        self.last_reminder_sent_at = None
+        self.save()
+
+    @property
+    def refresh_token_expires_at(self):
+        if not self.refresh_token_set_at:
+            return None
+        spec = self.spec
+        days = spec.lifetime_days if spec else 30
+        return self.refresh_token_set_at + timedelta(days=days)
+
+    def days_until_refresh_expiry(self):
+        expires = self.refresh_token_expires_at
+        if expires is None:
+            return None
+        return (expires - now()).days
+
+    def access_token_valid(self):
+        if not self.access_token or not self.access_token_expires_at:
+            return False
+        skew = timedelta(seconds=self.ACCESS_TOKEN_SKEW_SECONDS)
+        return self.access_token_expires_at - skew > now()
+
+    def store_access_token(self, token, ttl_seconds):
+        """Cache a freshly exchanged access token with its lifetime."""
+        self.access_token = token
+        self.access_token_expires_at = now() + timedelta(seconds=int(ttl_seconds))
+        self.save(update_fields=["access_token", "access_token_expires_at", "updated_at"])
+
+    def due_for_reminder(self):
+        """True when the refresh token expires within the renewal window.
+
+        Purely a window check — the weekly task may therefore flag the same token
+        on consecutive runs while it stays inside the window.
+        """
+        expires = self.refresh_token_expires_at
+        if expires is None:
+            return False
+        spec = self.spec
+        reminder_days = spec.reminder_days if spec else 9
+        return now() >= expires - timedelta(days=reminder_days)

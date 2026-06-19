@@ -596,6 +596,99 @@ def schedule_inactivity_deletion_task():
 
 
 # -----------------------------------------------------------------------------
+# External-service token renewal reminders.
+# -----------------------------------------------------------------------------
+
+
+@log_scheduled_catchup
+def check_service_token_renewals(trigger_source="scheduled"):
+    """Email staff when any external-service refresh token nears expiry.
+
+    Generic over every service registered in
+    ``works.utils.service_tokens.get_service_token_specs`` (OpenAIRE today).
+    A refresh token must be rotated about once a month; this weekly check emails
+    active staff whenever a token expires within the renewal window (default 9
+    days), with a link to the provider docs and step-by-step renewal instructions
+    (Django admin — no SSH). When nothing is due it simply logs and returns.
+    """
+    from works.models import EmailLog, ServiceToken
+    from works.utils.service_tokens import get_service_token_specs
+
+    User = get_user_model()
+    specs = get_service_token_specs()
+    logger.info("check_service_token_renewals: checking %d registered service(s).", len(specs))
+
+    due = []
+    for token_row in ServiceToken.objects.filter(service__in=specs.keys()):
+        if not token_row.refresh_token or not token_row.refresh_token_set_at:
+            continue
+        if not token_row.due_for_reminder():
+            continue
+        spec = specs[token_row.service]
+        admin_url = f"{settings.BASE_URL}{reverse(spec.admin_change_viewname, args=[token_row.pk])}"
+        due.append(
+            {
+                "row": token_row,
+                "label": spec.label,
+                "days_until_expiry": token_row.days_until_refresh_expiry(),
+                "expires_at": token_row.refresh_token_expires_at,
+                "docs_url": spec.docs_url,
+                "token_page_url": spec.token_page_url,
+                "admin_url": admin_url,
+            }
+        )
+
+    if not due:
+        logger.info("check_service_token_renewals: no tokens due for renewal.")
+        return
+
+    admin_emails = list(
+        User.objects.filter(is_staff=True, is_active=True).exclude(email="").values_list("email", flat=True)
+    )
+    if not admin_emails:
+        logger.warning("check_service_token_renewals: no staff emails configured.")
+        return
+
+    subject, body = render_email(
+        "email/service_token_renewal.en.txt",
+        {"count": len(due), "tokens": due},
+    )
+    sent_any = False
+    for admin_email in admin_emails:
+        try:
+            send_mail(subject, body, settings.EMAIL_HOST_USER, [admin_email], fail_silently=False)
+            EmailLog.log_email(admin_email, subject, body, trigger_source=trigger_source, status="success")
+            sent_any = True
+        except Exception as ex:  # noqa: BLE001
+            logger.exception("Failed to send service-token renewal reminder to %s.", admin_email)
+            EmailLog.log_email(
+                admin_email, subject, body, trigger_source=trigger_source, status="failed", error_message=str(ex)
+            )
+        time.sleep(settings.EMAIL_SEND_DELAY)
+
+    # Record when each flagged token was last reminded (informational only).
+    if sent_any:
+        reminded_at = timezone.now()
+        for entry in due:
+            row = entry["row"]
+            row.last_reminder_sent_at = reminded_at
+            row.save(update_fields=["last_reminder_sent_at", "updated_at"])
+    logger.info("check_service_token_renewals: reminded staff for %d token(s).", len(due))
+
+
+def schedule_service_token_renewal_check():
+    if not Schedule.objects.filter(func="works.tasks.check_service_token_renewals").exists():
+        schedule(
+            "works.tasks.check_service_token_renewals",
+            schedule_type="W",
+            repeats=-1,
+            next_run=_next_monday(),
+            intended_date_kwarg="scheduled_for",
+        )
+        logger.info("Scheduled check_service_token_renewals weekly.")
+
+
+# -----------------------------------------------------------------------------
 # Data dump regeneration.
 # -----------------------------------------------------------------------------
 

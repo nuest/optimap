@@ -27,6 +27,7 @@ from works.models import (
     EmailLog,
     GlobalRegion,
     HarvestingEvent,
+    ServiceToken,
     Source,
     Subscription,
     UserProfile,
@@ -918,3 +919,102 @@ class CollectionAdmin(admin.ModelAdmin):
     def unpublish_collections(self, request, queryset):
         n = queryset.update(is_published=False)
         self.message_user(request, f"Unpublished {n} collection(s).", level=messages.SUCCESS)
+
+
+@admin.register(ServiceToken)
+class ServiceTokenAdmin(admin.ModelAdmin):
+    """Stored API credentials for external-service connectors (e.g. OpenAIRE).
+
+    Lets staff rotate a refresh token without SSH: paste the new value into the
+    "Refresh token" field and save. The "Refresh access token now" action
+    immediately exchanges it so you can verify it works.
+    """
+
+    list_display = (
+        "service",
+        "has_refresh_token",
+        "refresh_token_set_at",
+        "expires_in_display",
+        "access_token_status",
+    )
+    fields = (
+        "service",
+        "refresh_token",
+        "refresh_token_set_at",
+        "expires_in_display",
+        "access_token_status",
+        "access_token_expires_at",
+        "last_reminder_sent_at",
+        "updated_at",
+    )
+    readonly_fields = (
+        "refresh_token_set_at",
+        "expires_in_display",
+        "access_token_status",
+        "access_token_expires_at",
+        "last_reminder_sent_at",
+        "updated_at",
+    )
+    actions = ["refresh_access_token_now"]
+
+    @admin.display(description="Refresh token set", boolean=True)
+    def has_refresh_token(self, obj):
+        return bool(obj.refresh_token)
+
+    @admin.display(description="Refresh token expires")
+    def expires_in_display(self, obj):
+        expires = obj.refresh_token_expires_at
+        if expires is None:
+            return "—"
+        days = obj.days_until_refresh_expiry()
+        return f"{expires:%Y-%m-%d} ({days} day(s) left)"
+
+    @admin.display(description="Access token")
+    def access_token_status(self, obj):
+        if obj.access_token_valid():
+            return format_html(
+                '<span style="color:green">valid until {}</span>',
+                f"{obj.access_token_expires_at:%Y-%m-%d %H:%M}",
+            )
+        if obj.access_token:
+            return format_html('<span style="color:#a00">expired</span>')
+        return "—"
+
+    def save_model(self, request, obj, form, change):
+        """Route refresh-token edits through set_refresh_token so timestamps/caches reset."""
+        if "refresh_token" in form.changed_data:
+            new_value = form.cleaned_data.get("refresh_token", "")
+            # Ensure the row exists before set_refresh_token() saves it.
+            if obj.pk is None:
+                obj.refresh_token = ""
+                super().save_model(request, obj, form, change)
+            obj.set_refresh_token(new_value)
+        else:
+            super().save_model(request, obj, form, change)
+
+    @admin.action(description="Refresh access token now")
+    def refresh_access_token_now(self, request, queryset):
+        from works.harvesting.openaire import get_openaire_access_token
+
+        # Currently only OpenAIRE has an exchange flow; generalise per service as needed.
+        exchangers = {ServiceToken.OPENAIRE: get_openaire_access_token}
+        for token_row in queryset:
+            exchanger = exchangers.get(token_row.service)
+            if exchanger is None:
+                messages.warning(request, f"No token exchange configured for {token_row.get_service_display()}.")
+                continue
+            if not token_row.refresh_token:
+                messages.error(request, f"{token_row.get_service_display()}: no refresh token set.")
+                continue
+            try:
+                access = exchanger()
+            except Exception as exc:  # noqa: BLE001
+                messages.error(request, f"{token_row.get_service_display()}: exchange failed — {exc}")
+                continue
+            if access:
+                messages.success(request, f"{token_row.get_service_display()}: obtained a fresh access token.")
+            else:
+                messages.error(
+                    request,
+                    f"{token_row.get_service_display()}: exchange returned no token (check the refresh token / logs).",
+                )

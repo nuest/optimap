@@ -1,0 +1,22 @@
+[OPTIMAP] 🔑 Service token renewal needed — {{ count }} service(s)
+
+The following external-service token(s) stored in OPTIMAP are about to expire
+and must be renewed so integrations with other services, such as metadata enrichment,
+keep working.
+Each refresh token must be updated on its own schedule via a table in Django admin.
+
+{% for t in tokens %}── {{ t.label }} ──
+Refresh token expires: {{ t.expires_at|date:"Y-m-d" }} ({{ t.days_until_expiry }} day(s) left)
+
+How to renew:
+  1. Open the provider's token page and generate/copy a new refresh token:
+       {{ t.token_page_url }}
+     (Authentication docs: {{ t.docs_url }})
+  2. Open the token in the OPTIMAP admin:
+       {{ t.admin_url }}
+  3. Paste the new value into the "Refresh token" field and save.
+  4. Optional: select the row and run the "Refresh access token now" action
+     to confirm the new refresh token works immediately.
+
+{% endfor %}(Sent weekly to all staff users with an email address while a token is
+within a few days of expiry.)

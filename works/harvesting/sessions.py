@@ -203,14 +203,41 @@ def _openalex_session():
 OPENAIRE_API_URL = "https://api.openaire.eu/graph/v1/researchProducts"
 OPENAIRE_USER_AGENT = f"{settings.OPTIMAP_USER_AGENT} openaire"
 OPENAIRE_HTTP_TIMEOUT = settings.OPTIMAP_OPENAIRE_HTTP_TIMEOUT
+# Exchanges a (monthly) refresh token for a ~1h access token.
+# See https://graph.openaire.eu/docs/apis/authentication/
+OPENAIRE_TOKEN_EXCHANGE_URL = "https://services.openaire.eu/uoa-user-management/api/users/getAccessToken"
+
+
+def _resolve_openaire_bearer_token() -> str | None:
+    """Resolve the OpenAIRE bearer token, preferring the DB refresh-token flow.
+
+    Priority:
+    1. A live access token exchanged from a refresh token stored in the
+       ``ServiceToken`` table (``works.harvesting.openaire.get_openaire_access_token``).
+    2. The static ``OPTIMAP_OPENAIRE_TOKEN`` personal access token from settings
+       (backward compatibility for deployments without a DB row).
+    3. ``None`` — anonymous (60 requests/hour).
+    """
+    try:
+        from works.harvesting.openaire import get_openaire_access_token
+
+        access = get_openaire_access_token()
+    except Exception as exc:  # noqa: BLE001 — never break a harvest over auth resolution
+        logger.warning("OpenAIRE access-token resolution failed: %s", exc)
+        access = None
+    if access:
+        return access
+    return settings.OPTIMAP_OPENAIRE_TOKEN or None
 
 
 def _openaire_session() -> requests.Session:
     """Return a `requests.Session` for the OpenAIRE Graph API.
 
-    Anonymous requests are limited to 60/hour; setting OPTIMAP_OPENAIRE_TOKEN
-    (a personal access token) raises the limit to 7200/hour via a Bearer header.
-    Retries respect the upstream Retry-After header so 429s back off cleanly.
+    Anonymous requests are limited to 60/hour; an authenticated Bearer token
+    raises the limit to 7200/hour. The token is resolved by
+    ``_resolve_openaire_bearer_token`` (DB refresh-token flow first, then the
+    static ``OPTIMAP_OPENAIRE_TOKEN``). Retries respect the upstream
+    Retry-After header so 429s back off cleanly.
     """
     session = requests.Session()
     retry = Retry(
@@ -225,7 +252,7 @@ def _openaire_session() -> requests.Session:
         "User-Agent": OPENAIRE_USER_AGENT,
         "Accept": "application/json",
     }
-    token = settings.OPTIMAP_OPENAIRE_TOKEN
+    token = _resolve_openaire_bearer_token()
     if token:
         headers["Authorization"] = f"Bearer {token}"
     session.headers.update(headers)

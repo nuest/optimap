@@ -36,6 +36,8 @@ from works.harvesting.enrichment import apply_enrichment
 from works.harvesting.sessions import (
     OPENAIRE_API_URL,
     OPENAIRE_HTTP_TIMEOUT,
+    OPENAIRE_TOKEN_EXCHANGE_URL,
+    OPENAIRE_USER_AGENT,
     _openaire_session,
 )
 from works.models import HarvestingEvent
@@ -51,6 +53,56 @@ _AUTOMATED_SUBJECT_SCHEMES = {"sdg", "fos"}
 # coarse "publication"/"dataset" is less useful than the source default);
 # `language` has no Work model field.
 ENRICHABLE_FIELDS = ("abstract", "keywords", "authors")
+
+
+def get_openaire_access_token():
+    """Return a valid OpenAIRE access token, or ``None``.
+
+    Backed by the refresh token stored in the ``ServiceToken`` table (rotated by
+    staff in the Django admin). Returns the cached access token while it is still
+    valid; otherwise exchanges the refresh token for a fresh one via
+    ``GET OPENAIRE_TOKEN_EXCHANGE_URL?refreshToken=...`` (the access token is
+    valid ~1h) and caches it on the row. Returns ``None`` when no refresh token
+    is configured or the exchange fails — callers then fall back to the static
+    ``OPTIMAP_OPENAIRE_TOKEN`` or anonymous access.
+
+    Uses a plain ``requests.get`` (not ``_openaire_session``) to avoid recursing
+    back into bearer-token resolution.
+    """
+    from works.models import ServiceToken
+
+    token_row = ServiceToken.objects.filter(service=ServiceToken.OPENAIRE).first()
+    if token_row is None or not token_row.refresh_token:
+        return None
+    if token_row.access_token_valid():
+        return token_row.access_token
+
+    try:
+        resp = requests.get(
+            OPENAIRE_TOKEN_EXCHANGE_URL,
+            params={"refreshToken": token_row.refresh_token},
+            headers={"User-Agent": OPENAIRE_USER_AGENT, "Accept": "application/json"},
+            timeout=OPENAIRE_HTTP_TIMEOUT,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    except (requests.RequestException, ValueError) as exc:
+        logger.warning("OpenAIRE token exchange failed: %s", exc)
+        return None
+
+    access_token = data.get("access_token") if isinstance(data, dict) else None
+    if not access_token:
+        logger.warning("OpenAIRE token exchange returned no access_token")
+        return None
+
+    ttl = data.get("expires_in") if isinstance(data, dict) else None
+    try:
+        ttl = int(ttl)
+    except (TypeError, ValueError):
+        ttl = settings.OPTIMAP_OPENAIRE_ACCESS_TOKEN_TTL
+    token_row.store_access_token(access_token, ttl)
+    logger.info("Exchanged OpenAIRE refresh token for a new access token (ttl=%ss).", ttl)
+    return access_token
 
 
 def fetch_openaire_record(doi, session=None):

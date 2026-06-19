@@ -233,7 +233,22 @@ python manage.py enrich_openaire --throttle 1                  # when a token is
 
 Flags: `--collection <identifier>`, `--doi-prefix <prefix>`, `--source <id|name>` (narrow the selection), `--limit N`, `--throttle SECONDS` (default `OPTIMAP_OPENAIRE_ENRICH_THROTTLE`), `--force` (query even works that already have all target fields), `--dry-run`.
 
-**Rate limits & token.** OpenAIRE allows **60 requests/hour** anonymously and **7200/hour** with a token. For anything beyond a few dozen works set `OPTIMAP_OPENAIRE_TOKEN` (a personal access token from <https://develop.openaire.eu/personal-token>) and lower the throttle (e.g. `OPTIMAP_OPENAIRE_ENRICH_THROTTLE=1`). The token is sent as a Bearer header; transient `429`/`5xx` responses are retried with backoff. OpenAIRE metadata is **CC-BY** — OPTIMAP credits OpenAIRE as a data source.
+**Rate limits & token.** OpenAIRE allows **60 requests/hour** anonymously and **7200/hour** with a token. For anything beyond a few dozen works authenticate (see below) and lower the throttle (e.g. `OPTIMAP_OPENAIRE_ENRICH_THROTTLE=1`). The token is sent as a Bearer header; transient `429`/`5xx` responses are retried with backoff. OpenAIRE metadata is **CC-BY** — OPTIMAP credits OpenAIRE as a data source.
+
+#### Renewing the OpenAIRE refresh token
+
+There are two ways to authenticate against OpenAIRE; the first needs no SSH access and is the recommended way to operate a deployment:
+
+1. **Refresh token in the database (admin, no SSH).** OpenAIRE's [authentication flow](https://graph.openaire.eu/docs/apis/authentication/) issues a **refresh token** that is valid for **one month**, which OPTIMAP exchanges for a short-lived (~1 h) access token as needed. The refresh token is stored in the **`ServiceToken`** admin (`/admin/works/servicetoken/`). To set or rotate it:
+   1. Open <https://develop.openaire.eu/personal-token> and click **"Get a refresh token"**; copy the value.
+   2. In the OPTIMAP admin, open (or add) the **OpenAIRE Graph API** `ServiceToken` row, paste the value into **Refresh token**, and save. Saving stamps the set-time and clears any cached access token.
+   3. Optional: select the row and run the **"Refresh access token now"** action to confirm the refresh token works — a success message means OpenAIRE returned an access token.
+
+   Because the refresh token expires monthly, a **weekly** Django-Q task (`works.tasks.check_service_token_renewals`) checks every stored token: if one expires within the next **9 days** (`OPTIMAP_OPENAIRE_RENEWAL_REMINDER_DAYS`) it emails **all active staff** the links and these steps; otherwise it just logs its run and does nothing. Since this is purely a window check (no per-token deduplication), a token may be flagged on one or two consecutive Mondays before it expires. The other relevant settings are `OPTIMAP_OPENAIRE_REFRESH_TOKEN_DAYS` (default 30) and `OPTIMAP_OPENAIRE_ACCESS_TOKEN_TTL` (default 3600).
+
+2. **Static personal access token (env var).** Alternatively set `OPTIMAP_OPENAIRE_TOKEN` to a short-lived personal access token with a TTL of 1 hour. It is used only when no DB refresh token is configured (resolution order: DB access token → `OPTIMAP_OPENAIRE_TOKEN` → anonymous), so it remains a valid fallback for deployments that prefer environment configuration.
+
+The `ServiceToken` table and the reminder machinery are **generic over a list of services** (see `works/utils/service_tokens.py`); OpenAIRE is currently the only registered connector.
 
 ### Email notifications on completion / failure
 
@@ -274,6 +289,7 @@ For maintainers cross-referencing the admin features above:
 - Models: [works/models.py](../works/models.py) — `Source`, `HarvestingEvent` (`error_message`, `log_text`, `records_added`, `records_with_spatial`, `records_with_temporal`; index on `(source, -started_at)`).
 - Migration: [works/migrations/0003_harvestingevent_error_message_and_more.py](../works/migrations/0003_harvestingevent_error_message_and_more.py).
 - Tests: [tests/test_admin_harvesting.py](../tests/test_admin_harvesting.py), [tests/test_regular_harvesting.py](../tests/test_regular_harvesting.py).
+- OpenAIRE refresh-token workflow: `ServiceToken` model ([works/models.py](../works/models.py)) + admin ([works/admin.py](../works/admin.py) `ServiceTokenAdmin`), token exchange in [works/harvesting/openaire.py](../works/harvesting/openaire.py) (`get_openaire_access_token`) wired through `_openaire_session()` in [works/harvesting/sessions.py](../works/harvesting/sessions.py), the service registry [works/utils/service_tokens.py](../works/utils/service_tokens.py), the weekly reminder `check_service_token_renewals` + `schedule_service_token_renewal_check` ([works/tasks.py](../works/tasks.py), registered in [works/apps.py](../works/apps.py)), template `works/templates/email/service_token_renewal.en.txt`, and [tests/test_service_tokens.py](../tests/test_service_tokens.py).
 
 ## Manage collections
 

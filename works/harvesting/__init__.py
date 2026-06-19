@@ -44,6 +44,7 @@ from .openaire import (
     enrich_event_from_openaire,
     enrich_work_from_openaire,
     fetch_openaire_record,
+    get_openaire_access_token,
 )
 from .openalex import build_openalex_fields
 from .rss import (
@@ -72,6 +73,7 @@ __all__ = [
     "enrich_event_from_openaire",
     "enrich_work_from_openaire",
     "fetch_openaire_record",
+    "get_openaire_access_token",
     # oai
     "harvest_oai_endpoint",
     "parse_oai_xml_and_save_works",

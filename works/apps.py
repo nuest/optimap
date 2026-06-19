@@ -53,6 +53,12 @@ def schedule_inactivity_tasks(sender, **kwargs):
     schedule_inactivity_deletion_task()
 
 
+def schedule_service_token_tasks(sender, **kwargs):
+    from works.tasks import schedule_service_token_renewal_check
+
+    schedule_service_token_renewal_check()
+
+
 def _update_pygeoapi_extent(sender=None, **kwargs):
     """Compute the bounding box of all published works and patch PYGEOAPI_CONFIG.
 
@@ -105,5 +111,11 @@ class WorksConfig(AppConfig):
             sender=self,
             weak=False,
             dispatch_uid="works.schedule_inactivity_tasks",
+        )
+        post_migrate.connect(
+            schedule_service_token_tasks,
+            sender=self,
+            weak=False,
+            dispatch_uid="works.schedule_service_token_tasks",
         )
         import works.signals  # noqa: F401 — connects @receiver decorators
