@@ -416,6 +416,20 @@ WIKIBASE_USER_AGENT = f"OPTIMAP/{optimap.__version__} (http://optimap.science; {
 # 90s accommodates slow endpoints (e.g. EarthArXiv ListRecords takes >30s for full history)
 OPTIMAP_OAI_HTTP_TIMEOUT = int(os.getenv("OPTIMAP_OAI_HTTP_TIMEOUT", 90))
 
+# OpenAIRE enrichment settings (second metadata enrichment source besides OpenAlex).
+# Anonymous access is limited to 60 requests/hour; set OPTIMAP_OPENAIRE_TOKEN
+# (a personal access token from https://develop.openaire.eu/personal-token) to
+# raise the limit to 7200/hour — strongly recommended when on-harvest enrichment
+# is enabled fleet-wide. The token is sent as `Authorization: Bearer <token>`.
+OPTIMAP_OPENAIRE_TOKEN = env("OPTIMAP_OPENAIRE_TOKEN", default="")
+OPTIMAP_OPENAIRE_HTTP_TIMEOUT = int(os.getenv("OPTIMAP_OPENAIRE_HTTP_TIMEOUT", 60))
+# When True (default), every successful harvest enqueues an async OpenAIRE sweep
+# that fills missing abstracts/keywords/authors on that event's works.
+OPTIMAP_OPENAIRE_ENRICH_ON_HARVEST = env("OPTIMAP_OPENAIRE_ENRICH_ON_HARVEST", default=True)
+# Seconds to sleep between OpenAIRE requests in the sweep / backfill. Default 60s
+# keeps anonymous runs under the 60/hour limit; lower it (e.g. 1) when a token is set.
+OPTIMAP_OPENAIRE_ENRICH_THROTTLE = float(os.getenv("OPTIMAP_OPENAIRE_ENRICH_THROTTLE", 60))
+
 
 # Geoextent API settings
 GEOEXTENT_MAX_FILE_SIZE_MB = int(os.getenv("OPTIMAP_GEOEXTENT_MAX_FILE_SIZE_MB", 100))

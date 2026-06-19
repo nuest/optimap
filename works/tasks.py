@@ -105,6 +105,12 @@ from works.harvesting.oai import (  # noqa: F401
     harvest_oai_endpoint,
     parse_oai_xml_and_save_works,
 )
+from works.harvesting.openaire import (  # noqa: F401
+    build_openaire_fields,
+    enrich_event_from_openaire,
+    enrich_work_from_openaire,
+    fetch_openaire_record,
+)
 from works.harvesting.openalex import build_openalex_fields  # noqa: F401
 from works.harvesting.openalex_source import (  # noqa: F401
     OPENALEX_API_URL,

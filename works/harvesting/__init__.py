@@ -39,6 +39,12 @@ from .oai import (
     harvest_oai_endpoint,
     parse_oai_xml_and_save_works,
 )
+from .openaire import (
+    build_openaire_fields,
+    enrich_event_from_openaire,
+    enrich_work_from_openaire,
+    fetch_openaire_record,
+)
 from .openalex import build_openalex_fields
 from .rss import (
     harvest_rss_endpoint,
@@ -61,6 +67,11 @@ __all__ = [
     "extract_timeperiod_from_html",
     # openalex
     "build_openalex_fields",
+    # openaire
+    "build_openaire_fields",
+    "enrich_event_from_openaire",
+    "enrich_work_from_openaire",
+    "fetch_openaire_record",
     # oai
     "harvest_oai_endpoint",
     "parse_oai_xml_and_save_works",

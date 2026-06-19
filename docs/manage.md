@@ -186,7 +186,7 @@ Every harvester (OAI-PMH, RSS, Crossref, MaRESS) routes its inserts through a sh
 | Same `Source` | on | Existing Work updated in place — see "Careful update" below. |
 | Different `Source` | n/a | Skipped with an info log message. **Cross-source merging is not handled.** |
 
-> **OPTIMAP does not currently merge metadata across sources.** When the same DOI/URL is exposed by two different sources (e.g. a journal article also surfaced via a preprint server), the second source's harvest is logged and skipped — the first source "owns" the Work. There is no automatic union of fields, no cross-source provenance trail, and no way to switch ownership without manual admin intervention. If this becomes a frequent need, open a follow-up issue.
+> **OPTIMAP does not currently merge metadata across *harvest* sources.** When the same DOI/URL is exposed by two different sources (e.g. a journal article also surfaced via a preprint server), the second source's harvest is logged and skipped — the first source "owns" the Work. There is no automatic union of fields, no cross-source provenance trail, and no way to switch ownership without manual admin intervention. If this becomes a frequent need, open a follow-up issue. (This is separate from **enrichment** sources — OpenAlex and OpenAIRE — which *do* fill in fields the owning source left empty; see [OpenAIRE enrichment](#openaire-enrichment) below.)
 
 **Retire a deprecated Source and move its Works to a replacement:** when a source moves platforms (e.g. EarthArXiv migrating off eScholarship to its own CDL-backed OAI-PMH endpoint) and you end up with an old `Source` row whose Works should really belong to the new one, use `python manage.py migrate_source_works`:
 
@@ -207,12 +207,33 @@ python manage.py migrate_source_works --from-source "eScholarship Publishing" --
 
 `python manage.py harvest_sources --update` (or `update_existing=True` on the task functions) refreshes existing same-source works in place. The update is deliberately conservative:
 
-- **Preserved when the new harvest brings nothing for them:** `geometry`, `timeperiod_startdate`, `timeperiod_enddate`. These often come from a user contribution through OPTIMAP that the source still does not provide; we don't want to wipe a curator's work because the upstream record is silent on coordinates.
+- **Preserved when the new harvest brings nothing for them:** `geometry`, `timeperiod_startdate`, `timeperiod_enddate`, `abstract`, `keywords`, `authors`. The first three often come from a user contribution through OPTIMAP that the source still does not provide; the latter three may have been filled by an enrichment source (OpenAIRE, OpenAlex) that the harvest origin lacks — we don't want a silent re-harvest to wipe either a curator's work or an enriched abstract.
 - **Never overwritten:** `status` (a Published Work stays Published, never flips back to Harvested) and `created_by` (audit trail).
-- **Refreshed from the new harvest:** title, abstract, authors, keywords, topics, OpenAlex enrichment fields, the `provenance.harvest` and `provenance.metadata_sources` and `provenance.openalex_match` sections, and the `Source` FK.
+- **Refreshed from the new harvest:** title, topics, OpenAlex enrichment fields, the `provenance.harvest` and `provenance.metadata_sources` and `provenance.openalex_match` sections, and the `Source` FK (and `abstract`/`keywords`/`authors` when the new harvest actually carries them).
 - **Audit trail:** a `harvest_update` event is appended to `Work.provenance.events` (existing events including user contributions are preserved).
 
 Use `--update` when you want OpenAlex enrichment to re-run on previously-harvested works (e.g. after a matcher change), or when an upstream metadata change should propagate without losing curator additions. Without it, re-running the harvester is a no-op for already-known records.
+
+### OpenAIRE enrichment
+
+OPTIMAP enriches works from the [OpenAIRE Graph API](https://graph.openaire.eu/docs/apis/graph-api/) as a second enrichment source besides OpenAlex. Its main job is to recover **abstracts** (and, when empty, keywords/authors) for works whose harvest origin does not supply them — most notably the AGILE Springer LNCS chapters (`agile-gi-lncs` source, DOI prefix `10.1007/978-…`), for which Crossref carries no abstract and the publisher landing page is not scraped.
+
+**How it works.** Enrichment is **fill-if-empty**: it only populates a field that is currently empty and never overwrites a value from the owning source or an earlier enrichment (precedence `original_source`/`crossref` > `openalex`/`openaire`). A single work is resolved by DOI via `GET https://api.openaire.eu/graph/v1/researchProducts?pid=<doi>`; the abstract is the longest entry in `results[0].descriptions[]`. Every decision is written to `Work.provenance`: the per-field origin (`metadata_sources.abstract = "openaire"`, etc.), an `openaire_enrich` event listing `fields_filled` and `fields_offered_not_applied` (values OpenAIRE had but that were *not* applied because a value already existed), and an `openaire_match` block (`status: matched|none`). See [Work provenance](#work-provenance).
+
+**On every harvest (all sources).** When `OPTIMAP_OPENAIRE_ENRICH_ON_HARVEST=True` (default), each successful harvest enqueues an async Django-Q sweep (`works.harvesting.openaire.enrich_event_from_openaire`) that enriches only that event's works which have a DOI and are missing an abstract/keywords/authors. The sweep runs **off** the harvest critical path and throttles between requests. The Django-Q cluster must be running for it to execute. Set `OPTIMAP_OPENAIRE_ENRICH_ON_HARVEST=False` to disable it fleet-wide.
+
+**Backfill existing works** with `enrich_openaire`:
+
+```bash
+python manage.py enrich_openaire --collection agile-gi        # AGILE GI works missing a field
+python manage.py enrich_openaire --doi-prefix 10.1007/978- --limit 50
+python manage.py enrich_openaire --dry-run                     # query OpenAIRE, write nothing
+python manage.py enrich_openaire --throttle 1                  # when a token is set (see below)
+```
+
+Flags: `--collection <identifier>`, `--doi-prefix <prefix>`, `--source <id|name>` (narrow the selection), `--limit N`, `--throttle SECONDS` (default `OPTIMAP_OPENAIRE_ENRICH_THROTTLE`), `--force` (query even works that already have all target fields), `--dry-run`.
+
+**Rate limits & token.** OpenAIRE allows **60 requests/hour** anonymously and **7200/hour** with a token. For anything beyond a few dozen works set `OPTIMAP_OPENAIRE_TOKEN` (a personal access token from <https://develop.openaire.eu/personal-token>) and lower the throttle (e.g. `OPTIMAP_OPENAIRE_ENRICH_THROTTLE=1`). The token is sent as a Bearer header; transient `429`/`5xx` responses are retried with backoff. OpenAIRE metadata is **CC-BY** — OPTIMAP credits OpenAIRE as a data source.
 
 ### Email notifications on completion / failure
 
@@ -450,6 +471,7 @@ Staff users additionally see the full provenance (including `original_record`, W
   },
   "metadata_sources": {                    // per-field attribution
     "authors": "openalex",
+    "abstract": "openaire",                // crossref | openaire
     "geometry": "DC.SpatialCoverage"
   },
   "openalex_match": {
@@ -457,6 +479,11 @@ Staff users additionally see the full provenance (including `original_record`, W
     "score": 0.95,
     "matched_id": "https://openalex.org/W123",
     "top_candidate": { ... }               // staff/curators only
+  },
+  "openaire_match": {
+    "status": "matched",                   // matched | none
+    "openaire_id": "doi_dedup___::…",      // present when matched
+    "num_found": 1
   },
   "geocoding": {
     "gazetteer": "nominatim",
@@ -470,7 +497,13 @@ Staff users additionally see the full provenance (including `original_record`, W
     { "type": "harvest",      "at": "..." },
     { "type": "contribution", "at": "...", "user_id": 42, "kind": "spatial" },
     { "type": "publish",      "at": "...", "user_id": 1 },
-    { "type": "source_migration", "at": "...", "from_source": "eScholarship", "to_source": "EarthArXiv" }
+    { "type": "source_migration", "at": "...", "from_source": "eScholarship", "to_source": "EarthArXiv" },
+    { "type": "openaire_enrich", "at": "...", "openaire_id": "doi_dedup___::…",
+      "doi": "10.1007/978-3-540-78946-8_4",
+      "source_url": "https://api.openaire.eu/graph/v1/researchProducts?pid=10.1007/978-3-540-78946-8_4",
+      "fields_filled": ["abstract"],            // were empty, now populated
+      "fields_offered_not_applied": ["authors"] // OpenAIRE had a value but one already existed (kept)
+    }
   ],
 }
 ```

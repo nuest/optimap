@@ -193,8 +193,9 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
             "Each key names a Work field; the value names where that field's data came from.\n"
             "| Key | Possible values |\n"
             "|-----|-----------------|\n"
-            "| `authors` | `original_source`, `openalex`, `crossref` |\n"
-            "| `keywords` | `original_source`, `openalex` |\n"
+            "| `abstract` | `crossref`, `openaire` |\n"
+            "| `authors` | `original_source`, `openalex`, `crossref`, `openaire` |\n"
+            "| `keywords` | `original_source`, `openalex`, `openaire` |\n"
             "| `topics` | `openalex` |\n"
             "| `type` | `openalex` |\n"
             "| `geometry` | `DC.SpatialCoverage`, `DC.box`, `link rel=alternate geo+json`, `study_sites` |\n"
@@ -211,6 +212,12 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
             "| `score` | number | Confidence score 0.0–1.0 (absent when status is `none` or `skipped`) |\n"
             "| `matched_id` | string | OpenAlex work URL, e.g. `https://openalex.org/W2741809807` |\n"
             "| `top_candidate` | object | Raw OpenAlex API response for the best candidate (staff/curators only; only present when status is `unverified`) |\n\n"
+            "**`openaire_match` keys:**\n"
+            "| Key | Type | Description |\n"
+            "|-----|------|-------------|\n"
+            "| `status` | string | `matched` (an OpenAIRE record was found for the DOI) or `none` |\n"
+            "| `openaire_id` | string | OpenAIRE internal id, e.g. `doi_dedup___::…` (present when matched) |\n"
+            "| `num_found` | integer | Number of OpenAIRE records found for the DOI |\n\n"
             "**`geocoding` keys:**\n"
             "| Key | Type | Description |\n"
             "|-----|------|-------------|\n"
@@ -228,7 +235,8 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
             "| `contribution` | `kinds` (array: `spatial`, `temporal`, `bok`), `user_id`\\*, `user_email`\\*, `game` (bool, optional) | User added spatial/temporal/BoK metadata; `game: true` when submitted via the georeferencing game |\n"
             "| `publish` | `status_from`, `status_to`, `user_id`\\*, `user_email`\\* | Work was published |\n"
             "| `unpublish` | `status_from`, `user_id`\\*, `user_email`\\* | Work was unpublished |\n"
-            "| `source_migration` | `from_source`, `to_source` | Work was reassigned to a different `Source` by the `migrate_source_works` management command |\n\n"
+            "| `source_migration` | `from_source`, `to_source` | Work was reassigned to a different `Source` by the `migrate_source_works` management command |\n"
+            "| `openaire_enrich` | `openaire_id`, `doi`, `source_url`, `fields_filled` (array), `fields_offered_not_applied` (array) | OpenAIRE enrichment ran; `fields_filled` were empty and were populated, `fields_offered_not_applied` had an OpenAIRE value but a value already existed (kept under the fill-if-empty policy) |\n\n"
             "\\* `user_id` and `user_email` are present for staff and curators only.\n\n"
             "**Other top-level keys:**\n"
             "| Key | Type | Description |\n"
@@ -252,9 +260,9 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
                         required=False,
                         help_text=(
                             "Per-field attribution map. Keys name Work fields; values name their source. "
-                            "Known keys: authors, keywords, topics, type, geometry, doi, date, "
+                            "Known keys: abstract, authors, keywords, topics, type, geometry, doi, date, "
                             "volume, issue, first_page, last_page, biblio, openalex_metadata, openalex. "
-                            "Known values: original_source, openalex, crossref, DC.SpatialCoverage, "
+                            "Known values: original_source, openalex, openaire, crossref, DC.SpatialCoverage, "
                             "DC.box, link rel=alternate geo+json, study_sites, "
                             "original_source (year-only), primary."
                         ),
@@ -265,6 +273,14 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
                             "OpenAlex enrichment result. "
                             "Keys: status (verified/unverified/none/skipped), score (0.0–1.0), matched_id. "
                             "Staff/curators also see top_candidate."
+                        ),
+                    ),
+                    "openaire_match": drf_serializers.DictField(
+                        required=False,
+                        help_text=(
+                            "OpenAIRE enrichment result. "
+                            "Keys: status (matched/none), openaire_id, num_found. "
+                            "See the openaire_enrich event for the fields filled/offered."
                         ),
                     ),
                     "geocoding": drf_serializers.DictField(
@@ -280,7 +296,7 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
                         help_text=(
                             "Chronological audit log. Each event has type (string) and at (ISO timestamp). "
                             "Event types: harvest_update, doi_backfill, contribution, publish, unpublish, "
-                            "source_migration. "
+                            "source_migration, openaire_enrich. "
                             "user_id and user_email are present for staff/curators only."
                         ),
                     ),

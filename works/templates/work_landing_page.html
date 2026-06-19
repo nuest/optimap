@@ -1270,6 +1270,15 @@
           }
         }
 
+        var oaire = data.openaire_match;
+        if (oaire && typeof oaire === 'object' && Object.keys(oaire).length) {
+          var pairs = Object.keys(oaire).map(function (k) {
+            var v = oaire[k];
+            return [k, typeof v === 'string' ? v : JSON.stringify(v)];
+          });
+          html += mkDl('OpenAIRE match', pairs);
+        }
+
         var geo = data.geocoding;
         if (geo && typeof geo === 'object' && Object.keys(geo).length) {
           var geoKeys = ['gazetteer', 'gazetteer_url', 'placename', 'country_code', 'n_geocoded', 'geocoded_at'];

@@ -95,6 +95,16 @@ def render_provenance(provenance):
             )
         sections.append(block)
 
+    openaire_match = provenance.get("openaire_match")
+    if isinstance(openaire_match, dict) and openaire_match:
+        rows = [(k, json.dumps(v) if not isinstance(v, str) else v) for k, v in openaire_match.items()]
+        sections.append(
+            format_html(
+                '<h6 class="mt-2 mb-1">OpenAIRE match</h6><dl class="row mb-2 small">{}</dl>',
+                format_html_join("", '<dt class="col-sm-3 text-muted">{}</dt><dd class="col-sm-9">{}</dd>', rows),
+            )
+        )
+
     geocoding = provenance.get("geocoding")
     if isinstance(geocoding, dict) and geocoding:
         rows = []
@@ -194,7 +204,7 @@ def render_provenance(provenance):
         )
 
     # Anything else — show raw JSON so nothing is hidden.
-    known = {"harvest", "metadata_sources", "openalex_match", "geocoding", "events"}
+    known = {"harvest", "metadata_sources", "openalex_match", "openaire_match", "geocoding", "events"}
     leftover = {k: v for k, v in provenance.items() if k not in known}
     if leftover:
         sections.append(

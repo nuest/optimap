@@ -36,7 +36,7 @@ Part of the KOMET project (<https://projects.tib.eu/komet>), continuing from OPT
     - `WikidataExportLog` - Wikidata/Wikibase export tracking
     - `BlockedEmail`/`BlockedDomain` - Anti-spam mechanisms
   - **Views** ([views.py](works/views.py)) - Handles passwordless login, subscriptions, data downloads
-  - **Harvesting** ([harvesting/](works/harvesting/)) — one module per source type (`oai.py`, `rss.py`, `crossref.py`, `mountain_wetlands.py`, `openalex_source.py`) plus shared helpers (`common.py`, `sessions.py`, `metadata_html.py`, `openalex.py` for enrichment). Public entry points are re-exported from [tasks.py](works/tasks.py) so Django-Q dotted-path schedules keep working.
+  - **Harvesting** ([harvesting/](works/harvesting/)) — one module per source type (`oai.py`, `rss.py`, `crossref.py`, `mountain_wetlands.py`, `openalex_source.py`) plus shared helpers (`common.py`, `sessions.py`, `metadata_html.py`) and **enrichment** modules (`openalex.py` and `openaire.py`, coordinated via the fill-if-empty `enrichment.py::apply_enrichment` helper). Public entry points are re-exported from [tasks.py](works/tasks.py) so Django-Q dotted-path schedules keep working. OpenAIRE enrichment runs as an async post-harvest sweep enqueued from `common.py::complete_harvest` (all sources) and via the `enrich_openaire` backfill command.
   - **Other tasks** ([tasks.py](works/tasks.py)) — non-harvest Django-Q tasks: monthly email digest, subscription emails, GeoJSON / GeoPackage cache regeneration, schedule helpers.
   - **API** ([api.py](works/api.py), [viewsets.py](works/viewsets.py), [serializers.py](works/serializers.py)) - DRF REST API at `/api/v1/`
   - **Feeds** ([feeds.py](works/feeds.py), [feeds_geometry.py](works/feeds_geometry.py)) - GeoRSS/GeoAtom feed generation
@@ -301,6 +301,17 @@ python manage.py extract_agile_bok
 # "BoK Concepts" section. Skips works that already have bok_concepts set
 # unless --force is given. Throttles PDF downloads (default: 2 s).
 # Flags: --limit N, --throttle SECONDS, --force, --dry-run.
+
+# Backfill missing abstracts/keywords/authors from OpenAIRE (enrichment source)
+python manage.py enrich_openaire
+# Looks up each work by DOI on the OpenAIRE Graph API and fills empty
+# abstract/keywords/authors (fill-if-empty; never overwrites). New harvests
+# get this automatically via an async sweep (OPTIMAP_OPENAIRE_ENRICH_ON_HARVEST).
+# Records every decision in Work.provenance (openaire_enrich event, openaire_match).
+# Flags: --collection <id>, --doi-prefix <prefix>, --source <id|name>,
+# --limit N, --throttle SECONDS, --force, --dry-run.
+# Set OPTIMAP_OPENAIRE_TOKEN to raise the rate limit from 60 to 7200/hour.
+# See docs/manage.md → "OpenAIRE enrichment".
 
 # Generate pygeoapi OpenAPI document (required for /ogcapi/ endpoint)
 python manage.py generate_pygeoapi_openapi

@@ -196,6 +196,42 @@ def _openalex_session():
     return session
 
 
+# OpenAIRE --------------------------------------------------------------------
+
+# OpenAIRE Graph API v1. A single DOI is looked up via `?pid=<doi>`; the abstract
+# lives in results[0].descriptions[].
+OPENAIRE_API_URL = "https://api.openaire.eu/graph/v1/researchProducts"
+OPENAIRE_USER_AGENT = f"{settings.OPTIMAP_USER_AGENT} openaire"
+OPENAIRE_HTTP_TIMEOUT = settings.OPTIMAP_OPENAIRE_HTTP_TIMEOUT
+
+
+def _openaire_session() -> requests.Session:
+    """Return a `requests.Session` for the OpenAIRE Graph API.
+
+    Anonymous requests are limited to 60/hour; setting OPTIMAP_OPENAIRE_TOKEN
+    (a personal access token) raises the limit to 7200/hour via a Bearer header.
+    Retries respect the upstream Retry-After header so 429s back off cleanly.
+    """
+    session = requests.Session()
+    retry = Retry(
+        total=4,
+        backoff_factor=2,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=frozenset(["GET"]),
+        respect_retry_after_header=True,
+    )
+    session.mount("https://", HTTPAdapter(max_retries=retry))
+    headers = {
+        "User-Agent": OPENAIRE_USER_AGENT,
+        "Accept": "application/json",
+    }
+    token = settings.OPTIMAP_OPENAIRE_TOKEN
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    session.headers.update(headers)
+    return session
+
+
 # Mountain Wetlands Repository (MaRESS) ---------------------------------------
 
 MWR_PAGE_SIZE = 500

@@ -22,6 +22,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
 from django.utils import timezone
+from django_q.tasks import async_task
 
 from works.models import Work
 
@@ -255,7 +256,20 @@ def parse_publication_date(date_string):
 #     a new "harvest_update" entry appended.
 # -----------------------------------------------------------------------------
 
-_HARVEST_PRESERVE_IF_NEW_EMPTY = ("geometry", "timeperiod_startdate", "timeperiod_enddate")
+# geometry / dates may be user contributions the source still lacks; abstract /
+# keywords / authors may have been filled by an enrichment source (OpenAIRE,
+# OpenAlex) that the harvest origin does not provide — a re-harvest that brings
+# nothing (None) for these must not wipe the enriched value. (Crossref returns
+# abstract=None / authors=None when absent, which `_is_empty_for_update` treats
+# as empty, so the existing value is kept.)
+_HARVEST_PRESERVE_IF_NEW_EMPTY = (
+    "geometry",
+    "timeperiod_startdate",
+    "timeperiod_enddate",
+    "abstract",
+    "keywords",
+    "authors",
+)
 _HARVEST_NEVER_OVERWRITE = ("status", "created_by", "creationDate")
 
 
@@ -643,6 +657,16 @@ def complete_harvest(event, stats, warning_collector, spatial_count=None, tempor
     if stat_lines:
         event.log_text = (event.log_text or "") + "\n\n" + "\n".join(stat_lines)
         event.save(update_fields=["log_text"])
+
+    # Enqueue the OpenAIRE enrichment sweep for this event's works (all sources).
+    # Async so harvest speed is decoupled from OpenAIRE's rate limit; the sweep
+    # only touches works that have a DOI and are missing a target field.
+    if getattr(settings, "OPTIMAP_OPENAIRE_ENRICH_ON_HARVEST", True) and event is not None:
+        try:
+            async_task("works.harvesting.openaire.enrich_event_from_openaire", event.id)
+        except Exception as exc:
+            logger.warning("Could not enqueue OpenAIRE enrichment sweep for event %s: %s", event.id, exc)
+
     return spatial_count, temporal_count
 
 
