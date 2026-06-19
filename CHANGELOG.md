@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-06-19
+
 ### Added
 
 - **Keywords and topics are now shown on the work landing page, and metadata items carry icons**: the work landing page (`/work/<id>/`) now displays a visible **Keywords** and **Topics** line (next to the Collections line, above the abstract) listing `Work.keywords` (🏷️ `fa-tags`) and `Work.topics` (💡 `fa-lightbulb`) — previously these were only emitted in the page `<head>` (`<meta name="keywords">` and the schema.org JSON-LD), so OpenAIRE/OpenAlex-enriched keywords and topics were invisible to readers. The inline metadata line above it also gained small leading icons for consistency with the existing Collections icon: Authors (`fa-users`), Placename (`fa-map-marker-alt`), Region (`fa-globe`), DOI (`fa-fingerprint`), Published (`fa-calendar-alt`), Source (`fa-newspaper`), OpenAlex (`fa-atom`), and Wikidata (`fa-database`).
