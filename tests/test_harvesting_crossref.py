@@ -103,6 +103,10 @@ class BuildCrossrefFilterTests(TestCase):
 
 class CrossrefItemConversionTests(TestCase):
     def setUp(self):
+        # Keep these offline + fast: OpenAlex enrichment is exercised separately.
+        patcher = patch("works.harvesting.crossref.build_openalex_fields", return_value=({}, {}))
+        self.mock_openalex = patcher.start()
+        self.addCleanup(patcher.stop)
         self.source = Source.objects.create(
             name="Crossref Test",
             url_field="https://api.crossref.org/works",
@@ -230,6 +234,10 @@ class FetchCopernicusAbstractTests(TestCase):
 class HarvestCrossrefPrefixEndToEndTests(TestCase):
     def setUp(self):
         from works.models import Collection
+
+        patcher = patch("works.harvesting.crossref.build_openalex_fields", return_value=({}, {}))
+        self.mock_openalex = patcher.start()
+        self.addCleanup(patcher.stop)
 
         collection, _ = Collection.objects.get_or_create(
             identifier="copernicus-publications",
@@ -468,6 +476,10 @@ class HarvestCrossrefDoiContainsTests(TestCase):
     def setUp(self):
         from works.models import Collection
 
+        patcher = patch("works.harvesting.crossref.build_openalex_fields", return_value=({}, {}))
+        self.mock_openalex = patcher.start()
+        self.addCleanup(patcher.stop)
+
         self.collection, _ = Collection.objects.get_or_create(
             identifier="ess-open-archive",
             defaults={"name": "ESS Open Archive", "is_published": True},
@@ -546,6 +558,94 @@ class HarvestCrossrefDoiContainsTests(TestCase):
         self.assertIn("from-update-date", responses.calls[0].request.url)
 
 
+class CrossrefOpenAlexEnrichmentTests(TestCase):
+    """The Crossref harvester enriches each work via OpenAlex (DOI match),
+    filling topics / openalex_* identity fields while Crossref-supplied values
+    (authors, biblio, work type) take precedence."""
+
+    def setUp(self):
+        from works.models import Collection
+
+        self.collection, _ = Collection.objects.get_or_create(
+            identifier="copernicus-publications",
+            defaults={"name": "Copernicus Publications", "is_published": True},
+        )
+        self.source = Source.objects.create(
+            name="Copernicus Crossref",
+            url_field="https://api.crossref.org/works?filter=prefix:10.5194",
+            source_type="crossref-prefix",
+            collection=self.collection,
+            doi_prefix="10.5194",
+            harvest_interval_minutes=0,
+            default_work_type="article",
+        )
+
+    def _crossref_response(self, items):
+        return {"status": "ok", "message": {"total-results": len(items), "items": items, "next-cursor": ""}}
+
+    @responses.activate
+    @patch("works.harvesting.crossref.build_openalex_fields")
+    def test_openalex_fields_applied_crossref_wins(self, mock_build):
+        # OpenAlex offers topics + identity + biblio + a different type/authors.
+        mock_build.return_value = (
+            {
+                "topics": ["Hydrology"],
+                "keywords": ["flood"],
+                "openalex_id": "W123",
+                "type": "report",  # must NOT override source default_work_type
+                "authors": ["OpenAlex Author"],  # must NOT override Crossref authors
+                "volume": "99",  # must NOT override Crossref volume
+            },
+            {"topics": "openalex", "keywords": "openalex", "type": "openalex", "authors": "openalex", "volume": "openalex"},
+        )
+        item = {
+            "DOI": "10.5194/x-1-2024",
+            "URL": "https://doi.org/10.5194/x-1-2024",
+            "title": ["Enriched article"],
+            "abstract": "<jats:p>a</jats:p>",
+            "published": {"date-parts": [[2024, 1, 1]]},
+            "author": [{"given": "Jane", "family": "Doe"}],
+            "volume": "12",
+        }
+        responses.add(responses.GET, "https://api.crossref.org/works", json=self._crossref_response([item]))
+
+        harvest_crossref_prefix(self.source.id, fetch_abstract_from_publisher=False)
+
+        mock_build.assert_called_once()
+        w = Work.objects.get(doi="10.5194/x-1-2024")
+        # OpenAlex fills topics/keywords/identity that Crossref lacks.
+        self.assertEqual(w.topics, ["Hydrology"])
+        self.assertEqual(w.keywords, ["flood"])
+        self.assertEqual(w.openalex_id, "W123")
+        # Crossref wins for authors, biblio, and work type.
+        self.assertEqual(w.authors, ["Jane Doe"])
+        self.assertEqual(w.volume, "12")
+        self.assertEqual(w.type, "article")
+        # Provenance reflects the precedence.
+        ms = w.provenance["metadata_sources"]
+        self.assertEqual(ms.get("authors"), "crossref")
+        self.assertEqual(ms.get("biblio"), "crossref")
+        self.assertEqual(ms.get("topics"), "openalex")
+
+    @responses.activate
+    @patch("works.harvesting.crossref.build_openalex_fields", side_effect=RuntimeError("OpenAlex down"))
+    def test_openalex_failure_does_not_break_harvest(self, _mock):
+        item = {
+            "DOI": "10.5194/y-1-2024",
+            "URL": "https://doi.org/10.5194/y-1-2024",
+            "title": ["Resilient article"],
+            "abstract": "<jats:p>a</jats:p>",
+            "published": {"date-parts": [[2024, 1, 1]]},
+        }
+        responses.add(responses.GET, "https://api.crossref.org/works", json=self._crossref_response([item]))
+
+        harvest_crossref_prefix(self.source.id, fetch_abstract_from_publisher=False)
+
+        self.assertTrue(Work.objects.filter(doi="10.5194/y-1-2024").exists())
+        event = HarvestingEvent.objects.filter(source=self.source).latest("started_at")
+        self.assertEqual(event.status, "completed")
+
+
 class BuildCrossrefFilterExtraTests(TestCase):
     def test_extra_filters_appended(self):
         out = _build_crossref_filter("10.1007", extra_filters=["isbn:9783030147457"])
@@ -565,6 +665,10 @@ class BuildCrossrefFilterExtraTests(TestCase):
 class HarvestCrossrefBookListTests(TestCase):
     def setUp(self):
         from works.models import Collection
+
+        patcher = patch("works.harvesting.crossref.build_openalex_fields", return_value=({}, {}))
+        self.mock_openalex = patcher.start()
+        self.addCleanup(patcher.stop)
 
         self.collection, _ = Collection.objects.get_or_create(
             identifier="agile-gis",

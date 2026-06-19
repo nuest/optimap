@@ -249,16 +249,27 @@ class RealHarvestingTest(TestCase):
         with Authorea, so a raw ``crossref_filter`` (member+type) base query is
         narrowed by ``doi_contains="essoar"`` to keep only ESSOAr records.
         """
-        col_name = "ESS Open Archive"
+        source = self._create_essoar_source()
+
+        harvest_crossref_prefix(source.id, user=self.user, max_records=10, fetch_abstract_from_publisher=False)
+
+        pub_count = self._assert_successful_harvest(source, min_publications=5)
+        # Every saved work must be an ESSOAr record, never an Authorea one.
+        dois = list(Work.objects.filter(source=source).values_list("doi", flat=True))
+        self.assertTrue(all("essoar" in (d or "").lower() for d in dois), f"Non-ESSOAr DOI leaked in: {dois}")
+        print(f"\n✓ ESSOAr: Harvested {pub_count} preprints via Crossref")
+
+    def _create_essoar_source(self):
+        """Create the ESS Open Archive Crossref source used by the ESSOAr tests."""
         from django.utils.text import slugify
 
         from works.models import Collection
 
         col, _ = Collection.objects.get_or_create(
-            identifier=slugify(col_name)[:100],
-            defaults={"name": col_name, "is_published": True},
+            identifier=slugify("ESS Open Archive")[:100],
+            defaults={"name": "ESS Open Archive", "is_published": True},
         )
-        source = Source.objects.create(
+        return Source.objects.create(
             name="TEST: ESS Open Archive",
             url_field="https://api.crossref.org/works?filter=member:311,type:posted-content",
             source_type="crossref-prefix",
@@ -270,13 +281,60 @@ class RealHarvestingTest(TestCase):
             harvest_interval_minutes=60 * 24 * 7,
         )
 
-        harvest_crossref_prefix(source.id, user=self.user, max_records=10, fetch_abstract_from_publisher=False)
+    def test_essoar_record_has_openalex_and_openaire_ids(self):
+        """A harvested ESSOAr record carries its external identifiers: DOI (from
+        Crossref), OpenAlex (inline enrichment during harvest) and OpenAIRE (the
+        post-harvest sweep). Verifies both enrichment sources are wired into the
+        Crossref harvest path and surface on the work's external-identifier links.
+        """
+        from works.harvesting.openaire import enrich_event_from_openaire
+        from works.seo import external_identifier_links
 
-        pub_count = self._assert_successful_harvest(source, min_publications=5)
-        # Every saved work must be an ESSOAr record, never an Authorea one.
-        dois = list(Work.objects.filter(source=source).values_list("doi", flat=True))
-        self.assertTrue(all("essoar" in (d or "").lower() for d in dois), f"Non-ESSOAr DOI leaked in: {dois}")
-        print(f"\n✓ ESSOAr: Harvested {pub_count} preprints via Crossref")
+        source = self._create_essoar_source()
+        # Harvest a larger batch so at least one record matches in both indexes.
+        harvest_crossref_prefix(
+            source.id,
+            user=self.user,
+            max_records=20,
+            fetch_abstract_from_publisher=False,
+            sort="indexed",
+            order="desc",
+        )
+        works = list(Work.objects.filter(source=source))
+        self.assertTrue(works, "No ESSOAr works harvested")
+
+        # OpenAlex enrichment runs inline during the Crossref harvest.
+        with_openalex = [w for w in works if w.openalex_id]
+        self.assertTrue(
+            with_openalex,
+            "No harvested ESSOAr work received an OpenAlex id — inline OpenAlex enrichment may have regressed",
+        )
+
+        # OpenAIRE enrichment is an async post-harvest sweep; run it synchronously.
+        event = HarvestingEvent.objects.filter(source=source).latest("started_at")
+        enrich_event_from_openaire(event.id)
+        for w in works:
+            w.refresh_from_db()
+        with_openaire = [w for w in works if w.openaire_url]
+        if not with_openaire:
+            self.skipTest("OpenAIRE returned no matches this run (possible rate-limit / network); rerun later")
+
+        # A single record should carry DOI + OpenAlex + OpenAIRE identifiers.
+        both = [w for w in works if w.doi and w.openalex_id and w.openaire_url]
+        self.assertTrue(
+            both,
+            "No single ESSOAr record carried DOI + OpenAlex + OpenAIRE ids together",
+        )
+        sample = both[0]
+        titles = {link["title"] for link in external_identifier_links(sample)}
+        self.assertTrue(
+            {"DOI", "OpenAlex", "OpenAIRE"}.issubset(titles),
+            f"Expected DOI/OpenAlex/OpenAIRE in external links, got {titles} for {sample.doi}",
+        )
+        print(
+            f"\n✓ ESSOAr external IDs: {len(with_openalex)} w/ OpenAlex, {len(with_openaire)} w/ OpenAIRE; "
+            f"sample {sample.doi} → {sorted(titles)}"
+        )
 
     def test_harvest_respects_max_records(self):
         """

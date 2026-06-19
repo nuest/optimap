@@ -41,6 +41,7 @@ from .common import (
     resolve_user,
     send_harvest_email,
 )
+from .openalex import build_openalex_fields
 from .sessions import (
     CROSSREF_API_URL,
     CROSSREF_HTTP_TIMEOUT,
@@ -207,6 +208,39 @@ def _crossref_item_to_work_kwargs(
     if volume or issue or first_page or last_page:
         metadata_sources["biblio"] = "crossref"
 
+    # OpenAlex enrichment (DOI-matched): adds research topics and the openalex_*
+    # identity fields, and fills authors/keywords/biblio that Crossref left empty.
+    # Fill-if-empty — Crossref-supplied values always win, and the source's
+    # default_work_type is kept rather than OpenAlex's type.
+    existing_metadata = {"authors": authors} if authors else {}
+    try:
+        openalex_fields, oa_provenance = build_openalex_fields(
+            title=title,
+            doi=doi,
+            author=", ".join(authors) if authors else None,
+            existing_metadata=existing_metadata,
+        )
+    except Exception as e:  # noqa: BLE001 — enrichment must never fail a harvest
+        logger.info("OpenAlex enrichment failed for %s: %s", doi, e)
+        openalex_fields, oa_provenance = {}, {}
+
+    # Crossref wins over OpenAlex for fields Crossref already provided.
+    openalex_fields.pop("type", None)
+    oa_provenance.pop("type", None)
+    if authors:
+        openalex_fields.pop("authors", None)
+        oa_provenance.pop("authors", None)
+    for biblio_key, crossref_value in (
+        ("volume", volume),
+        ("issue", issue),
+        ("first_page", first_page),
+        ("last_page", last_page),
+    ):
+        if crossref_value:
+            openalex_fields.pop(biblio_key, None)
+            oa_provenance.pop(biblio_key, None)
+    metadata_sources.update(oa_provenance)
+
     return {
         "title": title,
         "abstract": abstract,
@@ -234,6 +268,7 @@ def _crossref_item_to_work_kwargs(
             "metadata_sources": metadata_sources,
         },
         "status": "h",
+        **openalex_fields,
     }
 
 
