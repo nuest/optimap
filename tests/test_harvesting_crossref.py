@@ -596,7 +596,13 @@ class CrossrefOpenAlexEnrichmentTests(TestCase):
                 "authors": ["OpenAlex Author"],  # must NOT override Crossref authors
                 "volume": "99",  # must NOT override Crossref volume
             },
-            {"topics": "openalex", "keywords": "openalex", "type": "openalex", "authors": "openalex", "volume": "openalex"},
+            {
+                "topics": "openalex",
+                "keywords": "openalex",
+                "type": "openalex",
+                "authors": "openalex",
+                "volume": "openalex",
+            },
         )
         item = {
             "DOI": "10.5194/x-1-2024",

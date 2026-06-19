@@ -291,14 +291,16 @@ class RealHarvestingTest(TestCase):
         from works.seo import external_identifier_links
 
         source = self._create_essoar_source()
-        # Harvest a larger batch so at least one record matches in both indexes.
+        # Harvest the oldest-published records (2018–2020 legacy era): these are
+        # reliably present in both OpenAlex and OpenAIRE, whereas the newest
+        # preprints may not be ingested by OpenAIRE yet.
         harvest_crossref_prefix(
             source.id,
             user=self.user,
-            max_records=20,
+            max_records=12,
             fetch_abstract_from_publisher=False,
-            sort="indexed",
-            order="desc",
+            sort="published",
+            order="asc",
         )
         works = list(Work.objects.filter(source=source))
         self.assertTrue(works, "No ESSOAr works harvested")

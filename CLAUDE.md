@@ -190,6 +190,28 @@ too:
 OPTIMAP_TEST_HARVESTING_ONLINE=True python manage.py test tests.test_harvesting_online
 ```
 
+**OpenAIRE-authenticated harvest tests.** Online tests that exercise OpenAIRE
+enrichment (e.g. `tests.test_real_harvesting` asserting a harvested record has
+both OpenAlex and OpenAIRE external IDs) hit OpenAIRE's anonymous **60 req/hour**
+limit quickly and then *soft-skip*. The dev DB usually holds an OpenAIRE
+`ServiceToken` (refresh token + cached access token); exchange it for an access
+token and pass it as `OPTIMAP_OPENAIRE_TOKEN` to run the test on the authenticated
+**7200 req/hour** path (the test DB is empty, so the sweep can't read the token
+itself). One-shot, without printing the secret:
+
+```bash
+TOKEN=$(python manage.py shell -c \
+  "from works.harvesting.openaire import get_openaire_access_token; print(get_openaire_access_token() or '')" \
+  2>/dev/null | tail -1)
+OPTIMAP_OPENAIRE_TOKEN="$TOKEN" SKIP_REAL_HARVESTING=0 \
+  python manage.py test tests.test_real_harvesting.RealHarvestingTest.test_essoar_record_has_openalex_and_openaire_ids
+```
+
+`get_openaire_access_token()` auto-refreshes from the stored refresh token (see
+the [OpenAIRE refresh-token flow](docs/manage.md#openaire-enrichment)). If no
+`ServiceToken` exists the call returns empty and the test stays anonymous (and
+will likely skip under rate-limiting).
+
 ### Django Management Commands
 
 #### Standard Django Commands
