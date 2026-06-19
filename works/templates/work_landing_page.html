@@ -193,20 +193,20 @@
 
 <div class="meta muted">
   {% if authors_list %}
-    <strong>Authors:</strong> {{ authors_list|join:", " }} ·
+    <i class="fas fa-users text-muted"></i> <strong>Authors:</strong> {{ authors_list|join:", " }} ·
   {% endif %}
   {% if work.placename %}
-    <strong>Placename:</strong> {{ work.placename }}
+    <i class="fas fa-map-marker-alt text-muted"></i> <strong>Placename:</strong> {{ work.placename }}
     <i class="fas fa-info-circle text-muted" data-toggle="tooltip" title="This information was derived from the geometries of the work based on the Nominatim gazetteer." aria-label="This information was derived from the geometries of the work based on the Nominatim gazetteer."></i> ·
   {% endif %}
   {% if work.country_code %}
-    <strong>Region:</strong> {{ work.country_code }}
+    <i class="fas fa-globe text-muted"></i> <strong>Region:</strong> {{ work.country_code }}
     <i class="fas fa-info-circle text-muted" data-toggle="tooltip" title="This information was derived from the geometries of the work based on the Nominatim gazetteer." aria-label="This information was derived from the geometries of the work based on the Nominatim gazetteer."></i> ·
   {% endif %}
-  {% if work.doi %}<strong>DOI:</strong> <a href="https://doi.org/{{ work.doi }}" target="_blank" rel="noopener">{{ work.doi }}</a> ·{% endif %}
-  {% if work.publicationDate %}<strong>Published:</strong> {{ work.publicationDate }} ·{% endif %}
+  {% if work.doi %}<i class="fas fa-fingerprint text-muted"></i> <strong>DOI:</strong> <a href="https://doi.org/{{ work.doi }}" target="_blank" rel="noopener">{{ work.doi }}</a> ·{% endif %}
+  {% if work.publicationDate %}<i class="fas fa-calendar-alt text-muted"></i> <strong>Published:</strong> {{ work.publicationDate }} ·{% endif %}
   {% if work.source %}
-    <strong>Source:</strong>
+    <i class="fas fa-newspaper text-muted"></i> <strong>Source:</strong>
     {% if work.source.homepage_url %}
       <a href="{{ work.source.homepage_url }}" target="_blank" rel="noopener">{{ work.source.name }}</a>
     {% else %}
@@ -215,10 +215,10 @@
     ·
   {% endif %}
   {% if work.openalex_id %}
-    <strong>OpenAlex:</strong> <a href="{{ work.openalex_id }}" target="_blank" rel="noopener">View in OpenAlex</a> ·
+    <i class="fas fa-atom text-muted"></i> <strong>OpenAlex:</strong> <a href="{{ work.openalex_id }}" target="_blank" rel="noopener">View in OpenAlex</a> ·
   {% endif %}
   {% if latest_wikidata_export and latest_wikidata_export.wikidata_url %}
-    <strong>Wikidata:</strong> <a href="{{ latest_wikidata_export.wikidata_url }}" target="_blank" rel="noopener">{{ latest_wikidata_export.wikidata_qid }}</a>
+    <i class="fas fa-database text-muted"></i> <strong>Wikidata:</strong> <a href="{{ latest_wikidata_export.wikidata_url }}" target="_blank" rel="noopener">{{ latest_wikidata_export.wikidata_qid }}</a>
   {% endif %}
 </div>
 
@@ -227,6 +227,22 @@
     <i class="fas fa-layer-group"></i>
     <strong>{% if visible_collections|length == 1 %}Collection:{% else %}Collections:{% endif %}</strong>
     {% for c in visible_collections %}<a href="{% url 'optimap:collection-page' c.identifier %}">{{ c.name }}</a>{% if is_admin and not c.is_published %} <span class="badge badge-warning" data-toggle="tooltip" title="Unpublished — visible to admins only">unpublished</span>{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}
+  </p>
+{% endif %}
+
+{% if work.keywords or work.topics %}
+  <p class="meta muted" id="work-keywords">
+    {% if work.keywords %}
+      <i class="fas fa-tags"></i>
+      <strong>Keywords:</strong>
+      {% for kw in work.keywords %}{{ kw }}{% if not forloop.last %}, {% endif %}{% endfor %}
+      {% if work.topics %} · {% endif %}
+    {% endif %}
+    {% if work.topics %}
+      <i class="fas fa-lightbulb"></i>
+      <strong>Topics:</strong>
+      {% for t in work.topics %}{{ t }}{% if not forloop.last %}, {% endif %}{% endfor %}
+    {% endif %}
   </p>
 {% endif %}
 
