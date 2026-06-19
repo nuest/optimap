@@ -267,7 +267,7 @@ python manage.py harvest_sources --all --max-records 50
 # Harvests from all configured sources with record limit
 python manage.py harvest_sources --source essd --source geo-leo
 # Harvests from specific sources by identifier
-# Supports: essd, agile-giss, geo-leo, eartharxiv, scientific-data
+# Supports: essd, agile-giss, geo-leo, eartharxiv, scientific-data, essoar
 
 # Source synchronization
 python manage.py sync_source_metadata

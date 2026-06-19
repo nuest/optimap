@@ -30,7 +30,7 @@ django.setup()
 from django.contrib.auth import get_user_model
 
 from works.models import HarvestingEvent, Source, Work
-from works.tasks import harvest_oai_endpoint
+from works.tasks import harvest_crossref_prefix, harvest_oai_endpoint
 
 User = get_user_model()
 
@@ -236,26 +236,47 @@ class RealHarvestingTest(TestCase):
             f"{len(with_topics)} with topics"
         )
 
-    @skipIf(True, "EssOAr OAI-PMH endpoint not yet confirmed")
     def test_harvest_essoar(self):
         """
-        Test harvesting from ESS Open Archive (EssOAr).
+        Test harvesting from ESS Open Archive (ESSOAr) via Crossref.
 
         Issue: https://github.com/GeoinformationSystems/optimap/issues/99
         Repository: https://essopenarchive.org/
 
-        Note: OAI-PMH endpoint needs to be confirmed.
+        ESSOAr has no usable native API (Atypon/Cloudflare) and is harvested
+        through Crossref. It spans two DOI eras (10.1002/essoar.* legacy and
+        10.22541/essoar.* current) that share Wiley member 311 / posted-content
+        with Authorea, so a raw ``crossref_filter`` (member+type) base query is
+        narrowed by ``doi_contains="essoar"`` to keep only ESSOAr records.
         """
-        # Placeholder - needs endpoint URL
-        source = self._create_source(
-            name="ESS Open Archive",
-            url="https://essopenarchive.org/oai/request",  # To be confirmed
-            collection_name="EssOAr",
+        col_name = "ESS Open Archive"
+        from django.utils.text import slugify
+
+        from works.models import Collection
+
+        col, _ = Collection.objects.get_or_create(
+            identifier=slugify(col_name)[:100],
+            defaults={"name": col_name, "is_published": True},
+        )
+        source = Source.objects.create(
+            name="TEST: ESS Open Archive",
+            url_field="https://api.crossref.org/works?filter=member:311,type:posted-content",
+            source_type="crossref-prefix",
+            collection=col,
+            crossref_filter="member:311,type:posted-content",
+            doi_contains="essoar",
+            is_preprint=True,
+            default_work_type="preprint",
+            harvest_interval_minutes=60 * 24 * 7,
         )
 
-        harvest_oai_endpoint(source.id, user=self.user, max_records=20)
+        harvest_crossref_prefix(source.id, user=self.user, max_records=10, fetch_abstract_from_publisher=False)
+
         pub_count = self._assert_successful_harvest(source, min_publications=5)
-        print(f"\n✓ EssOAr: Harvested {pub_count} publications")
+        # Every saved work must be an ESSOAr record, never an Authorea one.
+        dois = list(Work.objects.filter(source=source).values_list("doi", flat=True))
+        self.assertTrue(all("essoar" in (d or "").lower() for d in dois), f"Non-ESSOAr DOI leaked in: {dois}")
+        print(f"\n✓ ESSOAr: Harvested {pub_count} preprints via Crossref")
 
     def test_harvest_respects_max_records(self):
         """

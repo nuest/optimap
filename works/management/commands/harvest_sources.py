@@ -193,6 +193,33 @@ SOURCE_CONFIG = {
         "is_oa": True,
         "default_work_type": "dataset",
     },
+    "essoar": {
+        "name": "ESS Open Archive",
+        # Display URL only — harvester builds its own Crossref API params.
+        "url": "https://api.crossref.org/works?filter=member:311,type:posted-content",
+        "collection_name": "ESS Open Archive",
+        "collection_description": (
+            "Preprints, posters and presentations from AGU's Earth and Space "
+            "Science Open Archive (ESSOAr), harvested via Crossref."
+        ),
+        "homepage_url": "https://essopenarchive.org/",
+        "publisher_name": "American Geophysical Union",
+        "source_type": "crossref-prefix",
+        # ESSOAr has no usable native API (Atypon/Cloudflare) and spans TWO DOI
+        # eras: 10.1002/essoar.* (2018–2022, original platform) and
+        # 10.22541/essoar.* (2022–present, Authorea). No single prefix covers
+        # both, but both are Wiley Crossref member 311, work type posted-content.
+        # We harvest that slice (~94k incl. Authorea) and keep only DOIs that
+        # contain "essoar" — capturing the complete ESSOAr corpus, both eras.
+        "crossref_filter": "member:311,type:posted-content",
+        "doi_contains": "essoar",
+        # essopenarchive.org sits behind Cloudflare (landing pages not scrapable);
+        # rely on the Crossref JATS abstract (+ async OpenAIRE enrichment).
+        "fetch_abstract_from_publisher": False,
+        "is_oa": True,
+        "is_preprint": True,
+        "default_work_type": "preprint",
+    },
     "mountain-wetlands": {
         "name": "Mountain Wetlands Repository",
         "url": "https://andes.mountain-wetlands-repository.info/api/v1/items/",
@@ -1104,6 +1131,8 @@ class Command(BaseCommand):
             default_work_type=config.get("default_work_type", "article"),
             openalex_id=config.get("openalex_id"),
             doi_prefix=config.get("doi_prefix") or config.get("crossref_prefix"),
+            doi_contains=config.get("doi_contains", ""),
+            crossref_filter=config.get("crossref_filter", ""),
             issn_l=config.get("issn_l"),
             source_titles=config.get("source_titles") or None,
             harvest_interval_minutes=0,
@@ -1142,6 +1171,8 @@ class Command(BaseCommand):
             "default_work_type",
             "openalex_id",
             "doi_prefix",
+            "doi_contains",
+            "crossref_filter",
             "issn_l",
             "source_titles",
         ):

@@ -718,6 +718,31 @@ class Source(models.Model):
             "Overrides the hardcoded fallback in harvest_crossref_prefix."
         ),
     )
+    doi_contains = models.CharField(
+        max_length=50,
+        blank=True,
+        default="",
+        help_text=(
+            "Crossref-only: keep only works whose DOI contains this substring "
+            "(case-insensitive). Use when a Crossref query returns more than one "
+            "venue — e.g. ESS Open Archive shares DOI prefixes and the Wiley "
+            "member id with Authorea; doi_contains='essoar' keeps only ESSOAr "
+            "(.../essoar.*). Leave blank to keep all query matches."
+        ),
+    )
+    crossref_filter = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text=(
+            "Crossref-only: raw Crossref filter clauses used as the harvest query "
+            "instead of prefix:<doi_prefix>. Comma-separated, e.g. "
+            "'member:311,type:posted-content' for ESS Open Archive (whose two DOI "
+            "eras — 10.1002/essoar.* and 10.22541/essoar.* — are only jointly "
+            "captured by the Wiley member + posted-content slice, then narrowed "
+            "with doi_contains). Leave blank to harvest by doi_prefix."
+        ),
+    )
     source_titles = models.JSONField(
         blank=True,
         null=True,

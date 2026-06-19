@@ -576,14 +576,21 @@ def fetch_and_store_crossref_works_count(source) -> str | None:
     """
     if not source or source.source_type not in _CROSSREF_TYPES:
         return None
-    doi_prefix = getattr(source, "doi_prefix", None)
-    if not doi_prefix:
-        return None
 
-    filter_parts = [f"prefix:{doi_prefix}"]
-    for title in getattr(source, "source_titles", None) or []:
-        filter_parts.append(f"container-title:{title}")
-    filter_str = ",".join(filter_parts)
+    raw_filter = (getattr(source, "crossref_filter", "") or "").strip()
+    if raw_filter:
+        # Venue spans several DOI prefixes (e.g. ESSOAr) — count the raw filter
+        # slice. With a doi_contains narrowing the stored count is the whole
+        # slice, not the matched subset (Crossref can't count by DOI substring).
+        filter_str = raw_filter
+    else:
+        doi_prefix = getattr(source, "doi_prefix", None)
+        if not doi_prefix:
+            return None
+        filter_parts = [f"prefix:{doi_prefix}"]
+        for title in getattr(source, "source_titles", None) or []:
+            filter_parts.append(f"container-title:{title}")
+        filter_str = ",".join(filter_parts)
 
     from works.harvesting.sessions import _crossref_session  # local import avoids circular
 

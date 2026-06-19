@@ -21,7 +21,7 @@ the landing-page fetch fails.
 
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import requests
 from bs4 import BeautifulSoup
@@ -64,8 +64,14 @@ def _strip_jats(jats_html):
 
 
 def _build_crossref_filter(prefix, source_titles=None, since=None, extra_filters=None):
-    """Assemble a Crossref ``filter=...`` parameter value."""
-    parts = [f"prefix:{prefix}"]
+    """Assemble a Crossref ``filter=...`` parameter value.
+
+    ``prefix`` may be ``None`` (or empty) to omit the ``prefix:`` clause — used
+    when the base query is expressed via ``extra_filters`` instead (e.g.
+    ``member:311,type:posted-content`` for ESS Open Archive, whose two DOI eras
+    share no single prefix).
+    """
+    parts = [f"prefix:{prefix}"] if prefix else []
     if source_titles:
         # Crossref lets the same filter key repeat — each title becomes its
         # own clause, and Crossref ORs same-key filters. So a multi-title
@@ -274,6 +280,8 @@ def parse_crossref_response_and_save_works(
     order=None,
     extra_filters=None,
     harvester_name=None,
+    since=None,
+    doi_contains=None,
 ):
     """Page through Crossref's ``works`` API and persist matched works.
 
@@ -289,24 +297,37 @@ def parse_crossref_response_and_save_works(
 
     ``extra_filters`` appends raw Crossref filter clauses (e.g.
     ``["isbn:978-3-030-14745-7"]``) after the prefix/title filters.
+
+    ``since`` (a date / ``YYYY-MM-DD`` string) adds a ``from-update-date``
+    clause for incremental harvesting — only records Crossref re-indexed on or
+    after that date are returned.
+
+    ``doi_contains`` is a case-insensitive substring filter applied client-side:
+    items whose DOI does not contain it are skipped. This is the only way to
+    isolate a single venue when a DOI prefix is shared (e.g. ``10.22541`` is
+    shared by ESS Open Archive ``.../essoar.*`` and Authorea ``.../au.*``).
     """
     session = _crossref_session()
     cursor = "*"
     saved = 0
-    seen = 0
+    seen = 0  # items matching doi_contains (== walked when no filter); drives stats + max_records
+    walked = 0  # every item Crossref returned; drives end-of-crawl detection vs total_results
     if stats is None:
         stats = HarvestStats()
     log_interval = 20 if (max_records or 0) <= 100 else 50
 
-    filter_value = _build_crossref_filter(prefix, source_titles=source_titles, extra_filters=extra_filters)
+    filter_value = _build_crossref_filter(
+        prefix, source_titles=source_titles, since=since, extra_filters=extra_filters
+    )
 
     # Crossref intermittently returns an empty `items` page (or drops the
     # `next-cursor`) part-way through a deep cursor crawl — server load,
     # rate-limiting, or eventual consistency of the cursor window. Treating
     # that as end-of-results silently truncates the harvest, so we re-request
     # the same cursor a few times before believing the crawl is done. The
-    # authoritative end signal is `seen >= total_results` (Crossref echoes
-    # `total-results` on every page).
+    # authoritative end signal is `walked >= total_results` (Crossref echoes
+    # `total-results` on every page) — compared against `walked`, not `seen`,
+    # because a `doi_contains` filter makes `seen` count only the matched subset.
     total_results = None
     empty_retries = 0
     EMPTY_PAGE_RETRIES = 3
@@ -343,22 +364,22 @@ def parse_crossref_response_and_save_works(
             # Transient empty page mid-walk? Retry the same cursor before
             # concluding the crawl is finished — but only while Crossref still
             # claims more results than we've seen.
-            if total_results and seen < total_results and empty_retries < EMPTY_PAGE_RETRIES:
+            if total_results and walked < total_results and empty_retries < EMPTY_PAGE_RETRIES:
                 empty_retries += 1
                 logger.info(
                     "Crossref returned an empty page at %d/%d records; retry %d/%d on the same cursor",
-                    seen,
+                    walked,
                     total_results,
                     empty_retries,
                     EMPTY_PAGE_RETRIES,
                 )
                 time.sleep(2 * empty_retries)
                 continue
-            if total_results and seen < total_results:
+            if total_results and walked < total_results:
                 logger.warning(
                     "Crossref harvest stopped early: %d of %d records fetched "
                     "(empty page after %d retries) for filter %r",
-                    seen,
+                    walked,
                     total_results,
                     EMPTY_PAGE_RETRIES,
                     filter_value,
@@ -367,6 +388,11 @@ def parse_crossref_response_and_save_works(
         empty_retries = 0
 
         for item in items:
+            walked += 1
+            if doi_contains and doi_contains.lower() not in (item.get("DOI") or "").lower():
+                # Shared-prefix record from another venue (e.g. Authorea under
+                # 10.22541); not part of this source — skip without counting.
+                continue
             seen += 1
             if seen % log_interval == 0:
                 suffix = f"/{max_records}" if max_records else ""
@@ -405,10 +431,10 @@ def parse_crossref_response_and_save_works(
 
         next_cursor = data.get("next-cursor")
         if not next_cursor:
-            if total_results and seen < total_results:
+            if total_results and walked < total_results:
                 logger.warning(
                     "Crossref harvest stopped early: %d of %d records fetched (no next-cursor) for filter %r",
-                    seen,
+                    walked,
                     total_results,
                     filter_value,
                 )
@@ -448,13 +474,53 @@ def harvest_crossref_prefix(
     warning_collector.setLevel(logging.INFO)
     logger.addHandler(warning_collector)
 
-    resolved_prefix = prefix or (source.doi_prefix if source else None) or "10.5194"
+    doi_contains = (source.doi_contains or None) if source else None
+
+    # ESS Open Archive and similar venues span more than one DOI prefix (ESSOAr:
+    # 10.1002/essoar.* legacy + 10.22541/essoar.* current) but share a Crossref
+    # member + work type. ``crossref_filter`` carries that raw base query (e.g.
+    # "member:311,type:posted-content"); when set we drop the prefix clause and
+    # rely on doi_contains to isolate the venue.
+    raw_filter = (source.crossref_filter or "").strip() if source else ""
+    if raw_filter:
+        resolved_prefix = None
+        extra_filters = [c.strip() for c in raw_filter.split(",") if c.strip()]
+    else:
+        resolved_prefix = prefix or (source.doi_prefix if source else None) or "10.5194"
+        extra_filters = None
+    filter_label = resolved_prefix or (",".join(extra_filters) if extra_filters else None)
+
+    # Incremental harvesting: only ask Crossref for records re-indexed since the
+    # last successful harvest of this source (minus a 2-day overlap buffer to
+    # catch late-indexed updates). First run (no prior completed event) → full
+    # backfill (since=None). For shared-prefix sources this is essential: it
+    # avoids re-walking the entire prefix (~79k for 10.22541) every cycle.
+    # Always page with a deterministic sort. Crossref's default (relevance)
+    # ordering is unstable under deep cursor paging and silently truncates the
+    # walk (observed: a member+type backfill stopping at ~150 records); sorting
+    # by `indexed` makes both full backfills and incremental runs walk reliably
+    # and surfaces newest-changed records first (so `max_records` stays useful).
+    if sort is None:
+        sort, order = "indexed", "desc"
+
+    since = None
+    last_completed = (
+        HarvestingEvent.objects.filter(source=source, status="completed", completed_at__isnull=False)
+        .exclude(id=event.id)
+        .order_by("-completed_at")
+        .first()
+    )
+    if last_completed:
+        since = (last_completed.completed_at.date() - timedelta(days=2)).isoformat()
 
     try:
         logger.info(
-            "Starting Crossref harvest: prefix=%s titles=%s max_records=%s",
+            "Starting Crossref harvest: prefix=%s filter=%s titles=%s doi_contains=%s since=%s max_records=%s",
             resolved_prefix,
+            extra_filters,
             source_titles,
+            doi_contains,
+            since,
             max_records,
         )
         stats = HarvestStats()
@@ -463,6 +529,7 @@ def harvest_crossref_prefix(
             event,
             prefix=resolved_prefix,
             source_titles=source_titles,
+            extra_filters=extra_filters,
             fetch_abstract_from_publisher=fetch_abstract_from_publisher,
             max_records=max_records,
             warning_collector=warning_collector,
@@ -470,6 +537,8 @@ def harvest_crossref_prefix(
             stats=stats,
             sort=sort,
             order=order,
+            since=since,
+            doi_contains=doi_contains,
         )
 
         spatial_count, temporal_count = complete_harvest(event, stats, warning_collector)
@@ -495,7 +564,7 @@ def harvest_crossref_prefix(
                 "event_started": f"{event.started_at:%Y-%m-%d %H:%M:%S}",
                 "event_completed": f"{event.completed_at:%Y-%m-%d %H:%M:%S}",
                 "warning_summary": warning_collector.get_summary(),
-                "resolved_prefix": resolved_prefix,
+                "resolved_prefix": filter_label,
                 "container_title_filters": ", ".join(source_titles) if source_titles else "<all>",
                 "openalex_source_id": None,
                 "records_seen": seen,
@@ -520,7 +589,7 @@ def harvest_crossref_prefix(
                 "source_name": source.name,
                 "source_url": None,
                 "collection_label": None,
-                "resolved_prefix": resolved_prefix,
+                "resolved_prefix": filter_label,
                 "event_started": None,
                 "event_failed": None,
                 "error": str(e),

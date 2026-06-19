@@ -88,6 +88,18 @@ class BuildCrossrefFilterTests(TestCase):
         out = _build_crossref_filter("10.5194", since="2026-01-01")
         self.assertIn("from-update-date:2026-01-01", out)
 
+    def test_no_prefix_uses_extra_filters_only(self):
+        # ESSOAr: no single prefix; base query is member+type via extra_filters.
+        out = _build_crossref_filter(
+            None,
+            extra_filters=["member:311", "type:posted-content"],
+            since="2026-01-01",
+        )
+        self.assertNotIn("prefix:", out)
+        self.assertIn("member:311", out)
+        self.assertIn("type:posted-content", out)
+        self.assertIn("from-update-date:2026-01-01", out)
+
 
 class CrossrefItemConversionTests(TestCase):
     def setUp(self):
@@ -446,6 +458,92 @@ class HarvestCrossrefPrefixEndToEndTests(TestCase):
         event = HarvestingEvent.objects.filter(source=self.source).latest("started_at")
         self.assertEqual(event.status, "completed")
         self.assertIn("stopped early", (event.log_text or "").lower())
+
+
+class HarvestCrossrefDoiContainsTests(TestCase):
+    """ESS Open Archive spans two DOI eras (10.1002/essoar.* + 10.22541/essoar.*)
+    that share Wiley member 311 / posted-content with Authorea. The source uses a
+    raw ``crossref_filter`` (member+type) base query narrowed by ``doi_contains``."""
+
+    def setUp(self):
+        from works.models import Collection
+
+        self.collection, _ = Collection.objects.get_or_create(
+            identifier="ess-open-archive",
+            defaults={"name": "ESS Open Archive", "is_published": True},
+        )
+        self.source = Source.objects.create(
+            name="ESS Open Archive",
+            url_field="https://api.crossref.org/works?filter=member:311,type:posted-content",
+            source_type="crossref-prefix",
+            collection=self.collection,
+            crossref_filter="member:311,type:posted-content",
+            doi_contains="essoar",
+            harvest_interval_minutes=60 * 24,
+            is_oa=True,
+            is_preprint=True,
+            default_work_type="preprint",
+        )
+
+    def _item(self, doi):
+        return {
+            "DOI": doi,
+            "URL": f"https://doi.org/{doi}",
+            "title": [doi],
+            "abstract": "<jats:p>abstract</jats:p>",
+            "published": {"date-parts": [[2024, 1, 1]]},
+        }
+
+    def _crossref_response(self, items):
+        return {
+            "status": "ok",
+            "message": {"total-results": len(items), "items": items, "next-cursor": ""},
+        }
+
+    @responses.activate
+    def test_keeps_only_essoar_dois_across_both_eras(self):
+        items = [
+            self._item("10.1002/essoar.10503356.1"),  # legacy era — keep
+            self._item("10.22541/au.222/v1"),  # Authorea — skip
+            self._item("10.22541/essoar.333/v1"),  # current era — keep
+            self._item("10.22541/authorea.444/v1"),  # Authorea variant — skip
+            self._item("10.1002/oarr.555/v1"),  # other Wiley posted-content — skip
+        ]
+        responses.add(responses.GET, "https://api.crossref.org/works", json=self._crossref_response(items), status=200)
+
+        harvest_crossref_prefix(self.source.id, fetch_abstract_from_publisher=False)
+
+        dois = set(Work.objects.filter(source=self.source).values_list("doi", flat=True))
+        self.assertEqual(dois, {"10.1002/essoar.10503356.1", "10.22541/essoar.333/v1"})
+        self.assertEqual(Work.objects.filter(source=self.source, collections=self.collection).count(), 2)
+
+    @responses.activate
+    def test_query_uses_member_type_filter_not_prefix(self):
+        responses.add(responses.GET, "https://api.crossref.org/works", json=self._crossref_response([]), status=200)
+        harvest_crossref_prefix(self.source.id, fetch_abstract_from_publisher=False)
+        url = responses.calls[0].request.url
+        self.assertIn("member%3A311", url.replace(":", "%3A"))
+        self.assertIn("type%3Aposted-content", url.replace(":", "%3A"))
+        self.assertNotIn("prefix%3A", url.replace(":", "%3A"))
+
+    @responses.activate
+    def test_first_run_has_no_from_update_date(self):
+        responses.add(responses.GET, "https://api.crossref.org/works", json=self._crossref_response([]), status=200)
+        harvest_crossref_prefix(self.source.id, fetch_abstract_from_publisher=False)
+        self.assertNotIn("from-update-date", responses.calls[0].request.url)
+
+    @responses.activate
+    def test_second_run_is_incremental(self):
+        # A prior completed event makes the next run incremental.
+        from django.utils import timezone
+
+        prior = HarvestingEvent.objects.create(source=self.source, status="completed")
+        prior.completed_at = timezone.now()
+        prior.save(update_fields=["completed_at"])
+
+        responses.add(responses.GET, "https://api.crossref.org/works", json=self._crossref_response([]), status=200)
+        harvest_crossref_prefix(self.source.id, fetch_abstract_from_publisher=False)
+        self.assertIn("from-update-date", responses.calls[0].request.url)
 
 
 class BuildCrossrefFilterExtraTests(TestCase):

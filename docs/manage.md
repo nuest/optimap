@@ -30,6 +30,8 @@ The change form is grouped into five fieldsets, mirrored below. **Only the three
 | **OpenAlex / external IDs** | `openalex_id` | **Yes for `source_type=openalex`**, optional otherwise | OpenAlex Source identifier (`S<digits>`, or the full `https://openalex.org/S<id>` URL). The display URL exposed by the public Source API as `openalex_url` is derived from this field on the fly. |
 | | `doi_prefix` | **Yes for `crossref-prefix` and `geoscienceworld`**, ignored otherwise | DOI prefix used by Crossref-based harvesters, e.g. `10.1190` (SEG) or `10.5194` (Copernicus). Replaces the old hardcoded Copernicus fallback. |
 | | `source_titles` | Optional, `crossref-prefix` only | JSON list of Crossref `container-title` filter values (e.g. `["Scientific Data"]`). Required when `doi_prefix` covers a broad prefix (e.g. `10.1038` = all Springer Nature) to restrict both harvesting and Crossref stats to the target journal. Auto-populated from `SOURCE_CONFIG`. |
+| | `crossref_filter` | Optional, `crossref-prefix` only | Raw Crossref filter clauses used as the harvest base query instead of `prefix:<doi_prefix>` (comma-separated, e.g. `member:311,type:posted-content`). Use when a venue spans several DOI prefixes that share a Crossref member/type — e.g. ESS Open Archive (`10.1002/essoar.*` + `10.22541/essoar.*`). Blank harvests by `doi_prefix`. |
+| | `doi_contains` | Optional, `crossref-prefix` only | Case-insensitive DOI-substring include-filter applied client-side. Use to narrow a query that spans multiple venues with no separating Crossref field — e.g. `essoar` for ESS Open Archive within the Wiley `posted-content` slice. Blank keeps all query matches. |
 | | `issn_l`, `abbreviated_title` | Optional | Display only. |
 | **Display metadata** | `publisher_name`, `homepage_url`, `is_oa`, `is_preprint`, `tags` | Optional | Display only — none of these affect harvesting. |
 | **Statistics (auto-populated)** | `works_count`, `cited_by_count`, `last_harvest`, `statistics` | Read-only | Auto-populated. `statistics` is a JSON field holding `openalex_works_count` / `openalex_fetched_at` (when `openalex_id` is set), `oai_works_count` / `oai_fetched_at` (OAI sources), and `crossref_works_count` / `crossref_fetched_at` (`crossref-prefix` sources). |
@@ -55,6 +57,10 @@ For each type, only mandatory and type-specific fields are listed; defaults / di
 - **`url_field`** — display only. Set it to something representative, e.g. `https://api.crossref.org/works?filter=prefix:10.5194`.
 - **`doi_prefix`** — the DOI prefix to filter on (e.g. `10.5194`). Falls back to `10.5194` if blank for backwards compatibility.
 - **`source_titles`** — optional JSON list of Crossref `container-title` filter values. Required for broad prefixes (e.g. `["Scientific Data"]` for 10.1038). Auto-populated from `SOURCE_CONFIG`; manual edits are preserved. Also drives the per-harvest Crossref total-works-count stat.
+- **`crossref_filter`** — optional raw Crossref filter clauses (comma-separated) used as the base query **instead of** `prefix:<doi_prefix>`. Use it when a venue spans more than one DOI prefix that share a Crossref member/type. The canonical case is **ESS Open Archive** (see its subsection below): `member:311,type:posted-content`.
+- **`doi_contains`** — optional case-insensitive DOI-substring include-filter, applied client-side, that narrows the query (prefix or `crossref_filter`) to a single venue. The canonical case is **ESS Open Archive**: `doi_contains=essoar` keeps only `…/essoar.*` records and discards Authorea (`…/au.*`) from the shared Wiley `posted-content` slice. Leave blank to keep all matches. Because the full query slice is walked to find the matching subset, the auto-populated `crossref_works_count` stat reflects the **whole slice**, not the filtered subset.
+- **Incremental harvesting** — after the first successful harvest, scheduled runs automatically add a Crossref `from-update-date` clause (watermark = previous completed event's date − 2 days), so only re-indexed records are fetched instead of re-walking the whole slice. The first run (no prior completed event) is a full backfill.
+- **Deterministic paging** — all `crossref-prefix` harvests page with `sort=indexed` (newest-indexed first). Crossref's default relevance ordering is unstable under deep cursor paging and can silently truncate a long backfill, so it is never used.
 - Harvest with `python manage.py harvest_sources --source copernicus [--source-title "<title>"]` to filter to a specific container title.
 
 ##### GeoScienceWorld (`geoscienceworld`)
@@ -112,6 +118,24 @@ python manage.py harvest_sources --source agile-gi-lncs
 ```
 
 The Springer source uses `harvest_crossref_book_list` — it iterates over 12 hardcoded ISBNs (one per conference year), calling `filter=prefix:10.1007,isbn:{isbn}` for each, and merges all results into a single `HarvestingEvent`. Springer chapters carry no spatial/temporal metadata from Crossref or from publisher landing pages; geometry can be contributed by users via the contribution workflow at `/contribute/`.
+
+#### ESS Open Archive (`essoar`) — two DOI eras, one Crossref slice
+
+The **ESS Open Archive** collection (`/collections/ess-open-archive/`) harvests AGU's [ESSOAr](https://essopenarchive.org/) preprint server. ESSOAr has no usable native API — its Atypon/Cloudflare platform blocks OAI-PMH, REST, RSS and even its sitemap — so it is harvested via Crossref. Two complications drive the config:
+
+1. **Two DOI eras.** ESSOAr launched in 2018 on its own platform (DOIs `10.1002/essoar.*`) and migrated to Authorea in 2022 (DOIs `10.22541/essoar.*`). No single DOI prefix covers both, and prefix `10.1002` alone is all of Wiley (millions of records).
+2. **Indistinguishable from Authorea.** Both eras are registered under Wiley Crossref **member 311**, work type **`posted-content`** — the same as Authorea — and Crossref carries no `container-title`/`group-title` that separates them.
+
+The solution: harvest the Wiley `posted-content` slice (`member:311,type:posted-content`, ~94k records incl. Authorea, which **does** contain both ESSOAr eras) and keep only DOIs containing `essoar`. The `essoar` config therefore sets `crossref_filter="member:311,type:posted-content"` and `doi_contains="essoar"` (see the `crossref-prefix` field notes above). Works are labelled as preprints. Create and harvest with:
+
+```bash
+python manage.py harvest_sources --create-sources --source essoar
+python manage.py harvest_sources --source essoar --max-records 50   # smoke test
+```
+
+The first backfill walks the whole `member:311,type:posted-content` slice (paged deterministically by `sort=indexed`); subsequent scheduled runs are incremental (`from-update-date`). The `crossref_works_count` stat reflects the whole slice (~94k), not the ESSOAr subset.
+
+> **Investigated and rejected** as harvest routes for ESSOAr: the ESSOAr platform API (Cloudflare 403 on every endpoint); OpenAIRE by data source (registered as `opendoar____::ada71870…` but **0 products collected** — "Not yet registered"); OpenAIRE/Crossref by publisher (both report `Wiley`); and BASE/CORE (IP-/key-gated, and they harvest the same blocked OAI endpoint). The Wiley member + `posted-content` slice is the only complete, tractable route.
 
 > **Note on the `doi_prefix` field**: the Springer source requires `doi_prefix = "10.1007"` on the `Source` row. `harvest_sources --insert-sources` sets this automatically; if you create the source manually in admin, set it explicitly.
 

@@ -544,6 +544,22 @@ class SourceAdmin(admin.ModelAdmin):
             },
         ),
         (
+            "Crossref harvesting",
+            {
+                "fields": ("doi_prefix", "crossref_filter", "doi_contains", "source_titles"),
+                "description": (
+                    "For <code>source_type=crossref-prefix</code>. <code>doi_prefix</code> is the "
+                    "Crossref filter prefix (e.g. <code>10.5194</code>). <code>crossref_filter</code> "
+                    "overrides the prefix with raw filter clauses (e.g. "
+                    "<code>member:311,type:posted-content</code> for ESS Open Archive, whose two DOI "
+                    "eras share no prefix). When a query spans multiple venues, set "
+                    "<code>doi_contains</code> to keep only matching DOIs (e.g. <code>essoar</code>). "
+                    "<code>source_titles</code> is an optional list of <code>container-title</code> "
+                    "filter values. All optional for other source types."
+                ),
+            },
+        ),
+        (
             "OpenAlex / external identifiers",
             {
                 "fields": ("openalex_id", "issn_l", "abbreviated_title"),
