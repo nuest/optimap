@@ -237,6 +237,27 @@ class Work(models.Model):
 
     permalink.short_description = "Permalink"
 
+    @property
+    def openaire_url(self) -> str | None:
+        """Public OpenAIRE Explore URL for a matched record, from provenance.
+
+        Mirrors how ``openalex_id`` exposes the OpenAlex page. Reads the URL
+        recorded by OpenAIRE enrichment (``provenance.openaire_match.url``) and,
+        for matches recorded before that URL was stored, derives it from the
+        OpenAIRE id. Returns ``None`` when the work was not matched in OpenAIRE.
+        """
+        provenance = self.provenance if isinstance(self.provenance, dict) else {}
+        match = provenance.get("openaire_match") or {}
+        if match.get("status") != "matched":
+            return None
+        url = match.get("url")
+        if url:
+            return url
+        openaire_id = match.get("openaire_id")
+        if openaire_id:
+            return f"https://explore.openaire.eu/search/result?id={openaire_id}"
+        return None
+
     def get_center_coordinate(self):
         """
         Calculate and return the center coordinate of the work's geometry using PostGIS.

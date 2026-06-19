@@ -259,6 +259,43 @@ class WorkLandingSEOTests(TestCase):
         self.assertIn(f"https://doi.org/{self.work.doi}", same_as)
         self.assertIn("https://openalex.org/W123456789", same_as)
 
+    def test_jsonld_sameas_includes_openaire_when_matched(self):
+        self.work.openalex_id = "https://openalex.org/W123456789"
+        self.work.provenance = {
+            "openaire_match": {
+                "status": "matched",
+                "openaire_id": "doi_dedup___::abc",
+                "url": "https://explore.openaire.eu/search/result?id=doi_dedup___::abc",
+            }
+        }
+        self.work.save()
+        resp = self.client.get(self.url)
+        soup = BeautifulSoup(resp.content, "html.parser")
+        article = next(
+            (b for b in _find_jsonld(soup) if b.get("@type") == "ScholarlyArticle"),
+            None,
+        )
+        same_as = article["sameAs"]
+        self.assertIn("https://openalex.org/W123456789", same_as)
+        self.assertIn("https://explore.openaire.eu/search/result?id=doi_dedup___::abc", same_as)
+
+    def test_alternate_links_for_external_identifiers(self):
+        self.work.openalex_id = "https://openalex.org/W123456789"
+        self.work.provenance = {
+            "openaire_match": {
+                "status": "matched",
+                "openaire_id": "doi_dedup___::abc",
+                "url": "https://explore.openaire.eu/search/result?id=doi_dedup___::abc",
+            }
+        }
+        self.work.save()
+        resp = self.client.get(self.url)
+        soup = BeautifulSoup(resp.content, "html.parser")
+        hrefs = {link.get("href") for link in soup.find_all("link", rel="alternate")}
+        self.assertIn(f"https://doi.org/{self.work.doi}", hrefs)
+        self.assertIn("https://openalex.org/W123456789", hrefs)
+        self.assertIn("https://explore.openaire.eu/search/result?id=doi_dedup___::abc", hrefs)
+
     def test_coins_span_present(self):
         resp = self.client.get(self.url)
         soup = BeautifulSoup(resp.content, "html.parser")

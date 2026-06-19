@@ -34,6 +34,7 @@ from works.seo import (
     citation_meta_tags,
     coins_title,
     dc_coverage_tags,
+    external_identifier_links,
     geo_meta_tags,
 )
 from works.serializers import get_available_gazetteers as _ner_available_gazetteers
@@ -392,6 +393,7 @@ def _build_work_landing_cacheable(request, work, identifier_type):
         "citation_tags": citation_meta_tags(work, request),
         "dc_coverage_tags": dc_coverage_tags(work),
         "geo_tags": geo_meta_tags(work),
+        "alternate_links": external_identifier_links(work),
         "coins_ctx": coins_title(work),
         "canonical_url": request.build_absolute_uri(reverse("optimap:work-landing", args=[work.get_identifier()])),
         "bok_concepts_resolved": bok_resolved,

@@ -75,6 +75,17 @@ class BuildOpenaireFieldsTest(TestCase):
         self.assertEqual(build_openaire_fields(None), {})
         self.assertEqual(build_openaire_fields({"descriptions": [], "subjects": [], "authors": []}), {})
 
+    def test_abstract_jats_markup_is_stripped(self):
+        record = {
+            "descriptions": [
+                "<jats:p>We revise the chronology <jats:italic>substantially</jats:italic>, R&amp;D included.</jats:p>"
+            ]
+        }
+        abstract = build_openaire_fields(record)["abstract"]
+        self.assertNotIn("<jats:", abstract)
+        self.assertNotIn("</jats:", abstract)
+        self.assertEqual(abstract, "We revise the chronology substantially, R&D included.")
+
 
 class ApplyEnrichmentTest(TestCase):
     """The fill-if-empty conflict policy + provenance recording."""
@@ -137,6 +148,16 @@ class EnrichWorkFromOpenaireTest(TestCase):
         self.work.refresh_from_db()
         self.assertFalse(changed)
         self.assertEqual(self.work.provenance["openaire_match"]["status"], "none")
+        self.assertIsNone(self.work.openaire_url)
+
+    @patch("works.harvesting.openaire.fetch_openaire_record", return_value=FAKE_RECORD)
+    def test_match_records_explore_url(self, _mock):
+        enrich_work_from_openaire(self.work)
+        self.work.refresh_from_db()
+        expected = "https://explore.openaire.eu/search/result?id=doi_dedup___::abc123"
+        self.assertEqual(self.work.provenance["openaire_match"]["url"], expected)
+        # the model property mirrors the OpenAlex link for the landing page
+        self.assertEqual(self.work.openaire_url, expected)
 
 
 class CarefulUpdatePreservesEnrichedFieldsTest(TestCase):
@@ -163,7 +184,7 @@ class EnrichEventSweepTest(TestCase):
         self.event = HarvestingEvent.objects.create(source=self.source, status="in_progress")
 
     @patch("works.harvesting.openaire.fetch_openaire_record", return_value=FAKE_RECORD)
-    def test_sweep_only_touches_missing_field_works(self, mock_fetch):
+    def test_sweep_checks_all_doi_works_for_audit_trail(self, mock_fetch):
         missing = Work.objects.create(title="m", doi="10.1/m", abstract="", status="h", job=self.event)
         complete = Work.objects.create(
             title="c", doi="10.1/c", abstract="has one", authors=["A"], keywords=["k"], status="h", job=self.event
@@ -174,13 +195,17 @@ class EnrichEventSweepTest(TestCase):
 
         missing.refresh_from_db()
         complete.refresh_from_db()
+        # fill-if-empty: only the empty work is filled, so `updated` counts it alone
         self.assertTrue(missing.abstract.startswith("A considerably longer"))
         self.assertEqual(complete.abstract, "has one")
         self.assertEqual(updated, 1)
-        # only the missing-field, DOI-bearing work was looked up
+        # both DOI-bearing works are looked up (audit trail), the DOI-less one is skipped
         looked_up = {c.args[0] for c in mock_fetch.call_args_list}
-        self.assertEqual(looked_up, {"10.1/m"})
+        self.assertEqual(looked_up, {"10.1/m", "10.1/c"})
         self.assertNotIn(no_doi.doi, looked_up)
+        # the already-complete work still records that OpenAIRE was checked
+        self.assertEqual(complete.provenance["openaire_match"]["status"], "matched")
+        self.assertIn("abstract", complete.provenance["events"][-1]["fields_offered_not_applied"])
 
 
 class CompleteHarvestEnqueueTest(TestCase):

@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **"View in OpenAIRE" link on the work landing page**, mirroring the existing "View in OpenAlex" link. When OpenAIRE enrichment matches a work, it now records the public OpenAIRE Explore URL in `Work.provenance.openaire_match.url`; the landing page exposes it via the new `Work.openaire_url` property.
+- **External identifier links in the page head**: the work landing page now emits the work's external identifier URLs (DOI, OpenAlex, OpenAIRE, Wikidata) both as schema.org JSON-LD `sameAs` relationships (OpenAIRE is new here; OpenAlex/DOI/Wikidata were already present) and as HTML `<link rel="alternate">` tags. Both are built from a single source (`works.seo.external_identifier_links`) so they stay in sync.
+- **OpenAIRE consultation is now always recorded (audit trail)**: the post-harvest enrichment sweep (`works.harvesting.openaire.enrich_event_from_openaire`) now looks up **every** DOI-bearing work in a harvest event, not only those missing a field. Works that already have an abstract/keywords/authors still get an `openaire_match` record (and, on a match, an `openaire_enrich` event listing the offered-but-not-applied fields), so it is always visible in the provenance whether OpenAIRE was checked and what it offered. The `enrich_openaire` backfill command deliberately keeps its missing-field filter — this fuller audit trail is built going forward, not retroactively.
+
+### Fixed
+
+- **OpenAIRE abstracts no longer leak JATS markup**: OpenAIRE returns abstracts wrapped in JATS tags (`<jats:p>…</jats:p>`, `<jats:italic>`, …). Enrichment now strips XML/HTML tags and unescapes entities before storing, so `Work.abstract` holds plain text.
+
 ## [0.28.0] - 2026-06-19
 
 ### Added

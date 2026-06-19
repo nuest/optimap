@@ -215,8 +215,9 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
             "**`openaire_match` keys:**\n"
             "| Key | Type | Description |\n"
             "|-----|------|-------------|\n"
-            "| `status` | string | `matched` (an OpenAIRE record was found for the DOI) or `none` |\n"
+            "| `status` | string | `matched` (an OpenAIRE record was found for the DOI) or `none`. Recorded for every DOI-bearing work checked by the post-harvest sweep, even when nothing was filled |\n"
             "| `openaire_id` | string | OpenAIRE internal id, e.g. `doi_dedup___::…` (present when matched) |\n"
+            "| `url` | string | Public OpenAIRE Explore page for the matched record, e.g. `https://explore.openaire.eu/search/result?id=doi_dedup___::…` (present when matched) |\n"
             "| `num_found` | integer | Number of OpenAIRE records found for the DOI |\n\n"
             "**`geocoding` keys:**\n"
             "| Key | Type | Description |\n"
@@ -279,7 +280,7 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
                         required=False,
                         help_text=(
                             "OpenAIRE enrichment result. "
-                            "Keys: status (matched/none), openaire_id, num_found. "
+                            "Keys: status (matched/none), openaire_id, url, num_found. "
                             "See the openaire_enrich event for the fields filled/offered."
                         ),
                     ),

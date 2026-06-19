@@ -164,6 +164,33 @@ def build_work_meta(request, work, *, kwargs_schema: dict | None = None) -> Meta
     return meta
 
 
+def external_identifier_links(work) -> list[dict]:
+    """External canonical URLs that identify this work elsewhere, in priority
+    order: DOI, OpenAlex, OpenAIRE, Wikidata.
+
+    Each entry is ``{"href", "title"}``. Used both for the schema.org ``sameAs``
+    relationships and for the HTML ``<link rel="alternate">`` tags, so the two
+    stay in sync. Only identifiers that exist on the work are included.
+    """
+    links: list[dict] = []
+    if work.doi:
+        links.append({"href": f"https://doi.org/{work.doi}", "title": "DOI"})
+    if work.openalex_id:
+        oa = work.openalex_id
+        links.append({"href": oa if oa.startswith("http") else f"https://openalex.org/{oa}", "title": "OpenAlex"})
+    if work.openaire_url:
+        links.append({"href": work.openaire_url, "title": "OpenAIRE"})
+    wikidata_url = (
+        work.wikidata_exports.filter(action__in=["created", "updated"], wikidata_url__isnull=False)
+        .order_by("-export_date")
+        .values_list("wikidata_url", flat=True)
+        .first()
+    )
+    if wikidata_url:
+        links.append({"href": wikidata_url, "title": "Wikidata"})
+    return links
+
+
 def _build_schema_org(work, request, canonical, image, authors, keywords, description) -> dict:
     """Schema.org ``ScholarlyArticle`` JSON-LD. Mirrors what we *consume* from
     Janeway in ``works/tasks.py`` — closing the loop: we now publish the same
@@ -179,20 +206,7 @@ def _build_schema_org(work, request, canonical, image, authors, keywords, descri
         payload["description"] = description
     if work.doi:
         payload["identifier"] = f"doi:{work.doi}"
-    same_as: list[str] = []
-    if work.doi:
-        same_as.append(f"https://doi.org/{work.doi}")
-    if work.openalex_id:
-        oa = work.openalex_id
-        same_as.append(oa if oa.startswith("http") else f"https://openalex.org/{oa}")
-    wikidata_log = (
-        work.wikidata_exports.filter(action__in=["created", "updated"], wikidata_url__isnull=False)
-        .order_by("-export_date")
-        .values_list("wikidata_url", flat=True)
-        .first()
-    )
-    if wikidata_log:
-        same_as.append(wikidata_log)
+    same_as = [link["href"] for link in external_identifier_links(work)]
     if same_as:
         payload["sameAs"] = same_as if len(same_as) > 1 else same_as[0]
     if work.publicationDate:

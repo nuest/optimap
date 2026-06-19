@@ -63,6 +63,8 @@ Crossref (DOI prefix 10.5194) is therefore the primary harvest route for all Cop
 python manage.py harvest_sources --source copernicus
 # narrow to a single journal, e.g. Earth System Science Data:
 python manage.py harvest_sources --source copernicus --source-title "Earth System Science Data"
+python manage.py harvest_sources --source copernicus --source-title "Geoscientific Instrumentation, Methods and Data Systems"
+python manage.py harvest_sources --source copernicus --source-title "Geoscientific Model Development"
 ```
 
 ---

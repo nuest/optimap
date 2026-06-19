@@ -99,11 +99,13 @@ The **AGILE GI** collection (`/collections/agile-gi/`) is fed by two `SOURCE_CON
 | `agile-gi-lncs` | AGILE: Springer LNCS Proceedings | Springer | 2008–2019 | `harvest_crossref_book_list` |
 
 Run both with:
+
 ```bash
 python manage.py harvest_sources --source-prefix agile-gi
 ```
 
 Or individually:
+
 ```bash
 python manage.py harvest_sources --source agile-giss
 python manage.py harvest_sources --source agile-gi-lncs
@@ -218,9 +220,9 @@ Use `--update` when you want OpenAlex enrichment to re-run on previously-harvest
 
 OPTIMAP enriches works from the [OpenAIRE Graph API](https://graph.openaire.eu/docs/apis/graph-api/) as a second enrichment source besides OpenAlex. Its main job is to recover **abstracts** (and, when empty, keywords/authors) for works whose harvest origin does not supply them — most notably the AGILE Springer LNCS chapters (`agile-gi-lncs` source, DOI prefix `10.1007/978-…`), for which Crossref carries no abstract and the publisher landing page is not scraped.
 
-**How it works.** Enrichment is **fill-if-empty**: it only populates a field that is currently empty and never overwrites a value from the owning source or an earlier enrichment (precedence `original_source`/`crossref` > `openalex`/`openaire`). A single work is resolved by DOI via `GET https://api.openaire.eu/graph/v1/researchProducts?pid=<doi>`; the abstract is the longest entry in `results[0].descriptions[]`. Every decision is written to `Work.provenance`: the per-field origin (`metadata_sources.abstract = "openaire"`, etc.), an `openaire_enrich` event listing `fields_filled` and `fields_offered_not_applied` (values OpenAIRE had but that were *not* applied because a value already existed), and an `openaire_match` block (`status: matched|none`). See [Work provenance](#work-provenance).
+**How it works.** Enrichment is **fill-if-empty**: it only populates a field that is currently empty and never overwrites a value from the owning source or an earlier enrichment (precedence `original_source`/`crossref` > `openalex`/`openaire`). A single work is resolved by DOI via `GET https://api.openaire.eu/graph/v1/researchProducts?pid=<doi>`; the abstract is the longest entry in `results[0].descriptions[]`, with JATS/HTML markup (`<jats:p>…`) stripped to plain text before storing. Every decision is written to `Work.provenance`: the per-field origin (`metadata_sources.abstract = "openaire"`, etc.), an `openaire_enrich` event listing `fields_filled` and `fields_offered_not_applied` (values OpenAIRE had but that were *not* applied because a value already existed), and an `openaire_match` block (`status: matched|none`, plus `openaire_id` and a public `url`). On a match the work landing page shows a **"View in OpenAIRE"** link (built from `openaire_match.url`), mirroring the OpenAlex link. See [Work provenance](#work-provenance).
 
-**On every harvest (all sources).** When `OPTIMAP_OPENAIRE_ENRICH_ON_HARVEST=True` (default), each successful harvest enqueues an async Django-Q sweep (`works.harvesting.openaire.enrich_event_from_openaire`) that enriches only that event's works which have a DOI and are missing an abstract/keywords/authors. The sweep runs **off** the harvest critical path and throttles between requests. The Django-Q cluster must be running for it to execute. Set `OPTIMAP_OPENAIRE_ENRICH_ON_HARVEST=False` to disable it fleet-wide.
+**On every harvest (all sources).** When `OPTIMAP_OPENAIRE_ENRICH_ON_HARVEST=True` (default), each successful harvest enqueues an async Django-Q sweep (`works.harvesting.openaire.enrich_event_from_openaire`) that looks up **every** work in that event with a DOI — not only those missing a field. Works that are missing an abstract/keywords/authors get filled; works that already have everything still get an `openaire_match` record (and, on a match, an `openaire_enrich` event noting the offered-but-not-applied fields), so the OpenAIRE consultation is always auditable. The sweep runs **off** the harvest critical path and throttles between requests. The Django-Q cluster must be running for it to execute. Set `OPTIMAP_OPENAIRE_ENRICH_ON_HARVEST=False` to disable it fleet-wide. (The `enrich_openaire` backfill command below deliberately keeps its missing-field filter — this full audit trail is built going forward, not retroactively.)
 
 **Backfill existing works** with `enrich_openaire`:
 
@@ -497,8 +499,9 @@ Staff users additionally see the full provenance (including `original_record`, W
     "top_candidate": { ... }               // staff/curators only
   },
   "openaire_match": {
-    "status": "matched",                   // matched | none
+    "status": "matched",                   // matched | none (recorded for every DOI-bearing work checked)
     "openaire_id": "doi_dedup___::…",      // present when matched
+    "url": "https://explore.openaire.eu/search/result?id=doi_dedup___::…",  // present when matched
     "num_found": 1
   },
   "geocoding": {

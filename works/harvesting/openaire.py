@@ -25,12 +25,13 @@ Both ``enrich_*`` callables are re-exported from ``works.tasks`` so Django-Q
 dotted-path schedules resolve.
 """
 
+import html
 import logging
+import re
 import time
 
 import requests
 from django.conf import settings
-from django.db.models import Q
 
 from works.harvesting.enrichment import apply_enrichment
 from works.harvesting.sessions import (
@@ -53,6 +54,29 @@ _AUTOMATED_SUBJECT_SCHEMES = {"sdg", "fos"}
 # coarse "publication"/"dataset" is less useful than the source default);
 # `language` has no Work model field.
 ENRICHABLE_FIELDS = ("abstract", "keywords", "authors")
+
+# Public OpenAIRE Explore landing page for a matched research product, keyed by
+# the OpenAIRE internal id (e.g. ``doi_dedup___::…``). Recorded in
+# ``provenance.openaire_match.url`` so the work landing page can offer a
+# "View in OpenAIRE" link, mirroring the OpenAlex link.
+OPENAIRE_EXPLORE_RESULT_URL = "https://explore.openaire.eu/search/result?id="
+
+_MARKUP_RE = re.compile(r"<[^>]+>")
+_WHITESPACE_RE = re.compile(r"\s+")
+
+
+def _strip_markup(text):
+    """Strip XML/HTML tags and unescape entities, returning plain text.
+
+    OpenAIRE abstracts arrive as JATS fragments (``<jats:p>…</jats:p>``,
+    ``<jats:italic>``, …) that must not leak into ``Work.abstract``. Tags are
+    removed, HTML entities unescaped, and runs of whitespace collapsed.
+    """
+    if not text or not isinstance(text, str):
+        return text
+    text = _MARKUP_RE.sub("", text)
+    text = html.unescape(text)
+    return _WHITESPACE_RE.sub(" ", text).strip()
 
 
 def get_openaire_access_token():
@@ -133,10 +157,14 @@ def fetch_openaire_record(doi, session=None):
 
 
 def _best_description(descriptions):
-    """Return the longest non-empty description (the fullest abstract)."""
+    """Return the longest non-empty description (the fullest abstract).
+
+    Markup is stripped first (OpenAIRE wraps abstracts in JATS tags), so the
+    "longest" comparison and the stored value are both on plain text.
+    """
     if not descriptions:
         return None
-    candidates = [d.strip() for d in descriptions if isinstance(d, str) and d.strip()]
+    candidates = [c for c in (_strip_markup(d) for d in descriptions if isinstance(d, str)) if c]
     if not candidates:
         return None
     return max(candidates, key=len)
@@ -213,6 +241,7 @@ def enrich_work_from_openaire(work, *, session=None, save=True):
         "status": "matched",
         "openaire_id": openaire_id,
         "num_found": 1,
+        "url": f"{OPENAIRE_EXPLORE_RESULT_URL}{openaire_id}" if openaire_id else None,
     }
     work.provenance = provenance
     append_event(
@@ -231,12 +260,20 @@ def enrich_work_from_openaire(work, *, session=None, save=True):
 
 
 def enrich_event_from_openaire(event_id, throttle=None):
-    """Async sweep: enrich a harvest event's works that are missing target fields.
+    """Async sweep: check a harvest event's DOI-bearing works against OpenAIRE.
 
     Enqueued by ``complete_harvest`` after every successful harvest (gated by
-    ``OPTIMAP_OPENAIRE_ENRICH_ON_HARVEST``). Throttles between requests to respect
-    OpenAIRE's rate limit (60/hour anonymous, 7200/hour with a token). Returns the
-    number of works updated.
+    ``OPTIMAP_OPENAIRE_ENRICH_ON_HARVEST``). Every work with a DOI is looked up so
+    the OpenAIRE consultation is always recorded in ``provenance.openaire_match``
+    (audit trail) — fields that are empty get filled (fill-if-empty), while works
+    that already have everything still get a ``matched``/``none`` record (and, on a
+    match, an ``openaire_enrich`` event listing the offered-but-not-applied fields).
+    Throttles between requests to respect OpenAIRE's rate limit (60/hour anonymous,
+    7200/hour with a token). Returns the number of works whose fields were filled.
+
+    Note: the ``enrich_openaire`` backfill command deliberately keeps its
+    missing-field filter — this full audit trail is only built going forward, as
+    part of the regular post-harvest enrichment.
     """
     try:
         event = HarvestingEvent.objects.get(id=event_id)
@@ -247,21 +284,9 @@ def enrich_event_from_openaire(event_id, throttle=None):
     if throttle is None:
         throttle = settings.OPTIMAP_OPENAIRE_ENRICH_THROTTLE
 
-    qs = (
-        event.works.filter(doi__isnull=False)
-        .exclude(doi="")
-        .filter(
-            Q(abstract__isnull=True)
-            | Q(abstract="")
-            | Q(keywords__isnull=True)
-            | Q(keywords=[])
-            | Q(authors__isnull=True)
-            | Q(authors=[])
-        )
-        .order_by("id")
-    )
+    qs = event.works.filter(doi__isnull=False).exclude(doi="").order_by("id")
     total = qs.count()
-    logger.info("OpenAIRE sweep for event %s: %d candidate work(s)", event_id, total)
+    logger.info("OpenAIRE sweep for event %s: %d work(s) with a DOI", event_id, total)
     if not total:
         return 0
 

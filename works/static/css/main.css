@@ -254,6 +254,15 @@ h1.page-title {
   word-break: break-all;
 }
 
+/* Inline metadata items (Authors · DOI · Published · …). The separator is
+   inserted between adjacent items only, so it never trails the last one
+   regardless of which optional items are present. */
+.meta-item + .meta-item::before {
+  content: "·";
+  margin: 0 0.5em;
+  color: #aaa;
+}
+
 #mini-map {
   height: 380px;
   border-radius: 8px;
