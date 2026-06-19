@@ -28,6 +28,7 @@ def schedule_data_dump(sender, **kwargs):
             minutes=settings.DATA_DUMP_INTERVAL_HOURS * 60,
             next_run=timezone.now(),
             repeats=-1,
+            intended_date_kwarg="scheduled_for",
         )
         logger.info(
             "Scheduled data‐dump task '%s' every %d hours",

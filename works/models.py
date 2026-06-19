@@ -807,6 +807,7 @@ class Source(models.Model):
             minutes=self.harvest_interval_minutes,
             next_run=timezone.now() + timedelta(minutes=self.harvest_interval_minutes),
             name=schedule_name,
+            intended_date_kwarg="scheduled_for",
         )
 
 

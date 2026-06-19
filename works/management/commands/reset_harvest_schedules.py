@@ -106,6 +106,7 @@ class Command(BaseCommand):
                 minutes=source.harvest_interval_minutes,
                 next_run=next_run,
                 name=name,
+                intended_date_kwarg="scheduled_for",
             )
             rebuilt += 1
 

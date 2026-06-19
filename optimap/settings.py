@@ -317,6 +317,13 @@ Q_CLUSTER = {
     "bulk": 10,
     "orm": "default",
     "max_attempts": 5,
+    # When the cluster has been down/blocked, do NOT replay every missed
+    # interval/cron slot on restart (Django-Q's default). With catch_up off,
+    # each recurring schedule advances to its next future run and fires once
+    # instead of piling up duplicate tasks of the same type. Manual one-off
+    # (ONCE) schedules and ad-hoc async_task calls are unaffected — they never
+    # go through this missed-slot replay path.
+    "catch_up": env.bool("OPTIMAP_SCHEDULER_CATCH_UP", default=False),
 }
 
 CACHES = {
@@ -382,6 +389,12 @@ EMAIL_SEND_DELAY = 2
 DATA_DUMP_INTERVAL_HOURS = 6
 INACTIVITY_WARNING_DAYS = env.int("OPTIMAP_INACTIVITY_WARNING_DAYS", default=365)
 INACTIVITY_DELETION_DAYS = env.int("OPTIMAP_INACTIVITY_DELETION_DAYS", default=396)
+
+# Recurring schedules run once after downtime (Q_CLUSTER["catch_up"] = False).
+# A scheduled task whose run starts more than this many minutes after its
+# intended fire time is logged as a catch-up (i.e. intervening missed runs were
+# skipped). Threshold avoids noise on normally on-time runs.
+SCHEDULED_TASK_CATCHUP_THRESHOLD_MINUTES = env.int("OPTIMAP_SCHEDULED_TASK_CATCHUP_THRESHOLD_MINUTES", default=5)
 
 # Contact email for API user agents (OpenAlex, Wikidata, etc.)
 CONTACT_EMAIL = "login@optimap.science"
@@ -616,6 +629,10 @@ LOGGING = {
             "level": env("DJANGO_LOGGING_LEVEL", default="INFO"),
         },
         "works": {
+            "handlers": ["console", "mail_admins"],
+            "level": env("OPTIMAP_LOGGING_LEVEL", default="INFO"),
+        },
+        "django-q": {
             "handlers": ["console", "mail_admins"],
             "level": env("OPTIMAP_LOGGING_LEVEL", default="INFO"),
         },

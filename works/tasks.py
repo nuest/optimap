@@ -136,9 +136,22 @@ from works.models import EmailLog, Subscription, Work
 from works.utils.email import render_email
 from works.utils.geojson import _GEOJSON_METADATA
 from works.utils.geometry import annotate_rounded_geometry, round_geojson_coordinates
+from works.utils.scheduling import log_scheduled_catchup
 
 logger = logging.getLogger(__name__)
 BASE_URL = settings.BASE_URL
+
+# Wrap the re-exported harvest entry points so recurring schedules
+# (`works.tasks.harvest_*`, which set intended_date_kwarg="scheduled_for") log a
+# catch-up notice when they fire late after downtime. Re-binding the names here
+# is what Django-Q resolves via dotted path; manual/ad-hoc calls (no
+# scheduled_for) are unaffected. See works/utils/scheduling.py.
+harvest_oai_endpoint = log_scheduled_catchup(harvest_oai_endpoint)
+harvest_rss_endpoint = log_scheduled_catchup(harvest_rss_endpoint)
+harvest_crossref_prefix = log_scheduled_catchup(harvest_crossref_prefix)
+harvest_mountain_wetlands = log_scheduled_catchup(harvest_mountain_wetlands)
+harvest_openalex_source = log_scheduled_catchup(harvest_openalex_source)
+harvest_geoscienceworld = log_scheduled_catchup(harvest_geoscienceworld)
 CACHE_DIR = Path(tempfile.gettempdir()) / "optimap_cache"
 User = get_user_model()
 
@@ -188,6 +201,7 @@ def cleanup_old_data_dumps(directory: Path, keep: int):
 # -----------------------------------------------------------------------------
 
 
+@log_scheduled_catchup
 def send_monthly_email(trigger_source="manual", sent_by=None):
     """
     Send the monthly digest of new manuscripts to users who opted in.
@@ -266,6 +280,7 @@ def send_monthly_email(trigger_source="manual", sent_by=None):
             )
 
 
+@log_scheduled_catchup
 def send_subscription_based_email(trigger_source="manual", sent_by=None, user_ids=None, interval=None):
     """
     Send subscription-based notifications grouped by region.
@@ -392,51 +407,59 @@ def send_subscription_based_email(trigger_source="manual", sent_by=None, user_id
 
 
 def schedule_monthly_email_task(sent_by=None):
-    if not Schedule.objects.filter(func="publications.tasks.send_monthly_email").exists():
-        now = datetime.now()
+    if not Schedule.objects.filter(func="works.tasks.send_monthly_email").exists():
+        now = timezone.localtime()
         last_day_of_month = calendar.monthrange(now.year, now.month)[1]
         next_run_date = now.replace(day=last_day_of_month, hour=23, minute=59)
+        # Function kwargs are spread, not passed as kwargs={...}: django_q's
+        # schedule() treats leftover keyword args as the task's own kwargs.
         schedule(
-            "publications.tasks.send_monthly_email",
+            "works.tasks.send_monthly_email",
             schedule_type="M",
             repeats=-1,
             next_run=next_run_date,
-            kwargs={"trigger_source": "scheduled", "sent_by": sent_by.id if sent_by else None},
+            intended_date_kwarg="scheduled_for",
+            trigger_source="scheduled",
+            sent_by=sent_by.id if sent_by else None,
         )
         logger.info(f"Scheduled 'schedule_monthly_email_task' for {next_run_date}")
 
 
 def schedule_subscription_email_task(sent_by=None):
-    monthly_kwargs = {"trigger_source": "scheduled", "interval": "monthly", "sent_by": sent_by.id if sent_by else None}
-    if not Schedule.objects.filter(
-        func="publications.tasks.send_subscription_based_email", kwargs__contains='"interval": "monthly"'
-    ).exists():
-        now = datetime.now()
+    # Monthly subscription digest — distinguished from the weekly one by schedule_type "M".
+    if not Schedule.objects.filter(func="works.tasks.send_subscription_based_email", schedule_type="M").exists():
+        now = timezone.localtime()
         last_day_of_month = calendar.monthrange(now.year, now.month)[1]
         next_run_date = now.replace(day=last_day_of_month, hour=23, minute=59)
         schedule(
-            "publications.tasks.send_subscription_based_email",
+            "works.tasks.send_subscription_based_email",
             schedule_type="M",
             repeats=-1,
             next_run=next_run_date,
-            kwargs=monthly_kwargs,
+            intended_date_kwarg="scheduled_for",
+            trigger_source="scheduled",
+            interval="monthly",
+            sent_by=sent_by.id if sent_by else None,
         )
         logger.info(f"Scheduled monthly 'send_subscription_based_email' for {next_run_date}")
 
 
 def schedule_weekly_subscription_email_task(sent_by=None):
-    weekly_kwargs = {"trigger_source": "scheduled", "interval": "weekly", "sent_by": sent_by.id if sent_by else None}
-    if not Schedule.objects.filter(
-        func="publications.tasks.send_subscription_based_email", kwargs__contains='"interval": "weekly"'
-    ).exists():
+    # Weekly subscription digest — distinguished from the monthly one by weekly schedule_type "W".
+    # Uses "W" (not cron "C") so it works without the optional croniter dependency.
+    if not Schedule.objects.filter(func="works.tasks.send_subscription_based_email", schedule_type="W").exists():
+        next_run = _next_monday().replace(hour=2, minute=0, second=0, microsecond=0)
         schedule(
-            "publications.tasks.send_subscription_based_email",
-            schedule_type="C",
-            cron="0 2 * * 1",
+            "works.tasks.send_subscription_based_email",
+            schedule_type="W",
             repeats=-1,
-            kwargs=weekly_kwargs,
+            next_run=next_run,
+            intended_date_kwarg="scheduled_for",
+            trigger_source="scheduled",
+            interval="weekly",
+            sent_by=sent_by.id if sent_by else None,
         )
-        logger.info("Scheduled weekly 'send_subscription_based_email' (Monday 02:00 UTC)")
+        logger.info("Scheduled weekly 'send_subscription_based_email' (Mondays 02:00).")
 
 
 # -----------------------------------------------------------------------------
@@ -451,6 +474,7 @@ def _next_monday():
     return (now + timedelta(days=days_ahead)).replace(hour=8, minute=0, second=0, microsecond=0)
 
 
+@log_scheduled_catchup
 def send_inactivity_warning_emails(trigger_source="scheduled"):
     """Email users in the 12-to-13-month inactivity window (#120)."""
     from django.contrib.auth import get_user_model
@@ -493,6 +517,7 @@ def send_inactivity_warning_emails(trigger_source="scheduled"):
         time.sleep(settings.EMAIL_SEND_DELAY)
 
 
+@log_scheduled_catchup
 def send_inactivity_deletion_list_to_admins(trigger_source="scheduled"):
     """Email admins a list of users inactive for 13+ months (#121)."""
     from django.contrib.auth import get_user_model
@@ -548,7 +573,13 @@ def send_inactivity_deletion_list_to_admins(trigger_source="scheduled"):
 
 def schedule_inactivity_warning_task():
     if not Schedule.objects.filter(func="works.tasks.send_inactivity_warning_emails").exists():
-        schedule("works.tasks.send_inactivity_warning_emails", schedule_type="W", repeats=-1, next_run=_next_monday())
+        schedule(
+            "works.tasks.send_inactivity_warning_emails",
+            schedule_type="W",
+            repeats=-1,
+            next_run=_next_monday(),
+            intended_date_kwarg="scheduled_for",
+        )
         logger.info("Scheduled send_inactivity_warning_emails weekly.")
 
 
@@ -559,6 +590,7 @@ def schedule_inactivity_deletion_task():
             schedule_type="W",
             repeats=-1,
             next_run=_next_monday(),
+            intended_date_kwarg="scheduled_for",
         )
         logger.info("Scheduled send_inactivity_deletion_list_to_admins weekly.")
 
@@ -737,6 +769,7 @@ def regenerate_csv_cache():
     return csv_path
 
 
+@log_scheduled_catchup
 def regenerate_all_data_dumps():
     """Regenerate GeoJSON + GeoPackage + CSV from a single PostGIS pass.
 

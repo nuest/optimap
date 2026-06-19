@@ -593,11 +593,23 @@ python manage.py qinfo      # one-shot stats: cluster status, queue depth, last 
 - **Scheduled tasks** (`/admin/django_q/schedule/`) — every recurring schedule, including the `Harvest Source <id>` rows created by `Source.save()` and the `Manual Harvest Source <id>` one-offs created by the admin "Schedule harvesting" action. Stale or duplicate rows can be deleted here directly.
 - **Successful** / **Failed** tasks (`/admin/django_q/success/`, `/failure/`) — completed task history with full stack traces on failure. Useful for diagnosing harvests that died before their `HarvestingEvent.error_message` could be persisted.
 
+**Catch-up behaviour after downtime:**
+
+The cluster runs with `catch_up: False` (in `Q_CLUSTER`; override with `OPTIMAP_SCHEDULER_CATCH_UP=True`). When the cluster has been down or blocked, Django-Q's **default** is to replay *every* missed interval/cron slot on restart — so a recurring task could execute many times back-to-back. With catch-up off, each recurring schedule instead advances to its next future run and fires **once**. Manual work is unaffected: ad-hoc `async_task` actions (Trigger harvesting, Schedule data dump regeneration now, Calculate statistics now, retries), the `Manual Harvest Source <id>` `ONCE` schedule, and `manage.py harvest_sources` never go through the missed-slot replay path.
+
+The catch-up is **logged**. Recurring schedules pass `intended_date_kwarg="scheduled_for"`, and a run that starts more than `OPTIMAP_SCHEDULED_TASK_CATCHUP_THRESHOLD_MINUTES` (default 5) after its intended time logs a WARNING (`works.utils.scheduling`) noting that intervening missed runs were skipped. Keep the threshold below the smallest recurring interval to avoid spurious notices. The `django-q` logger is configured in `LOGGING`, so the scheduler's own "created task … from schedule" lines are also visible. Note: catch-up only governs the *scheduler's* missed-slot replay — if the scheduler keeps running while only the worker is saturated, on-time enqueues can still back up in the broker queue (drain via `qinfo` or truncate `django_q_ormq`).
+
 **Common failure modes:**
 
-- **Stale dotted paths.** Pre-v0.12.0 schedules referenced `publications.tasks.*` instead of `works.tasks.*`. Long-lived deployments may still have these — the cluster fails them with `ImportError`. Delete them from `/admin/django_q/schedule/` and re-create them by saving the corresponding `Source` (or run `python manage.py reset_harvest_schedules`).
+- **Stale dotted paths.** Pre-v0.12.0 schedules referenced `publications.tasks.*` instead of `works.tasks.*`. The cluster fails them with `ImportError`. The monthly/weekly email-digest helpers now register under `works.tasks.*`, but **long-lived deployments may still carry orphaned `publications.tasks.*` rows** that nothing recreates. Clear them **once** (idempotent — safe to skip if there are none):
+
+  ```bash
+  python manage.py shell -c "from django_q.models import Schedule; print(Schedule.objects.filter(func__startswith='publications.tasks.').delete())"
+  ```
+
+  For other stale paths, delete them from `/admin/django_q/schedule/` and re-create by saving the corresponding `Source` (or run `python manage.py reset_harvest_schedules`).
 - **Thundering herd after `harvest_sources --insert-sources`.** Pre-fix `Source.save()` created Schedule rows with `next_run = now`. Recover with `python manage.py reset_harvest_schedules` (see "Manage harvesting" → "Recover from a thundering-herd schedule state").
-- **Cluster down, queue grows.** Restart `qcluster` and watch `qinfo` — the queue drains in roughly the order tasks were enqueued. To skip the backlog, truncate `django_q_ormq` from the dbshell or via the `/admin/django_q/` views.
+- **Cluster down, queue grows.** Restart `qcluster` and watch `qinfo` — the queue drains in roughly the order tasks were enqueued. With `catch_up: False` the scheduler no longer adds a burst of missed recurring runs on restart. To skip any remaining backlog, truncate `django_q_ormq` from the dbshell or via the `/admin/django_q/` views.
 
 ---
 
