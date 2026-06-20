@@ -32,6 +32,7 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 from django.utils.text import slugify
+from django_q.tasks import async_task
 
 from works.models import Collection, HarvestingEvent, Source, Work
 from works.tasks import (
@@ -668,6 +669,20 @@ class Command(BaseCommand):
             help="Create Source entries if they don't exist (default: use existing sources only)",
         )
         parser.add_argument(
+            "--async",
+            dest="async_mode",
+            action="store_true",
+            help=(
+                "Enqueue each harvest as a Django-Q task instead of running it "
+                "synchronously. Requires a running qcluster (python manage.py "
+                "qcluster); without one the tasks sit in the broker queue and "
+                "never execute. Prints the enqueued task id per source and "
+                "returns immediately — the per-source statistics summary is "
+                "skipped because results are not available yet (watch the "
+                "HarvestingEvent rows / harvest-completion emails instead)."
+            ),
+        )
+        parser.add_argument(
             "--user-email",
             type=str,
             default=None,
@@ -764,6 +779,29 @@ class Command(BaseCommand):
         max_records = options["max_records"]
         create_sources = options["create_sources"]
         update_existing = options.get("update", False)
+        async_mode = options.get("async_mode", False)
+
+        if async_mode:
+            self.stdout.write(
+                self.style.WARNING(
+                    "--async: enqueuing harvests as Django-Q tasks. Ensure a qcluster "
+                    "is running (python manage.py qcluster), or the tasks will not execute."
+                )
+            )
+            # Fail fast: every harvest-affecting option the user explicitly set
+            # must actually land in the enqueued task kwargs for every selected
+            # source. The sync path silently ignores crossref-only options
+            # (--source-title, --no-publisher-abstract) on non-crossref sources;
+            # async refuses to drop them quietly and stops instead.
+            self._validate_async_coverage(
+                sources_to_harvest=sources_to_harvest,
+                include_disabled=include_disabled,
+                user=user,
+                max_records=max_records,
+                source_titles=source_titles,
+                no_publisher_abstract=no_publisher_abstract,
+                update_existing=update_existing,
+            )
 
         # Summary statistics
         total_harvested = 0
@@ -807,6 +845,31 @@ class Command(BaseCommand):
                 # Harvest based on source type
                 source_type = config.get("source_type", "oai-pmh")
                 oai_result = None
+
+                # Async route: enqueue the same task target the recurring
+                # Django-Q schedules use, then move on. We can't report
+                # per-source stats because the work hasn't run yet.
+                if async_mode:
+                    task_path, task_kwargs = self._build_harvest_spec(
+                        config=config,
+                        source_type=source_type,
+                        user=user,
+                        max_records=max_records,
+                        source_titles=source_titles,
+                        no_publisher_abstract=no_publisher_abstract,
+                        update_existing=update_existing,
+                    )
+                    task_id = async_task(task_path, source.id, **task_kwargs)
+                    self.stdout.write(self.style.SUCCESS(f"  Enqueued {task_path} (task id: {task_id})"))
+                    results.append(
+                        {
+                            "source": config["name"],
+                            "status": "queued",
+                            "count": 0,
+                            "task_id": task_id,
+                        }
+                    )
+                    continue
 
                 if update_existing:
                     self.stdout.write(
@@ -1010,13 +1073,24 @@ class Command(BaseCommand):
                     self.stdout.write(f"  Years:   {', '.join(year_parts)}")
             elif result["status"] == "skipped":
                 self.stdout.write(self.style.WARNING(f"⊘ {result['source']}  —  skipped (disabled)"))
+            elif result["status"] == "queued":
+                self.stdout.write(
+                    self.style.SUCCESS(f"⧖ {result['source']}  —  queued (task id: {result.get('task_id')})")
+                )
             else:
                 error_msg = result.get("error", result["status"])
                 dur = result.get("duration", 0)
                 self.stdout.write(self.style.ERROR(f"✗ {result['source']}  —  failed ({dur:.1f}s): {error_msg}"))
 
         self.stdout.write(self.style.SUCCESS(f"\n{'=' * 70}"))
-        self.stdout.write(f"Total publications harvested: {total_harvested}")
+        if async_mode:
+            queued = sum(1 for r in results if r["status"] == "queued")
+            self.stdout.write(
+                f"Queued {queued} harvest task(s). Watch progress via the HarvestingEvent "
+                "rows (Django admin) or qmonitor; results land asynchronously."
+            )
+        else:
+            self.stdout.write(f"Total publications harvested: {total_harvested}")
         if total_failed > 0:
             self.stdout.write(self.style.WARNING(f"Failed sources: {total_failed}"))
         if total_skipped > 0:
@@ -1026,6 +1100,108 @@ class Command(BaseCommand):
                 )
             )
         self.stdout.write(self.style.SUCCESS(f"{'=' * 70}\n"))
+
+    def _validate_async_coverage(
+        self,
+        *,
+        sources_to_harvest,
+        include_disabled,
+        user,
+        max_records,
+        source_titles,
+        no_publisher_abstract,
+        update_existing,
+    ):
+        """Abort --async if any explicitly-set option can't reach the task.
+
+        Builds the task spec for each source that will actually run and checks
+        that every harvest-affecting option the operator provided maps to a
+        kwarg in that spec. Raises CommandError (stopping the whole command,
+        before anything is enqueued) when an option cannot be matched — e.g.
+        --source-title given for an OAI-PMH source, whose harvester takes no
+        title filter. Keeps the async route honest as new options are added:
+        wire a new flag into _build_harvest_spec or this map will flag it.
+        """
+        # option flag -> (was it explicitly set?, kwarg it must appear as)
+        required = {
+            "--max-records": (max_records is not None, "max_records"),
+            "--update": (bool(update_existing), "update_existing"),
+            "--user-email": (user is not None, "user"),
+            "--source-title": (bool(source_titles), "source_titles"),
+            "--no-publisher-abstract": (bool(no_publisher_abstract), "fetch_abstract_from_publisher"),
+        }
+        provided = {flag: kwarg for flag, (was_set, kwarg) in required.items() if was_set}
+        if not provided:
+            return
+
+        for source_key in sources_to_harvest:
+            config = SOURCE_CONFIG[source_key]
+            # Mirror the loop's skip logic: disabled sources that won't run
+            # can't cause a coverage error.
+            if not _is_enabled(config) and not include_disabled:
+                continue
+            source_type = config.get("source_type", "oai-pmh")
+            task_path, task_kwargs = self._build_harvest_spec(
+                config=config,
+                source_type=source_type,
+                user=user,
+                max_records=max_records,
+                source_titles=source_titles,
+                no_publisher_abstract=no_publisher_abstract,
+                update_existing=update_existing,
+            )
+            unmatched = [flag for flag, kwarg in provided.items() if kwarg not in task_kwargs]
+            if unmatched:
+                raise CommandError(
+                    f"--async cannot honor {', '.join(unmatched)} for source "
+                    f"'{source_key}' (type '{source_type}'): the harvest task "
+                    f"{task_path} takes no such argument. Remove the option, or harvest this "
+                    "source without --async (the synchronous path ignores "
+                    "options that don't apply). No tasks were enqueued."
+                )
+
+    def _build_harvest_spec(
+        self,
+        *,
+        config,
+        source_type,
+        user,
+        max_records,
+        source_titles,
+        no_publisher_abstract,
+        update_existing,
+    ):
+        """Map a source config to its Django-Q task path and kwargs.
+
+        Mirrors the synchronous dispatch in handle() so --async enqueues the
+        same task target (the dotted paths the recurring schedules use) with
+        the same arguments. Returns (dotted_path, kwargs); source.id is passed
+        positionally by the caller.
+        """
+        common = {"user": user, "max_records": max_records, "update_existing": update_existing}
+
+        if source_type == "rss":
+            return "works.tasks.harvest_rss_endpoint", common
+        if source_type == "mountain-wetlands":
+            return "works.tasks.harvest_mountain_wetlands", common
+        if source_type == "crossref-prefix":
+            book_isbns = config.get("book_isbns")
+            if book_isbns:
+                return "works.tasks.harvest_crossref_book_list", {**common, "book_isbns": book_isbns}
+            effective_titles = source_titles or config.get("source_titles")
+            fetch_abstract = config.get("fetch_abstract_from_publisher", True) and not no_publisher_abstract
+            return "works.tasks.harvest_crossref_prefix", {
+                **common,
+                "source_titles": effective_titles,
+                "prefix": config.get("crossref_prefix"),
+                "fetch_abstract_from_publisher": fetch_abstract,
+            }
+        if source_type == "geoscienceworld":
+            return "works.tasks.harvest_geoscienceworld", common
+        if source_type == "openalex":
+            return "works.tasks.harvest_openalex_source", common
+        # Covers oai-pmh, ojs, janeway — all share the OAI harvester.
+        return "works.tasks.harvest_oai_endpoint", common
 
     def _insert_sources(self, include_disabled=False):
         """Create Source rows for every entry in SOURCE_CONFIG without harvesting.

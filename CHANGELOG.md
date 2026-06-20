@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`--async` flag for `harvest_sources`**: the management command can now enqueue each harvest as a Django-Q task (`async_task` against the same `works.tasks.harvest_*` dotted paths the recurring schedules use) instead of running it synchronously. It prints the enqueued task id per source and returns immediately; the per-source statistics summary is skipped because results land asynchronously (watch the `HarvestingEvent` rows / harvest-completion emails / `qmonitor`). Requires a running `qcluster`. As a safety guard the async path validates, before enqueuing anything, that every harvest-affecting option the operator set maps to an argument the chosen task actually accepts — passing a crossref-only option such as `--source-title`/`--no-publisher-abstract` to a non-Crossref source stops the command with an error instead of silently dropping it (the synchronous path's existing lax behavior is unchanged).
+
 ## [0.29.0] - 2026-06-19
 
 ### Added
