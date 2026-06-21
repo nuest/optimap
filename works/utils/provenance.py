@@ -25,6 +25,8 @@ Schema:
             "top_candidate": {...}        # only when unverified
         },
         "events": [                       # chronological audit log
+            {"type": "doi_contribution", "user_id": 42, "doi": "10.5194/...",
+             "at": "2026-04-30T..."},     # user added this work by submitting its DOI
             {"type": "contribution", "user_id": 42, "kind": "spatial",
              "at": "2026-04-30T...", "changes": [...]},
             {"type": "publish", "user_id": 1, "at": "..."},

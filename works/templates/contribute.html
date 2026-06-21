@@ -2,6 +2,7 @@
 {# SPDX-License-Identifier: GPL-3.0-or-later #}
 
 {% extends "main.html" %}
+{% load static %}
 
 {% block title %}Contribute Geolocation Data | {% endblock %}
 
@@ -25,6 +26,51 @@
     <p class="lead">Help us add geographic metadata to scientific works!</p>
 
     <p class="text-wrap text-break">The works listed below have been harvested from various scientific sources but do not have geolocation data yet. If you know the geographic location or area mentioned in any of these works, you can help us improve our database.</p>
+
+    {# --- Add a work by DOI --------------------------------------------------- #}
+    <div class="card mb-4">
+      <div class="card-header p-0">
+        <button class="btn btn-link btn-block text-left text-decoration-none d-flex justify-content-between align-items-center px-3 py-2"
+                type="button" data-toggle="collapse" data-target="#doiContributeForm"
+                aria-expanded="false" aria-controls="doiContributeForm">
+          <span><i class="fas fa-plus-circle" aria-hidden="true"></i> Add a work by DOI</span>
+          <i class="fas fa-chevron-down" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div id="doiContributeForm" class="collapse">
+        <div class="card-body">
+          <p class="text-muted small mb-3">
+            Know a publication that should be in OPTIMAP? Enter its DOI and we will fetch its metadata
+            from Crossref and enrich it automatically. If we already have it, you will be taken to its page.
+          </p>
+          {% if request.user.is_authenticated %}
+            <form id="doiForm" novalidate>
+              {% csrf_token %}
+              <div class="form-group">
+                <label for="doiInput">DOI or DOI URL</label>
+                <input type="text" class="form-control" id="doiInput" name="doi"
+                       placeholder="10.5194/example or https://doi.org/10.5194/example"
+                       autocomplete="off" aria-describedby="doiHelp doiFeedback">
+                <small id="doiHelp" class="form-text text-muted">Example: <code>10.5194/gi-9-219-2020</code></small>
+                <div id="doiFeedback" class="invalid-feedback" role="alert"></div>
+              </div>
+              <button type="submit" id="doiSubmit" class="btn btn-primary" disabled>
+                <span id="doiSubmitSpinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                <i class="fas fa-paper-plane" aria-hidden="true"></i> Add work
+              </button>
+            </form>
+          {% else %}
+            <button disabled class="btn btn-outline-secondary"
+                    aria-label="Log in to add a work — use the user menu at the top right">
+              <i class="fas fa-user-circle" aria-hidden="true"></i> Add work
+            </button>
+            <p class="text-muted small mt-2 mb-0">
+              Please log in to add works by DOI — use the user menu at the top right of the page.
+            </p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
 
     {% if filter_invalid %}
       <div class="alert alert-warning text-break" role="alert">
@@ -172,4 +218,12 @@
   </div>
 </div>
 
+{% endblock %}
+
+{% block scripts %}
+{{ block.super }}
+{% if request.user.is_authenticated %}
+<script src="{% static 'js/doi-validate.js' %}"></script>
+<script src="{% static 'js/contribute-doi.js' %}"></script>
+{% endif %}
 {% endblock %}

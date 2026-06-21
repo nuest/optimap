@@ -317,6 +317,15 @@ For maintainers cross-referencing the admin features above:
 - Tests: [tests/test_admin_harvesting.py](../tests/test_admin_harvesting.py), [tests/test_regular_harvesting.py](../tests/test_regular_harvesting.py).
 - OpenAIRE refresh-token workflow: `ServiceToken` model ([works/models.py](../works/models.py)) + admin ([works/admin.py](../works/admin.py) `ServiceTokenAdmin`), token exchange in [works/harvesting/openaire.py](../works/harvesting/openaire.py) (`get_openaire_access_token`) wired through `_openaire_session()` in [works/harvesting/sessions.py](../works/harvesting/sessions.py), the service registry [works/utils/service_tokens.py](../works/utils/service_tokens.py), the weekly reminder `check_service_token_renewals` + `schedule_service_token_renewal_check` ([works/tasks.py](../works/tasks.py), registered in [works/apps.py](../works/apps.py)), template `works/templates/email/service_token_renewal.en.txt`, and [tests/test_service_tokens.py](../tests/test_service_tokens.py).
 
+### User contributions by DOI
+
+Logged-in users can add a publication to OPTIMAP from the `/contribute/` page by submitting its DOI (the collapsible **"Add a work by DOI"** form). The DOI is validated client-side, then `POST /api/v1/works/contribute-doi/` either redirects the user to the existing work (if already present, case-insensitive DOI match) or harvests the single DOI from Crossref and runs OpenAlex + OpenAIRE enrichment **synchronously** before redirecting to the new work's contribution page.
+
+- **Where they land:** every user-submitted DOI becomes a `Work` with status **Harvested (`h`)** attached to a dedicated **"User contributions"** `Source` (and its auto-created collection), seeded by migration `0026` and fetched-or-created at runtime by `works.harvesting.crossref.get_user_contributions_source`. Filter the admin Works list by this source to review them.
+- **Provenance & recognition:** a `doi_contribution` event is appended to `Work.provenance` (see [Work provenance](#work-provenance)), and a `Contribution` row with the new `doi` kind is created so the submission counts on the [Recognition Board](#manage-the-recognition-board) and in the `contributed_dois` statistic on `/statistics/`.
+- **Rate limit & quota:** the endpoint is per-user rate-limited via `OPTIMAP_CONTRIBUTE_DOI_RATE` (default `30/hour`). The synchronous OpenAIRE call consumes the OpenAIRE quota — anonymous is 60 req/hour deployment-wide, raised to 7200/hour when an OpenAIRE `ServiceToken` is stored (see [OpenAIRE enrichment](#openaire-enrichment)).
+- **Code:** `harvest_crossref_doi` in [works/harvesting/crossref.py](../works/harvesting/crossref.py); `WorkViewSet.contribute_doi` + `ContributeDoiThrottle` in [works/viewsets.py](../works/viewsets.py); `normalize_doi` in [works/utils/identifiers.py](../works/utils/identifiers.py); UI in [works/templates/contribute.html](../works/templates/contribute.html) + `static/js/doi-validate.js` / `static/js/contribute-doi.js`; tests in [tests/test_contribute_doi.py](../tests/test_contribute_doi.py).
+
 ## Manage collections
 
 A **`Collection`** groups works under a curated identifier — typically a journal (`scientific-data`, `eartharxiv`), a thematic dataset (`mountain-wetlands`), or a community-curated series (`agile-gi`). A `Work` can belong to **multiple** collections (`Work.collections`, M2M). Each `Source` has an optional default `collection`, so works harvested from that source can be tagged automatically.
@@ -538,6 +547,7 @@ Staff users additionally see the full provenance (including `original_record`, W
   },
   "events": [                              // chronological audit log
     { "type": "harvest",      "at": "..." },
+    { "type": "doi_contribution", "at": "...", "user_id": 42, "doi": "10.5194/..." },  // user added this work by submitting its DOI on /contribute/
     { "type": "contribution", "at": "...", "user_id": 42, "kind": "spatial" },
     { "type": "publish",      "at": "...", "user_id": 1 },
     { "type": "source_migration", "at": "...", "from_source": "eScholarship", "to_source": "EarthArXiv" },

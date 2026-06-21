@@ -66,6 +66,7 @@ from works.harvesting.crossref import (  # noqa: F401
     _strip_jats,
     fetch_copernicus_abstract,
     harvest_crossref_book_list,
+    harvest_crossref_doi,
     harvest_crossref_prefix,
     parse_crossref_response_and_save_works,
 )

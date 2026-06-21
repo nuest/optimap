@@ -25,6 +25,7 @@ from datetime import datetime, timedelta
 
 import requests
 from bs4 import BeautifulSoup
+from django.conf import settings
 from django.utils import timezone
 
 from works.models import HarvestingEvent, Source
@@ -36,11 +37,13 @@ from .common import (
     HarvestWarningCollector,
     _save_or_update_work,
     complete_harvest,
+    ensure_collection_for_source,
     fail_harvest,
     render_harvest_email,
     resolve_user,
     send_harvest_email,
 )
+from .openaire import enrich_work_from_openaire
 from .openalex import build_openalex_fields
 from .sessions import (
     CROSSREF_API_URL,
@@ -48,6 +51,22 @@ from .sessions import (
     CROSSREF_PAGE_ROWS,
     _crossref_session,
 )
+
+#: Stable name for the auto-seeded Source that owns all user-submitted DOIs
+#: (the /contribute/ "add a work by DOI" form).
+USER_CONTRIBUTIONS_SOURCE_NAME = "User contributions"
+
+
+def user_contributions_source_url():
+    """Display-only ``url_field`` for the User contributions source.
+
+    A ``crossref-prefix`` source's ``url_field`` is never used for harvesting
+    (the harvester reads ``doi_prefix`` / ``crossref_filter``), so this is purely
+    cosmetic — point it at *this* deployment's own /contribute/ page rather than a
+    hardcoded domain, so it is correct regardless of where OPTIMAP is hosted.
+    """
+    return f"{settings.BASE_URL.rstrip('/')}/contribute/"
+
 
 logger = logging.getLogger(__name__)
 
@@ -752,3 +771,101 @@ def harvest_crossref_book_list(
         raise
     finally:
         logger.removeHandler(warning_collector)
+
+
+def get_user_contributions_source():
+    """Fetch-or-create the dedicated Source that owns user-submitted DOIs.
+
+    Idempotent: returns the existing "User contributions" Source if present,
+    otherwise creates it (manual-only, crossref-prefix type) together with its
+    auto-collection. Resilient on fresh databases where no migration-seeded row
+    exists yet.
+    """
+    source, created = Source.objects.get_or_create(
+        name=USER_CONTRIBUTIONS_SOURCE_NAME,
+        defaults={
+            "url_field": user_contributions_source_url(),
+            "source_type": "crossref-prefix",
+            "harvest_interval_minutes": 0,
+        },
+    )
+    if created:
+        logger.info("Created the '%s' source (id=%s).", USER_CONTRIBUTIONS_SOURCE_NAME, source.id)
+    if source.collection_id is None:
+        ensure_collection_for_source(source)
+        source.save(update_fields=["collection"])
+    return source
+
+
+def harvest_crossref_doi(doi, user=None, source_id=None):
+    """Harvest a single DOI from Crossref into a ``Work`` (synchronous).
+
+    Used by the /contribute/ "add a work by DOI" flow. Fetches the one Crossref
+    record, runs inline OpenAlex enrichment (via ``_crossref_item_to_work_kwargs``)
+    and then OpenAIRE enrichment synchronously, and attaches the work to the
+    dedicated "User contributions" Source/collection.
+
+    Deliberately does *not* call ``complete_harvest`` — that would enqueue the
+    async OpenAIRE sweep and send harvest-completion emails, neither of which
+    fits an interactive single-DOI contribution.
+
+    Returns ``(work_or_none, action)`` where ``action`` is one of ``"created"``,
+    ``"exists"`` (a Work with this DOI already existed) or ``"not_found"``
+    (Crossref has no record for the DOI).
+    """
+    user = resolve_user(user)
+    source = Source.objects.get(id=source_id) if source_id else get_user_contributions_source()
+
+    session = _crossref_session()
+    try:
+        resp = session.get(f"{CROSSREF_API_URL}/{doi}", timeout=CROSSREF_HTTP_TIMEOUT)
+        if resp.status_code == 404:
+            return None, "not_found"
+        resp.raise_for_status()
+        item = (resp.json() or {}).get("message")
+    except (requests.RequestException, ValueError) as exc:
+        logger.warning("Crossref single-DOI lookup failed for %s: %s", doi, exc)
+        return None, "not_found"
+
+    if not item:
+        return None, "not_found"
+
+    event = HarvestingEvent.objects.create(source=source, status="in_progress")
+    try:
+        kwargs = _crossref_item_to_work_kwargs(
+            item,
+            source,
+            event,
+            fetch_abstract_from_publisher=True,
+            abstract_session=session,
+            harvester_name="harvest_crossref_doi",
+        )
+        if not kwargs:
+            event.status = "failed"
+            event.save(update_fields=["status"])
+            return None, "not_found"
+
+        work, action = _save_or_update_work(kwargs, source, event, update_existing=False)
+        if action != "created":
+            # DOI already known — surface the existing work to the caller.
+            event.status = "completed"
+            event.completed_at = timezone.now()
+            event.save(update_fields=["status", "completed_at"])
+            return work, "exists"
+
+        if source.collection_id:
+            work.collections.add(source.collection_id)
+        _try_bok_pdf_extraction(work, kwargs.get("doi", ""), session)
+
+        # OpenAIRE enrichment, synchronous (fill-if-empty; never raises).
+        try:
+            enrich_work_from_openaire(work)
+        except Exception as exc:  # noqa: BLE001 — enrichment must never fail a contribution
+            logger.info("OpenAIRE enrichment failed for %s: %s", doi, exc)
+
+        event.status = "completed"
+        event.completed_at = timezone.now()
+        event.save(update_fields=["status", "completed_at"])
+        return work, "created"
+    finally:
+        session.close()

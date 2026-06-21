@@ -915,10 +915,13 @@ class Contribution(models.Model):
     # Generic "ontology" bucket covers any controlled-vocabulary tagging
     # (EO4GEO BoK today; e.g. GCMD, Wikidata QIDs in the future).
     ONTOLOGY = "ontology"
+    # A new work brought into OPTIMAP by a user submitting its DOI on /contribute/.
+    DOI = "doi"
     KIND_CHOICES = [
         (SPATIAL, "Spatial metadata"),
         (TEMPORAL, "Temporal metadata"),
         (ONTOLOGY, "Ontology contributions"),
+        (DOI, "Submitted works (DOI)"),
     ]
 
     user = models.ForeignKey(
@@ -957,6 +960,8 @@ class StatisticsSnapshot(models.Model):
     published_works = models.IntegerField(default=0)
     harvested_works = models.IntegerField(default=0)
     contributed_works = models.IntegerField(default=0)
+    # Cumulative count of works submitted by users via the contribute-by-DOI form.
+    contributed_dois = models.IntegerField(default=0)
     with_geometry = models.IntegerField(default=0)
     with_temporal = models.IntegerField(default=0)
     with_complete_metadata = models.IntegerField(default=0)

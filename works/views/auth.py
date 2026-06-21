@@ -344,6 +344,10 @@ def recognition_board(request):
                 "user__contributions",
                 filter=Q(user__contributions__kind=Contribution.TEMPORAL),
             ),
+            doi_count=Count(
+                "user__contributions",
+                filter=Q(user__contributions__kind=Contribution.DOI),
+            ),
         )
         .filter(total__gt=0)
         .order_by("-total", "recognition_username")

@@ -29,14 +29,16 @@ from drf_spectacular.utils import (
 from rest_framework import serializers as drf_serializers
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import AllowAny, IsAuthenticatedOrReadOnly
+from rest_framework.permissions import AllowAny, IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.renderers import BrowsableAPIRenderer, JSONRenderer
 from rest_framework.response import Response
+from rest_framework.throttling import UserRateThrottle
 from rest_framework_gis import filters
 
 from .models import Collection, GlobalRegion, Source, Subscription, Work
 from .serializers import (
     CollectionSerializer,
+    ContributeDoiSerializer,
     GeoextentBatchSerializer,
     GeoextentExtractSerializer,
     GeoextentExtractTextSerializer,
@@ -49,7 +51,7 @@ from .serializers import (
     WorkSerializer,
 )
 from .utils.geometry import annotate_rounded_geometry
-from .utils.provenance import public_subset
+from .utils.provenance import append_event, public_subset
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +67,17 @@ _ERROR_RESPONSE = inline_serializer(
         "details": drf_serializers.CharField(required=False),
     },
 )
+
+
+class ContributeDoiThrottle(UserRateThrottle):
+    """Per-user rate limit for the contribute-by-DOI endpoint.
+
+    Each new DOI triggers external API calls (Crossref + OpenAlex + OpenAIRE),
+    so cap how often an authenticated user can submit. Rate is configured under
+    the ``contribute_doi`` scope in ``REST_FRAMEWORK['DEFAULT_THROTTLE_RATES']``.
+    """
+
+    scope = "contribute_doi"
 
 
 class _GeoJSONRenderer(JSONRenderer):
@@ -233,6 +246,7 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
             "|--------|-------------|-------------|\n"
             "| `harvest_update` | `harvesting_event_id` | Recorded each time an existing work is re-harvested |\n"
             "| `doi_backfill` | `doi`, `harvesting_event_id` | DOI was added to a previously DOI-less work |\n"
+            "| `doi_contribution` | `doi`, `user_id`\\*, `user_email`\\* | A user added this work to OPTIMAP by submitting its DOI on /contribute/ (harvested from Crossref + enriched) |\n"
             "| `contribution` | `kinds` (array: `spatial`, `temporal`, `bok`), `user_id`\\*, `user_email`\\*, `game` (bool, optional) | User added spatial/temporal/BoK metadata; `game: true` when submitted via the georeferencing game |\n"
             "| `publish` | `status_from`, `status_to`, `user_id`\\*, `user_email`\\* | Work was published |\n"
             "| `unpublish` | `status_from`, `user_id`\\*, `user_email`\\* | Work was unpublished |\n"
@@ -296,8 +310,8 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
                         required=False,
                         help_text=(
                             "Chronological audit log. Each event has type (string) and at (ISO timestamp). "
-                            "Event types: harvest_update, doi_backfill, contribution, publish, unpublish, "
-                            "source_migration, openaire_enrich. "
+                            "Event types: harvest_update, doi_backfill, doi_contribution, contribution, publish, "
+                            "unpublish, source_migration, openaire_enrich. "
                             "user_id and user_email are present for staff/curators only."
                         ),
                     ),
@@ -453,6 +467,128 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
         else:
             response["Cache-Control"] = "public, max-age=3600"
         return response
+
+    @extend_schema(
+        summary="Contribute a new work by DOI",
+        tags=["Contribute"],
+        description=(
+            "Add a publication to OPTIMAP by its DOI. Requires authentication.\n\n"
+            "The DOI may be bare (`10.5194/example`) or a resolver URL "
+            "(`https://doi.org/10.5194/example`); it is normalized and validated server-side.\n\n"
+            "- **If the DOI already exists**, returns `200` with `exists: true` and the existing "
+            "work's `work_url` so the client can redirect to it.\n"
+            "- **If the DOI is new**, it is harvested from Crossref and enriched (OpenAlex + OpenAIRE) "
+            "synchronously, attached to the dedicated *User contributions* source, recorded in the "
+            "work's provenance (`doi_contribution` event) and on the recognition board, then returned "
+            "with `201` and `created: true`.\n\n"
+            "Rate-limited per user (`contribute_doi` scope) because each new DOI triggers external "
+            "API calls."
+        ),
+        request=ContributeDoiSerializer,
+        responses={
+            201: OpenApiResponse(
+                inline_serializer(
+                    name="ContributeDoiCreatedResponse",
+                    fields={
+                        "exists": drf_serializers.BooleanField(),
+                        "created": drf_serializers.BooleanField(),
+                        "work_id": drf_serializers.IntegerField(),
+                        "doi": drf_serializers.CharField(),
+                        "work_url": drf_serializers.CharField(),
+                    },
+                ),
+                description="A new work was harvested and created.",
+            ),
+            200: OpenApiResponse(
+                inline_serializer(
+                    name="ContributeDoiExistsResponse",
+                    fields={
+                        "exists": drf_serializers.BooleanField(),
+                        "work_id": drf_serializers.IntegerField(),
+                        "doi": drf_serializers.CharField(),
+                        "work_url": drf_serializers.CharField(),
+                    },
+                ),
+                description="A work with this DOI already exists; redirect the user to it.",
+            ),
+            400: OpenApiResponse(_ERROR_RESPONSE, description="The DOI is missing or not syntactically valid."),
+            403: OpenApiResponse(_ERROR_RESPONSE, description="Authentication credentials were not provided."),
+            404: OpenApiResponse(_ERROR_RESPONSE, description="Crossref has no record for this DOI."),
+            429: OpenApiResponse(_ERROR_RESPONSE, description="Rate limit exceeded for DOI contributions."),
+        },
+    )
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="contribute-doi",
+        permission_classes=[IsAuthenticated],
+        throttle_classes=[ContributeDoiThrottle],
+    )
+    def contribute_doi(self, request):
+        from django.urls import reverse
+
+        from .harvesting.crossref import harvest_crossref_doi
+        from .models import Contribution
+
+        def landing_url(work):
+            return reverse("optimap:work-landing", args=[work.get_identifier()])
+
+        serializer = ContributeDoiSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        doi = serializer.validated_data["doi"]
+
+        existing = Work.objects.filter(doi__iexact=doi).first()
+        if existing is not None:
+            return Response(
+                {
+                    "exists": True,
+                    "work_id": existing.id,
+                    "doi": existing.doi,
+                    "work_url": landing_url(existing),
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        work, action_taken = harvest_crossref_doi(doi, user=request.user)
+        if action_taken == "not_found" or work is None:
+            return Response(
+                {"error": f"Crossref has no record for DOI '{doi}'."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if action_taken == "exists":
+            # Raced with a concurrent submission, or the DOI differs only in case.
+            return Response(
+                {
+                    "exists": True,
+                    "work_id": work.id,
+                    "doi": work.doi,
+                    "work_url": landing_url(work),
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        # Record the contribution: provenance event + recognition-board row.
+        append_event(
+            work,
+            "doi_contribution",
+            user_id=request.user.id,
+            user_email=request.user.email,
+            doi=work.doi,
+        )
+        work.save(update_fields=["provenance", "lastUpdate"])
+        Contribution.objects.create(user=request.user, work=work, kind=Contribution.DOI)
+        logger.info("User %s contributed new work %s via DOI %s", request.user, work.id, work.doi)
+
+        return Response(
+            {
+                "exists": False,
+                "created": True,
+                "work_id": work.id,
+                "doi": work.doi,
+                "work_url": landing_url(work),
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 _SUBSCRIPTION_AUTH_RESPONSES = {
@@ -1431,6 +1567,9 @@ class GeoextentViewSet(viewsets.ViewSet):
                         "with_abstract": drf_serializers.IntegerField(),
                         "open_access": drf_serializers.IntegerField(),
                         "from_openalex": drf_serializers.IntegerField(),
+                        "contributed_dois": drf_serializers.IntegerField(
+                            help_text="Works submitted by users via the contribute-by-DOI form.",
+                        ),
                         "with_complete_metadata": drf_serializers.IntegerField(),
                         "complete_percentage": drf_serializers.FloatField(),
                         "works_by_status": drf_serializers.DictField(
