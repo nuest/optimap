@@ -262,6 +262,25 @@
         host.appendChild(div);
         startAutoclose(div);
       };
+
+      // Replay a one-shot flash stashed before a client-side redirect
+      // (e.g. the contribute-by-DOI form). See static/js/contribute-doi.js.
+      (function () {
+        let raw;
+        try {
+          raw = sessionStorage.getItem('optimapFlash');
+          if (raw) sessionStorage.removeItem('optimapFlash');
+        } catch (e) {
+          return;
+        }
+        if (!raw) return;
+        try {
+          const f = JSON.parse(raw);
+          if (f && f.message) window.OPTIMAP_FLASH(f.level || 'info', f.message);
+        } catch (e) {
+          /* ignore malformed payloads */
+        }
+      })();
     </script>
   </body>
 </html>

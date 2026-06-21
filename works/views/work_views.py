@@ -639,7 +639,15 @@ def statistics_page(request):
     # Last 90 snapshots for time-series charts (one per day ≈ 3 months)
     history = list(
         StatisticsSnapshot.objects.order_by("computed_at")
-        .values("computed_at", "published_works", "total_works", "with_geometry", "with_temporal", "contributors")
+        .values(
+            "computed_at",
+            "published_works",
+            "total_works",
+            "with_geometry",
+            "with_temporal",
+            "contributors",
+            "contributed_dois",
+        )
         .reverse()[:90]
     )
     history.reverse()  # chronological order for Chart.js
@@ -701,6 +709,7 @@ def statistics_page(request):
                         "with_geometry": h["with_geometry"],
                         "with_temporal": h["with_temporal"],
                         "contributors": h["contributors"],
+                        "contributed_dois": h["contributed_dois"],
                     }
                     for h in history
                 ]

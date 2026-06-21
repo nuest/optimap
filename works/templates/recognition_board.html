@@ -52,6 +52,9 @@
                     <th scope="col" class="text-right" title="Temporal metadata contributions">
                       <i class="fas fa-clock"></i>
                     </th>
+                    <th scope="col" class="text-right" title="Works submitted by DOI">
+                      <i class="fas fa-plus-circle"></i>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -62,6 +65,7 @@
                       <td class="text-right"><strong>{{ entry.total }}</strong></td>
                       <td class="text-right">{{ entry.spatial_count }}</td>
                       <td class="text-right">{{ entry.temporal_count }}</td>
+                      <td class="text-right">{{ entry.doi_count }}</td>
                     </tr>
                   {% endfor %}
                 </tbody>

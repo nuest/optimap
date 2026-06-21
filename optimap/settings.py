@@ -149,6 +149,13 @@ REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_PAGINATION_CLASS": "works.pagination.LinkHeaderPagination",
     "PAGE_SIZE": 999,
+    # Per-scope rate limits (only the endpoints that opt in via throttle_classes
+    # are affected — there is no global default throttle). The contribute-by-DOI
+    # endpoint triggers external API calls (Crossref/OpenAlex/OpenAIRE), so it is
+    # capped per authenticated user.
+    "DEFAULT_THROTTLE_RATES": {
+        "contribute_doi": env("OPTIMAP_CONTRIBUTE_DOI_RATE", default="30/hour"),
+    },
 }
 
 # Database
@@ -273,6 +280,10 @@ download URLs directly.
         {
             "name": "Statistics",
             "description": "Cached aggregate counts for works, sources, collections, and users. Refreshed every 24 h.",
+        },
+        {
+            "name": "Contribute",
+            "description": "User contributions to OPTIMAP — add a new work by submitting its DOI (harvested from Crossref and enriched). Session auth required.",
         },
     ],
     "SWAGGER_UI_DIST": "SIDECAR",  # shorthand to use the sidecar instead

@@ -468,6 +468,29 @@ class GeoextentExtractTextSerializer(serializers.Serializer):
         return value
 
 
+class ContributeDoiSerializer(serializers.Serializer):
+    """Validate a user-submitted DOI (bare or as a doi.org URL).
+
+    ``validate_doi`` normalizes the input to a bare DOI via
+    ``works.utils.identifiers.normalize_doi`` and rejects anything that is not a
+    syntactically valid DOI, so the view only ever sees a clean identifier.
+    """
+
+    doi = serializers.CharField(
+        required=True,
+        max_length=500,
+        help_text="A DOI (e.g. 10.5194/example) or DOI URL (e.g. https://doi.org/10.5194/example).",
+    )
+
+    def validate_doi(self, value):
+        from .utils.identifiers import normalize_doi
+
+        normalized = normalize_doi(value)
+        if not normalized:
+            raise serializers.ValidationError("Not a valid DOI.")
+        return normalized
+
+
 class GlobalRegionSerializer(GeoFeatureModelSerializer):
     """Serializer for GlobalRegion model with GeoJSON output."""
 

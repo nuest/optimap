@@ -31,6 +31,7 @@ def calculate_statistics():
         "published_works": published.count(),
         "harvested_works": Work.objects.filter(status="h").count(),
         "contributed_works": Work.objects.filter(status="c").count(),
+        "contributed_dois": Contribution.objects.filter(kind=Contribution.DOI).count(),
         "with_geometry": published.exclude(geometry__isnull=True).count(),
         "with_temporal": published.filter(
             Q(timeperiod_startdate__isnull=False) | Q(timeperiod_enddate__isnull=False)
@@ -138,6 +139,7 @@ def save_statistics_snapshot():
         published_works=stats["published_works"],
         harvested_works=stats["harvested_works"],
         contributed_works=stats["contributed_works"],
+        contributed_dois=stats["contributed_dois"],
         with_geometry=stats["with_geometry"],
         with_temporal=stats["with_temporal"],
         with_complete_metadata=stats["with_complete_metadata"],

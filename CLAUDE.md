@@ -554,6 +554,7 @@ optimap/
 > - **Provenance endpoint** (`GET /api/v1/works/<id>/provenance/`, `WorkViewSet.provenance` in [works/viewsets.py](works/viewsets.py)): the `@extend_schema` decorator contains the authoritative list of `metadata_sources` keys and values, `harvest` keys, `openalex_match` status values, event types, and response examples. Whenever you add a new key to `Work.provenance` (in any harvester, view, or utility), or change the set of possible values for an existing key, update all of the following in the same commit: the `description` tables in `@extend_schema`, the `help_text` on the affected `inline_serializer` field, the `OpenApiExample` values, and the schema quick reference in [docs/manage.md](docs/manage.md#work-provenance). The provenance schema is defined in [works/utils/provenance.py](works/utils/provenance.py).
 
 - `/api/v1/` - REST API root (see `/api/schema/ui/` for OpenAPI docs)
+- `/api/v1/works/contribute-doi/` - POST (auth required) to add a new work by DOI; harvests Crossref + enrichment synchronously, returns existing-vs-created. See [docs/manage.md](docs/manage.md#user-contributions-by-doi)
 - `/admin/` - Django admin interface
 - `/download/geojson/` - Download full publication dataset as GeoJSON
 - `/download/geopackage/` - Download as GeoPackage

@@ -9,6 +9,7 @@ This module provides centralized logic for resolving various identifier types
 """
 
 import logging
+import re
 from urllib.parse import unquote
 
 from django.http import Http404
@@ -16,6 +17,50 @@ from django.http import Http404
 from works.models import Work
 
 logger = logging.getLogger(__name__)
+
+# Crossref's recommended DOI pattern (https://www.crossref.org/blog/dois-and-matching-regular-expressions/),
+# applied after stripping any resolver prefix. Case-insensitive on the "10." literal.
+_DOI_RE = re.compile(r"^10\.\d{4,9}/\S+$", re.IGNORECASE)
+
+# Resolver / scheme prefixes that may wrap a bare DOI, longest first so the most
+# specific match wins. Comparison is case-insensitive; the DOI body keeps its case
+# because stored Crossref DOIs are case-preserving.
+_DOI_PREFIXES = (
+    "https://dx.doi.org/",
+    "http://dx.doi.org/",
+    "https://doi.org/",
+    "http://doi.org/",
+    "dx.doi.org/",
+    "doi.org/",
+    "doi:",
+)
+
+
+def normalize_doi(raw):
+    """Normalize a user-supplied DOI or DOI URL to a bare DOI string.
+
+    Strips surrounding whitespace and any known resolver/scheme prefix, then
+    validates the remainder against the DOI shape. Returns the bare DOI, or
+    ``None`` if the input is empty or not a DOI.
+
+    The DOI body's case is preserved (DOIs are case-insensitive per spec, but
+    stored Crossref DOIs keep their original case); callers that compare against
+    the database should use ``doi__iexact``.
+    """
+    if not raw:
+        return None
+    doi = raw.strip()
+    if not doi:
+        return None
+    lowered = doi.lower()
+    for prefix in _DOI_PREFIXES:
+        if lowered.startswith(prefix):
+            doi = doi[len(prefix) :]
+            break
+    doi = doi.strip()
+    if not _DOI_RE.match(doi):
+        return None
+    return doi
 
 
 def resolve_work_identifier(identifier):
