@@ -898,14 +898,29 @@ class Command(BaseCommand):
                         full_backfill=full_backfill,
                         since=since,
                     )
+                    # Pre-create the HarvestingEvent so its PK can be printed
+                    # now and matched against the row that appears in the Django
+                    # admin once the task runs (the task reuses this event via
+                    # start_harvesting_event rather than creating its own). The
+                    # Django-Q task id is internal to the queue and never lands
+                    # on a model the admin shows, so the event PK is the durable
+                    # correlation handle.
+                    event = HarvestingEvent.objects.create(source=source, status="pending")
+                    task_kwargs["event_id"] = event.id
                     task_id = async_task(task_path, source.id, **task_kwargs)
-                    self.stdout.write(self.style.SUCCESS(f"  Enqueued {task_path} (task id: {task_id})"))
+                    self.stdout.write(
+                        self.style.SUCCESS(
+                            f"  Enqueued {task_path} — HarvestingEvent #{event.id} "
+                            f"(Django admin), Django-Q task id: {task_id}"
+                        )
+                    )
                     results.append(
                         {
                             "source": config["name"],
                             "status": "queued",
                             "count": 0,
                             "task_id": task_id,
+                            "event_id": event.id,
                         }
                     )
                     continue
@@ -1120,7 +1135,10 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.WARNING(f"⊘ {result['source']}  —  skipped (disabled)"))
             elif result["status"] == "queued":
                 self.stdout.write(
-                    self.style.SUCCESS(f"⧖ {result['source']}  —  queued (task id: {result.get('task_id')})")
+                    self.style.SUCCESS(
+                        f"⧖ {result['source']}  —  queued (HarvestingEvent #{result.get('event_id')}, "
+                        f"task id: {result.get('task_id')})"
+                    )
                 )
             else:
                 error_msg = result.get("error", result["status"])
@@ -1132,7 +1150,8 @@ class Command(BaseCommand):
             queued = sum(1 for r in results if r["status"] == "queued")
             self.stdout.write(
                 f"Queued {queued} harvest task(s). Watch progress via the HarvestingEvent "
-                "rows (Django admin) or qmonitor; results land asynchronously."
+                "rows printed above (open /admin/works/harvestingevent/<id>/ in the Django "
+                "admin) or qmonitor; results land asynchronously."
             )
         else:
             self.stdout.write(f"Total publications harvested: {total_harvested}")

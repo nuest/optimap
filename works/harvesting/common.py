@@ -416,6 +416,27 @@ def resolve_user(user):
     return user
 
 
+def start_harvesting_event(source, event_id=None):
+    """Return the ``HarvestingEvent`` to harvest into, set to ``in_progress``.
+
+    When ``event_id`` is given (the ``--async`` route in ``harvest_sources``
+    pre-creates a ``pending`` event so its PK can be printed and matched in the
+    Django admin), reuse that row instead of creating a fresh one — but only if
+    it still belongs to ``source`` and hasn't already run. Otherwise (recurring
+    schedules, synchronous CLI, admin actions) create a new event as before.
+    """
+    from works.models import HarvestingEvent  # local import avoids circular import
+
+    if event_id is not None:
+        event = HarvestingEvent.objects.filter(id=event_id, source=source).first()
+        if event is not None and event.status in ("pending", "in_progress"):
+            if event.status != "in_progress":
+                event.status = "in_progress"
+                event.save(update_fields=["status"])
+            return event
+    return HarvestingEvent.objects.create(source=source, status="in_progress")
+
+
 def count_spatial_temporal(event):
     """Return ``(spatial_count, temporal_count)`` for works attached to ``event``."""
     spatial = Work.objects.filter(job=event).exclude(geometry__isnull=True).count()
@@ -670,7 +691,13 @@ def complete_harvest(event, stats, warning_collector, spatial_count=None, tempor
     # only touches works that have a DOI and are missing a target field.
     if getattr(settings, "OPTIMAP_OPENAIRE_ENRICH_ON_HARVEST", True) and event is not None:
         try:
-            async_task("works.harvesting.openaire.enrich_event_from_openaire", event.id)
+            from works.harvesting.openaire import openaire_task_q_options
+
+            async_task(
+                "works.harvesting.openaire.enrich_event_from_openaire",
+                event.id,
+                q_options=openaire_task_q_options(),
+            )
         except Exception as exc:
             logger.warning("Could not enqueue OpenAIRE enrichment sweep for event %s: %s", event.id, exc)
 

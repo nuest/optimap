@@ -36,6 +36,7 @@ from .common import (
     render_harvest_email,
     resolve_user,
     send_harvest_email,
+    start_harvesting_event,
 )
 from .metadata_html import extract_geometry_from_html, extract_timeperiod_from_html
 from .openalex import build_openalex_fields
@@ -422,7 +423,7 @@ def _year_chunk_items(base_url: str, list_params: dict, start_year: int, end_yea
         )
 
 
-def harvest_oai_endpoint(source_id, user=None, max_records=None, update_existing=False):
+def harvest_oai_endpoint(source_id, user=None, max_records=None, update_existing=False, event_id=None):
     user = resolve_user(user)
     source = Source.objects.get(id=source_id)
     # Issue #192: the generic OAI-PMH harvester creates a Collection for each
@@ -431,7 +432,7 @@ def harvest_oai_endpoint(source_id, user=None, max_records=None, update_existing
     # name/description before flipping it on. No-op when source.collection is
     # already set (e.g. via harvest_sources --insert-sources).
     ensure_collection_for_source(source)
-    event = HarvestingEvent.objects.create(source=source, status="in_progress")
+    event = start_harvesting_event(source, event_id)
 
     new_count = None
     spatial_count = None

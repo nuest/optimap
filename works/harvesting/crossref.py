@@ -42,6 +42,7 @@ from .common import (
     render_harvest_email,
     resolve_user,
     send_harvest_email,
+    start_harvesting_event,
 )
 from .openaire import enrich_work_from_openaire
 from .openalex import build_openalex_fields
@@ -515,6 +516,7 @@ def harvest_crossref_prefix(
     order=None,
     full=False,
     since=None,
+    event_id=None,
 ):
     """Harvest publications from Crossref by DOI prefix.
 
@@ -530,7 +532,7 @@ def harvest_crossref_prefix(
     """
     user = resolve_user(user)
     source = Source.objects.get(id=source_id)
-    event = HarvestingEvent.objects.create(source=source, status="in_progress")
+    event = start_harvesting_event(source, event_id)
 
     warning_collector = HarvestWarningCollector()
     warning_collector.setLevel(logging.INFO)
@@ -675,6 +677,7 @@ def harvest_crossref_book_list(
     max_records=None,
     book_isbns=None,
     update_existing=False,
+    event_id=None,
 ):
     """Harvest all chapters from a list of book ISBNs via Crossref.
 
@@ -690,7 +693,7 @@ def harvest_crossref_book_list(
     """
     user = resolve_user(user)
     source = Source.objects.get(id=source_id)
-    event = HarvestingEvent.objects.create(source=source, status="in_progress")
+    event = start_harvesting_event(source, event_id)
 
     warning_collector = HarvestWarningCollector()
     warning_collector.setLevel(logging.INFO)

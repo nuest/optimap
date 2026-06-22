@@ -23,7 +23,7 @@ from django.conf import settings
 from django.contrib.gis.geos import GeometryCollection, GEOSGeometry
 from django.utils import timezone
 
-from works.models import HarvestingEvent, Source
+from works.models import Source
 
 from .common import (
     HarvestStats,
@@ -37,6 +37,7 @@ from .common import (
     render_harvest_email,
     resolve_user,
     send_harvest_email,
+    start_harvesting_event,
 )
 from .crossref import (
     _authors_from_crossref,
@@ -266,7 +267,7 @@ def parse_gsw_response_and_save_works(
     return saved, seen
 
 
-def harvest_geoscienceworld(source_id, user=None, max_records=None, update_existing=False):
+def harvest_geoscienceworld(source_id, user=None, max_records=None, update_existing=False, event_id=None):
     """Harvest publications from GeoScienceWorld (issue #251).
 
     Enumerates articles via Crossref (source.doi_prefix) then extracts
@@ -275,7 +276,7 @@ def harvest_geoscienceworld(source_id, user=None, max_records=None, update_exist
     user = resolve_user(user)
     source = Source.objects.get(id=source_id)
     ensure_collection_for_source(source)
-    event = HarvestingEvent.objects.create(source=source, status="in_progress")
+    event = start_harvesting_event(source, event_id)
 
     warning_collector = HarvestWarningCollector()
     warning_collector.setLevel(logging.INFO)

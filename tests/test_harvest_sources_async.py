@@ -79,6 +79,34 @@ class HarvestSourcesAsyncUnitTest(TestCase):
         self.assertEqual(kwargs["prefix"], "10.5194")
         self.assertTrue(kwargs["fetch_abstract_from_publisher"])
 
+    def test_async_creates_pending_event_and_passes_event_id(self):
+        # The command pre-creates a HarvestingEvent so its PK can be printed
+        # and matched in the Django admin; the task receives it as event_id.
+        async_mock = self._run_async("--source", "eartharxiv")
+        source = Source.objects.get(name="EarthArXiv")
+        event = HarvestingEvent.objects.filter(source=source).get()
+        self.assertEqual(event.status, "pending")
+        _, kwargs = async_mock.call_args
+        self.assertEqual(kwargs["event_id"], event.id)
+
+    def test_async_prints_event_id_for_admin_matching(self):
+        out = StringIO()
+        patchers = {name: patch(f"works.management.commands.harvest_sources.{name}") for name in SYNC_FUNCS}
+        [p.start() for p in patchers.values()]
+        self.addCleanup(lambda: [p.stop() for p in patchers.values()])
+        with patch("works.management.commands.harvest_sources.async_task", return_value="task-xyz"):
+            call_command(
+                "harvest_sources",
+                "--source",
+                "eartharxiv",
+                "--async",
+                "--create-sources",
+                stdout=out,
+                stderr=out,
+            )
+        event = HarvestingEvent.objects.get()
+        self.assertIn(f"HarvestingEvent #{event.id}", out.getvalue())
+
     def test_async_propagates_max_records_and_update(self):
         async_mock = self._run_async("--source", "eartharxiv", "--max-records", "7", "--update")
         _, kwargs = async_mock.call_args

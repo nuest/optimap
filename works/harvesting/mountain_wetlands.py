@@ -18,7 +18,7 @@ import requests
 from django.contrib.gis.geos import GeometryCollection, GEOSGeometry, Point
 from django.utils import timezone
 
-from works.models import HarvestingEvent, Source, Work
+from works.models import Source, Work
 
 from .common import (
     HarvestStats,
@@ -33,6 +33,7 @@ from .common import (
     render_harvest_email,
     resolve_user,
     send_harvest_email,
+    start_harvesting_event,
 )
 from .openalex import build_openalex_fields
 from .sessions import (
@@ -309,7 +310,7 @@ def parse_mountain_wetlands_response_and_save_works(
     return saved, processed
 
 
-def harvest_mountain_wetlands(source_id, user=None, max_records=None, update_existing=False):
+def harvest_mountain_wetlands(source_id, user=None, max_records=None, update_existing=False, event_id=None):
     """Bespoke harvester for the Mountain Wetlands Repository (MaRESS API).
 
     Manual-only — the issue #192 explicitly forbids auto-scheduling. Run via
@@ -322,7 +323,7 @@ def harvest_mountain_wetlands(source_id, user=None, max_records=None, update_exi
     # run if the source has none, mirroring the OAI-PMH path. Idempotent — re-runs
     # are no-ops once the source has a collection assigned.
     ensure_collection_for_source(source)
-    event = HarvestingEvent.objects.create(source=source, status="in_progress")
+    event = start_harvesting_event(source, event_id)
 
     warning_collector = HarvestWarningCollector()
     warning_collector.setLevel(logging.INFO)

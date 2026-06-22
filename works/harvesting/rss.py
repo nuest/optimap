@@ -25,6 +25,7 @@ from .common import (
     render_harvest_email,
     resolve_user,
     send_harvest_email,
+    start_harvesting_event,
 )
 from .openalex import build_openalex_fields
 
@@ -231,11 +232,11 @@ def parse_rss_feed_and_save_publications(
         return 0, 0
 
 
-def harvest_rss_endpoint(source_id, user=None, max_records=None, update_existing=False):
+def harvest_rss_endpoint(source_id, user=None, max_records=None, update_existing=False, event_id=None):
     """Harvest publications from an RSS/Atom feed."""
     user = resolve_user(user)
     source = Source.objects.get(id=source_id)
-    event = HarvestingEvent.objects.create(source=source, status="in_progress")
+    event = start_harvesting_event(source, event_id)
 
     warning_collector = HarvestWarningCollector()
     warning_collector.setLevel(logging.INFO)

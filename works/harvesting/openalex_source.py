@@ -27,7 +27,7 @@ import requests
 from django.contrib.gis.geos import GeometryCollection
 from django.utils import timezone
 
-from works.models import HarvestingEvent, Source
+from works.models import Source
 
 from .common import (
     HarvestStats,
@@ -40,6 +40,7 @@ from .common import (
     render_harvest_email,
     resolve_user,
     send_harvest_email,
+    start_harvesting_event,
 )
 from .sessions import (
     OPENALEX_API_URL,
@@ -333,6 +334,7 @@ def harvest_openalex_source(
     max_records=None,
     sort=None,
     update_existing=False,
+    event_id=None,
 ):
     """Harvest publications from a configured OpenAlex source.
 
@@ -346,7 +348,7 @@ def harvest_openalex_source(
     # run if the source has none, mirroring the OAI-PMH path. Idempotent — re-runs
     # are no-ops once the source has a collection assigned.
     ensure_collection_for_source(source)
-    event = HarvestingEvent.objects.create(source=source, status="in_progress")
+    event = start_harvesting_event(source, event_id)
 
     warning_collector = HarvestWarningCollector()
     warning_collector.setLevel(logging.INFO)
