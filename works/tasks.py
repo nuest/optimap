@@ -19,7 +19,6 @@ import gzip
 import json
 import logging
 import os
-import subprocess
 import tempfile
 import time
 from collections import defaultdict
@@ -36,6 +35,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django_q.models import Schedule
 from django_q.tasks import schedule
+from osgeo import gdal
 
 # -----------------------------------------------------------------------------
 # Re-exports from the harvesting package — preserve the public surface that
@@ -907,8 +907,13 @@ def regenerate_geojson_cache():
     return json_path
 
 
-def convert_geojson_via_ogr(geojson_path, *, fmt, ext, layer_creation_options=None, field_type_map=None):
-    """Convert an existing GeoJSON dump to ``fmt`` via ``ogr2ogr``.
+def convert_geojson_via_gdal(geojson_path, *, fmt, ext, layer_creation_options=None, field_type_map=None):
+    """Convert an existing GeoJSON dump to ``fmt`` via the GDAL Python bindings.
+
+    Uses ``osgeo.gdal.VectorTranslate`` (the in-process equivalent of the
+    ``ogr2ogr`` CLI) so the conversion does not depend on the ``ogr2ogr`` binary
+    being installed and on ``PATH`` — the GDAL bindings are already a hard
+    dependency of the app via GeoDjango.
 
     ``fmt`` is the OGR driver name (e.g. ``"GPKG"``, ``"CSV"``); ``ext`` is the
     file extension used for the output dump filename (e.g. ``"gpkg"``,
@@ -916,32 +921,39 @@ def convert_geojson_via_ogr(geojson_path, *, fmt, ext, layer_creation_options=No
     passed via ``-lco``; ``field_type_map`` is a list of ``SRC=DST`` strings
     passed via ``-mapFieldType`` (used to pin field-type conversions the driver
     would otherwise do implicitly, e.g. ``StringList=String(JSON)`` for GPKG).
-    Returns the output path or ``None`` if ogr2ogr fails.
+    Returns the output path or ``None`` if the conversion fails.
     """
     cache_dir = os.path.dirname(geojson_path)
     out_filename = generate_data_dump_filename(ext)
     out_path = os.path.join(cache_dir, out_filename)
-    cmd = ["ogr2ogr", "-f", fmt, out_path, geojson_path]
+    # A plain list of strings passed as ``options=`` is parsed exactly like the
+    # ``ogr2ogr`` command-line arguments would be.
+    options = ["-f", fmt]
     for opt in layer_creation_options or []:
-        cmd.extend(["-lco", opt])
+        options.extend(["-lco", opt])
     for spec in field_type_map or []:
-        cmd.extend(["-mapFieldType", spec])
+        options.extend(["-mapFieldType", spec])
     try:
-        output = subprocess.check_output(cmd, stderr=subprocess.STDOUT, text=True)
-        logger.info("ogr2ogr output (%s):\n%s", fmt, output)
+        ds = gdal.VectorTranslate(out_path, geojson_path, options=options)
+        if ds is None:
+            logger.warning("GDAL %s conversion failed: %s", fmt, gdal.GetLastErrorMsg())
+            return None
+        # Drop the reference so GDAL flushes the dataset to disk.
+        ds = None
+        logger.info("GDAL %s conversion succeeded: %s (%s)", fmt, out_path, gdal.GetLastErrorMsg())
         return out_path
-    except subprocess.CalledProcessError as err:
-        logger.warning("ogr2ogr %s conversion failed: %s", fmt, err.output)
+    except Exception as err:
+        logger.warning("GDAL %s conversion failed: %s", fmt, err)
         return None
 
 
 def convert_geojson_to_geopackage(geojson_path):
-    # GPKG has no native list column type. Without an explicit mapping, ogr2ogr
+    # GPKG has no native list column type. Without an explicit mapping, GDAL
     # auto-downgrades the GeoJSON array fields (authors/keywords/topics/
     # bok_concepts/collections, all StringList) to String(JSON) and warns about
     # it on every run. Pin that same conversion so the output is unchanged but
     # the benign warnings disappear.
-    return convert_geojson_via_ogr(
+    return convert_geojson_via_gdal(
         geojson_path,
         fmt="GPKG",
         ext="gpkg",
@@ -950,9 +962,9 @@ def convert_geojson_to_geopackage(geojson_path):
 
 
 def convert_geojson_to_csv(geojson_path):
-    # `GEOMETRY=AS_WKT` makes ogr2ogr emit a `WKT` column instead of dropping
+    # `GEOMETRY=AS_WKT` makes GDAL emit a `WKT` column instead of dropping
     # the geometry — that's the whole point of a CSV export for #206.
-    return convert_geojson_via_ogr(
+    return convert_geojson_via_gdal(
         geojson_path,
         fmt="CSV",
         ext="csv",

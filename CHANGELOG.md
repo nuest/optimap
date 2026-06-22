@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Data-dump regeneration no longer requires the `ogr2ogr` CLI binary on `PATH`**: the scheduled `regenerate_all_data_dumps` task (GeoPackage + CSV exports) shelled out to `ogr2ogr`, which crashed the whole task on deployments where the binary was missing from the qcluster process's `PATH` (`FileNotFoundError: [Errno 2] No such file or directory: 'ogr2ogr'`). The conversion now uses the in-process GDAL Python bindings (`osgeo.gdal.VectorTranslate`, already a hard dependency via GeoDjango); a genuinely missing/broken GDAL now degrades gracefully (GeoJSON still produced, GPKG/CSV skipped with a warning) instead of failing the task.
 - **OpenAIRE enrichment tasks no longer hit the 600-second Django-Q timeout**: the post-harvest OpenAIRE sweep (`enrich_event_from_openaire`) and the `enrich_openaire --async` backfill (`enrich_openaire_backfill`) sleep `OPTIMAP_OPENAIRE_ENRICH_THROTTLE` seconds between requests (60s anonymously), so a run over more than a handful of DOIs ran past the global `Q_CLUSTER['timeout']` and was killed with `TimeoutException: Task exceeded maximum timeout value (600 seconds)`. Both enqueue sites now pass per-task `q_options` (new `works.harvesting.openaire.openaire_task_q_options`) that raise the per-task `timeout` (and a matching `retry` above it, so Django-Q doesn't re-queue the still-running task) to `OPTIMAP_OPENAIRE_ENRICH_TASK_TIMEOUT` — default **24h**, configurable, set to `0` to keep the cluster default.
 
 ### Added
