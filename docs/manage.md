@@ -257,9 +257,14 @@ python manage.py enrich_openaire --collection agile-gi        # AGILE GI works m
 python manage.py enrich_openaire --doi-prefix 10.1007/978- --limit 50
 python manage.py enrich_openaire --dry-run                     # query OpenAIRE, write nothing
 python manage.py enrich_openaire --throttle 1                  # when a token is set (see below)
+python manage.py enrich_openaire --collection eartharxiv --async  # run in the background (needs qcluster)
 ```
 
-Flags: `--collection <identifier>`, `--doi-prefix <prefix>`, `--source <id|name>` (narrow the selection), `--limit N`, `--throttle SECONDS` (default `OPTIMAP_OPENAIRE_ENRICH_THROTTLE`), `--force` (query even works that already have all target fields), `--dry-run`.
+Flags: `--collection <identifier>`, `--doi-prefix <prefix>`, `--source <id|name>` (narrow the selection), `--limit N`, `--throttle SECONDS` (default `OPTIMAP_OPENAIRE_ENRICH_THROTTLE`), `--force` (query even works that already have all target fields), `--dry-run`, `--async`.
+
+`--async` enqueues the whole backfill as a single Django-Q task (`works.tasks.enrich_openaire_backfill`) instead of blocking the terminal — useful for large, rate-limited backfills. It prints the enqueued task **id** and its **humanized name** and returns immediately; progress and the processed/updated/no-match/failed summary land in the Q worker log and the task result. A `qcluster` must be running, otherwise the task sits in the broker queue and never executes. The single-task design keeps `--throttle` and the OpenAIRE rate limit honored centrally (unlike one-task-per-work fan-out).
+
+To track it in the Django admin: while it waits it appears under **Django Q → Queued tasks** (identified by the raw `id`); once it runs it moves to **Successful tasks** (or **Failed tasks**), where the searchable *Name* column shows the humanized name printed by the command — Django-Q does not show the raw UUID in those lists, so note the name from the command output.
 
 **Rate limits & token.** OpenAIRE allows **60 requests/hour** anonymously and **7200/hour** with a token. For anything beyond a few dozen works authenticate (see below) and lower the throttle (e.g. `OPTIMAP_OPENAIRE_ENRICH_THROTTLE=1`). The token is sent as a Bearer header; transient `429`/`5xx` responses are retried with backoff. OpenAIRE metadata is **CC-BY** — OPTIMAP credits OpenAIRE as a data source.
 

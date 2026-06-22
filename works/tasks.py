@@ -31,6 +31,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.mail import EmailMessage, send_mail
 from django.core.serializers.json import DjangoJSONEncoder
+from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
 from django_q.models import Schedule
@@ -131,6 +132,7 @@ from works.harvesting.sessions import (  # noqa: F401
     OAI_USER_AGENT,
     _looks_like_oai_xml,
     _oai_session,
+    _openaire_session,
     _short_body,
 )
 from works.models import EmailLog, Subscription, Work
@@ -687,6 +689,117 @@ def schedule_service_token_renewal_check():
             intended_date_kwarg="scheduled_for",
         )
         logger.info("Scheduled check_service_token_renewals weekly.")
+
+
+# -----------------------------------------------------------------------------
+# OpenAIRE backfill enrichment.
+# -----------------------------------------------------------------------------
+
+# Works missing at least one of the OpenAIRE-fillable target fields.
+_OPENAIRE_MISSING_TARGET_FIELD = (
+    Q(abstract__isnull=True)
+    | Q(abstract="")
+    | Q(keywords__isnull=True)
+    | Q(keywords=[])
+    | Q(authors__isnull=True)
+    | Q(authors=[])
+)
+
+
+def enrich_openaire_backfill(
+    collection=None,
+    doi_prefix=None,
+    source=None,
+    limit=None,
+    throttle=None,
+    force=False,
+    dry_run=False,
+    on_progress=None,
+):
+    """Backfill missing abstract/keywords/authors on existing works from OpenAIRE.
+
+    Shared core for the ``enrich_openaire`` management command: runs synchronously
+    when called directly (command's sync path) and as a single Django-Q task when
+    enqueued with ``--async``. Selects works by collection / DOI prefix / source
+    (mirrors the command flags) and fills empty target fields via
+    ``enrich_work_from_openaire`` (fill-if-empty; never overwrites).
+
+    ``on_progress`` is an optional ``callable(str)`` for per-work lines; the
+    command passes ``self.stdout.write`` to preserve its interactive output. When
+    ``None`` (async path) progress goes to the logger so it shows up in the Q
+    worker log. Returns a summary dict suitable as the Django-Q task result.
+    """
+    if throttle is None:
+        throttle = settings.OPTIMAP_OPENAIRE_ENRICH_THROTTLE
+
+    def report(message):
+        if on_progress is not None:
+            on_progress(message)
+        else:
+            logger.info(message)
+
+    qs = Work.objects.filter(doi__isnull=False).exclude(doi="")
+    if not force:
+        qs = qs.filter(_OPENAIRE_MISSING_TARGET_FIELD)
+    if collection:
+        qs = qs.filter(collections__identifier=collection)
+    if doi_prefix:
+        qs = qs.filter(doi__startswith=doi_prefix)
+    if source:
+        source = str(source)
+        qs = qs.filter(source_id=int(source)) if source.isdigit() else qs.filter(source__name=source)
+    qs = qs.order_by("id").distinct()
+    if limit:
+        qs = qs[:limit]
+
+    total = qs.count()
+    if dry_run:
+        report("DRY RUN — no changes will be saved")
+    report(f"Processing {total} work(s) against OpenAIRE...")
+
+    session = _openaire_session()
+    processed = updated = no_match = failed = 0
+    try:
+        for work in qs.iterator(chunk_size=50):
+            processed += 1
+            doi = work.doi or ""
+            try:
+                enrich_work_from_openaire(work, session=session, save=not dry_run)
+            except Exception as exc:
+                logger.warning("OpenAIRE enrich failed for work %s (%s): %s", work.id, doi, exc)
+                failed += 1
+                if processed < total and throttle:
+                    time.sleep(throttle)
+                continue
+
+            provenance = work.provenance if isinstance(work.provenance, dict) else {}
+            match = provenance.get("openaire_match") or {}
+            if match.get("status") != "matched":
+                report(f"  [{work.id}] {doi} — no OpenAIRE match")
+                no_match += 1
+            else:
+                events = provenance.get("events") or []
+                filled = (events[-1].get("fields_filled") if events else None) or []
+                if filled:
+                    report(f"  [{work.id}] {doi} — filled {filled}")
+                    updated += 1
+                else:
+                    report(f"  [{work.id}] {doi} — matched, nothing to fill")
+
+            if processed < total and throttle:
+                time.sleep(throttle)
+    finally:
+        session.close()
+
+    summary = {
+        "processed": processed,
+        "updated": updated,
+        "no_match": no_match,
+        "failed": failed,
+        "dry_run": dry_run,
+    }
+    report(f"Done. processed={processed} updated={updated} no_match={no_match} failed={failed}")
+    return summary
 
 
 # -----------------------------------------------------------------------------

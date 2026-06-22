@@ -453,6 +453,13 @@ OPTIMAP_OPENAIRE_ENRICH_ON_HARVEST = env("OPTIMAP_OPENAIRE_ENRICH_ON_HARVEST", d
 # Seconds to sleep between OpenAIRE requests in the sweep / backfill. Default 60s
 # keeps anonymous runs under the 60/hour limit; lower it (e.g. 1) when a token is set.
 OPTIMAP_OPENAIRE_ENRICH_THROTTLE = float(os.getenv("OPTIMAP_OPENAIRE_ENRICH_THROTTLE", 60))
+# OpenAIRE enrichment sweeps / backfills sleep OPTIMAP_OPENAIRE_ENRICH_THROTTLE
+# seconds between requests, so a run over many DOIs can take hours — far longer
+# than the global Q_CLUSTER timeout (600s). These tasks therefore override the
+# per-task timeout (and a matching retry above it, so Django-Q does not re-queue
+# the still-running task). Default 24h; raise for very large backfills. Set to 0
+# to fall back to the cluster default.
+OPTIMAP_OPENAIRE_ENRICH_TASK_TIMEOUT = env.int("OPTIMAP_OPENAIRE_ENRICH_TASK_TIMEOUT", default=24 * 60 * 60)
 # OpenAIRE refresh-token workflow (stored in the DB via the ServiceToken model,
 # editable in the Django admin — no SSH needed). A refresh token obtained from
 # https://develop.openaire.eu/personal-token expires after one month and is

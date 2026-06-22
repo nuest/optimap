@@ -9,8 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **OpenAIRE enrichment tasks no longer hit the 600-second Django-Q timeout**: the post-harvest OpenAIRE sweep (`enrich_event_from_openaire`) and the `enrich_openaire --async` backfill (`enrich_openaire_backfill`) sleep `OPTIMAP_OPENAIRE_ENRICH_THROTTLE` seconds between requests (60s anonymously), so a run over more than a handful of DOIs ran past the global `Q_CLUSTER['timeout']` and was killed with `TimeoutException: Task exceeded maximum timeout value (600 seconds)`. Both enqueue sites now pass per-task `q_options` (new `works.harvesting.openaire.openaire_task_q_options`) that raise the per-task `timeout` (and a matching `retry` above it, so Django-Q doesn't re-queue the still-running task) to `OPTIMAP_OPENAIRE_ENRICH_TASK_TIMEOUT` — default **24h**, configurable, set to `0` to keep the cluster default.
+
 ### Added
 
+- **`--async` flag for `enrich_openaire`**: the OpenAIRE backfill command can now enqueue the whole run as a single Django-Q task (`async_task` against the new `works.tasks.enrich_openaire_backfill`) instead of blocking the terminal for a long, rate-limited backfill. It prints the enqueued task id **and its humanized admin name** (so the task can be located in the Django admin under Django Q → Queued tasks while it waits and then Successful/Failed tasks, whose searchable *Name* column shows the humanized name, not the raw UUID) and returns immediately; progress and the summary land in the Q worker log / task result. Requires a running `qcluster`. The selection + enrichment loop was extracted into the reusable `enrich_openaire_backfill()` task so the synchronous path is unchanged (it calls the same function directly, passing `self.stdout.write` for per-work output).
 - **`--full` / `--since` flags for `harvest_sources`** (Crossref-prefix sources): by default a Crossref harvest is incremental — after the first successful run it only asks Crossref for records re-indexed since the last completed harvest (watermark − 2 days), which is why re-running a recently-harvested source returns very few records. `--full` forces a complete backfill (ignores prior `HarvestingEvent`s and re-walks the whole slice) without having to delete events by hand; `--since YYYY-MM-DD` sets an explicit `from-update-date` window. The two are mutually exclusive, validated up front, and apply only to `crossref-prefix` sources (under `--async` they error for sources that can't honor them rather than silently dropping). Threaded through to `works.harvesting.crossref.harvest_crossref_prefix` (new `full` / `since` parameters).
 
 ## [0.31.0] - 2026-06-22

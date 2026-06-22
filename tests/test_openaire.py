@@ -252,6 +252,36 @@ class EnrichOpenaireCommandTest(TestCase):
         self.work.refresh_from_db()
         self.assertEqual(self.work.abstract, "")
 
+    @patch(
+        "works.management.commands.enrich_openaire.async_task",
+        return_value="9f8c2a1b4d5e6f708192a3b4c5d6e7f8",
+    )
+    @patch("works.harvesting.openaire.fetch_openaire_record", return_value=FAKE_RECORD)
+    def test_async_enqueues_task_without_running(self, mock_fetch, mock_async):
+        out = StringIO()
+        call_command(
+            "enrich_openaire",
+            "--collection",
+            "eartharxiv",
+            "--async",
+            stdout=out,
+        )
+        # --async must not run enrichment in-process.
+        mock_fetch.assert_not_called()
+        self.work.refresh_from_db()
+        self.assertEqual(self.work.abstract, "")
+        # It enqueues exactly one task to the queryset-based backfill function.
+        mock_async.assert_called_once()
+        self.assertEqual(mock_async.call_args[0][0], "works.tasks.enrich_openaire_backfill")
+        self.assertEqual(mock_async.call_args[1]["collection"], "eartharxiv")
+        # Output carries both the raw id and the humanized admin "Name" so the
+        # operator can locate the task in the Django Q admin.
+        from django_q.humanhash import humanize
+
+        output = out.getvalue()
+        self.assertIn("9f8c2a1b4d5e6f708192a3b4c5d6e7f8", output)
+        self.assertIn(humanize("9f8c2a1b4d5e6f708192a3b4c5d6e7f8"), output)
+
 
 @tag("online")
 class OpenaireOnlineTest(TestCase):

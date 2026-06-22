@@ -332,7 +332,10 @@ python manage.py enrich_openaire
 # get this automatically via an async sweep (OPTIMAP_OPENAIRE_ENRICH_ON_HARVEST).
 # Records every decision in Work.provenance (openaire_enrich event, openaire_match).
 # Flags: --collection <id>, --doi-prefix <prefix>, --source <id|name>,
-# --limit N, --throttle SECONDS, --force, --dry-run.
+# --limit N, --throttle SECONDS, --force, --dry-run, --async.
+# --async enqueues the whole run as one Django-Q task
+# (works.tasks.enrich_openaire_backfill) and returns immediately; needs a
+# running qcluster. Synchronous run is the default.
 # Set OPTIMAP_OPENAIRE_TOKEN to raise the rate limit from 60 to 7200/hour, or
 # store a monthly refresh token in the ServiceToken admin (no SSH; auto-exchanged
 # for access tokens by works.harvesting.openaire.get_openaire_access_token, with a

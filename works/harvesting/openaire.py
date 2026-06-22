@@ -46,6 +46,23 @@ from works.utils.provenance import append_event
 
 logger = logging.getLogger(__name__)
 
+
+def openaire_task_q_options():
+    """Per-task Django-Q options for the throttled OpenAIRE enrichment tasks.
+
+    The sweep / backfill sleep ``OPTIMAP_OPENAIRE_ENRICH_THROTTLE`` seconds
+    between requests, so a run over many DOIs can take hours — far longer than
+    the global ``Q_CLUSTER['timeout']`` (600s). Override the per-task ``timeout``
+    and set ``retry`` above it so Django-Q does not re-queue the still-running
+    task. Returns ``{}`` when the override is disabled (set to 0), keeping the
+    cluster default. Pass the result as ``q_options=`` to ``async_task``.
+    """
+    timeout = getattr(settings, "OPTIMAP_OPENAIRE_ENRICH_TASK_TIMEOUT", 0)
+    if not timeout:
+        return {}
+    return {"timeout": int(timeout), "retry": int(timeout) + 60 * 10}
+
+
 # OpenAIRE attaches automated classifications under these subject schemes; they
 # are not free-text keywords and would pollute Work.keywords, so we drop them.
 _AUTOMATED_SUBJECT_SCHEMES = {"sdg", "fos"}
