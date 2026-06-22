@@ -146,6 +146,26 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
             return WorkMinimalSerializer
         return WorkSerializer
 
+    def retrieve(self, request, *args, **kwargs):
+        """302-redirect a merged-away duplicate's detail to the canonical work.
+
+        Redirected works (``status='r'``) are excluded from ``get_queryset``, so a
+        normal lookup would 404. Resolve the pk directly and, unless
+        ``?include=redirected`` is set, send clients to the canonical detail URL.
+        """
+        qp = getattr(request, "query_params", request.GET)
+        if qp.get("include") != "redirected":
+            pk = kwargs.get(self.lookup_field or "pk")
+            work = Work.objects.filter(pk=pk).first()
+            if work is not None and work.status == "r":
+                canonical = work.canonical_work()
+                if canonical.id != work.id:
+                    from django.shortcuts import redirect
+                    from django.urls import reverse
+
+                    return redirect(reverse("optimap:works:work-detail", args=[canonical.id]))
+        return super().retrieve(request, *args, **kwargs)
+
     def get_queryset(self):
         """
         Return all publications for admin users, only published ones for others.
@@ -155,10 +175,16 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
         collections at any publication status (not just published ones), so
         they can view provenance for harvested/contributed/draft works too.
         """
+        # query_params is a DRF-only attribute; fall back to .GET for plain WSGIRequests.
+        qp = getattr(self.request, "query_params", self.request.GET)
+        # Merged-away duplicates (status='r') are tombstones for redirect only —
+        # never list them, unless explicitly requested for inspection.
+        include_redirected = qp.get("include") == "redirected"
+
         if self.request.user.is_authenticated and self.request.user.is_staff:
             qs = Work.objects.all().distinct()
-            # query_params is a DRF-only attribute; fall back to .GET for plain WSGIRequests.
-            qp = getattr(self.request, "query_params", self.request.GET)
+            if not include_redirected:
+                qs = qs.exclude(status="r")
             if qp.get("minimal") == "true":
                 # For map loading, put published works (which have geometry) first so
                 # markers appear in the first chunk instead of at the end of 4k harvested ones.
@@ -175,8 +201,12 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
         if getattr(self, "action", None) == "provenance" and self.request.user.is_authenticated:
             curated = Work.objects.filter(collections__curators=self.request.user)
             public = Work.objects.filter(status="p")
-            return annotate_rounded_geometry((curated | public).distinct())
-        return annotate_rounded_geometry(Work.objects.filter(status="p").order_by("-creationDate", "-id").distinct())
+            qs = (curated | public).distinct()
+            if not include_redirected:
+                qs = qs.exclude(status="r")
+            return annotate_rounded_geometry(qs)
+        public = Work.objects.filter(status="p").order_by("-creationDate", "-id").distinct()
+        return annotate_rounded_geometry(public)
 
     @extend_schema(
         summary="Retrieve provenance for a work",
@@ -305,13 +335,31 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
                             "Keys: gazetteer, placename, country_code, n_geocoded, geocoded_at, matches."
                         ),
                     ),
+                    "dedup": drf_serializers.DictField(
+                        required=False,
+                        help_text=(
+                            "Present on a canonical work that absorbed duplicates sharing its OpenAlex id. "
+                            "Keys: openalex_id, merged_work_ids, merged_identifiers, method (openalex_id), "
+                            "primary_basis (openalex_primary_location/version_rank/existing), at. "
+                            "An optional dedup_conflict list records non-primary geometry/temporal extents "
+                            "that differed from the canonical's (kept for audit)."
+                        ),
+                    ),
+                    "redirect": drf_serializers.DictField(
+                        required=False,
+                        help_text=(
+                            "Present on a merged-away duplicate (work status='r'). "
+                            "Keys: canonical_work_id, canonical_identifier, openalex_id, at. "
+                            "Requests for this work's identifiers 302-redirect to the canonical work."
+                        ),
+                    ),
                     "events": drf_serializers.ListField(
                         child=drf_serializers.DictField(),
                         required=False,
                         help_text=(
                             "Chronological audit log. Each event has type (string) and at (ISO timestamp). "
                             "Event types: harvest_update, doi_backfill, doi_contribution, contribution, publish, "
-                            "unpublish, source_migration, openaire_enrich. "
+                            "unpublish, source_migration, openaire_enrich, dedup_merge, dedup_unmerge. "
                             "user_id and user_email are present for staff/curators only."
                         ),
                     ),
@@ -566,6 +614,12 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
                 },
                 status=status.HTTP_200_OK,
             )
+
+        # The harvest may have auto-merged this DOI with an existing version of
+        # the same work (shared OpenAlex id) — e.g. the user added a preprint DOI
+        # for an article we already hold. Re-fetch and follow to the canonical row
+        # so the contribution and response attach to the surviving work.
+        work = Work.objects.get(pk=work.pk).canonical_work()
 
         # Record the contribution: provenance event + recognition-board row.
         append_event(

@@ -92,46 +92,77 @@ def resolve_work_identifier(identifier):
         >>> print(f"Found {work.title} via {id_type}")
         Found Example Work via id
     """
-    # Decode URL-encoded identifier
-    identifier = unquote(identifier)
-
-    work = None
-    identifier_type = None
-
-    # Strategy 1: Try DOI first (contains '/' or starts with '10.')
-    if "/" in identifier or identifier.startswith("10."):
-        try:
-            work = Work.objects.get(doi=identifier)
-            identifier_type = "doi"
-            logger.debug(f"Found work by DOI: {identifier}")
-        except Work.DoesNotExist:
-            logger.debug(f"No work found with DOI: {identifier}")
-
-    # Strategy 2: Try internal ID if identifier is numeric
-    if work is None and identifier.isdigit():
-        try:
-            work = Work.objects.get(id=int(identifier))
-            identifier_type = "id"
-            logger.debug(f"Found work by ID: {identifier}")
-        except Work.DoesNotExist:
-            logger.debug(f"No work found with ID: {identifier}")
-
-    # Strategy 3: Try Handle (placeholder for future implementation)
-    # Future: if work is None and identifier.startswith('hdl:'):
-    #     try:
-    #         handle = identifier.replace('hdl:', '')
-    #         work = Work.objects.get(handle=handle)
-    #         identifier_type = 'handle'
-    #         logger.debug(f"Found work by handle: {identifier}")
-    #     except Work.DoesNotExist:
-    #         logger.debug(f"No work found with handle: {identifier}")
-
-    # If still not found, raise 404
-    if work is None:
+    matched, identifier_type = _match_work(identifier)
+    if matched is None:
         logger.warning(f"Work not found with identifier: {identifier}")
         raise Http404("Work not found.")
+    # Follow a redirect tombstone (merged duplicate) to the canonical work so
+    # all callers operate on the surviving row.
+    return matched.canonical_work(), identifier_type
 
-    return work, identifier_type
+
+def _match_work(identifier):
+    """Look up the ``Work`` row an identifier refers to (may be a redirect tombstone).
+
+    Returns ``(work, identifier_type)`` or ``(None, None)``. Resolution order:
+    DOI, internal ID, OpenAlex id (full/bare), OpenAlex external ids
+    (``openalex_ids`` — doi/pmid/pmcid/mag), then OpenAlex location landing-page
+    URL / version DOI (``locations``). The later strategies make every known
+    identifier of a merged work resolve to its canonical row.
+    """
+    identifier = unquote(identifier)
+    work = None
+
+    # Strategy 1: DOI (contains '/' or starts with '10.')
+    if "/" in identifier or identifier.startswith("10."):
+        work = Work.objects.filter(doi=identifier).first()
+        if work is not None:
+            return work, "doi"
+
+    # Strategy 2: internal ID
+    if identifier.isdigit():
+        work = Work.objects.filter(id=int(identifier)).first()
+        if work is not None:
+            return work, "id"
+
+    # Strategy 3: OpenAlex work id (accept full URL or bare W-id).
+    oa = identifier
+    if oa.lower().startswith(("w",)) or "openalex.org/" in oa.lower():
+        bare = oa.rsplit("/", 1)[-1]
+        work = Work.objects.filter(openalex_id__iendswith=bare).first()
+        if work is not None:
+            return work, "openalex_id"
+
+    # Strategy 4: external ids carried in openalex_ids (pmid/pmcid/mag/doi).
+    for key in ("pmid", "pmcid", "mag", "doi"):
+        work = Work.objects.filter(**{f"openalex_ids__{key}": identifier}).first()
+        if work is not None:
+            return work, "openalex_external_id"
+
+    # Strategy 5: an OpenAlex location landing-page URL or version DOI.
+    work = Work.objects.filter(locations__contains=[{"landing_page_url": identifier}]).first()
+    if work is None:
+        work = Work.objects.filter(locations__contains=[{"doi": identifier}]).first()
+    if work is not None:
+        return work, "location"
+
+    return None, None
+
+
+def resolve_work_for_landing(identifier):
+    """Resolve for the landing page, signalling when a 302 to canonical is needed.
+
+    Returns ``(canonical_work, identifier_type, should_redirect)``. ``should_redirect``
+    is True when the requested identifier matched a *different* row than the
+    canonical one (a merged-away duplicate or an alternate identifier of one) —
+    the landing view 302-redirects to ``/work/<canonical>`` in that case.
+    """
+    matched, identifier_type = _match_work(identifier)
+    if matched is None:
+        logger.warning(f"Work not found with identifier: {identifier}")
+        raise Http404("Work not found.")
+    canonical = matched.canonical_work()
+    return canonical, identifier_type, canonical.id != matched.id
 
 
 def get_work_by_identifier(identifier):

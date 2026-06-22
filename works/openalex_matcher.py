@@ -208,6 +208,8 @@ class OpenAlexMatcher:
                     bare_doi = bare_doi[len(prefix) :]
                     break
 
+        from works.harvesting.openalex_locations import build_locations
+
         extracted = {
             "openalex_id": work_data.get("id"),
             "openalex_fulltext_origin": fulltext_origin,
@@ -222,6 +224,8 @@ class OpenAlexMatcher:
             "issue": None,
             "first_page": None,
             "last_page": None,
+            # Hosting copies/versions, normalised + credited to OpenAlex.
+            "locations": build_locations(work_data),
         }
         if bare_doi:
             extracted["doi"] = bare_doi

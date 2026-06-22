@@ -159,6 +159,20 @@ CACHE_DIR = Path(tempfile.gettempdir()) / "optimap_cache"
 User = get_user_model()
 
 
+def dedup_sweep(locations_only=False, force=False, limit=None):
+    """Django-Q entry point: backfill OpenAlex locations + auto-merge duplicates.
+
+    Thin wrapper over ``works.dedup.sweep`` so recurring schedules and the
+    ``dedup_works --async`` command can resolve it by dotted path. See
+    ``works/dedup.py`` for the two-pass behaviour.
+    """
+    from works.dedup import sweep
+
+    stats = sweep(locations_only=locations_only, force=force, limit=limit)
+    logger.info("dedup_sweep finished: %s", stats)
+    return stats
+
+
 # -----------------------------------------------------------------------------
 # Data-dump helpers (used by regenerate_geojson_cache / regenerate_geopackage_cache).
 # -----------------------------------------------------------------------------

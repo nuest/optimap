@@ -214,9 +214,30 @@ Every harvester (OAI-PMH, RSS, Crossref, MaRESS) routes its inserts through a sh
 | None | n/a | New Work created. |
 | Same `Source` | off (default) | Duplicate skipped silently. |
 | Same `Source` | on | Existing Work updated in place — see "Careful update" below. |
-| Different `Source` | n/a | Skipped with an info log message. **Cross-source merging is not handled.** |
+| Different `Source` | n/a | Skipped with an info log message (exact same DOI/URL). |
 
-> **OPTIMAP does not currently merge metadata across *harvest* sources.** When the same DOI/URL is exposed by two different sources (e.g. a journal article also surfaced via a preprint server), the second source's harvest is logged and skipped — the first source "owns" the Work. There is no automatic union of fields, no cross-source provenance trail, and no way to switch ownership without manual admin intervention. If this becomes a frequent need, open a follow-up issue. (This is separate from **enrichment** sources — OpenAlex and OpenAIRE — which *do* fill in fields the owning source left empty; see [OpenAIRE enrichment](#openaire-enrichment) below.)
+> This DOI/URL exact-match step only catches the *same* identifier harvested twice. **Different versions of one work** (a preprint DOI vs. the published DOI) have different identifiers and are each created — then linked automatically by OpenAlex-id deduplication, below.
+
+### OpenAlex deduplication (locations)
+
+OpenAlex assigns one work id to a scholarly work and lists every hosting copy (journal version, preprint, repository copies) under `locations[]`. OPTIMAP captures these into `Work.locations` (credited to OpenAlex) and uses the shared OpenAlex id to **merge duplicate works automatically — no human review** (`works/dedup.py`):
+
+- The version OpenAlex marks as `primary_location` becomes the **canonical** OPTIMAP work and keeps its DOI/URL. The other versions become `status='r'` **redirect tombstones**: excluded from all listings/feeds/map/API-list, kept only so their identifiers still resolve.
+- Every known identifier of the work — each version's DOI, the OpenAlex id, external ids (pmid/pmcid/mag), and OpenAlex location landing URLs — resolves to the canonical work and **302-redirects** to it (landing page and API detail). The landing page lists all copies under "Also available at".
+- Merging is **lossless** for spatial/temporal extents: the canonical's is kept; a non-primary's fills an empty one; a genuine conflict is recorded under `provenance.dedup_conflict` for audit. The merge writes `provenance.dedup` on the canonical and `provenance.redirect` on each tombstone (see [Work provenance](#work-provenance)).
+
+**When it runs.** Automatically at harvest time and in the contribute-by-DOI flow (adding a preprint DOI links it to an existing article). For pre-existing data, run the backfill:
+
+```bash
+python manage.py dedup_works                 # backfill locations on ALL works w/ an OpenAlex id, then merge duplicates
+python manage.py dedup_works --locations-only # only populate locations, no merging
+python manage.py dedup_works --source essd --limit 100 --dry-run
+python manage.py dedup_works --async          # enqueue works.tasks.dedup_sweep (needs qcluster)
+```
+
+The default run **populates `Work.locations` on every record with an OpenAlex id** (re-fetching the OpenAlex payload, rate-limited), not only duplicates. Progress is reported per work and per merged group (to the terminal for the sync command, to the Django-Q worker log for `--async`). Set `OPTIMAP_DEDUP_AUTO_MERGE=False` to capture/expose locations without auto-merging. This is separate from **enrichment** sources (OpenAlex/OpenAIRE) which fill empty fields; see [OpenAIRE enrichment](#openaire-enrichment).
+
+**Un-merge (reverse a merge).** Merges are reversible. In the **Django admin → Works**, filter the list by status **Redirected**, select the wrongly-merged duplicate(s), and run the **"Un-merge (re-promote redirected duplicates)"** action: each tombstone returns to status **Harvested** and is detached from its canonical work's `provenance.dedup`. (Equivalent in a shell: `from works.dedup import unmerge; unmerge(work)`.) To inspect a merged-away duplicate without un-merging it, open it from the Redirected-filtered admin list or pass `?include=redirected` to the API.
 
 **Retire a deprecated Source and move its Works to a replacement:** when a source moves platforms (e.g. EarthArXiv migrating off eScholarship to its own CDL-backed OAI-PMH endpoint) and you end up with an old `Source` row whose Works should really belong to the new one, use `python manage.py migrate_source_works`:
 
@@ -556,12 +577,29 @@ Staff users additionally see the full provenance (including `original_record`, W
     "geocoded_at": "2026-04-30T12:00:05+00:00",
     "matches": [ ... ]                     // per-point Nominatim results
   },
+  "dedup": {                               // on the CANONICAL work (absorbed duplicates)
+    "openalex_id": "https://openalex.org/W123",
+    "merged_work_ids": [17, 88],
+    "merged_identifiers": ["10.31223/preprint", "https://eartharxiv.org/preprint"],
+    "method": "openalex_id",
+    "primary_basis": "openalex_primary_location", // | version_rank | existing
+    "at": "..."
+    // optional sibling key "dedup_conflict": [ { "work_id": 88, "kind": "geometry", "at": "..." } ]
+  },
+  "redirect": {                            // on a REDIRECTED tombstone (work status='r')
+    "canonical_work_id": 42,
+    "canonical_identifier": "10.5194/essd-16-1",
+    "openalex_id": "https://openalex.org/W123",
+    "at": "..."
+  },
   "events": [                              // chronological audit log
     { "type": "harvest",      "at": "..." },
     { "type": "doi_contribution", "at": "...", "user_id": 42, "doi": "10.5194/..." },  // user added this work by submitting its DOI on /contribute/
     { "type": "contribution", "at": "...", "user_id": 42, "kind": "spatial" },
     { "type": "publish",      "at": "...", "user_id": 1 },
     { "type": "source_migration", "at": "...", "from_source": "eScholarship", "to_source": "EarthArXiv" },
+    { "type": "dedup_merge",  "at": "...", "merged_work_ids": [17, 88] },  // on canonical; on a tombstone: { "canonical_work_id": 42 }
+    { "type": "dedup_unmerge", "at": "..." },                              // a tombstone was re-promoted
     { "type": "openaire_enrich", "at": "...", "openaire_id": "doi_dedup___::…",
       "doi": "10.1007/978-3-540-78946-8_4",
       "source_url": "https://api.openaire.eu/graph/v1/researchProducts?pid=10.1007/978-3-540-78946-8_4",

@@ -305,6 +305,28 @@ class SimpleTest(TestCase):
             self.skipTest(f"AGILE-GISS endpoint not available: {e}")
 
 
+class OpenAlexLocationsOnlineTests(TestCase):
+    """Live check that a real OpenAlex work payload yields normalised locations."""
+
+    @tag("online")
+    def test_real_openalex_payload_has_locations(self):
+        import requests as _requests
+
+        from works.harvesting.openalex_locations import build_locations
+
+        try:
+            # A well-known multi-version work (ESSD article also on a preprint server).
+            r = _requests.get("https://api.openalex.org/works/doi:10.5194/essd-13-4349-2021", timeout=15)
+            r.raise_for_status()
+        except _requests.RequestException as e:
+            self.skipTest(f"OpenAlex unreachable: {e}")
+
+        locations = build_locations(r.json())
+        self.assertGreaterEqual(len(locations), 1, "Real OpenAlex work should yield at least one location")
+        self.assertTrue(all(loc["credit"] == "openalex" for loc in locations))
+        self.assertTrue(any(loc.get("is_primary") for loc in locations))
+
+
 class HarvestingErrorTests(TestCase):
     """
     Test cases for error handling during harvesting.

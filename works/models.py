@@ -10,6 +10,7 @@ from django.contrib.gis.db import models
 from django.contrib.gis.db.models.functions import Centroid, Envelope
 from django.contrib.gis.geos import Point
 from django.contrib.postgres.fields import ArrayField
+from django.contrib.postgres.indexes import GinIndex
 from django.db import connection
 from django.db.models import Q
 from django.urls import reverse
@@ -27,6 +28,11 @@ STATUS_CHOICES = (
     ("w", "Withdrawn"),
     ("h", "Harvested"),
     ("c", "Contributed"),
+    # Redirected: a duplicate that was merged into a canonical work (same
+    # OpenAlex id). The row is kept only so its identifiers still resolve and
+    # 302-redirect to the canonical work — see works/dedup.py. Excluded from
+    # all listings, feeds, map, and the API list.
+    ("r", "Redirected"),
 )
 
 EMAIL_STATUS_CHOICES = [
@@ -192,6 +198,18 @@ class Work(models.Model):
     openalex_ids = models.JSONField(blank=True, null=True, help_text="OpenAlex IDs object (doi, pmid, etc)")
     openalex_open_access_status = models.CharField(max_length=50, blank=True, null=True)
 
+    # All hosting copies of this work (journal version, preprint, repository
+    # copies), normalised from OpenAlex `primary_location` + `locations[]` by
+    # works/harvesting/openalex_locations.py::build_locations. Each entry is
+    # credited (`credit: "openalex"`). When duplicate Works (same openalex_id)
+    # are merged, the non-primary versions' identifiers and locations are folded
+    # in here on the canonical work. See works/dedup.py.
+    locations = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Hosting copies/versions of this work (from OpenAlex). Each entry carries a `credit` field.",
+    )
+
     class Meta:
         ordering = ["-id"]
         constraints = [
@@ -208,6 +226,11 @@ class Work(models.Model):
                 name="work_published_recent_idx",
                 condition=Q(status="p"),
             ),
+            # JSONB containment lookups for identifier->canonical resolution:
+            # `openalex_ids__contains` (pmid/pmcid/mag) and `locations__contains`
+            # (location landing URL / version DOI). See works/utils/identifiers.py.
+            GinIndex(fields=["openalex_ids"], name="work_openalex_ids_gin"),
+            GinIndex(fields=["locations"], name="work_locations_gin"),
         ]
 
     def __str__(self):
@@ -236,6 +259,29 @@ class Work(models.Model):
         return f"{base}{rel}"
 
     permalink.short_description = "Permalink"
+
+    @property
+    def is_redirected(self) -> bool:
+        """True when this row is a merged-away duplicate (status='r')."""
+        return self.status == "r"
+
+    def canonical_work(self) -> "Work":
+        """Return the canonical work this row resolves to.
+
+        For a redirected duplicate (``status='r'``) this follows
+        ``provenance.redirect.canonical_work_id`` to the surviving work; for any
+        other work it returns ``self``. Falls back to ``self`` if the pointer is
+        missing or dangling. See works/dedup.py for how the pointer is written.
+        """
+        if not self.is_redirected:
+            return self
+        provenance = self.provenance if isinstance(self.provenance, dict) else {}
+        canonical_id = (provenance.get("redirect") or {}).get("canonical_work_id")
+        if canonical_id and canonical_id != self.id:
+            canonical = Work.objects.filter(id=canonical_id).first()
+            if canonical is not None:
+                return canonical
+        return self
 
     @property
     def openaire_url(self) -> str | None:

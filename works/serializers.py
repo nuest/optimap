@@ -207,7 +207,17 @@ class WorkSerializer(GeoFeatureModelSerializer):
             "openalex_is_retracted",
             "openalex_ids",
             "openalex_open_access_status",
+            "locations",
         ]
+
+    locations = serializers.JSONField(
+        read_only=True,
+        help_text=(
+            "Hosting copies/versions of this work (journal version, preprint, repository "
+            "copies). Each entry carries a `credit` field crediting the data source "
+            "(currently always `openalex`; OpenAlex data is CC0)."
+        ),
+    )
 
     def to_representation(self, instance):
         feature = super().to_representation(instance)

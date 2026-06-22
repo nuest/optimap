@@ -42,6 +42,7 @@ from .common import (
     send_harvest_email,
     start_harvesting_event,
 )
+from .openalex_locations import build_locations
 from .sessions import (
     OPENALEX_API_URL,
     OPENALEX_HTTP_TIMEOUT,
@@ -222,6 +223,7 @@ def _openalex_item_to_work_kwargs(item, source, event):
         "openalex_fulltext_origin": fulltext_origin,
         "openalex_is_retracted": bool(item.get("is_retracted", False)),
         "openalex_open_access_status": open_access.get("oa_status"),
+        "locations": build_locations(item),
         "provenance": {
             "harvest": {
                 "harvester": "harvest_openalex_source",

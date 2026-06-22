@@ -221,7 +221,35 @@
   {% if latest_wikidata_export and latest_wikidata_export.wikidata_url %}
     <span class="meta-item"><i class="fas fa-database text-muted"></i> <strong>Wikidata:</strong> <a href="{{ latest_wikidata_export.wikidata_url }}" target="_blank" rel="noopener">{{ latest_wikidata_export.wikidata_qid }}</a></span>
   {% endif %}
+  {% if work.locations %}
+    <span class="meta-item">
+      <a class="collapse-toggle" data-toggle="collapse" href="#work-locations-details" role="button"
+         aria-expanded="false" aria-controls="work-locations-details"
+         data-label-show="Show other locations ({{ work.locations|length }})"
+         data-label-hide="Hide other locations ({{ work.locations|length }})">
+        <i class="fas fa-link text-muted"></i> <span class="collapse-toggle-label">Also available at ({{ work.locations|length }})</span>
+      </a>
+    </span>
+  {% endif %}
 </div>
+
+{% if work.locations %}
+  <div class="collapse mt-2 meta muted" id="work-locations-details">
+    <ul class="list-unstyled ml-3 mb-1">
+      {% for loc in work.locations %}
+        {% if loc.landing_page_url or loc.pdf_url %}
+          <li>
+            {% if loc.landing_page_url %}<a href="{{ loc.landing_page_url }}" target="_blank" rel="noopener">{% if loc.source.display_name %}{{ loc.source.display_name }}{% else %}{{ loc.landing_page_url }}{% endif %}</a>{% endif %}
+            {% if loc.version %}<span class="badge badge-light">{{ loc.version }}</span>{% endif %}
+            {% if loc.is_oa %}<span class="badge badge-success">open access</span>{% endif %}
+            {% if loc.pdf_url %}<a href="{{ loc.pdf_url }}" target="_blank" rel="noopener" title="PDF"><i class="fas fa-file-pdf"></i></a>{% endif %}
+          </li>
+        {% endif %}
+      {% endfor %}
+    </ul>
+    <small class="text-muted">Version &amp; location data from <a href="https://openalex.org/" target="_blank" rel="noopener">OpenAlex</a> (CC0).</small>
+  </div>
+{% endif %}
 
 {% if visible_collections %}
   <p class="meta muted" id="work-collections">

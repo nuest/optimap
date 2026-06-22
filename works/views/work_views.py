@@ -44,7 +44,7 @@ from works.services.preview_image import (
 from works.services.preview_image import (
     render_work_preview,
 )
-from works.utils.identifiers import resolve_work_identifier
+from works.utils.identifiers import resolve_work_for_landing, resolve_work_identifier
 from works.utils.statistics import get_cached_statistics
 
 
@@ -430,8 +430,15 @@ def work_landing(request, identifier):
     game_done = max(0, int(request.GET.get("done", "0") or 0))
     game_coll_raw = request.GET.get("collection", "").strip()
 
-    # Resolve identifier to work object.
-    work, identifier_type = resolve_work_identifier(identifier)
+    # Resolve identifier to work object. A merged-away duplicate (or an alternate
+    # identifier of one) 302-redirects to the canonical work so every identifier
+    # of a work lands on one page.
+    work, identifier_type, should_redirect = resolve_work_for_landing(identifier)
+    if should_redirect:
+        target = reverse("optimap:work-landing", args=[work.get_identifier()])
+        if request.META.get("QUERY_STRING"):
+            target = f"{target}?{request.META['QUERY_STRING']}"
+        return redirect(target)  # 302: merges are reversible (unmerge)
 
     # Visibility: 'p' (Published) is fully public. 'h' (Harvested) and 'c'
     # (Contributed) are also visible to non-admins so the /contribute/ flow

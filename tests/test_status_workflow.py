@@ -30,8 +30,12 @@ class StatusWorkflowComplianceTests(TestCase):
             is_superuser=True,
         )
 
-    def test_all_six_statuses_defined(self):
-        """Verify all 6 statuses from README are defined in model."""
+    def test_all_statuses_defined(self):
+        """Verify all workflow statuses are defined in the model.
+
+        The six README workflow statuses plus 'r' (Redirected), the tombstone
+        for a duplicate merged into a canonical work — see works/dedup.py.
+        """
         expected_statuses = {
             "d": "Draft",
             "h": "Harvested",
@@ -39,11 +43,12 @@ class StatusWorkflowComplianceTests(TestCase):
             "p": "Published",
             "t": "Testing",
             "w": "Withdrawn",
+            "r": "Redirected",
         }
 
         actual_statuses = dict(STATUS_CHOICES)
         self.assertEqual(actual_statuses, expected_statuses)
-        self.assertEqual(len(STATUS_CHOICES), 6)
+        self.assertEqual(len(STATUS_CHOICES), 7)
 
     def test_harvested_status_visibility(self):
         """Harvested landing pages are visible to non-admins.

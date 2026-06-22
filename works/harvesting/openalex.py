@@ -67,6 +67,13 @@ def build_openalex_fields(title, doi=None, author=None, existing_metadata=None):
             openalex_fields["openalex_ids"] = openalex_data.get("openalex_ids", {})
             openalex_fields["openalex_open_access_status"] = openalex_data.get("openalex_open_access_status")
 
+            # Hosting copies/versions (credited to OpenAlex). Fill-if-empty: only
+            # set when OpenAlex actually returned locations so a re-enrich does
+            # not blank an existing list.
+            if openalex_data.get("locations"):
+                openalex_fields["locations"] = openalex_data["locations"]
+                metadata_provenance["locations"] = "openalex"
+
             for biblio_key in ("volume", "issue", "first_page", "last_page"):
                 if openalex_data.get(biblio_key):
                     openalex_fields[biblio_key] = openalex_data[biblio_key]

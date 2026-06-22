@@ -450,6 +450,11 @@ OPTIMAP_OPENAIRE_HTTP_TIMEOUT = int(os.getenv("OPTIMAP_OPENAIRE_HTTP_TIMEOUT", 6
 # When True (default), every successful harvest enqueues an async OpenAIRE sweep
 # that fills missing abstracts/keywords/authors on that event's works.
 OPTIMAP_OPENAIRE_ENRICH_ON_HARVEST = env("OPTIMAP_OPENAIRE_ENRICH_ON_HARVEST", default=True)
+# When True (default), works that share an OpenAlex id are automatically merged
+# into one canonical work (no human review): the OpenAlex primary_location version
+# survives, the others become status='r' redirect tombstones. See works/dedup.py.
+# Set False to capture/expose OpenAlex locations without auto-merging.
+OPTIMAP_DEDUP_AUTO_MERGE = env("OPTIMAP_DEDUP_AUTO_MERGE", default=True)
 # Seconds to sleep between OpenAIRE requests in the sweep / backfill. Default 60s
 # keeps anonymous runs under the 60/hour limit; lower it (e.g. 1) when a token is set.
 OPTIMAP_OPENAIRE_ENRICH_THROTTLE = float(os.getenv("OPTIMAP_OPENAIRE_ENRICH_THROTTLE", 60))

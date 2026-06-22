@@ -316,17 +316,44 @@ class WorkAdmin(LeafletGeoAdmin, ImportExportModelAdmin):
         "openalex_is_retracted",
         "openalex_ids",
         "openalex_open_access_status",
+        "locations",
     )
-    readonly_fields = ("created_by", "updated_by", "openalex_link")
+    readonly_fields = ("created_by", "updated_by", "openalex_link", "locations")
     actions = [
         make_public,
         make_draft,
+        "unmerge_works",
         regenerate_all_exports,
         "export_permalinks_csv",
         "email_permalinks_preview",
         export_to_wikidata,
         export_to_wikidata_dryrun,
     ]
+
+    @admin.action(description="Un-merge (re-promote redirected duplicates)")
+    def unmerge_works(self, request, queryset):
+        """Reverse an automatic dedup merge for the selected Redirected works.
+
+        Re-promotes each ``status='r'`` tombstone to a standalone Harvested work
+        and removes it from its canonical work's ``provenance.dedup`` list (see
+        works.dedup.unmerge). Filter the list by status **Redirected** first.
+        """
+        from works.dedup import unmerge
+
+        redirected = [w for w in queryset if w.status == "r"]
+        skipped = len(queryset) - len(redirected)
+        for work in redirected:
+            unmerge(work)
+        if redirected:
+            messages.success(
+                request,
+                f"Re-promoted {len(redirected)} work(s) to Harvested and detached them from their canonical works.",
+            )
+        if skipped:
+            messages.warning(
+                request,
+                f"Skipped {skipped} selected work(s) that are not Redirected (status='r'); only merged duplicates can be un-merged.",
+            )
 
     @admin.display(boolean=True, description="Has DOI")
     def has_permalink(self, obj):

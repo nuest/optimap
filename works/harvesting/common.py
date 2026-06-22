@@ -269,6 +269,9 @@ _HARVEST_PRESERVE_IF_NEW_EMPTY = (
     "abstract",
     "keywords",
     "authors",
+    # OpenAlex locations may have been filled by an enrichment pass that a
+    # plain re-harvest does not carry — don't blank them with an empty list.
+    "locations",
 )
 _HARVEST_NEVER_OVERWRITE = ("status", "created_by", "creationDate")
 
@@ -397,10 +400,29 @@ def _save_or_update_work(work_kwargs, source, event, update_existing=False):
             )
             return existing, "doi_backfilled" if backfilled else "skipped_same_source"
         _carefully_update_work(existing, work_kwargs, event)
+        _reconcile_dedup(existing)
         return existing, "updated"
 
     work = Work.objects.create(**work_kwargs)
+    _reconcile_dedup(work)
     return work, "created"
+
+
+def _reconcile_dedup(work):
+    """Auto-merge same-``openalex_id`` siblings after a harvest save.
+
+    Imported lazily to avoid a circular import (``works.dedup`` imports the
+    harvesting helpers). Failures must never break a harvest, so they are logged
+    and swallowed — the scheduled ``dedup_sweep`` will retry.
+    """
+    if not getattr(work, "openalex_id", None):
+        return
+    try:
+        from works.dedup import reconcile
+
+        reconcile(work)
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning("Dedup reconcile failed for work id=%s: %s", getattr(work, "id", None), exc)
 
 
 # -----------------------------------------------------------------------------
