@@ -513,12 +513,20 @@ def harvest_crossref_prefix(
     update_existing=False,
     sort=None,
     order=None,
+    full=False,
+    since=None,
 ):
     """Harvest publications from Crossref by DOI prefix.
 
     Primary harvest route for Copernicus (DOI prefix 10.5194, OAI-PMH endpoint
     dead since 2025-12); also used for Scientific Data and the AGILE GIScience
     Series.
+
+    By default the harvest is incremental: it only asks Crossref for records
+    re-indexed since the last completed harvest of this source (see below).
+    Pass ``full=True`` to force a complete backfill (ignore prior events), or
+    ``since="YYYY-MM-DD"`` to set an explicit ``from-update-date`` window. The
+    two are mutually exclusive; ``full`` wins if both are given.
     """
     user = resolve_user(user)
     source = Source.objects.get(id=source_id)
@@ -557,15 +565,20 @@ def harvest_crossref_prefix(
     if sort is None:
         sort, order = "indexed", "desc"
 
-    since = None
-    last_completed = (
-        HarvestingEvent.objects.filter(source=source, status="completed", completed_at__isnull=False)
-        .exclude(id=event.id)
-        .order_by("-completed_at")
-        .first()
-    )
-    if last_completed:
-        since = (last_completed.completed_at.date() - timedelta(days=2)).isoformat()
+    # `full` forces a complete backfill (ignore prior events); an explicit
+    # `since` overrides the derived window. Otherwise derive it from the last
+    # completed harvest event for this source.
+    if full:
+        since = None
+    elif since is None:
+        last_completed = (
+            HarvestingEvent.objects.filter(source=source, status="completed", completed_at__isnull=False)
+            .exclude(id=event.id)
+            .order_by("-completed_at")
+            .first()
+        )
+        if last_completed:
+            since = (last_completed.completed_at.date() - timedelta(days=2)).isoformat()
 
     try:
         logger.info(

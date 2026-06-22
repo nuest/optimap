@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`--full` / `--since` flags for `harvest_sources`** (Crossref-prefix sources): by default a Crossref harvest is incremental — after the first successful run it only asks Crossref for records re-indexed since the last completed harvest (watermark − 2 days), which is why re-running a recently-harvested source returns very few records. `--full` forces a complete backfill (ignores prior `HarvestingEvent`s and re-walks the whole slice) without having to delete events by hand; `--since YYYY-MM-DD` sets an explicit `from-update-date` window. The two are mutually exclusive, validated up front, and apply only to `crossref-prefix` sources (under `--async` they error for sources that can't honor them rather than silently dropping). Threaded through to `works.harvesting.crossref.harvest_crossref_prefix` (new `full` / `since` parameters).
+
 ## [0.31.0] - 2026-06-22
 
 ### Added

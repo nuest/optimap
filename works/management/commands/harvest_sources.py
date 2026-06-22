@@ -27,6 +27,7 @@ Usage:
 """
 
 import logging
+from datetime import datetime
 
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
@@ -653,6 +654,30 @@ class Command(BaseCommand):
             ),
         )
         parser.add_argument(
+            "--full",
+            action="store_true",
+            help=(
+                "For Crossref-prefix sources, force a complete backfill: ignore "
+                "the last completed harvest event and re-walk the entire prefix "
+                "instead of only records re-indexed since then. Use this to "
+                "recover the full catalogue without deleting HarvestingEvent "
+                "rows by hand. Mutually exclusive with --since. Ignored by "
+                "non-Crossref sources."
+            ),
+        )
+        parser.add_argument(
+            "--since",
+            type=str,
+            default=None,
+            help=(
+                "For Crossref-prefix sources, set an explicit from-update-date "
+                "window (YYYY-MM-DD): only records Crossref re-indexed on or "
+                "after this date are returned. Overrides the window derived from "
+                "the last completed harvest. Mutually exclusive with --full. "
+                "Ignored by non-Crossref sources."
+            ),
+        )
+        parser.add_argument(
             "--no-publisher-abstract",
             action="store_true",
             help=(
@@ -735,6 +760,16 @@ class Command(BaseCommand):
         include_disabled = options["include_disabled"]
         source_titles = options["source_title"]
         no_publisher_abstract = options["no_publisher_abstract"]
+        full_backfill = options["full"]
+        since = options["since"]
+
+        if full_backfill and since:
+            raise CommandError("--full and --since are mutually exclusive; pass only one.")
+        if since:
+            try:
+                datetime.strptime(since, "%Y-%m-%d")
+            except ValueError:
+                raise CommandError(f"--since must be a YYYY-MM-DD date, got {since!r}.")
 
         # Bulk-insert sources and exit (no harvesting)
         if options["insert_sources"]:
@@ -801,6 +836,8 @@ class Command(BaseCommand):
                 source_titles=source_titles,
                 no_publisher_abstract=no_publisher_abstract,
                 update_existing=update_existing,
+                full_backfill=full_backfill,
+                since=since,
             )
 
         # Summary statistics
@@ -858,6 +895,8 @@ class Command(BaseCommand):
                         source_titles=source_titles,
                         no_publisher_abstract=no_publisher_abstract,
                         update_existing=update_existing,
+                        full_backfill=full_backfill,
+                        since=since,
                     )
                     task_id = async_task(task_path, source.id, **task_kwargs)
                     self.stdout.write(self.style.SUCCESS(f"  Enqueued {task_path} (task id: {task_id})"))
@@ -920,6 +959,10 @@ class Command(BaseCommand):
                         self.stdout.write(
                             f"  Fetch abstract from publisher landing page: {'yes' if fetch_abstract else 'no'}"
                         )
+                        if full_backfill:
+                            self.stdout.write("  --full: full backfill (ignoring last harvest date).")
+                        elif since:
+                            self.stdout.write(f"  --since: only records re-indexed on or after {since}.")
                         harvest_crossref_prefix(
                             source.id,
                             user=user,
@@ -928,6 +971,8 @@ class Command(BaseCommand):
                             prefix=config.get("crossref_prefix"),
                             fetch_abstract_from_publisher=fetch_abstract,
                             update_existing=update_existing,
+                            full=full_backfill,
+                            since=since,
                         )
                 elif source_type == "geoscienceworld":
                     self.stdout.write("Source type: GeoScienceWorld (Crossref + geoextent)")
@@ -1111,6 +1156,8 @@ class Command(BaseCommand):
         source_titles,
         no_publisher_abstract,
         update_existing,
+        full_backfill,
+        since,
     ):
         """Abort --async if any explicitly-set option can't reach the task.
 
@@ -1129,6 +1176,8 @@ class Command(BaseCommand):
             "--user-email": (user is not None, "user"),
             "--source-title": (bool(source_titles), "source_titles"),
             "--no-publisher-abstract": (bool(no_publisher_abstract), "fetch_abstract_from_publisher"),
+            "--full": (bool(full_backfill), "full"),
+            "--since": (bool(since), "since"),
         }
         provided = {flag: kwarg for flag, (was_set, kwarg) in required.items() if was_set}
         if not provided:
@@ -1149,6 +1198,8 @@ class Command(BaseCommand):
                 source_titles=source_titles,
                 no_publisher_abstract=no_publisher_abstract,
                 update_existing=update_existing,
+                full_backfill=full_backfill,
+                since=since,
             )
             unmatched = [flag for flag, kwarg in provided.items() if kwarg not in task_kwargs]
             if unmatched:
@@ -1170,6 +1221,8 @@ class Command(BaseCommand):
         source_titles,
         no_publisher_abstract,
         update_existing,
+        full_backfill=False,
+        since=None,
     ):
         """Map a source config to its Django-Q task path and kwargs.
 
@@ -1195,6 +1248,8 @@ class Command(BaseCommand):
                 "source_titles": effective_titles,
                 "prefix": config.get("crossref_prefix"),
                 "fetch_abstract_from_publisher": fetch_abstract,
+                "full": full_backfill,
+                "since": since,
             }
         if source_type == "geoscienceworld":
             return "works.tasks.harvest_geoscienceworld", common

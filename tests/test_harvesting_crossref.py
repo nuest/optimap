@@ -557,6 +557,31 @@ class HarvestCrossrefDoiContainsTests(TestCase):
         harvest_crossref_prefix(self.source.id, fetch_abstract_from_publisher=False)
         self.assertIn("from-update-date", responses.calls[0].request.url)
 
+    @responses.activate
+    def test_full_forces_backfill_ignoring_prior_event(self):
+        # Even with a prior completed event, full=True drops the incremental window.
+        from django.utils import timezone
+
+        prior = HarvestingEvent.objects.create(source=self.source, status="completed")
+        prior.completed_at = timezone.now()
+        prior.save(update_fields=["completed_at"])
+
+        responses.add(responses.GET, "https://api.crossref.org/works", json=self._crossref_response([]), status=200)
+        harvest_crossref_prefix(self.source.id, fetch_abstract_from_publisher=False, full=True)
+        self.assertNotIn("from-update-date", responses.calls[0].request.url)
+
+    @responses.activate
+    def test_explicit_since_overrides_derived_window(self):
+        from django.utils import timezone
+
+        prior = HarvestingEvent.objects.create(source=self.source, status="completed")
+        prior.completed_at = timezone.now()
+        prior.save(update_fields=["completed_at"])
+
+        responses.add(responses.GET, "https://api.crossref.org/works", json=self._crossref_response([]), status=200)
+        harvest_crossref_prefix(self.source.id, fetch_abstract_from_publisher=False, since="2020-01-01")
+        self.assertIn("from-update-date%3A2020-01-01", responses.calls[0].request.url.replace(":", "%3A"))
+
 
 class CrossrefOpenAlexEnrichmentTests(TestCase):
     """The Crossref harvester enriches each work via OpenAlex (DOI match),
