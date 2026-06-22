@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-06-22
+
 ### Added
 
 - **Contribute a new work by DOI**: the `/contribute/` page has a new collapsible "Add a work by DOI" form. A logged-in user pastes a DOI or DOI URL, which is validated client-side (regex helper in `static/js/doi-validate.js`, mirroring the new server-side `works.utils.identifiers.normalize_doi`) before the submit button activates. On submit the new authenticated endpoint **`POST /api/v1/works/contribute-doi/`** either (a) redirects the user to an existing work when the DOI is already in OPTIMAP (`200 exists`, case-insensitive match), or (b) harvests the single DOI from Crossref and runs OpenAlex + OpenAIRE enrichment **synchronously** (`harvest_crossref_doi`), attaches the new work to a dedicated **"User contributions"** source/collection, records a `doi_contribution` provenance event plus a recognition-board `Contribution` row (new `doi` kind), and returns `201 created` with the new work's URL. The endpoint is per-user rate-limited (`OPTIMAP_CONTRIBUTE_DOI_RATE`, default `30/hour`). The recognition board shows a per-contributor "submitted by DOI" count, and the statistics page tracks the cumulative number of DOI-submitted works over time (new `StatisticsSnapshot.contributed_dois`).
