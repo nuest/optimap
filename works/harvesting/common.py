@@ -97,13 +97,31 @@ class HarvestWarningCollector(logging.Handler):
     def emit(self, record):
         message = self.format(record)
         if record.levelno >= logging.ERROR:
-            self.errors.append(f"🔴 ERROR: {message}")
+            entry = f"🔴 ERROR: {message}"
+            if entry not in self.errors:
+                self.errors.append(entry)
         elif record.levelno >= logging.WARNING:
-            self.warnings.append(f"🟡 WARNING: {message}")
+            entry = f"🟡 WARNING: {message}"
+            if entry not in self.warnings:
+                self.warnings.append(entry)
         elif record.levelno >= logging.INFO and any(
             keyword in message.lower() for keyword in ["no openalex match", "openalex matching failed", "skipping"]
         ):
             self.info.append(f"🔵 INFO: {message}")
+
+    def add_warning(self, message):
+        """Record a warning directly, independent of the logging pipeline.
+
+        Use this for messages that *must* land in ``HarvestingEvent.log_text``
+        (e.g. "harvest stopped early") even when global logging state has been
+        altered (``logging.disable``, a raised logger level, a disabled logger)
+        — which would otherwise drop the matching ``logger.warning`` call before
+        it reaches :meth:`emit`. Deduplicated against entries already captured
+        via the logging handler so a message logged *and* recorded appears once.
+        """
+        entry = f"🟡 WARNING: {message}"
+        if entry not in self.warnings:
+            self.warnings.append(entry)
 
     def get_summary(self):
         """Return a formatted summary of all collected messages."""

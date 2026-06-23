@@ -82,8 +82,12 @@ class GeoFeedTestCase(TestCase):
         )
         xml_content = re.sub(r"<updated>[^<]+</updated>", "<updated>TIMESTAMP</updated>", xml_content)
         # Normalize test-server hostnames so the reference is environment-agnostic.
+        # Item links come from settings.BASE_URL (default http://localhost:8000),
+        # while the channel link comes from the request host (testserver); older
+        # references used 127.0.0.1:8000. Map all local hosts to one placeholder.
         xml_content = xml_content.replace("http://testserver", "http://TESTSERVER")
         xml_content = xml_content.replace("http://127.0.0.1:8000", "http://TESTSERVER")
+        xml_content = xml_content.replace("http://localhost:8000", "http://TESTSERVER")
         return xml_content
 
     def _compare_with_reference(self, generated_xml, filename):

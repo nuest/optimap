@@ -431,14 +431,13 @@ def parse_crossref_response_and_save_works(
                 time.sleep(2 * empty_retries)
                 continue
             if total_results and walked < total_results:
-                logger.warning(
-                    "Crossref harvest stopped early: %d of %d records fetched "
-                    "(empty page after %d retries) for filter %r",
-                    walked,
-                    total_results,
-                    EMPTY_PAGE_RETRIES,
-                    filter_value,
+                msg = (
+                    f"Crossref harvest stopped early: {walked} of {total_results} records fetched "
+                    f"(empty page after {EMPTY_PAGE_RETRIES} retries) for filter {filter_value!r}"
                 )
+                logger.warning(msg)
+                if warning_collector is not None:
+                    warning_collector.add_warning(msg)
             break
         empty_retries = 0
 
@@ -487,12 +486,13 @@ def parse_crossref_response_and_save_works(
         next_cursor = data.get("next-cursor")
         if not next_cursor:
             if total_results and walked < total_results:
-                logger.warning(
-                    "Crossref harvest stopped early: %d of %d records fetched (no next-cursor) for filter %r",
-                    walked,
-                    total_results,
-                    filter_value,
+                msg = (
+                    f"Crossref harvest stopped early: {walked} of {total_results} records fetched "
+                    f"(no next-cursor) for filter {filter_value!r}"
                 )
+                logger.warning(msg)
+                if warning_collector is not None:
+                    warning_collector.add_warning(msg)
             break
         # Crossref sometimes returns the same cursor string for consecutive pages
         # (observed for prefix:10.1038,container-title:Scientific Data) — the

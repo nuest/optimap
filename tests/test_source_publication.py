@@ -55,8 +55,9 @@ class SourceAPITest(TestCase):
         else:
             sources_list = data
 
-        # We expect exactly 2 sources
-        self.assertEqual(len(sources_list), 2)
+        # We expect at least our 2 test sources (a seed "User contributions"
+        # source from migration 0026 may also be present).
+        self.assertGreaterEqual(len(sources_list), 2)
         names = {j["name"] for j in sources_list}
         self.assertIn("Test source A", names)
         self.assertIn("No ISSN source", names)

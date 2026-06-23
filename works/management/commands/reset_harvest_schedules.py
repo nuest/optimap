@@ -62,9 +62,13 @@ class Command(BaseCommand):
         stagger = not options["no_stagger"]
         clear_manual = options["clear_manual"]
 
-        sources = list(Source.objects.order_by("id"))
+        # Interval-0 sources are "no automatic harvest" (matches Source.save,
+        # which never creates a recurring schedule for them) — skip them so the
+        # seeded "User contributions" source (interval 0) doesn't get scheduled
+        # or poison the stagger math (min_interval=0 → zero spread).
+        sources = [s for s in Source.objects.order_by("id") if s.harvest_interval_minutes > 0]
         if not sources:
-            self.stdout.write(self.style.WARNING("No sources in the database; nothing to do."))
+            self.stdout.write(self.style.WARNING("No sources with a harvest interval; nothing to do."))
             return
 
         now = timezone.now()
