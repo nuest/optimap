@@ -231,6 +231,7 @@ def place_page(request, place_slug):
     normalized = normalize_region_slug(place_slug)
     country = Country.objects.filter(slug=normalized).first()
     is_country = country is not None
+    extra = {"show_place_nav": True}
     if is_country:
         works = annotate_rounded_geometry(
             Work.objects.filter(status="p", country_code=country.iso_code)
@@ -239,6 +240,10 @@ def place_page(request, place_slug):
         )
         kind = "Country"
         name = country.name
+        # The country outline is loaded onto the facet map (from the shared,
+        # browser-cached /api/v1/countries/ data) so the page always shows a
+        # map even when no works carry geometry.
+        extra["facet_country_iso"] = country.iso_code
     else:
         region = get_region_from_slug(place_slug)
         if region is None:
@@ -256,7 +261,7 @@ def place_page(request, place_slug):
         title=f"{name} — works on OPTIMAP",
         description=f"Published research works with geographic metadata for {name}.",
         works=works,
-        extra={"show_place_nav": True},
+        extra=extra,
         with_map=True,
         map_cache_key=f"facet_map_all:place:{normalized}",
     )

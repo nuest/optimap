@@ -45,6 +45,14 @@ class PlacePageTests(TestCase):
         self.assertContains(resp, "Mali study")
         self.assertNotContains(resp, "facet-map")
 
+    def test_country_outline_drawn_when_map_shown(self):
+        # When the map renders (a work has geometry), the country outline is drawn
+        # from the shared, browser-cached /api/v1/countries/ data.
+        resp = self.client.get(reverse("optimap:at-place", kwargs={"place_slug": "germany"}))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'facetCountryIso = "DE"')
+        self.assertContains(resp, "countries-cache.js")
+
     def test_unknown_place_404(self):
         resp = self.client.get("/at/atlantis/")
         self.assertEqual(resp.status_code, 404)

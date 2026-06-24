@@ -11,6 +11,7 @@
 <script src="{% static 'js/map-zoom-to-all.js' %}"></script>
 <script src="{% static 'js/map-base.js' %}"></script>
 <script src="{% static 'js/map-locate-card.js' %}"></script>
+<script src="{% static 'js/countries-cache.js' %}"></script>
 <script type="text/javascript">
   $(document).ready(function () {
     if (!document.getElementById('facet-map')) { return; }
@@ -80,6 +81,25 @@
 
     if (typeof MapGazetteerManager !== 'undefined') {
       new MapGazetteerManager(map, { provider: 'nominatim', placeholder: 'Search for a location...' });
+    }
+
+    // Country landing pages: overlay the country outline, taken from the shared,
+    // browser-cached all-countries GeoJSON (countries-cache.js). The same cache
+    // is populated by / reused for the main map's countries layer.
+    const facetCountryIso = "{{ facet_country_iso|default:'' }}";
+    if (facetCountryIso && window.OptimapCountries) {
+      window.OptimapCountries.loadCountryFeatures().then(function (features) {
+        const feature = window.OptimapCountries.findByIso(features, facetCountryIso);
+        if (!feature) { return; }
+        const outline = L.geoJSON(feature, {
+          style: { color: '#2A6FB0', weight: 2, opacity: 0.85, fillColor: '#2A6FB0', fillOpacity: 0.05 },
+          interactive: false,
+        }).addTo(map);
+        // With no work geometry the map has no bounds yet — frame the country.
+        if ((!pubLayer || !pubLayer.getBounds().isValid()) && outline.getBounds().isValid()) {
+          map.fitBounds(outline.getBounds(), { padding: [20, 20] });
+        }
+      });
     }
   });
 </script>

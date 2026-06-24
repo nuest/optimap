@@ -4,14 +4,14 @@
 // map-countries.js
 // Manages a toggleable countries (national borders) layer on the map (#29).
 // Mirrors MapGlobalRegionsManager: outlines only, non-interactive, off by
-// default, lazily fetched from /api/v1/countries/.
+// default. Country data is loaded (and browser-cached) via the shared
+// OptimapCountries loader in countries-cache.js, which must be loaded first.
 
 class MapCountriesManager {
   constructor(map, layerControl) {
     this.map = map;
     this.layerControl = layerControl;
     this.countriesLayer = null;
-    this.apiUrl = '/api/v1/countries/';
     this.init();
   }
 
@@ -20,22 +20,8 @@ class MapCountriesManager {
       this.countriesLayer = L.featureGroup();
       this.layerControl.addOverlay(this.countriesLayer, 'Countries');
 
-      const response = await fetch(this.apiUrl);
-      const data = await response.json();
-
-      let countries;
-      if (data.results && data.results.type === 'FeatureCollection') {
-        countries = data.results.features;
-      } else if (data.results && Array.isArray(data.results)) {
-        countries = data.results;
-      } else if (data.features && Array.isArray(data.features)) {
-        countries = data.features;
-      } else if (Array.isArray(data)) {
-        countries = data;
-      } else {
-        console.error('Unexpected /api/v1/countries/ response format:', data);
-        return;
-      }
+      const countries = await window.OptimapCountries.loadCountryFeatures();
+      if (!countries || !countries.length) return;
 
       const geoJsonLayer = L.geoJSON(countries, {
         style: this.getCountryStyle.bind(this),
