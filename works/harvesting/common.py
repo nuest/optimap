@@ -427,18 +427,22 @@ def _save_or_update_work(work_kwargs, source, event, update_existing=False):
 
 
 def _reconcile_dedup(work):
-    """Auto-merge same-``openalex_id`` siblings after a harvest save.
+    """Auto-merge duplicate siblings after a harvest save.
 
-    Imported lazily to avoid a circular import (``works.dedup`` imports the
-    harvesting helpers). Failures must never break a harvest, so they are logged
-    and swallowed — the scheduled ``dedup_sweep`` will retry.
+    Two independent dedup bases run here: same-``openalex_id`` cross-source
+    duplicates, and ESSOAr/Authorea per-version DOIs (``…/v2``) that share a
+    versionless base. The version pass runs regardless of ``openalex_id`` (most
+    versioned preprints never get an OpenAlex match). Imported lazily to avoid a
+    circular import (``works.dedup`` imports the harvesting helpers). Failures
+    must never break a harvest, so they are logged and swallowed — the scheduled
+    ``dedup_sweep`` will retry.
     """
-    if not getattr(work, "openalex_id", None):
-        return
     try:
-        from works.dedup import reconcile
+        from works.dedup import reconcile, reconcile_versions
 
-        reconcile(work)
+        if getattr(work, "openalex_id", None):
+            work = reconcile(work) or work
+        reconcile_versions(work)
     except Exception as exc:  # pragma: no cover - defensive
         logger.warning("Dedup reconcile failed for work id=%s: %s", getattr(work, "id", None), exc)
 

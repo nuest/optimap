@@ -354,9 +354,11 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
                     "dedup": drf_serializers.DictField(
                         required=False,
                         help_text=(
-                            "Present on a canonical work that absorbed duplicates sharing its OpenAlex id. "
-                            "Keys: openalex_id, merged_work_ids, merged_identifiers, method (openalex_id), "
-                            "primary_basis (openalex_primary_location/version_rank/existing), at. "
+                            "Present on a canonical work that absorbed duplicates — either siblings sharing its "
+                            "OpenAlex id, or ESSOAr/Authorea per-version DOIs sharing its versionless DOI base. "
+                            "Keys: openalex_id (null for version dedup), merged_work_ids, merged_identifiers, "
+                            "method (openalex_id/doi_version), "
+                            "primary_basis (openalex_primary_location/version_rank/existing/doi_version), at. "
                             "An optional dedup_conflict list records non-primary geometry/temporal extents "
                             "that differed from the canonical's (kept for audit)."
                         ),

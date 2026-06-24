@@ -135,7 +135,17 @@ python manage.py harvest_sources --create-sources --source essoar
 python manage.py harvest_sources --source essoar --max-records 50   # smoke test
 ```
 
-The first backfill walks the whole `member:311,type:posted-content` slice (paged deterministically by `sort=indexed`); subsequent scheduled runs are incremental (`from-update-date`). The `crossref_works_count` stat reflects the whole slice (~94k), not the ESSOAr subset.
+A full backfill walks the whole `member:311,type:posted-content` slice (paged deterministically by `sort=indexed`); subsequent scheduled runs are incremental (`from-update-date`). The `crossref_works_count` stat reflects the whole slice (~94k), not the ESSOAr subset.
+
+> **Recovering a stale ESSOAr catalogue.** If the admin count looks capped (e.g. it sits at a few thousand while [essopenarchive.org](https://essopenarchive.org/) reports far more), the cause is almost always that the source is being **re-harvested incrementally**. The default run derives a `from-update-date` watermark from the last completed event, so it only re-fetches *recently re-indexed* records — nearly all already stored — and therefore **never backfills the historical ESSOAr records that predate the first harvest**. `--max-records` does **not** help: it caps the number of *matched* (`essoar`) records, not how far the walk reaches, so raising it changes nothing when the incremental window itself is small. To re-walk the entire catalogue, force a full backfill:
+>
+> ```bash
+> python manage.py harvest_sources --source essoar --full      # no --max-records cap
+> ```
+>
+> Because a full ~94k-record walk over hours is fragile (cursor expiry, transient empty pages), a full backfill of a `crossref_filter` source is automatically **partitioned into yearly deposit-date windows** (`from-created-date`/`until-created-date`, the *stable* deposit date — the index date is refreshed constantly and would pile everything into the latest window). Each window is a bounded walk, so a transient failure costs one window rather than the whole catalogue; any shortfall is reported in the harvest email as a "stopped early" warning. Schedule a periodic `--full` resync so incremental drift can't permanently hide backlog.
+
+> **Version dedup.** ESS Open Archive mints a **separate DOI per version** of a preprint (`…/v2` in the current era, a trailing `.2` in the legacy era), so a raw full backfill would create one Work per version and over-count the catalogue (~50k versioned DOIs vs. ~23k unique preprints). OPTIMAP collapses these automatically onto the **latest version**: `works.utils.doi.normalize_versioned_doi` derives the versionless base, and `works.dedup.reconcile_versions` (on every harvest save) / `works.dedup.version_sweep` (the scheduled `dedup_sweep` and `dedup_works`) keep the highest version live and turn older versions into `status='r'` redirect tombstones — the same machinery as [OpenAlex deduplication](#openalex-deduplication-locations) but keyed on the DOI base instead of an `openalex_id`.
 
 > **Investigated and rejected** as harvest routes for ESSOAr: the ESSOAr platform API (Cloudflare 403 on every endpoint); OpenAIRE by data source (registered as `opendoar____::ada71870…` but **0 products collected** — "Not yet registered"); OpenAIRE/Crossref by publisher (both report `Wiley`); and BASE/CORE (IP-/key-gated, and they harvest the same blocked OAI endpoint). The Wiley member + `posted-content` slice is the only complete, tractable route.
 
@@ -584,11 +594,11 @@ Staff users additionally see the full provenance (including `original_record`, W
     "assigned_at": "2026-04-30T12:00:06+00:00"
   },
   "dedup": {                               // on the CANONICAL work (absorbed duplicates)
-    "openalex_id": "https://openalex.org/W123",
+    "openalex_id": "https://openalex.org/W123", // null for doi_version dedup
     "merged_work_ids": [17, 88],
     "merged_identifiers": ["10.31223/preprint", "https://eartharxiv.org/preprint"],
-    "method": "openalex_id",
-    "primary_basis": "openalex_primary_location", // | version_rank | existing
+    "method": "openalex_id",               // | doi_version (ESSOAr per-version DOIs)
+    "primary_basis": "openalex_primary_location", // | version_rank | existing | doi_version
     "at": "..."
     // optional sibling key "dedup_conflict": [ { "work_id": 88, "kind": "geometry", "at": "..." } ]
   },

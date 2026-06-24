@@ -530,6 +530,46 @@ class HarvestCrossrefDoiContainsTests(TestCase):
         self.assertEqual(Work.objects.filter(source=self.source, collections=self.collection).count(), 2)
 
     @responses.activate
+    def test_full_backfill_windows_by_created_date(self):
+        # A full backfill of a shared-member source is partitioned into yearly
+        # deposit-date windows, so it issues many calls each carrying a
+        # from-created-date/until-created-date pair rather than one giant walk.
+        responses.add(responses.GET, "https://api.crossref.org/works", json=self._crossref_response([]), status=200)
+        harvest_crossref_prefix(self.source.id, fetch_abstract_from_publisher=False, full=True)
+
+        # Ignore the rows=0 works-count probe; the paging walk uses a cursor.
+        walk_urls = [call.request.url for call in responses.calls if "rows=0" not in call.request.url]
+        self.assertGreater(len(walk_urls), 1)
+        self.assertTrue(all("from-created-date" in url for url in walk_urls))
+        self.assertTrue(any("until-created-date" in url for url in walk_urls))
+
+    @responses.activate
+    def test_bounded_smoke_test_is_not_windowed(self):
+        # A bounded max_records run (smoke test) stays a single cursor walk even
+        # on a first run, rather than fanning out into per-year windows.
+        responses.add(responses.GET, "https://api.crossref.org/works", json=self._crossref_response([]), status=200)
+        harvest_crossref_prefix(self.source.id, fetch_abstract_from_publisher=False, max_records=50)
+
+        walk_urls = [call.request.url for call in responses.calls if "rows=0" not in call.request.url]
+        self.assertEqual(len(walk_urls), 1)
+        self.assertNotIn("from-created-date", walk_urls[0])
+
+    @responses.activate
+    def test_harvest_collapses_essoar_versions_to_latest(self):
+        items = [
+            self._item("10.22541/essoar.123.456/v1"),
+            self._item("10.22541/essoar.123.456/v2"),
+        ]
+        responses.add(responses.GET, "https://api.crossref.org/works", json=self._crossref_response(items), status=200)
+
+        harvest_crossref_prefix(self.source.id, fetch_abstract_from_publisher=False)
+
+        live = Work.objects.filter(source=self.source).exclude(status="r")
+        self.assertEqual([w.doi for w in live], ["10.22541/essoar.123.456/v2"])
+        tomb = Work.objects.get(doi="10.22541/essoar.123.456/v1")
+        self.assertEqual(tomb.status, "r")
+
+    @responses.activate
     def test_query_uses_member_type_filter_not_prefix(self):
         responses.add(responses.GET, "https://api.crossref.org/works", json=self._crossref_response([]), status=200)
         harvest_crossref_prefix(self.source.id, fetch_abstract_from_publisher=False)

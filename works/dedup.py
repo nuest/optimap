@@ -29,12 +29,15 @@ Gated by ``settings.OPTIMAP_DEDUP_AUTO_MERGE`` (default True).
 """
 
 import logging
+from collections import defaultdict
 
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from works.models import Work
+from works.utils.doi import normalize_versioned_doi
 
 logger = logging.getLogger(__name__)
 
@@ -257,6 +260,116 @@ def reconcile(work):
     return merge(primary, others)
 
 
+# -----------------------------------------------------------------------------
+# Version dedup — collapse ESSOAr/Authorea per-version DOIs onto one Work.
+#
+# ESS Open Archive mints a separate DOI per version of a preprint (``…/v2`` in
+# the current era, a trailing ``.2`` in the legacy era), so a full harvest would
+# create one Work per version and over-count the catalogue. This keeps the
+# highest version as canonical and tombstones the older ones, reusing the same
+# ``merge`` machinery as the openalex_id dedup above. Unlike that path it does
+# not require an ``openalex_id`` — the DOI base is the join key.
+# -----------------------------------------------------------------------------
+
+
+def _pick_latest_version(works):
+    """Canonical = highest version; tie-break by lowest id for a stable choice."""
+    return max(works, key=lambda w: (normalize_versioned_doi(w.doi)[1] or 0, -w.id))
+
+
+def _merge_version_group(works):
+    """Merge a same-base ESSOAr version group onto its latest version.
+
+    ``works`` may include the chosen primary — ``merge`` drops it from the
+    others itself — so callers don't pre-filter.
+    """
+    primary = _pick_latest_version(works)
+    primary._primary_basis = "doi_version"
+    return merge(primary, works, basis="doi_version")
+
+
+def _version_siblings(work):
+    """Return ``(base, live_siblings)`` sharing ``work``'s versionless DOI base.
+
+    ``live_siblings`` is empty when ``work`` is not a versioned ESSOAr DOI. The
+    ``doi__startswith`` clause only narrows the DB scan; each candidate is
+    re-normalized so a base that is a prefix of a *different* work id can't leak
+    in (e.g. legacy ``essoar.10512157`` must not match ``essoar.105121570``).
+    """
+    base, version = normalize_versioned_doi(work.doi)
+    if version is None:
+        return base, []
+    candidates = Work.objects.filter(doi__startswith=base).exclude(status="r")
+    siblings = [w for w in candidates if normalize_versioned_doi(w.doi)[0] == base]
+    return base, siblings
+
+
+def reconcile_versions(work):
+    """Collapse ``work``'s ESSOAr version siblings onto the latest-version Work.
+
+    No-op when auto-merge is disabled, ``work`` is a tombstone, its DOI is not a
+    versioned ESSOAr DOI, or it has no older/newer sibling. Returns the canonical
+    Work (which may differ from ``work`` when a newer version wins).
+    """
+    if not _auto_merge_enabled() or work.status == "r":
+        return work
+    _base, siblings = _version_siblings(work)
+    if len(siblings) < 2:
+        return work
+    return _merge_version_group(siblings)
+
+
+#: DOI prefixes that carry versioned ESSOAr works (both eras). Anchored so the
+#: sweep's filter can use the ``doi`` index instead of a leading-wildcard scan.
+_ESSOAR_DOI_PREFIXES = ("10.22541/essoar.", "10.1002/essoar.")
+
+
+def version_sweep(queryset=None, *, dry_run=False, limit=None, on_progress=None):
+    """Collapse every ESSOAr version group in ``queryset`` onto its latest version.
+
+    Backfill counterpart to :func:`reconcile_versions` for works already stored
+    as separate versions. ``limit`` coarsely bounds the number of works scanned
+    (a group split across the bound is simply picked up by the next sweep).
+    Returns ``{groups_merged, works_redirected}``.
+    """
+
+    def report(message):
+        (on_progress or logger.info)(message)
+
+    if queryset is None:
+        queryset = Work.objects.all()
+    prefix_match = Q()
+    for doi_prefix in _ESSOAR_DOI_PREFIXES:
+        prefix_match |= Q(doi__startswith=doi_prefix)
+    live = queryset.exclude(status="r").filter(prefix_match)
+    if limit:
+        live = live[:limit]
+
+    groups: dict[str, list] = defaultdict(list)
+    for work in live.iterator(chunk_size=200):
+        base, version = normalize_versioned_doi(work.doi)
+        if version is None:
+            continue
+        groups[base].append(work)
+
+    stats = {"groups_merged": 0, "works_redirected": 0}
+    prefix = "[dry-run] " if dry_run else ""
+    for base, works in groups.items():
+        if len(works) < 2:
+            continue
+        stats["groups_merged"] += 1
+        stats["works_redirected"] += len(works) - 1
+        if dry_run:
+            report(f"{prefix}  {base}: would merge {len(works)} versions ({sorted(w.id for w in works)})")
+            continue
+        _merge_version_group(works)
+    report(
+        f"{prefix}Version sweep: {stats['groups_merged']} group(s) merged, "
+        f"{stats['works_redirected']} older version(s) redirected."
+    )
+    return stats
+
+
 def backfill_locations(work, *, matcher=None, force=False) -> bool:
     """Populate ``work.locations`` from OpenAlex. Returns True if it wrote anything.
 
@@ -363,6 +476,12 @@ def sweep(queryset=None, *, locations_only=False, force=False, dry_run=False, li
         f"{prefix}Pass 2 done: {stats['groups_merged']} group(s) merged, "
         f"{stats['works_redirected']} work(s) redirected."
     )
+
+    # Pass 3: collapse ESSOAr/Authorea version siblings (independent of openalex_id).
+    report(f"{prefix}Pass 3/3: scanning ESSOAr version groups...")
+    version_stats = version_sweep(queryset, dry_run=dry_run, limit=limit, on_progress=report)
+    stats["groups_merged"] += version_stats["groups_merged"]
+    stats["works_redirected"] += version_stats["works_redirected"]
 
     return stats
 

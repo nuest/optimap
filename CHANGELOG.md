@@ -9,8 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **ESS Open Archive version deduplication.** ESSOAr mints a separate DOI per preprint version (`…/v2` in the current Authorea era, a trailing `.2` in the legacy `10.1002/essoar.*` era), which previously created one `Work` per version and inflated the catalogue (~50k versioned DOIs vs. ~23k unique preprints). Versions are now collapsed automatically onto the **latest** one: `works.utils.doi.normalize_versioned_doi` derives the versionless base, and `works.dedup.reconcile_versions` (on every harvest save) / `works.dedup.version_sweep` (folded into the scheduled `dedup_sweep` and the `dedup_works` command) keep the highest version live and turn older versions into `status='r'` redirect tombstones — reusing the existing OpenAlex-id merge machinery but keyed on the DOI base.
+
 ### Fixed
 
+- **ESS Open Archive (and other shared-Crossref-member) full backfills no longer silently under-fill.** A full backfill of a `crossref_filter` source (e.g. ESSOAr's ~94k-record `member:311,type:posted-content` slice) is now **partitioned into yearly deposit-date windows** (`from-created-date`/`until-created-date`) so each cursor walk is bounded and a transient failure costs one window instead of the whole catalogue; the per-page empty-page retry budget was also raised (3 → 6) with backoff. This addresses the symptom where the admin ESSOAr count capped well below the upstream figure: the default incremental run only re-fetches recently re-indexed records and never backfills history, and `--max-records` caps *matched* records, not the walk — so recovery requires `python manage.py harvest_sources --source essoar --full` (now documented in [docs/manage.md](docs/manage.md)).
 - Country backfill (`backfill_work_countries`) no longer crashes with `TopologyException` on invalid (e.g. self-intersecting) work geometries — the geometry is now repaired with PostGIS `ST_MakeValid` before the spatial join. Coastal and small-island works within ~12 nautical miles (0.12°) of a simplified country outline now snap to that country instead of returning no match. How each work was joined (`intersects` vs. `buffer_snap`, with the tolerance used) is recorded transparently in `Work.provenance.countries` (issue #261).
 
 ## [0.34.0] - 2026-06-24

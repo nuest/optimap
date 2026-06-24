@@ -84,13 +84,21 @@ def _strip_jats(jats_html):
     return soup.get_text(separator=" ", strip=True) or None
 
 
-def _build_crossref_filter(prefix, source_titles=None, since=None, extra_filters=None):
+def _build_crossref_filter(
+    prefix, source_titles=None, since=None, extra_filters=None, created_from=None, created_until=None
+):
     """Assemble a Crossref ``filter=...`` parameter value.
 
     ``prefix`` may be ``None`` (or empty) to omit the ``prefix:`` clause — used
     when the base query is expressed via ``extra_filters`` instead (e.g.
     ``member:311,type:posted-content`` for ESS Open Archive, whose two DOI eras
     share no single prefix).
+
+    ``created_from`` / ``created_until`` add ``from-created-date`` /
+    ``until-created-date`` clauses (the deposit date, which is *stable* per
+    record, unlike the constantly-changing index date). They partition a full
+    backfill into bounded windows so a single cursor walk never has to span the
+    whole ~94k-record member slice — see ``harvest_crossref_prefix``.
     """
     parts = [f"prefix:{prefix}"] if prefix else []
     if source_titles:
@@ -101,9 +109,32 @@ def _build_crossref_filter(prefix, source_titles=None, since=None, extra_filters
             parts.append(f"container-title:{title}")
     if since:
         parts.append(f"from-update-date:{since}")
+    if created_from:
+        parts.append(f"from-created-date:{created_from}")
+    if created_until:
+        parts.append(f"until-created-date:{created_until}")
     if extra_filters:
         parts.extend(extra_filters)
     return ",".join(parts)
+
+
+#: Earliest deposit year to window over for shared-member full backfills. ESS
+#: Open Archive's earliest preprints date to 2018; 2015 leaves a safe margin and
+#: pre-corpus windows return empty quickly.
+_CREATED_WINDOW_START_YEAR = 2015
+
+
+def _created_date_windows(start_year=_CREATED_WINDOW_START_YEAR):
+    """Yield ``(from_created_date, until_created_date)`` yearly deposit windows.
+
+    Covers ``start_year-01-01`` through the end of the current year with no gaps
+    or overlaps. Deposit (created) date is stable per record, so partitioning a
+    full backfill this way splits the corpus into bounded slices — unlike the
+    index date, which is refreshed constantly and would pile ~everything into the
+    latest window.
+    """
+    this_year = timezone.now().date().year
+    return [(f"{year}-01-01", f"{year}-12-31") for year in range(start_year, this_year + 1)]
 
 
 def fetch_copernicus_abstract(landing_url, session=None):
@@ -337,6 +368,8 @@ def parse_crossref_response_and_save_works(
     harvester_name=None,
     since=None,
     doi_contains=None,
+    created_from=None,
+    created_until=None,
 ):
     """Page through Crossref's ``works`` API and persist matched works.
 
@@ -372,7 +405,12 @@ def parse_crossref_response_and_save_works(
     log_interval = 20 if (max_records or 0) <= 100 else 50
 
     filter_value = _build_crossref_filter(
-        prefix, source_titles=source_titles, since=since, extra_filters=extra_filters
+        prefix,
+        source_titles=source_titles,
+        since=since,
+        extra_filters=extra_filters,
+        created_from=created_from,
+        created_until=created_until,
     )
 
     # Crossref intermittently returns an empty `items` page (or drops the
@@ -385,7 +423,10 @@ def parse_crossref_response_and_save_works(
     # because a `doi_contains` filter makes `seen` count only the matched subset.
     total_results = None
     empty_retries = 0
-    EMPTY_PAGE_RETRIES = 3
+    # A full member+type backfill is ~900 pages over hours; transient empty
+    # pages / cursor hiccups are common, so retry generously before believing
+    # the crawl is done (each retry backs off 2s × attempt).
+    EMPTY_PAGE_RETRIES = 6
 
     while True:
         params = {
@@ -593,22 +634,45 @@ def harvest_crossref_prefix(
             max_records,
         )
         stats = HarvestStats()
-        saved, seen = parse_crossref_response_and_save_works(
-            source,
-            event,
-            prefix=resolved_prefix,
-            source_titles=source_titles,
-            extra_filters=extra_filters,
-            fetch_abstract_from_publisher=fetch_abstract_from_publisher,
-            max_records=max_records,
-            warning_collector=warning_collector,
-            update_existing=update_existing,
-            stats=stats,
-            sort=sort,
-            order=order,
-            since=since,
-            doi_contains=doi_contains,
-        )
+        # A full backfill of a shared-member source (e.g. ESS Open Archive's
+        # ~94k member:311 posted-content slice) is too large for one reliable
+        # cursor walk over hours. Partition it into yearly deposit-date windows
+        # so each walk is bounded and a transient failure costs only one window.
+        # Incremental runs (since set), prefix-scoped sources, and bounded
+        # `max_records` smoke tests keep a single walk.
+        windowed = bool(raw_filter) and since is None and not max_records
+        windows = _created_date_windows() if windowed else [(None, None)]
+
+        saved = 0
+        seen = 0
+        remaining = max_records
+        for created_from, created_until in windows:
+            if remaining is not None and remaining <= 0:
+                break
+            if windowed:
+                logger.info("Crossref backfill window: created %s..%s", created_from, created_until)
+            window_saved, window_seen = parse_crossref_response_and_save_works(
+                source,
+                event,
+                prefix=resolved_prefix,
+                source_titles=source_titles,
+                extra_filters=extra_filters,
+                fetch_abstract_from_publisher=fetch_abstract_from_publisher,
+                max_records=remaining,
+                warning_collector=warning_collector,
+                update_existing=update_existing,
+                stats=stats,
+                sort=sort,
+                order=order,
+                since=since,
+                doi_contains=doi_contains,
+                created_from=created_from,
+                created_until=created_until,
+            )
+            saved += window_saved
+            seen += window_seen
+            if remaining is not None:
+                remaining -= window_seen
 
         spatial_count, temporal_count = complete_harvest(event, stats, warning_collector)
 
