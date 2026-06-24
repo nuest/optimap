@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-06-24
+
 ### Added
 
 - **Country landing pages (`/at/<country>/`) now draw the country outline on the map**: when the map is shown (i.e. the country's published works have geometry) the country boundary is overlaid. The outline is taken from a new shared, browser-cached copy of the all-countries GeoJSON (`works/static/js/countries-cache.js`, `localStorage`, one-week TTL). The main map's Countries layer (`map-countries.js`) now uses the same loader, so the data is fetched once from `/api/v1/countries/` and reused across the main map and country pages on subsequent visits.
