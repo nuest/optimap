@@ -6,18 +6,24 @@ from django.utils.text import slugify
 
 
 def backfill_source_slugs(apps, schema_editor):
-    """Populate Source.slug for existing rows (unique, name-derived)."""
+    """Populate Source.slug for existing rows (unique, name-derived).
+
+    Slugs are truncated to the field's max_length, leaving room for any
+    numeric collision suffix, so long source names don't overflow the column.
+    """
     Source = apps.get_model("works", "Source")
+    max_length = Source._meta.get_field("slug").max_length
     used = set()
     for source in Source.objects.all().order_by("pk"):
         if source.slug:
             used.add(source.slug)
             continue
-        base = slugify(source.name) or f"source-{source.pk}"
+        base = (slugify(source.name) or f"source-{source.pk}")[:max_length].rstrip("-")
         candidate = base
         n = 2
         while candidate in used:
-            candidate = f"{base}-{n}"
+            suffix = f"-{n}"
+            candidate = f"{base[: max_length - len(suffix)].rstrip('-')}{suffix}"
             n += 1
         source.slug = candidate
         source.save(update_fields=["slug"])

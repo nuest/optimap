@@ -31,6 +31,21 @@ class SourceSlugTests(TestCase):
         self.assertNotEqual(a.slug, b.slug)
         self.assertTrue(b.slug.startswith("same-name"))
 
+    def test_slug_truncated_to_max_length(self):
+        max_length = Source._meta.get_field("slug").max_length
+        long_name = "Long " * 40 + "X"  # fits name (255) but slugifies to >100 chars
+        s = _make_source(long_name)
+        self.assertLessEqual(len(s.slug), max_length)
+        self.assertFalse(s.slug.endswith("-"))
+
+    def test_slug_truncated_collision_stays_within_max_length(self):
+        max_length = Source._meta.get_field("slug").max_length
+        long_name = "Long " * 40 + "X"
+        a = _make_source(long_name)
+        b = _make_source(long_name)
+        self.assertNotEqual(a.slug, b.slug)
+        self.assertLessEqual(len(b.slug), max_length)
+
 
 class SourcePageTests(TestCase):
     def setUp(self):

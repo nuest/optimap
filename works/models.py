@@ -931,13 +931,17 @@ class Source(models.Model):
         return self.coverage_snapshots.order_by("-computed_at").first()
 
     def _generate_unique_slug(self) -> str:
-        """Slugify the name and append a numeric suffix on collision."""
+        """Slugify the name (truncated to the field length) and append a
+        numeric suffix on collision, keeping the result within max_length."""
+        max_length = self._meta.get_field("slug").max_length
         base = slugify(self.name) or f"source-{self.pk or ''}".rstrip("-")
+        base = base[:max_length].rstrip("-")
         candidate = base
         n = 2
         qs = Source.objects.exclude(pk=self.pk)
         while qs.filter(slug=candidate).exists():
-            candidate = f"{base}-{n}"
+            suffix = f"-{n}"
+            candidate = f"{base[: max_length - len(suffix)].rstrip('-')}{suffix}"
             n += 1
         return candidate
 
