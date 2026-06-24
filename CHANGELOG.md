@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-06-24
+
+### Added
+
+- **Multi-country support + self-healing country enrichment (issue #261)**: works are now associated with countries through a new many-to-many relation `Work.countries → Country`, replacing the single `Work.country_code` scalar. Association is derived by an **offline point-in-polygon join** against the Natural Earth `Country` outlines (`works.services.countries.countries_for_geometry`), so it is deterministic, needs no network, and is **multi-valued**: a transboundary study links every country its geometry intersects. It is populated both on save (a `post_save` signal gated by `OPTIMAP_GEOCODE_WORKS_ON_SAVE`) and by a **weekly self-healing sweep** (`works.tasks.backfill_work_countries`, scheduled automatically) that links any work with geometry but no countries yet — closing the coverage gap that previously made `/at/<country>/` pages and the `by_country` statistics undercount. The sweep emails active staff a summary only when something changed or errored. Run on demand with `python manage.py backfill_work_countries` (requires `load_countries` to have populated the `Country` table).
+
+### Changed
+
+- **BREAKING (API): `country_code` → `country_codes`**: the Works GeoJSON API (`/api/v1/works/`) and the GeoJSON/GeoPackage/CSV data dumps now expose `country_codes` — a list of ISO 3166-1 alpha-2 codes — in place of the single `country_code` string. The schema.org `Place.addressCountry` and the `geo.region` HTML meta tag likewise carry every country a work spans. The `Work.country_code` model field is removed (migration `0031_work_countries`, which preserves existing values by linking them into the new relation before dropping the column). `python manage.py backfill_placenames` now fills only `Work.placename`; country association is handled by `backfill_work_countries`.
+
 ## [0.33.0] - 2026-06-24
 
 ### Added

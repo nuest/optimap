@@ -572,11 +572,10 @@ Staff users additionally see the full provenance (including `original_record`, W
   "geocoding": {
     "gazetteer": "nominatim",
     "placename": "Sulawesi, Indonesia",
-    "country_code": "ID",
     "n_geocoded": 3,
     "geocoded_at": "2026-04-30T12:00:05+00:00",
     "matches": [ ... ]                     // per-point Nominatim results
-  },
+  },                                       // country association is the Work.countries M2M, not here
   "dedup": {                               // on the CANONICAL work (absorbed duplicates)
     "openalex_id": "https://openalex.org/W123",
     "merged_work_ids": [17, 88],
@@ -625,17 +624,24 @@ Work landing pages also emit the conventional [HTML *Geotagging* meta tags](http
 - `geo.position` — `"lat;lon"` of the geometry's bounding-box centroid.
 - `ICBM` — `"lat, lon"`, the [Yahoo variant](https://en.wikipedia.org/wiki/ICBM_address#Modern_use). Both tags are emitted when geometry is present.
 - `geo.placename` — the human-readable Nominatim hierarchy (e.g. *"Sulawesi, Indonesia"*), only when `Work.placename` is set.
-- `geo.region` — ISO 3166-1 alpha-2 country code (e.g. `ID`), only when `Work.country_code` is set.
+- `geo.region` — ISO 3166-1 alpha-2 country code(s) from the `Work.countries` M2M (comma-joined for transboundary works), only when the work is linked to at least one country.
 
 The corresponding [schema.org `Place.geo`](https://schema.org/geo) payload follows the spec: single-point geometries are emitted as `GeoCoordinates`, anything else as `GeoShape` with `box="south west north east"` (matching the format already used for region feed pages).
 
-## Reverse geocoding (placename / country backfill)
+## Reverse geocoding (placename) and country association
 
-`Work.placename` and `Work.country_code` are populated by reverse-geocoding the work's geometry via [Nominatim](https://nominatim.openstreetmap.org/). For multi-point geometries — e.g. the Mountain Wetlands harvester emits one `Point` per study site — every representative point is geocoded separately and the result is reduced to the **lowest common ancestor** in the Nominatim address hierarchy. So a work with sites in Berlin and Munich resolves to *"Germany"* / `DE` (state diverges, country shared); a work spanning Germany and France resolves to `(None, None)` rather than the misleading geometric centroid in northern France. Single-Polygon works contribute one interior representative point. The walk is capped at 20 points so a 500-vertex polygon doesn't trigger 500 Nominatim requests.
+OPTIMAP derives two distinct things from a work's geometry:
 
-Reverse geocoding is **on by default in production** so the `geo.placename` / `geo.region` HTML meta tags are emitted and `Work.provenance.geocoding` is populated by every harvester — set `OPTIMAP_GEOCODE_WORKS_ON_SAVE=False` in the deployment environment to opt out (e.g. for a bulk import where you would rather backfill placenames separately afterwards). The setting is forced off under the test runner regardless, so the suite stays offline. With the flag on, every `Work.save()` (creation or geometry edit) calls `works.services.geocoding.geocode_geometry(geom)` from a `pre_save` signal — each per-point lookup is cached in the per-process `LocMemCache` (key `reverse_geocode:<lat>:<lon>` with 3-decimal-place quantisation, ~100 m, 30-day TTL) so popular regions hit memory after the first lookup, keeping sustained Nominatim traffic well below the 1 req/s courtesy limit. On a complete geocoding outage (no point returned an address) the existing fields are preserved; on a real "geometry spans incompatible regions" outcome the fields are honestly cleared.
+- **`Work.placename`** — a human-readable Nominatim hierarchy string (e.g. *"Sulawesi, Indonesia"*), via reverse geocoding.
+- **`Work.countries`** — a many-to-many link to the `Country` table (ISO 3166-1 alpha-2), via an **offline point-in-polygon join** against the Natural Earth outlines. This powers the `/at/<country>/` pages and the `by_country` statistics. It is **multi-valued**: a transboundary study links every country its geometry intersects.
 
-For an existing deployment that wants to populate the new fields retroactively, run the backfill:
+### Placename (Nominatim)
+
+`Work.placename` is populated by reverse-geocoding the geometry via [Nominatim](https://nominatim.openstreetmap.org/). For multi-point geometries — e.g. the Mountain Wetlands harvester emits one `Point` per study site — every representative point is geocoded separately and the result is reduced to the **lowest common ancestor** in the Nominatim address hierarchy. So a work with sites in Berlin and Munich resolves to *"Germany"* (state diverges, country shared); a work spanning Germany and France resolves to `None` rather than the misleading geometric centroid in northern France. Single-Polygon works contribute one interior representative point. The walk is capped at 20 points so a 500-vertex polygon doesn't trigger 500 Nominatim requests.
+
+Reverse geocoding is **on by default in production** so the `geo.placename` / `geo.region` HTML meta tags are emitted and `Work.provenance.geocoding` is populated by every harvester — set `OPTIMAP_GEOCODE_WORKS_ON_SAVE=False` in the deployment environment to opt out (e.g. for a bulk import where you would rather backfill separately afterwards). The setting is forced off under the test runner regardless, so the suite stays offline. With the flag on, every `Work.save()` (creation or geometry edit) calls `works.services.geocoding.geocode_geometry(geom)` from a `pre_save` signal — each per-point lookup is cached in the per-process `LocMemCache` (key `reverse_geocode:<lat>:<lon>` with 3-decimal-place quantisation, ~100 m, 30-day TTL) so popular regions hit memory after the first lookup, keeping sustained Nominatim traffic well below the 1 req/s courtesy limit. On a complete geocoding outage (no point returned an address) the existing placename is preserved; on a real "geometry spans incompatible regions" outcome it is honestly cleared.
+
+Backfill the placename for an existing deployment:
 
 ```bash
 python manage.py backfill_placenames                  # all works missing placename
@@ -645,7 +651,22 @@ python manage.py backfill_placenames --force          # re-fetch existing entrie
 python manage.py backfill_placenames --sleep 1.5      # increase courtesy delay
 ```
 
-The command sleeps `--sleep` seconds (default 1.1) between cache *misses* to honour Nominatim's [1 req/s usage policy](https://operations.osmfoundation.org/policies/nominatim/). Cache hits are free. Failures (network errors, no result) are logged at WARNING level and leave the existing fields untouched — the meta tags simply omit `geo.placename` / `geo.region` until a successful lookup persists. Customise the User-Agent string via `OPTIMAP_GEOCODER_USER_AGENT`.
+The command sleeps `--sleep` seconds (default 1.1) between cache *misses* to honour Nominatim's [1 req/s usage policy](https://operations.osmfoundation.org/policies/nominatim/). Cache hits are free. Failures (network errors, no result) are logged at WARNING level and leave the existing placename untouched. Customise the User-Agent string via `OPTIMAP_GEOCODER_USER_AGENT`.
+
+### Country association (offline, issue #261)
+
+`Work.countries` is set by `works.services.countries.countries_for_geometry`, which intersects the geometry against the simplified `Country` outlines — so **`python manage.py load_countries` must have populated the `Country` table** for this to do anything. It runs in two places, both gated by `OPTIMAP_GEOCODE_WORKS_ON_SAVE`:
+
+- a `post_save` signal (`works.signals.assign_work_countries`) on every save, and
+- a **weekly self-healing sweep** (`works.tasks.backfill_work_countries`, scheduled automatically) that links any work which has geometry but no countries yet — covering works saved with the flag off, harvested before #261, or whose geometry only matched after `load_countries` ran. Ocean / no-match works are simply retried each run (the join is cheap). The sweep emails active staff a summary **only when something changed or errored**.
+
+Backfill or re-check on demand:
+
+```bash
+python manage.py backfill_work_countries              # link all works missing countries
+python manage.py backfill_work_countries --limit 200  # batch the first 200
+python manage.py backfill_work_countries --dry-run    # report counts, no DB writes or email
+```
 
 ## Block emails and domains (anti-spam)
 
@@ -825,15 +846,15 @@ When to clear which:
     3. *Simplify* each geometry with Douglas–Peucker (`OPTIMAP_COUNTRY_SIMPLIFICATION_TOLERANCE`, default `0.01` ≈ 1 km; raise to shrink the payload, `--tolerance 0` keeps full resolution) and wrap as `MultiPolygon`.
     4. *Store* via `update_or_create(iso_code=…)`, so re-running updates in place. Data dir honors `OPTIMAP_GLOBAL_REGIONS_DATA_DIR`. Loads ~237 countries/territories.
   - **File sizes:** 50m source GeoJSON ≈ 3.1 MB; the `/api/v1/countries/` payload served to the map is ≈ 1.6 MB at the default 0.01° tolerance (for comparison, the previous 110m source simplified at 0.05° was only ≈ 0.25 MB but far too coarse). The Countries overlay is off by default and fetched lazily only when toggled, so the larger payload has no cost until a user opts in.
-  - `iso_code` is ISO 3166-1 alpha-2 and matches `Work.country_code` — that's how `/at/<country>/` finds works.
+  - `iso_code` is ISO 3166-1 alpha-2 and links to works via the `Work.countries` M2M — that's how `/at/<country>/` finds works.
   - Exposed at `/api/v1/countries/` (GeoJSON) and rendered as the toggleable **Countries** overlay (off by default) on the main and collection maps.
-  - **Coverage caveat:** `/at/<country>/` undercounts when works lack a `country_code` — see the reverse-geocoding section below and issue [#261](https://github.com/GeoinformationSystems/optimap/issues/261). Run `python manage.py backfill_placenames` to populate codes for existing works.
+  - **Coverage caveat:** `/at/<country>/` undercounts when works are not yet linked to a country — see the [country association](#country-association-offline-issue-261) section. Run `python manage.py backfill_work_countries` (after `load_countries`) to link existing works; the weekly sweep does this automatically.
 
 ### Faceted permalink pages and source landing pages (#29, #253)
 
 Short, indexable URLs that list published works:
 
-- `/at/<place>/` — continent/ocean (`GlobalRegion`) or country (`Country`, by `country_code`).
+- `/at/<place>/` — continent/ocean (`GlobalRegion`) or country (`Country`, by the `Work.countries` M2M).
 - `/during/<year>/` — works whose **temporal coverage** (`Work.timeperiod_*` data years) covers the year — *not* `publicationDate`.
 - `/on/<topic>/` — works tagged with an OpenAlex topic (`Work.topics`).
 - `/in/<source-slug>/` — the **source landing page**: work list + coverage panel (latest `SourceCoverageSnapshot`: coverage %, with-geometry/temporal/open-access rates, contributors, per-year chart) + known totals (`Source.statistics`) + per-source GeoRSS/Atom feeds (`/api/v1/feeds/source-<slug>.rss|.atom`).

@@ -203,9 +203,11 @@
   {% if work.placename %}
     <span class="meta-item"><i class="fas fa-map-marker-alt text-muted"></i> <strong>Placename:</strong> {{ work.placename }} <i class="fas fa-info-circle text-muted" data-toggle="tooltip" title="This information was derived from the geometries of the work based on the Nominatim gazetteer." aria-label="This information was derived from the geometries of the work based on the Nominatim gazetteer."></i></span>
   {% endif %}
-  {% if work.country_code %}
-    <span class="meta-item"><i class="fas fa-globe text-muted"></i> <strong>Region:</strong> {{ work.country_code }} <i class="fas fa-info-circle text-muted" data-toggle="tooltip" title="This information was derived from the geometries of the work based on the Nominatim gazetteer." aria-label="This information was derived from the geometries of the work based on the Nominatim gazetteer."></i></span>
+  {% with work_countries=work.countries.all %}
+  {% if work_countries %}
+    <span class="meta-item"><i class="fas fa-globe text-muted"></i> <strong>{% if work_countries|length > 1 %}Countries{% else %}Country{% endif %}:</strong> {% for country in work_countries %}<a href="{{ country.get_absolute_url }}">{{ country.name }}</a>{% if not forloop.last %}, {% endif %}{% endfor %} <i class="fas fa-info-circle text-muted" data-toggle="tooltip" title="Derived from the work's geometries against Natural Earth country outlines." aria-label="Derived from the work's geometries against Natural Earth country outlines."></i></span>
   {% endif %}
+  {% endwith %}
   {% if work.doi %}<span class="meta-item"><i class="fas fa-fingerprint text-muted"></i> <strong>DOI:</strong> <a href="https://doi.org/{{ work.doi }}" target="_blank" rel="noopener">{{ work.doi }}</a></span>{% endif %}
   {% if work.publicationDate %}<span class="meta-item"><i class="fas fa-calendar-alt text-muted"></i> <strong>Published:</strong> {{ work.publicationDate }}</span>{% endif %}
   {% if work.source %}
@@ -1326,7 +1328,7 @@
 
         var geo = data.geocoding;
         if (geo && typeof geo === 'object' && Object.keys(geo).length) {
-          var geoKeys = ['gazetteer', 'gazetteer_url', 'placename', 'country_code', 'n_geocoded', 'geocoded_at'];
+          var geoKeys = ['gazetteer', 'gazetteer_url', 'placename', 'n_geocoded', 'geocoded_at'];
           var pairs = geoKeys.map(function (k) { return [k, geo[k]]; })
             .filter(function (p) { return p[1] != null && p[1] !== ''; });
           html += mkDl('Reverse geocoding', pairs);

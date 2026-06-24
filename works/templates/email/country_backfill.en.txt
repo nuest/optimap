@@ -1,0 +1,18 @@
+[OPTIMAP] 🗺️ Country backfill — {{ tally.updated }} work(s) updated
+
+Hello,
+
+Deployment: {{ base_url }}
+
+The scheduled country-code backfill sweep linked works to their countries via
+the offline point-in-polygon join against the Natural Earth outlines.
+
+Summary:
+- Works processed: {{ tally.processed }}
+- Works updated (countries linked): {{ tally.updated }}
+- … of which span multiple countries: {{ tally.multi_country }}
+- No polygon match (ocean / coastal gap, retried next run): {{ tally.no_match }}
+- Errors: {{ tally.errors }}
+
+Works with no polygon match are retried automatically on the next weekly run.
+If "Errors" is non-zero, check the application logs for details.

@@ -184,11 +184,12 @@ class Work(models.Model):
         blank=True,
         help_text="Reverse-geocoded placename for the geometry centroid (Nominatim).",
     )
-    country_code = models.CharField(
-        max_length=8,
-        null=True,
+    countries = models.ManyToManyField(
+        "Country",
+        related_name="works",
         blank=True,
-        help_text="ISO 3166-1 alpha-2 country code (or 3166-2 subdivision) for the geometry centroid.",
+        help_text="Countries whose outline intersects the work's geometry "
+        "(offline point-in-polygon join; multi-valued for transboundary studies).",
     )
 
     # OpenAlex-specific fields (only from OpenAlex)
@@ -265,6 +266,19 @@ class Work(models.Model):
     def is_redirected(self) -> bool:
         """True when this row is a merged-away duplicate (status='r')."""
         return self.status == "r"
+
+    @property
+    def country_codes(self) -> list[str]:
+        """Sorted ISO 3166-1 alpha-2 codes from the ``countries`` M2M (#261).
+
+        Iterates the related manager (not ``values_list``) so a
+        ``prefetch_related("countries")`` cache is reused rather than triggering
+        a fresh query per work. Empty for unsaved works or works with no
+        country association.
+        """
+        if not self.pk:
+            return []
+        return sorted(c.iso_code for c in self.countries.all())
 
     def canonical_work(self) -> "Work":
         """Return the canonical work this row resolves to.
@@ -608,10 +622,12 @@ class Country(models.Model):
     """A country with a simplified outline geometry, used for the /at/<country>
     permalink pages (issue #29) and a toggleable countries map layer.
 
-    ``iso_code`` is ISO 3166-1 alpha-2 and matches ``Work.country_code`` (set by
-    reverse-geocoding), which is how works are associated with a country. The
-    geometry is a simplified Natural Earth outline, stored for the map layer and
-    any future spatial filtering. Mirrors :class:`GlobalRegion`.
+    ``iso_code`` is ISO 3166-1 alpha-2. Works are associated with a country via
+    the ``Work.countries`` M2M (``related_name="works"``), populated by an
+    offline point-in-polygon join against ``geom`` (see
+    ``works.services.countries.countries_for_geometry``). The geometry is a
+    simplified Natural Earth outline, used for that join, the map layer, and the
+    ``/at/<country>`` pages. Mirrors :class:`GlobalRegion`.
     """
 
     name = models.CharField(max_length=100, unique=True)

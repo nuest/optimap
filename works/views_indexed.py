@@ -212,7 +212,7 @@ def _render_facet(
 
 
 def place_page(request, place_slug):
-    """Works in a continent/ocean (GlobalRegion) or a country (by country_code).
+    """Works in a continent/ocean (GlobalRegion) or a country (by Work.countries).
 
     An ISO 3166-1 alpha-2 code (e.g. ``/at/DE``) 301-redirects to the canonical
     country-name slug (``/at/germany``).
@@ -224,7 +224,7 @@ def place_page(request, place_slug):
             return redirect(by_code.get_absolute_url(), permanent=True)
 
     # Country-first: when a name is both a country and a continent (e.g.
-    # "Australia"), the country view (by country_code) wins so its work count
+    # "Australia"), the country view (by Work.countries) wins so its work count
     # matches the count shown on /countries. Continents/oceans keep their own
     # spatial landing pages under /regions/ (linked from the place index).
     # Lookup is via the indexed Country.slug, not a full-table scan.
@@ -234,7 +234,7 @@ def place_page(request, place_slug):
     extra = {"show_place_nav": True}
     if is_country:
         works = annotate_rounded_geometry(
-            Work.objects.filter(status="p", country_code=country.iso_code)
+            Work.objects.filter(status="p", countries=country)
             .select_related("source")
             .order_by("-creationDate", "-id")
         )
@@ -400,13 +400,11 @@ def _flag_emoji(iso_code):
 def _published_country_counts():
     """{iso_code: published-work count} for the country overviews."""
     rows = (
-        Work.objects.filter(status="p")
-        .exclude(country_code__isnull=True)
-        .exclude(country_code="")
-        .values("country_code")
-        .annotate(n=Count("id"))
+        Work.objects.filter(status="p", countries__isnull=False)
+        .values("countries__iso_code")
+        .annotate(n=Count("id", distinct=True))
     )
-    return {r["country_code"]: r["n"] for r in rows}
+    return {r["countries__iso_code"]: r["n"] for r in rows}
 
 
 def _countries_by_continent():

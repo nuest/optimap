@@ -58,15 +58,17 @@ OPTIMAP_SUPERUSER_EMAILS = [
 
 TEST_HARVESTING_ONLINE = env("OPTIMAP_TEST_HARVESTING_ONLINE", default=False)
 
-# Reverse-geocoding via Nominatim (issue #222) — populates Work.placename and
-# Work.country_code on save when geometry changes. Default is on in production
-# (so the `geo.placename` / `geo.region` HTML meta tags are emitted and the
+# Reverse-geocoding via Nominatim (issue #222) — populates Work.placename on
+# save when geometry changes, and gates the offline Work.countries point-in-
+# polygon assignment (issue #261). Default is on in production (so the
+# `geo.placename` / `geo.region` HTML meta tags are emitted and the
 # Work.provenance.geocoding block is populated by every harvester); the
 # 30-day per-coordinate LocMemCache absorbs repeat lookups so the 1 req/s
 # Nominatim courtesy budget is rarely tested. Forced off under the test
 # runner so the suite stays offline; opt out in a deployment by setting
 # OPTIMAP_GEOCODE_WORKS_ON_SAVE=False (e.g. during a bulk import where you
-# want to backfill placenames separately via `manage.py backfill_placenames`).
+# want to backfill separately via `manage.py backfill_placenames` and
+# `manage.py backfill_work_countries`).
 _RUNNING_TESTS = "test" in sys.argv or "pytest" in sys.modules or env("PYTEST_CURRENT_TEST", default="") != ""
 GEOCODE_WORKS_ON_SAVE = env(
     "OPTIMAP_GEOCODE_WORKS_ON_SAVE",

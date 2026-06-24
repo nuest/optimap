@@ -23,6 +23,12 @@ _CACHES = {
 }
 
 
+def _country_geom():
+    from django.contrib.gis.geos import MultiPolygon, Polygon
+
+    return MultiPolygon(Polygon(((0, 0), (1, 0), (1, 1), (0, 1), (0, 0))))
+
+
 def _make_published_work(**kwargs):
     return Work.objects.create(status="p", title="Test work", **kwargs)
 
@@ -95,8 +101,12 @@ class StatisticsSnapshotTests(TestCase):
         self.assertNotIn("Hidden", names)
 
     def test_snapshot_by_country_populated(self):
-        _make_published_work(country_code="DE")
-        _make_published_work(country_code="FR")
+        from works.models import Country
+
+        de = Country.objects.create(name="Germany", iso_code="DE", geom=_country_geom())
+        fr = Country.objects.create(name="France", iso_code="FR", geom=_country_geom())
+        _make_published_work().countries.add(de)
+        _make_published_work().countries.add(fr)
         from works.utils.statistics import save_statistics_snapshot
 
         snap = save_statistics_snapshot()

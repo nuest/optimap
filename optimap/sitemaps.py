@@ -149,14 +149,7 @@ class CountrySitemap(Sitemap):
     changefreq = "weekly"
 
     def items(self):
-        codes = set(
-            Work.objects.filter(status="p")
-            .exclude(country_code__isnull=True)
-            .exclude(country_code="")
-            .values_list("country_code", flat=True)
-            .distinct()
-        )
-        return Country.objects.filter(iso_code__in=codes).order_by("name")
+        return Country.objects.filter(works__status="p").distinct().order_by("name")
 
     def location(self, obj):
         return obj.get_absolute_url()

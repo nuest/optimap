@@ -74,14 +74,14 @@ def calculate_statistics():
     stats["by_continent"] = sorted(by_continent, key=lambda x: -x["count"])
     stats["by_ocean"] = sorted(by_ocean, key=lambda x: -x["count"])
 
-    # by_country — use country_code centroid field (ISO 3166-1 alpha-2)
+    # by_country — Work.countries M2M (ISO 3166-1 alpha-2); a transboundary work
+    # counts under each of its countries.
     stats["by_country"] = [
-        {"name": row["country_code"], "count": row["cnt"]}
+        {"name": row["countries__iso_code"], "count": row["cnt"]}
         for row in (
-            published.exclude(country_code__isnull=True)
-            .exclude(country_code="")
-            .values("country_code")
-            .annotate(cnt=Count("id"))
+            published.filter(countries__isnull=False)
+            .values("countries__iso_code")
+            .annotate(cnt=Count("id", distinct=True))
             .order_by("-cnt")[:100]
         )
     ]

@@ -706,6 +706,123 @@ def schedule_service_token_renewal_check():
 
 
 # -----------------------------------------------------------------------------
+# Country-code backfill sweep (issue #261).
+# -----------------------------------------------------------------------------
+
+
+def backfill_work_countries(trigger_source="scheduled", limit=None, dry_run=False):
+    """Link ``Work.countries`` for works that have geometry but no countries yet.
+
+    Self-healing catch-up for the on-save signal: fills works saved with
+    geocoding off, harvested before #261, or whose geometry never matched (the
+    offline point-in-polygon join is deterministic and cheap, so ocean / no-match
+    works are simply retried each run). Uses
+    ``works.services.countries.countries_for_geometry`` — the same helper as the
+    post-save signal — so multi-country geometries link every intersecting
+    country.
+
+    Emails active staff a summary **only when something changed or errored**
+    (silent on no-op runs), following the ``check_service_token_renewals``
+    pattern. Returns the tally dict for callers/tests.
+    """
+    from works.models import Country
+    from works.services.countries import countries_for_geometry
+
+    tally = {"processed": 0, "updated": 0, "multi_country": 0, "no_match": 0, "errors": 0}
+
+    if not Country.objects.exists():
+        logger.warning("backfill_work_countries: Country table empty — run load_countries first; skipping.")
+        return tally
+
+    qs = (
+        Work.objects.filter(geometry__isnull=False)
+        .exclude(geometry__isempty=True)
+        .filter(countries__isnull=True)
+        .order_by("id")
+    )
+    if limit:
+        qs = qs[:limit]
+
+    for work in qs.iterator():
+        tally["processed"] += 1
+        # Intermediate progress so a long sweep over thousands of works is
+        # visible in the Q-cluster log rather than going silent until the end.
+        if tally["processed"] % 100 == 0:
+            logger.info(
+                "backfill_work_countries: progress — processed %d, updated %d, no-match %d, errors %d.",
+                tally["processed"],
+                tally["updated"],
+                tally["no_match"],
+                tally["errors"],
+            )
+        try:
+            countries = countries_for_geometry(work.geometry)
+        except Exception:  # noqa: BLE001
+            logger.exception("backfill_work_countries: lookup failed for work %s.", work.pk)
+            tally["errors"] += 1
+            continue
+        if not countries:
+            tally["no_match"] += 1
+            continue
+        if len(countries) > 1:
+            tally["multi_country"] += 1
+        if not dry_run:
+            work.countries.set(countries)
+        tally["updated"] += 1
+
+    logger.info(
+        "backfill_work_countries: processed %d, updated %d (multi %d), no-match %d, errors %d%s.",
+        tally["processed"],
+        tally["updated"],
+        tally["multi_country"],
+        tally["no_match"],
+        tally["errors"],
+        " (dry-run)" if dry_run else "",
+    )
+
+    if dry_run or not (tally["updated"] or tally["errors"]):
+        return tally
+
+    User = get_user_model()
+    admin_emails = list(
+        User.objects.filter(is_staff=True, is_active=True).exclude(email="").values_list("email", flat=True)
+    )
+    if not admin_emails:
+        logger.warning("backfill_work_countries: no staff emails configured; skipping notification.")
+        return tally
+
+    subject, body = render_email(
+        "email/country_backfill.en.txt",
+        {"tally": tally, "base_url": settings.BASE_URL},
+    )
+    for admin_email in admin_emails:
+        try:
+            send_mail(subject, body, settings.EMAIL_HOST_USER, [admin_email], fail_silently=False)
+            EmailLog.log_email(admin_email, subject, body, trigger_source=trigger_source, status="success")
+        except Exception as ex:  # noqa: BLE001
+            logger.exception("backfill_work_countries: failed to email %s.", admin_email)
+            EmailLog.log_email(
+                admin_email, subject, body, trigger_source=trigger_source, status="failed", error_message=str(ex)
+            )
+        time.sleep(settings.EMAIL_SEND_DELAY)
+
+    return tally
+
+
+def schedule_backfill_work_countries():
+    if not Schedule.objects.filter(func="works.tasks.backfill_work_countries").exists():
+        schedule(
+            "works.tasks.backfill_work_countries",
+            schedule_type="W",
+            repeats=-1,
+            # Offset from the other weekly sweeps so they don't all fire at 08:00.
+            next_run=_next_monday().replace(hour=4),
+            intended_date_kwarg="scheduled_for",
+        )
+        logger.info("Scheduled backfill_work_countries weekly.")
+
+
+# -----------------------------------------------------------------------------
 # OpenAIRE backfill enrichment.
 # -----------------------------------------------------------------------------
 
@@ -863,7 +980,6 @@ _DUMP_FIELDS = [
     "topics",
     "bok_concepts",
     "placename",
-    "country_code",
     "openalex_id",
     "openalex_open_access_status",
     "openalex_is_retracted",
@@ -878,7 +994,7 @@ def regenerate_geojson_cache():
     json_path = os.path.join(cache_dir, json_filename)
 
     works_qs = annotate_rounded_geometry(
-        Work.objects.filter(status="p").select_related("source").prefetch_related("collections")
+        Work.objects.filter(status="p").select_related("source").prefetch_related("collections", "countries")
     )
 
     base_url = settings.BASE_URL.rstrip("/")
@@ -887,6 +1003,7 @@ def regenerate_geojson_cache():
         props = {field: getattr(w, field) for field in _DUMP_FIELDS}
         props.update(
             {
+                "country_codes": w.country_codes,
                 "source_name": w.source.name if w.source else None,
                 "source_url": f"{base_url}/api/v1/sources/{w.source.pk}/" if w.source else None,
                 "collections": [c.identifier for c in w.collections.all()],

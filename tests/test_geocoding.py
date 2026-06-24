@@ -389,10 +389,11 @@ class WorkPreSaveGeocodeSignalTests(TestCase):
             )
             gg.assert_not_called()
         self.assertIsNone(work.placename)
-        self.assertIsNone(work.country_code)
 
     @override_settings(GEOCODE_WORKS_ON_SAVE=True)
-    def test_signal_populates_placename_and_country_when_enabled(self):
+    def test_signal_populates_placename_when_enabled(self):
+        # Country association is handled by a separate offline signal (#261);
+        # this signal only fills the Nominatim placename string.
         with mock.patch(
             "works.services.geocoding.geocode_geometry",
             return_value=("Berlin, Germany", "DE", 1),
@@ -406,7 +407,6 @@ class WorkPreSaveGeocodeSignalTests(TestCase):
                 url="https://example.test/article/signal-on",
             )
         self.assertEqual(work.placename, "Berlin, Germany")
-        self.assertEqual(work.country_code, "DE")
 
     @override_settings(GEOCODE_WORKS_ON_SAVE=True)
     def test_signal_inert_when_no_geometry(self):
@@ -421,7 +421,6 @@ class WorkPreSaveGeocodeSignalTests(TestCase):
             )
             gg.assert_not_called()
         self.assertIsNone(work.placename)
-        self.assertIsNone(work.country_code)
 
     @override_settings(GEOCODE_WORKS_ON_SAVE=True)
     def test_signal_preserves_fields_when_all_geocodes_fail(self):
@@ -447,7 +446,6 @@ class WorkPreSaveGeocodeSignalTests(TestCase):
             work.save()
         work.refresh_from_db()
         self.assertEqual(work.placename, "Berlin, Germany")
-        self.assertEqual(work.country_code, "DE")
 
     @override_settings(GEOCODE_WORKS_ON_SAVE=True)
     def test_signal_clears_fields_on_real_no_lca(self):
@@ -473,4 +471,3 @@ class WorkPreSaveGeocodeSignalTests(TestCase):
             work.save()
         work.refresh_from_db()
         self.assertIsNone(work.placename)
-        self.assertIsNone(work.country_code)

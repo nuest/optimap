@@ -24,10 +24,10 @@ class PlacePageTests(TestCase):
         self.germany = Country.objects.create(
             name="Germany", iso_code="DE", continent="Europe", geom=MultiPolygon(_square(10, 51))
         )
-        Work.objects.create(
-            status="p", title="German study", country_code="DE", geometry=GeometryCollection(Point(10, 51))
-        )
-        Work.objects.create(status="p", title="French study", country_code="FR")
+        german = Work.objects.create(status="p", title="German study", geometry=GeometryCollection(Point(10, 51)))
+        german.countries.add(self.germany)
+        # No France Country row — the French study simply has no country link.
+        Work.objects.create(status="p", title="French study")
 
     def test_country_page(self):
         resp = self.client.get(reverse("optimap:at-place", kwargs={"place_slug": "germany"}))
@@ -38,8 +38,10 @@ class PlacePageTests(TestCase):
 
     def test_no_map_when_no_geometry(self):
         # A country whose published works have no geometry shows no (empty) map.
-        Country.objects.create(name="Mali", iso_code="ML", continent="Africa", geom=MultiPolygon(_square(-4, 17)))
-        Work.objects.create(status="p", title="Mali study", country_code="ML")  # no geometry
+        mali = Country.objects.create(
+            name="Mali", iso_code="ML", continent="Africa", geom=MultiPolygon(_square(-4, 17))
+        )
+        Work.objects.create(status="p", title="Mali study").countries.add(mali)  # no geometry
         resp = self.client.get(reverse("optimap:at-place", kwargs={"place_slug": "mali"}))
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Mali study")
@@ -65,7 +67,7 @@ class PlacePageTests(TestCase):
 
     def test_country_wins_over_same_named_continent(self):
         """When a country and continent share a name (Australia), /at/<slug>
-        shows the country (by country_code), so the count matches /countries."""
+        shows the country (by Work.countries), so the count matches /countries."""
         from works.models import GlobalRegion
 
         GlobalRegion.objects.create(
@@ -75,13 +77,13 @@ class PlacePageTests(TestCase):
             license="x",
             geom=MultiPolygon(_square(134, -25, 20)),
         )
-        Country.objects.create(
+        australia = Country.objects.create(
             name="Australia", iso_code="AU", continent="Oceania", geom=MultiPolygon(_square(134, -25, 5))
         )
-        # 2 works tagged AU by country_code; the continent polygon also covers a
-        # geometry-only work that must NOT be counted on the country page.
-        Work.objects.create(status="p", title="AU tagged", country_code="AU")
-        Work.objects.create(status="p", title="AU tagged 2", country_code="AU")
+        # 2 works linked to AU; the continent polygon also covers a geometry-only
+        # work that must NOT be counted on the country page.
+        Work.objects.create(status="p", title="AU tagged").countries.add(australia)
+        Work.objects.create(status="p", title="AU tagged 2").countries.add(australia)
         Work.objects.create(status="p", title="In-continent only", geometry=GeometryCollection(Point(134, -25)))
         cache.clear()
         resp = self.client.get("/at/australia/")
@@ -224,17 +226,17 @@ class IndexedSitemapTests(TestCase):
     def setUp(self):
         cache.clear()
         self.source = Source.objects.create(name="Sitemap Source", url_field="https://e.org/oai")
-        Country.objects.create(name="Germany", iso_code="DE", geom=MultiPolygon(_square(10, 51)))
-        Work.objects.create(
+        germany = Country.objects.create(name="Germany", iso_code="DE", geom=MultiPolygon(_square(10, 51)))
+        work = Work.objects.create(
             status="p",
             title="Sitemap work",
             source=self.source,
-            country_code="DE",
             topics=["Geodesy"],
             geometry=GeometryCollection(Point(10, 51)),
             timeperiod_startdate=["2022-01-01"],
             timeperiod_enddate=["2022-12-31"],
         )
+        work.countries.add(germany)
 
     def test_sitemaps_contain_new_facets(self):
         from optimap.sitemaps import (

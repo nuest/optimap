@@ -265,8 +265,10 @@ def _build_schema_org(work, request, canonical, image, authors, keywords, descri
         # share the same denormalized values.
         if getattr(work, "placename", None):
             place["name"] = work.placename
-        if getattr(work, "country_code", None):
-            place["addressCountry"] = work.country_code
+        country_codes = work.country_codes
+        if country_codes:
+            # schema.org addressCountry accepts a single value or a list.
+            place["addressCountry"] = country_codes[0] if len(country_codes) == 1 else country_codes
         payload["spatialCoverage"] = place
     temporal_intervals = _temporal_iso_intervals(work)
     if temporal_intervals:
@@ -318,7 +320,8 @@ def geo_meta_tags(work) -> list[dict]:
     - ``geo.position``  → ``"lat;lon"`` (semicolon)
     - ``ICBM``          → ``"lat, lon"`` (comma + space)
     - ``geo.placename`` → human-readable placename, when ``Work.placename`` is set
-    - ``geo.region``    → ISO 3166-1/-2 code, when ``Work.country_code`` is set
+    - ``geo.region``    → ISO 3166-1 alpha-2 code(s) from ``Work.countries``
+      (comma-joined when the geometry spans multiple countries)
 
     Returns ``[]`` when the work has no geometry. The two coordinate-based
     tags use different separators by design — both forms are still consumed
@@ -339,9 +342,9 @@ def geo_meta_tags(work) -> list[dict]:
     placename = getattr(work, "placename", None)
     if placename:
         tags.append({"name": "geo.placename", "content": placename})
-    country_code = getattr(work, "country_code", None)
-    if country_code:
-        tags.append({"name": "geo.region", "content": country_code})
+    country_codes = work.country_codes
+    if country_codes:
+        tags.append({"name": "geo.region", "content": ", ".join(country_codes)})
     return tags
 
 

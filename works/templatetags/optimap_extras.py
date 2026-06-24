@@ -112,7 +112,6 @@ def render_provenance(provenance):
             ("Gazetteer", "gazetteer"),
             ("Gazetteer URL", "gazetteer_url"),
             ("Placename", "placename"),
-            ("Country code", "country_code"),
             ("Points geocoded", "n_geocoded"),
             ("Geocoded at", "geocoded_at"),
         ):
@@ -123,7 +122,7 @@ def render_provenance(provenance):
         block = (
             format_html(
                 '<h6 class="mt-2 mb-1">Reverse geocoding</h6>'
-                '<p class="small text-muted mb-1">Placename and country code derived from the work\'s geometries via the Nominatim gazetteer.</p>'
+                '<p class="small text-muted mb-1">Placename derived from the work\'s geometries via the Nominatim gazetteer. Country association is derived separately by a point-in-polygon join with Natural Earth data (see Work.countries).</p>'
                 '<dl class="row mb-2 small">{}</dl>',
                 format_html_join("", '<dt class="col-sm-3 text-muted">{}</dt><dd class="col-sm-9">{}</dd>', rows),
             )

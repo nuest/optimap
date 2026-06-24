@@ -97,12 +97,15 @@ class PublicationsApiTest(TestCase):
         response = self.client.get("/api/v1/works/99.json")
         self.assertEqual(response.status_code, 404)
 
-    def test_api_exposes_placename_and_country_code(self):
-        # Reverse-geocoded fields populated by the geocoding pipeline must
-        # surface in the public API so consumers can render them without a
-        # second roundtrip. Bypass the pre_save geocoding signal via
-        # queryset.update() so the test does not depend on Nominatim or its
-        # canonicalisation of "Berlin" → "Berlin, Germany".
+    def test_api_exposes_placename_and_country_codes(self):
+        # Reverse-geocoded placename + the Work.countries M2M must surface in
+        # the public API so consumers can render them without a second
+        # roundtrip. Bypass the pre_save geocoding signal via queryset.update()
+        # so the test does not depend on Nominatim.
+        from django.contrib.gis.geos import MultiPolygon, Polygon
+
+        from works.models import Country
+
         pub = Work.objects.create(
             title="Geocoded Work",
             url="https://example.com/geo",
@@ -110,21 +113,27 @@ class PublicationsApiTest(TestCase):
             publicationDate=date(2026, 1, 1),
             geometry=GeometryCollection(Point(13.405, 52.52)),
         )
-        Work.objects.filter(pk=pub.pk).update(placename="Berlin", country_code="DE")
+        Work.objects.filter(pk=pub.pk).update(placename="Berlin")
+        germany = Country.objects.create(
+            name="Germany",
+            iso_code="DE",
+            geom=MultiPolygon(Polygon(((13, 52), (14, 52), (14, 53), (13, 53), (13, 52)))),
+        )
+        pub.countries.add(germany)
         response = self.client.get(f"/api/v1/works/{pub.id}.json")
         self.assertEqual(response.status_code, 200)
         properties = response.json()["properties"]
         self.assertEqual(properties["placename"], "Berlin")
-        self.assertEqual(properties["country_code"], "DE")
+        self.assertEqual(properties["country_codes"], ["DE"])
 
     def test_api_emits_null_placename_when_unset(self):
-        # Works without geocoding still expose the keys (set to null) so the
-        # response shape is stable for clients.
+        # Works without geocoding still expose the keys (placename null,
+        # country_codes empty) so the response shape is stable for clients.
         properties = self.client.get("/api/v1/works/").json()["results"]["features"][0]["properties"]
         self.assertIn("placename", properties)
-        self.assertIn("country_code", properties)
+        self.assertIn("country_codes", properties)
         self.assertIsNone(properties["placename"])
-        self.assertIsNone(properties["country_code"])
+        self.assertEqual(properties["country_codes"], [])
 
     def test_api_exposes_status_for_frontend_layer_split(self):
         # The frontend splits the map into a "Published" and an "Unpublished"

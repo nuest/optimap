@@ -197,6 +197,10 @@ class WorkSerializer(GeoFeatureModelSerializer):
     bok_concepts_resolved = serializers.SerializerMethodField(
         help_text="Each BoK code resolved against the active EO4GEO BoK snapshot: code, name, uri, parent_code, breadcrumb, orphan flag."
     )
+    country_codes = serializers.SerializerMethodField(
+        help_text="ISO 3166-1 alpha-2 codes of the countries the geometry intersects "
+        "(offline point-in-polygon join; multi-valued for transboundary works)."
+    )
 
     class Meta:
         model = Work
@@ -213,7 +217,7 @@ class WorkSerializer(GeoFeatureModelSerializer):
             "timeperiod_startdate",
             "timeperiod_enddate",
             "placename",
-            "country_code",
+            "country_codes",
             "source_details",
             "status",
             "status_display",
@@ -256,6 +260,10 @@ class WorkSerializer(GeoFeatureModelSerializer):
         if not source:
             return {}
         return SourceSerializer(source, context=self.context).data
+
+    @extend_schema_field(serializers.ListField(child=serializers.CharField()))
+    def get_country_codes(self, obj):
+        return obj.country_codes
 
     @extend_schema_field(serializers.ListField(child=serializers.DictField()))
     def get_bok_concepts_resolved(self, obj):

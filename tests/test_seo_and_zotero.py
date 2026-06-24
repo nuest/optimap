@@ -78,12 +78,25 @@ def _find_jsonld(soup: BeautifulSoup) -> list[dict]:
     return blobs
 
 
+def _indonesia():
+    from django.contrib.gis.geos import MultiPolygon, Polygon
+
+    from works.models import Country
+
+    return Country.objects.create(
+        name="Indonesia",
+        iso_code="ID",
+        geom=MultiPolygon(Polygon(((118, -3), (122, -3), (122, 1), (118, 1), (118, -3)))),
+    )
+
+
 @override_settings(GEOCODE_WORKS_ON_SAVE=False)
 class WorkLandingSEOTests(TestCase):
     """SEO / meta-tag rendering tests. The reverse-geocoding pre_save signal
-    is disabled here so the test suite never hits Nominatim — placename /
-    country_code are exercised by the dedicated tests in test_geocoding.py
-    and assigned directly here to verify the *rendering* path."""
+    is disabled here so the test suite never hits Nominatim — placename is
+    exercised by the dedicated tests in test_geocoding.py, and country
+    association (Work.countries) is linked directly here to verify the
+    *rendering* path."""
 
     def setUp(self):
         self.client = Client()
@@ -350,8 +363,8 @@ class WorkLandingSEOTests(TestCase):
         # When the denormalized fields are populated (by the pre_save signal
         # or the backfill command), the corresponding meta tags appear.
         self.work.placename = "Sulawesi, Indonesia"
-        self.work.country_code = "ID"
         self.work.save()
+        self.work.countries.add(_indonesia())
         resp = self.client.get(self.url)
         soup = BeautifulSoup(resp.content, "html.parser")
         placename = soup.find("meta", attrs={"name": "geo.placename"})
@@ -398,8 +411,8 @@ class WorkLandingSEOTests(TestCase):
         # When the new denormalized fields are populated, the JSON-LD Place
         # carries the placename + ISO country code as well.
         self.work.placename = "Sulawesi, Indonesia"
-        self.work.country_code = "ID"
         self.work.save()
+        self.work.countries.add(_indonesia())
         resp = self.client.get(self.url)
         soup = BeautifulSoup(resp.content, "html.parser")
         article = next(

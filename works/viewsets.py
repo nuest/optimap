@@ -198,16 +198,16 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
                 ).order_by("_status_priority", "-creationDate", "-id")
             else:
                 qs = qs.order_by("-creationDate", "-id")
-            return annotate_rounded_geometry(qs)
+            return annotate_rounded_geometry(qs).prefetch_related("countries")
         if getattr(self, "action", None) == "provenance" and self.request.user.is_authenticated:
             curated = Work.objects.filter(collections__curators=self.request.user)
             public = Work.objects.filter(status="p")
             qs = (curated | public).distinct()
             if not include_redirected:
                 qs = qs.exclude(status="r")
-            return annotate_rounded_geometry(qs)
+            return annotate_rounded_geometry(qs).prefetch_related("countries")
         public = Work.objects.filter(status="p").order_by("-creationDate", "-id").distinct()
-        return annotate_rounded_geometry(public)
+        return annotate_rounded_geometry(public).prefetch_related("countries")
 
     @extend_schema(
         summary="Retrieve provenance for a work",
@@ -268,7 +268,6 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
             "|-----|------|-------------|\n"
             "| `gazetteer` | string | Always `nominatim` |\n"
             "| `placename` | string | Human-readable location hierarchy, e.g. `Sulawesi, Indonesia` |\n"
-            "| `country_code` | string | ISO 3166-1 alpha-2, e.g. `ID` |\n"
             "| `n_geocoded` | integer | Number of geometry points successfully reverse-geocoded |\n"
             "| `geocoded_at` | string | ISO 8601 timestamp |\n"
             "| `matches` | array | Per-point Nominatim results (display name, OSM type/id/url, lat, lon) |\n\n"
@@ -333,7 +332,7 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
                         required=False,
                         help_text=(
                             "Reverse-geocoding via Nominatim. "
-                            "Keys: gazetteer, placename, country_code, n_geocoded, geocoded_at, matches."
+                            "Keys: gazetteer, placename, n_geocoded, geocoded_at, matches."
                         ),
                     ),
                     "dedup": drf_serializers.DictField(
@@ -410,7 +409,6 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
                     "geocoding": {
                         "gazetteer": "nominatim",
                         "placename": "Sulawesi, Indonesia",
-                        "country_code": "ID",
                         "n_geocoded": 2,
                         "geocoded_at": "2026-04-30T12:00:05+00:00",
                     },
@@ -476,7 +474,6 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
                     "geocoding": {
                         "gazetteer": "nominatim",
                         "placename": "Uttarakhand, India",
-                        "country_code": "IN",
                         "n_geocoded": 5,
                         "geocoded_at": "2026-03-10T06:30:10+00:00",
                     },
@@ -770,8 +767,8 @@ class GlobalRegionViewSet(viewsets.ReadOnlyModelViewSet):
         summary="List countries (outline geometries)",
         description=(
             "Country outlines (simplified Natural Earth geometries) as a GeoJSON FeatureCollection, "
-            "used by the toggleable countries map layer. `iso_code` is ISO 3166-1 alpha-2 and matches "
-            "`Work.country_code`; `absolute_url` links to the `/at/<country>/` landing page."
+            "used by the toggleable countries map layer. `iso_code` is ISO 3166-1 alpha-2 and links to "
+            "works via the `Work.countries` M2M; `absolute_url` links to the `/at/<country>/` landing page."
         ),
         tags=["Global regions"],
     ),

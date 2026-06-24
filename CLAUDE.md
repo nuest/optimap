@@ -253,6 +253,17 @@ python manage.py enrich_openaire
 # or store a monthly refresh token in the ServiceToken admin.
 # See docs/manage.md → "OpenAIRE enrichment" / "Renewing the OpenAIRE refresh token".
 
+# Link Work.countries via offline point-in-polygon join (issue #261)
+python manage.py backfill_work_countries
+# Links each work (with geometry but no countries) to every Country whose Natural
+# Earth outline intersects its geometry — multi-valued for transboundary works.
+# Needs `load_countries` to have populated the Country table. A weekly self-healing
+# sweep (works.tasks.backfill_work_countries) does this automatically and emails
+# staff on change/error; the post_save signal handles it on save (gated by
+# OPTIMAP_GEOCODE_WORKS_ON_SAVE). country_code (scalar) was replaced by the
+# Work.countries M2M; the API exposes `country_codes` (list). Flags: --limit, --dry-run.
+# `backfill_placenames` now fills only Work.placename (Nominatim), not country.
+
 # Generate pygeoapi OpenAPI document (required for /ogcapi/ endpoint)
 python manage.py generate_pygeoapi_openapi
 # Reads etc/pygeoapi-config.yml and writes etc/pygeoapi-openapi.yml.

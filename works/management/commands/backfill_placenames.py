@@ -1,7 +1,11 @@
 # SPDX-FileCopyrightText: 2026 OPTIMETA and KOMET projects <https://projects.tib.eu/komet>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Backfill ``Work.placename`` and ``Work.country_code`` via reverse geocoding.
+"""Backfill ``Work.placename`` via reverse geocoding.
+
+Country association lives in the ``Work.countries`` M2M — populated separately by
+the offline point-in-polygon sweep (``manage.py backfill_work_countries``), not
+here. This command only fills the Nominatim placename string.
 
 Iterates over works that have geometry but no placename yet, calls
 ``works.services.geocoding.geocode_geometry`` (which geocodes each
@@ -39,7 +43,7 @@ from works.services.geocoding import (
 
 
 class Command(BaseCommand):
-    help = "Reverse-geocode Work.placename / country_code for works with geometry."
+    help = "Reverse-geocode Work.placename for works with geometry."
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -119,10 +123,8 @@ class Command(BaseCommand):
                         }
                     )
 
-            placename, country_code = _common_address(addresses)
-            self.stdout.write(
-                f"work {work.id}: {len(points)} point(s), {len(addresses)} geocoded → {placename!r} / {country_code!r}"
-            )
+            placename, _country_code = _common_address(addresses)
+            self.stdout.write(f"work {work.id}: {len(points)} point(s), {len(addresses)} geocoded → {placename!r}")
             if not addresses:
                 # All Nominatim calls failed — leave the work alone.
                 continue
@@ -133,7 +135,6 @@ class Command(BaseCommand):
                 "gazetteer": "Nominatim",
                 "gazetteer_url": "https://nominatim.openstreetmap.org/",
                 "placename": placename,
-                "country_code": country_code,
                 "n_geocoded": len(addresses),
                 "matches": matches,
                 "geocoded_at": timezone.now().isoformat(),
@@ -142,16 +143,11 @@ class Command(BaseCommand):
             new_provenance = dict(existing_provenance)
             new_provenance["geocoding"] = geocoding_block
 
-            changed = (
-                work.placename != placename
-                or work.country_code != country_code
-                or existing_provenance.get("geocoding") != geocoding_block
-            )
+            changed = work.placename != placename or existing_provenance.get("geocoding") != geocoding_block
             if changed:
                 # Use update() to avoid bumping lastUpdate / re-running signals.
                 Work.objects.filter(pk=work.pk).update(
                     placename=placename,
-                    country_code=country_code,
                     provenance=new_provenance,
                 )
                 updated += 1

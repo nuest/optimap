@@ -72,12 +72,12 @@ def invalidate_work_preview_cache(sender, instance, **kwargs):
         logger.debug("preview cache invalidation failed for work %s: %s", instance.pk, err)
 
 
-# --- Reverse-geocoded placename / country_code (issue #222) -----------------
+# --- Reverse-geocoded placename (#222) + offline country assignment (#261) ---
 
 
 @receiver(pre_save, sender=_Work)
 def update_work_placename(sender, instance, **kwargs):
-    """Populate ``placename`` + ``country_code`` via per-point reverse geocoding.
+    """Populate ``placename`` via per-point reverse geocoding.
 
     Gated by ``OPTIMAP_GEOCODE_WORKS_ON_SAVE`` — defaults to ``True`` in
     production and is forced off under the test runner (see ``settings.py``).
@@ -85,9 +85,13 @@ def update_work_placename(sender, instance, **kwargs):
 
     Multi-point geometries are geocoded per-site and reduced to the lowest
     common ancestor in the address hierarchy — a work covering Berlin and
-    Munich becomes ``("Germany", "DE")`` rather than the misleading
+    Munich becomes ``"Germany"`` rather than the misleading
     centroid-of-Berlin-and-Munich result. See
     ``works.services.geocoding.geocode_geometry``.
+
+    Country association is *not* set here: it lives in the ``Work.countries``
+    M2M, populated by the offline point-in-polygon join in
+    ``assign_work_countries`` (post-save) — see issue #261.
 
     On a complete geocoding failure (no point returned an address — typically
     a transient Nominatim outage) we leave the existing fields untouched
@@ -106,7 +110,7 @@ def update_work_placename(sender, instance, **kwargs):
             geocode_geometry,
         )
 
-        placename, country_code, n_geocoded = geocode_geometry(geom)
+        placename, _country_code, n_geocoded = geocode_geometry(geom)
     except Exception as err:  # pragma: no cover — geocode_geometry never raises
         logger.warning("reverse-geocode failed for work %s: %s", instance.pk, err)
         return
@@ -116,7 +120,6 @@ def update_work_placename(sender, instance, **kwargs):
         # describes the values currently in the DB).
         return
     instance.placename = placename
-    instance.country_code = country_code
 
     # Per-point matches (cache hit since geocode_geometry just populated it).
     # For multi-point geometries the LCA placename is broader than any single
@@ -129,15 +132,39 @@ def update_work_placename(sender, instance, **kwargs):
         matches = []
 
     # Record reverse-geocoding provenance — single block, overwritten on each
-    # successful run, so it always describes the current placename / country.
+    # successful run, so it always describes the current placename.
     provenance = instance.provenance if isinstance(instance.provenance, dict) else {}
     provenance["geocoding"] = {
         "gazetteer": "Nominatim",
         "gazetteer_url": "https://nominatim.openstreetmap.org/",
         "placename": placename,
-        "country_code": country_code,
         "n_geocoded": n_geocoded,
         "matches": matches,
         "geocoded_at": timezone.now().isoformat(),
     }
     instance.provenance = provenance
+
+
+@receiver(post_save, sender=_Work)
+def assign_work_countries(sender, instance, **kwargs):
+    """Populate ``Work.countries`` via an offline point-in-polygon join (#261).
+
+    Runs post-save (M2M needs a PK). Gated by ``OPTIMAP_GEOCODE_WORKS_ON_SAVE``
+    for parity with the Nominatim placename signal — the recurring sweep
+    (``works.tasks.backfill_work_countries``) is the guaranteed catch-up path
+    for works saved with it off, during a load before ``load_countries``, or
+    legacy records. Naturally multi-valued: a transboundary geometry links
+    every intersecting country. ``set()`` does not re-fire ``Work`` save, so
+    there is no recursion.
+    """
+    if not getattr(settings, "GEOCODE_WORKS_ON_SAVE", False):
+        return
+    geom = instance.geometry
+    if not geom or geom.empty:
+        return
+    try:
+        from works.services.countries import countries_for_geometry
+
+        instance.countries.set(countries_for_geometry(geom))
+    except Exception as err:  # pragma: no cover — non-critical path
+        logger.warning("country assignment failed for work %s: %s", instance.pk, err)
