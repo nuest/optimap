@@ -8,12 +8,22 @@ OPTIMAP is a geospatial discovery portal for research articles based on open met
 
 Part of the KOMET project (<https://projects.tib.eu/komet>), continuing from OPTIMETA (<https://projects.tib.eu/optimeta>). Source code and issue tracker: <https://github.com/GeoinformationSystems/optimap>.
 
+## General workflow (every task)
+
+Apply these steps to every task. Most are conditional — check whether the condition is met before acting.
+
+- **Keep a to-do list** for any non-trivial task (multi-step or touching more than one file). Track progress as you go.
+- **Run `/simplify`** after completing any non-trivial change (more than 20 lines of code), **before** running the test suite.
+- **Run `/code-review`** after completing any complex change set (more than 5 changed files **or** more than 100 lines of code), **before** running the test suite. (For very large or risky changes, run both `/simplify` and `/code-review`.)
+- **Run the test suite** after the cleanup/review steps above (see [Testing](#testing)).
+- **Always include questions in a plan**, both for clarification (missing requirements, ambiguity) and for judgement calls (design trade-offs where more than one reasonable choice exists). Before presenting a plan via `ExitPlanMode`, re-read this section and fold the applicable steps (to-do list, `/simplify`, `/code-review`, test suite) into the plan itself so they are scheduled, not forgotten.
+
 ## Companion docs
 
 - [README.md](README.md) — developer / deployer setup, local dev, harvesting CLI.
 - [docs/manage.md](docs/manage.md) — admin / operator handbook (Django admin workflows, harvesting management, suggested sections for the rest of the admin surface). When the user asks about how to run, monitor, or troubleshoot a feature **as an admin**, read this first and update it as features change.
 - [CHANGELOG.md](CHANGELOG.md) — Keep-a-Changelog-formatted release notes; update on every user-visible change.
-- [docs/geoextent_response_formats.md](docs/geoextent_response_formats.md) — geoextent API response shapes.
+- [docs/geoextent_api.md](docs/geoextent_api.md) — geoextent API endpoints, parameters, and response shapes.
 
 ## Core Architecture
 
@@ -59,56 +69,16 @@ Part of the KOMET project (<https://projects.tib.eu/komet>), continuing from OPT
 
 ## Development Commands
 
-### Docker Development
+### Local & Docker development
 
-```bash
-# Start all services (app, db, webserver)
-docker compose up
+Full setup — venv, GDAL, PostGIS container, `migrate`, `createcachetable`,
+`load_global_regions`, `qcluster`, `generate_pygeoapi_openapi` — is documented in
+[README.md](README.md#development). Quick reference:
 
-# Load test data
-docker compose run --entrypoint python app manage.py loaddata fixtures/test_data.json
-
-# Create superuser
-docker compose run --entrypoint python app manage.py createsuperuser
-
-# Run migrations manually (normally auto-applied via etc/manage-and-run.sh)
-docker compose run --entrypoint python app manage.py migrate
-
-# Collect static files
-docker compose run --entrypoint python app manage.py collectstatic --noinput
-```
-
-Access at <http://localhost:80/> (note: use `localhost` not `127.0.0.1` to avoid CSRF issues)
-
-### Local Development
-
-```bash
-# Setup (once)
-python -m venv .venv
-source .venv/bin/activate
-pip install gdal=="$(gdal-config --version).*"
-pip install -r requirements.txt
-
-# Start local PostGIS container
-docker run --name optimapDB -p 5432:5432 \
-  -e POSTGRES_USER=optimap -e POSTGRES_PASSWORD=optimap \
-  -e POSTGRES_DB=optimap -d postgis/postgis:14-3.3
-
-# Apply migrations
-python manage.py migrate
-python manage.py createcachetable
-
-# Load global regions (required for predefined feeds)
-python manage.py load_global_regions
-
-# Start Django-Q cluster (separate terminal, required for harvesting/tasks)
-python manage.py qcluster
-
-# Run server (debug mode)
-OPTIMAP_DEBUG=True OPTIMAP_CACHE=dummy python manage.py runserver
-```
-
-Access at http://127.0.0.1:8000/
+- **Docker:** `docker compose up` → <http://localhost:80/> (use `localhost`, not
+  `127.0.0.1`, to avoid CSRF issues). Migrations auto-apply via `etc/manage-and-run.sh`.
+- **Local dev server:** `OPTIMAP_DEBUG=True OPTIMAP_CACHE=dummy python manage.py runserver`
+  → http://127.0.0.1:8000/
 
 ### Code formatting
 
@@ -151,6 +121,8 @@ coverage report --show-missing --fail-under=70
 coverage html  # generates htmlcov/
 ```
 
+Run a single module/test with `python manage.py test tests.test_geoextent` (or `…test tests-ui`); add `-Wa` to surface deprecation warnings.
+
 #### `online`-tagged tests (network required)
 
 Tests decorated with `@tag('online')` make real HTTP requests to external
@@ -190,14 +162,11 @@ too:
 OPTIMAP_TEST_HARVESTING_ONLINE=True python manage.py test tests.test_harvesting_online
 ```
 
-**OpenAIRE-authenticated harvest tests.** Online tests that exercise OpenAIRE
-enrichment (e.g. `tests.test_real_harvesting` asserting a harvested record has
-both OpenAlex and OpenAIRE external IDs) hit OpenAIRE's anonymous **60 req/hour**
-limit quickly and then *soft-skip*. The dev DB usually holds an OpenAIRE
-`ServiceToken` (refresh token + cached access token); exchange it for an access
-token and pass it as `OPTIMAP_OPENAIRE_TOKEN` to run the test on the authenticated
-**7200 req/hour** path (the test DB is empty, so the sweep can't read the token
-itself). One-shot, without printing the secret:
+**OpenAIRE-authenticated harvest tests.** Online OpenAIRE-enrichment tests (e.g.
+`tests.test_real_harvesting`) hit OpenAIRE's anonymous **60 req/hour** limit and
+soft-skip. Pass `OPTIMAP_OPENAIRE_TOKEN` to use the authenticated **7200 req/hour**
+path (the test DB is empty, so the sweep can't read the stored `ServiceToken`).
+Exchange the stored refresh token for an access token without printing it:
 
 ```bash
 TOKEN=$(python manage.py shell -c \
@@ -208,56 +177,13 @@ OPTIMAP_OPENAIRE_TOKEN="$TOKEN" SKIP_REAL_HARVESTING=0 \
 ```
 
 `get_openaire_access_token()` auto-refreshes from the stored refresh token (see
-the [OpenAIRE refresh-token flow](docs/manage.md#openaire-enrichment)). If no
-`ServiceToken` exists the call returns empty and the test stays anonymous (and
-will likely skip under rate-limiting).
+the [OpenAIRE refresh-token flow](docs/manage.md#openaire-enrichment)).
 
 ### Django Management Commands
 
-#### Standard Django Commands
-
-```bash
-# Database operations
-python manage.py makemigrations              # Create new migrations (should detect no changes normally)
-python manage.py migrate                     # Apply database migrations
-python manage.py showmigrations              # List all migrations and their status
-python manage.py sqlmigrate publications 0001  # Show SQL for a specific migration
-
-# User management
-python manage.py createsuperuser             # Create admin user interactively
-python manage.py createsuperuser --username=optimap --email=admin@optimap.science
-python manage.py changepassword <username>   # Change user password
-
-# Static files
-python manage.py collectstatic --noinput     # Collect static files to STATIC_ROOT
-python manage.py findstatic <filename>       # Find location of static file
-
-# Cache
-python manage.py createcachetable            # Create database cache table (required on setup)
-
-# Data management
-python manage.py dumpdata <app.Model>        # Export data as JSON
-python manage.py loaddata <fixture.json>     # Import data from JSON fixture
-python manage.py flush                       # Clear all data from database (careful!)
-
-# Shell access
-python manage.py shell                       # Django shell with models loaded
-python manage.py shell -c "from works.tasks import regenerate_geojson_cache; regenerate_geojson_cache()"
-python manage.py dbshell                     # Direct PostgreSQL shell
-
-# Development server
-python manage.py runserver                   # Start dev server on 127.0.0.1:8000
-python manage.py runserver 0.0.0.0:8000     # Start on all interfaces (Docker)
-OPTIMAP_DEBUG=True python manage.py runserver  # With debug mode
-
-# Testing
-python manage.py test                        # Run all tests
-python manage.py test tests                  # Run unit tests only
-python manage.py test tests-ui               # Run UI tests only
-python manage.py test tests.test_geo_data    # Run specific test module
-python manage.py test tests.test_geoextent   # Run geoextent API integration tests
-python -Wa manage.py test                    # Show deprecation warnings
-```
+Stock Django commands (`migrate`, `makemigrations`, `createsuperuser`,
+`collectstatic`, `dumpdata`/`loaddata`, `shell`, `dbshell`, `test`, …) work as
+usual. Only OPTIMAP-specific commands are documented below.
 
 #### Custom OPTIMAP Commands
 
@@ -293,13 +219,11 @@ python manage.py harvest_sources --source essd --source geo-leo
 
 # Source synchronization
 python manage.py sync_source_metadata
-# Syncs metadata from configured OAI-PMH sources
-# Updates Source model with latest information from endpoints
+# Syncs metadata from configured OAI-PMH sources; updates Source model from endpoints
 
 # OpenAlex source updates
 python manage.py update_openalex_sources
-# Fetches and updates source metadata from OpenAlex API
-# Enriches Source records with additional information
+# Fetches and updates Source metadata from the OpenAlex API
 
 # Reset harvest schedules
 python manage.py reset_harvest_schedules
@@ -307,48 +231,33 @@ python manage.py reset_harvest_schedules
 # next_run (and stagger by default), recovering from a state where every
 # source's schedule fires at once. Flags: --dry-run, --no-stagger, --clear-manual.
 
-# Clear Django caches
+# Clear Django caches — clears configured backends (memory, default, dummy).
 python manage.py clear_caches
-# Clears all configured Django cache backends (`memory`, `default`, `dummy`).
-# Django ships no built-in `clearcache` (see SO #5942759); this command
-# makes the operation explicit, idempotent, and scriptable for deploy hooks.
-# Flags: --cache <alias> (repeatable, clear only those), --exclude <alias>
-# (repeatable, clear all except those — `--exclude default` preserves
-# in-flight login-magic / email-confirmation tokens), --dry-run.
-# See docs/manage.md → "Manage data dumps and caches" for which backend
-# stores what and when to clear which.
+# Flags: --cache <alias> / --exclude <alias> (repeatable; `--exclude default`
+# preserves in-flight login/email-confirmation tokens), --dry-run.
+# See docs/manage.md → "Manage data dumps and caches" for what each backend stores.
 
 # Extract BoK concepts from AGILE GISS PDFs (backfill existing works)
 python manage.py extract_agile_bok
 # Downloads the full-text PDF for each AGILE GISS work and parses the
 # "BoK Concepts" section. Skips works that already have bok_concepts set
-# unless --force is given. Throttles PDF downloads (default: 2 s).
-# Flags: --limit N, --throttle SECONDS, --force, --dry-run.
+# unless --force is given. Flags: --limit N, --throttle SECONDS, --force, --dry-run.
 
-# Backfill missing abstracts/keywords/authors from OpenAIRE (enrichment source)
+# Backfill empty abstract/keywords/authors from OpenAIRE (fill-if-empty, never
+# overwrites; records every decision in Work.provenance). New harvests get this
+# via an async sweep (OPTIMAP_OPENAIRE_ENRICH_ON_HARVEST).
 python manage.py enrich_openaire
-# Looks up each work by DOI on the OpenAIRE Graph API and fills empty
-# abstract/keywords/authors (fill-if-empty; never overwrites). New harvests
-# get this automatically via an async sweep (OPTIMAP_OPENAIRE_ENRICH_ON_HARVEST).
-# Records every decision in Work.provenance (openaire_enrich event, openaire_match).
-# Flags: --collection <id>, --doi-prefix <prefix>, --source <id|name>,
-# --limit N, --throttle SECONDS, --force, --dry-run, --async.
-# --async enqueues the whole run as one Django-Q task
-# (works.tasks.enrich_openaire_backfill) and returns immediately; needs a
-# running qcluster. Synchronous run is the default.
-# Set OPTIMAP_OPENAIRE_TOKEN to raise the rate limit from 60 to 7200/hour, or
-# store a monthly refresh token in the ServiceToken admin (no SSH; auto-exchanged
-# for access tokens by works.harvesting.openaire.get_openaire_access_token, with a
-# weekly staff renewal reminder via works.tasks.check_service_token_renewals).
+# Flags: --collection/--doi-prefix/--source filters, --limit, --throttle, --force,
+# --dry-run, --async (enqueues one Django-Q task, works.tasks.enrich_openaire_backfill;
+# needs a running qcluster). OPTIMAP_OPENAIRE_TOKEN raises the rate limit 60→7200/hour,
+# or store a monthly refresh token in the ServiceToken admin.
 # See docs/manage.md → "OpenAIRE enrichment" / "Renewing the OpenAIRE refresh token".
 
 # Generate pygeoapi OpenAPI document (required for /ogcapi/ endpoint)
 python manage.py generate_pygeoapi_openapi
 # Reads etc/pygeoapi-config.yml and writes etc/pygeoapi-openapi.yml.
-# Must be run once after install and whenever the config changes.
-# The /ogcapi/ endpoint is silently disabled until this file exists.
-# Run with --force to regenerate. Docker startup (etc/manage-and-run.sh)
-# runs this automatically with --force on every deploy.
+# The /ogcapi/ endpoint is silently disabled until this file exists. Run with
+# --force to regenerate; Docker startup (etc/manage-and-run.sh) runs it --force on deploy.
 ```
 
 #### Django-Q Task Management
@@ -382,7 +291,7 @@ python manage.py loaddata fixtures/test_data_optimap.json
 python manage.py loaddata fixtures/test_data_partners.json
 python manage.py loaddata fixtures/test_data_global_feeds.json
 
-# Manually regenerate GeoJSON/GeoPackage cache (without Django-Q)
+# Manually regenerate GeoJSON/GeoPackage cache (synchronous, without Django-Q)
 python manage.py shell -c "from works.tasks import regenerate_geojson_cache; regenerate_geojson_cache()"
 ```
 
@@ -405,14 +314,13 @@ All deployment-specific config uses `OPTIMAP_*` environment variables loaded fro
 3. Fetch XML/RSS/JSON → parse → extract DOI, spatial, temporal metadata → save `Work` records with status `h` (Harvested)
 4. Track status in `HarvestingEvent.status` (pending/in_progress/completed/failed)
 5. Works with spatial/temporal metadata can be published directly, or users can contribute missing metadata
-6. OpenAlex enrichment: Automatically fetches additional metadata (authors, keywords, topics) when DOI is available — runs inside the OAI-PMH harvester via `works.harvesting.openalex.build_openalex_fields`. Distinct from the **`openalex` source type** (`works.harvesting.openalex_source`), which uses OpenAlex as the *primary* harvest origin (see [docs/manage.md](docs/manage.md) → "OpenAlex-as-source"). The OpenAlex source harvester does not fetch publisher landing pages — OpenAlex carries no spatial/temporal coverage and the journals it currently targets (e.g. AGILE-GISS) don't expose any in their HTML either.
+6. OpenAlex enrichment fills extra metadata (authors, keywords, topics) when a DOI is present, via `works.harvesting.openalex.build_openalex_fields` inside the harvester. This is distinct from the **`openalex` source type** (`works.harvesting.openalex_source`), which uses OpenAlex as the *primary* harvest origin (see [docs/manage.md](docs/manage.md) → "OpenAlex-as-source").
 
 ### Authentication
 
 - Passwordless "magic link" system based on own implementation
 - Users receive login token via email (10-minute expiration)
 - Email confirmation for account changes
-- CSRF tokens required - use `localhost` domain during development (not 127.0.0.1)
 
 ### Email notifications
 
@@ -489,39 +397,11 @@ For harvest completion/failure emails use `render_harvest_email` from `works.har
 - **Formatter not installed**: Run `pip install -r requirements-dev.txt`; verify with `ruff format --check .` and `ruff check .`.
 - **Django template comments `{# … #}` must be on a single line.** The parser does not support multi-line `{# #}` blocks — a newline inside the comment is rendered verbatim and may break the page. For multi-line notes use `{% comment %}…{% endcomment %}` instead.
 
-## File Structure Highlights
+## Key Features & UI
 
-```
-optimap/
-├── optimap/          # Django project settings
-├── works/     # Main app (models, views, tasks, API)
-│   ├── management/commands/  # Custom Django commands
-│   ├── static/       # Frontend assets, logos
-│   └── templates/    # Django templates
-├── tests/            # Unit tests
-├── tests-ui/         # Selenium UI tests
-├── fixtures/         # Test data JSON
-├── etc/              # Deployment scripts (manage-and-run.sh)
-├── static/           # Collected static files (generated)
-└── docker-compose.yml / docker-compose.deploy.yml
-```
-
-## Key Features & UI Components
-
-### Navigation
-
-- **Burger Menu** - Unified hamburger menu (☰) in top bar with links to all main pages
-- **User Menu** - User icon in top bar with login/logout and user settings
-- **Footer** - Sitemap, About/Contact, Privacy, Data License links
-
-### Map Features
-
-- **Interactive Map** - Main map with publication markers using Leaflet
-- **Zoom-to-All Control** - Quick button to fit all publications in view (available on all maps)
-- **Gazetteer/Geocoding Search** - Search for locations by name (Nominatim, GeoNames, Photon support)
-- **Global Regions Layer** - Toggle-able overlay showing continent and ocean boundaries
-- **Paginated Popups** - Cycle through multiple overlapping publications with Previous/Next navigation
-- **Geometry Highlighting** - Visual feedback when selecting publications (gold/orange colors)
+- **Navigation:** burger menu (☰, links to all pages), user menu (login/logout/settings), footer (sitemap, about/contact, privacy, data license).
+- **Map (Leaflet):** publication markers, zoom-to-all control (all maps), gazetteer search (Nominatim/GeoNames/Photon), toggle-able global-regions overlay, paginated popups for overlapping works, geometry highlighting on selection.
+- **Workflow:** publication status Draft → Harvested → Contributed → Published (plus Testing, Withdrawn). Users contribute spatial/temporal extent to harvested works; admins review and publish. Regional subscriptions email users about new works in selected continents/oceans.
 
 ### Pages
 
@@ -533,14 +413,7 @@ optimap/
 - `/geoextent/` - Geoextent extraction web UI
 - `/pages` - Human-readable sitemap with organized page list
 - `/feeds/` - Feed landing pages for global and regional RSS/Atom feeds
-- `/ogcapi/` - OGC API - Features landing page (pygeoapi; conformance at `/ogcapi/conformance`, collections at `/ogcapi/collections`, works at `/ogcapi/collections/works/items`). Only active when `etc/pygeoapi-openapi.yml` exists — generate with `python manage.py generate_pygeoapi_openapi`. See [docs/ogcapi-clients.md](docs/ogcapi-clients.md) for Python/R/QGIS usage examples.
-
-### Workflows
-
-- **Publication Status**: Draft → Harvested → Contributed → Published (with Testing and Withdrawn states)
-- **User Contribution**: Users can add spatial and/or temporal extent to harvested publications
-- **Regional Subscriptions**: Users receive email notifications for new publications in selected regions
-- **Admin Publishing**: Admins review contributions and publish works
+- `/ogcapi/` - OGC API - Features landing page (pygeoapi). Only active when `etc/pygeoapi-openapi.yml` exists — generate with `python manage.py generate_pygeoapi_openapi`. See [docs/ogcapi-clients.md](docs/ogcapi-clients.md) for Python/R/QGIS usage examples.
 
 ## API & Endpoints
 
@@ -569,129 +442,32 @@ optimap/
 - `/geoextent/` - Geoextent extraction web UI (interactive tool for file upload and remote resource extraction)
 - `/ogcapi/collections/works/items` - Published works via OGC API - Features (pygeoapi); supports `bbox`, `datetime`, `limit`/`offset` — see [docs/ogcapi-clients.md](docs/ogcapi-clients.md)
 
-### Geoextent API Endpoints
+### Geoextent API & Web UI
 
-#### Public API - No authentication required
+Full endpoint, parameter, response-format (`geojson`/`wkt`/`wkb`), and status-code
+reference: [docs/geoextent_api.md](docs/geoextent_api.md). The endpoints are public
+(no auth) and return GeoJSON FeatureCollections by default.
 
-All geoextent endpoints return valid GeoJSON FeatureCollections by default, matching the geoextent CLI output format.
+- `POST /api/v1/geoextent/extract/` — extent from an uploaded file
+- `GET|POST /api/v1/geoextent/extract-remote/` — extent from remote repositories
+  (Zenodo, PANGAEA, OSF, Figshare, Dryad, GFZ Data Services, Dataverse); parallel
+  downloads via the `GEOEXTENT_DOWNLOAD_WORKERS` setting
+- `POST /api/v1/geoextent/extract-batch/` — combined extent over multiple files
+- `POST /api/v1/geoextent/extract-text/` — NER place-name extraction from free text
+  (issue #199); see [docs/ner_location_suggestions.md](docs/ner_location_suggestions.md)
 
-- `/api/v1/geoextent/extract/` - Extract spatial/temporal extent from uploaded file
-  - Method: POST with multipart/form-data
-  - Parameters: file, bbox, tbox, convex_hull, response_format, placename, gazetteer
-  - Returns: GeoJSON FeatureCollection with `geoextent_extraction` metadata
+**Known bug (upstream):** `geoextent.from_remote()` returns the bounding box as
+`[minLat, minLon, maxLat, maxLon]` instead of the GeoJSON-standard
+`[minLon, minLat, maxLon, maxLat]`. Affects remote extraction only (not file
+uploads); must be fixed upstream in the geoextent library.
 
-- `/api/v1/geoextent/extract-remote/` - Extract extent from remote repositories
-  - Methods: GET or POST (same URL)
-  - POST: JSON body with `identifiers` array
-  - GET: URL parameters with comma-separated `identifiers`
-  - Supports: Zenodo, PANGAEA, OSF, Figshare, Dryad, GFZ Data Services, Dataverse
-  - Parameters: identifiers, bbox, tbox, convex_hull, response_format, placename, gazetteer, file_limit, size_limit_mb
-  - Uses geoextent's native multi-identifier support with automatic extent merging
-  - Parallel downloads controlled by `GEOEXTENT_DOWNLOAD_WORKERS` setting
-  - Example GET: `/api/v1/geoextent/extract-remote/?identifiers=10.5281/zenodo.4593540&bbox=true&tbox=true`
-  - Example POST: `{"identifiers": ["10.5281/zenodo.4593540"], "bbox": true, "tbox": true}`
-
-- `/api/v1/geoextent/extract-batch/` - Batch processing of multiple files
-  - Method: POST with multipart/form-data (multiple files)
-  - Parameters: files[], bbox, tbox, convex_hull, response_format, placename, gazetteer, size_limit_mb
-  - Uses geoextent's `from_directory` for native extent combination
-  - Returns: GeoJSON FeatureCollection with combined extent and individual features
-
-- `/api/v1/geoextent/extract-text/` - NER-based location extraction from free text (issue #199)
-  - Method: POST with JSON body
-  - Parameters: `text` (required), `gazetteer` (default from `OPTIMAP_GEOEXTENT_NER_GAZETTEER`), `ner_ambiguity` (`'drop'`/`'top'`), `tbox`, `convex_hull`
-  - Calls `geoextent.from_text()` with spaCy NER + gazetteer lookup
-  - Returns: GeoJSON FeatureCollection with `geoextent_extraction.place_names` (each entry has `char_start`/`char_end` offsets, `matched`, `candidate_count`, coordinates, `gazetteer_url`)
-  - spaCy model auto-downloads on first call (`ner_auto_download=True`)
-  - See [docs/ner_location_suggestions.md](docs/ner_location_suggestions.md) for user documentation
-
-**Response Formats** (`response_format` parameter):
-
-- `geojson` (default) - Valid GeoJSON FeatureCollection matching CLI output
-  - Structure: `{"type": "FeatureCollection", "features": [...], "geoextent_extraction": {...}}`
-  - Temporal extent in feature properties as `tbox` (not `temporal_extent`)
-- `wkt` - WKT (Well-Known Text) string with metadata
-  - Structure: `{"wkt": "POLYGON(...)", "crs": "EPSG:4326", "tbox": [...], "geoextent_extraction": {...}}`
-- `wkb` - WKB (Well-Known Binary) hex string with metadata
-  - Structure: `{"wkb": "0103...", "crs": "EPSG:4326", "tbox": [...], "geoextent_extraction": {...}}`
-
-See [docs/geoextent_response_formats.md](docs/geoextent_response_formats.md) for detailed examples.
-
-**Metadata Structure** (`geoextent_extraction`):
-
-Property names match geoextent CLI output to avoid confusion:
-
-- `version` - Geoextent library version
-- `inputs` - List of input identifiers/filenames
-- `statistics.files_processed` - Number of files processed
-- `statistics.files_with_extent` - Number of files with valid extent
-- `statistics.total_size` - Total size (e.g., "2.71 MiB")
-- `format` - Source format (e.g., "remote", "geojson")
-- `crs` - Coordinate reference system
-- `extent_type` - "bounding_box" or "convex_hull"
-
-**HTTP Status Codes:**
-
-- `200 OK` - Successful extraction
-- `400 Bad Request` - Invalid parameters
-- `413 Request Entity Too Large` - File too large
-- `500 Internal Server Error` - Processing error
-
-Error responses: `{"error": "message"}` (no `success: false` property)
-
-**Supported Input Formats:**
-GeoJSON, GeoTIFF, Shapefile, GeoPackage, KML, GML, GPX, FlatGeobuf, CSV (with lat/lon)
-
-**Gazetteers:** Nominatim (default), GeoNames (requires username), Photon
-
-**Known Issues:**
-
-- **Coordinate order bug in geoextent.from_remote()**: The geoextent library's `from_remote()` function returns bounding boxes in `[minLat, minLon, maxLat, maxLon]` format instead of the GeoJSON standard `[minLon, minLat, maxLon, maxLat]`. This affects remote extractions only (not file uploads). This needs to be fixed upstream in the geoextent library. Until fixed, remote extraction coordinates will be in the wrong order.
-
-### Geoextent Web UI
-
-Interactive web interface at [/geoextent](works/templates/geoextent.html) for extracting geospatial/temporal extents from data files.
-
-**Features:**
-
-- File upload (single or batch) with size validation
-- Remote resource extraction via DOI/URL (comma-separated)
-- Interactive Leaflet map preview with clickable features
-- Parameter customization (bbox, tbox, convex_hull, placename, gazetteer)
-- Response format selection (GeoJSON, WKT, WKB)
-- Download results in selected format
-- Client-side file size validation against server limits
-- Error handling with informative messages
-- Documentation section with supported formats and providers
-- Use *sentence case* for all headlines and fields
-
-**Implementation:**
-
-- View: [works/views.py](works/views.py) - `geoextent()` function
-  - Uses `geoextent.lib.features.get_supported_features()` to dynamically load supported formats and providers
-  - No hardcoded format lists - always reflects current geoextent capabilities
-- Template: [works/templates/geoextent.html](works/templates/geoextent.html)
-  - Uses Fetch API for AJAX requests (jQuery slim doesn't include $.ajax)
-  - Interactive file management with add/remove functionality
-  - Multiple file selection from different locations
-  - CSRF token handling for secure POST requests
-- Uses existing jQuery (slim) and Bootstrap (no additional libraries)
-- Map integration via existing Leaflet setup
-- API calls to `/api/v1/geoextent/` endpoints
-- UI tests: [tests-ui/test_geoextent.py](tests-ui/test_geoextent.py)
-
-**Configuration:**
-
-Size limits passed from Django settings:
-
-- `GEOEXTENT_MAX_FILE_SIZE_MB` - Single file upload limit
-- `GEOEXTENT_MAX_BATCH_SIZE_MB` - Total batch upload limit
-- `GEOEXTENT_MAX_DOWNLOAD_SIZE_MB` - Remote resource download limit
-
-**Navigation:**
-
-- Footer link added to [works/templates/footer.html](works/templates/footer.html)
-- URL route: `path("geoextent/", views.geoextent, name="geoextent")` in [works/urls.py](works/urls.py)
+**Web UI** ([/geoextent](works/templates/geoextent.html), `geoextent()` in
+[works/views.py](works/views.py); UI tests
+[tests-ui/test_geoextent.py](tests-ui/test_geoextent.py)): supported formats and
+providers load dynamically via `geoextent.lib.features.get_supported_features()` —
+never hardcode format lists. Use **sentence case** for all headlines and fields.
+Upload size limits come from the `GEOEXTENT_MAX_FILE_SIZE_MB` /
+`GEOEXTENT_MAX_BATCH_SIZE_MB` / `GEOEXTENT_MAX_DOWNLOAD_SIZE_MB` settings.
 
 ## Version Management
 
