@@ -1,0 +1,62 @@
+{# SPDX-FileCopyrightText: 2026 OPTIMETA and KOMET projects <https://projects.tib.eu/komet> #}
+{# SPDX-License-Identifier: GPL-3.0-or-later #}
+{# Shared list-only landing template for /at/, /during/, /on/ facet pages (#29). #}
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ facet_heading }} | {% endblock %}
+
+{% block head %}
+{{ block.super }}
+{% if map_has_features %}
+<link rel="stylesheet" href="{% static 'css/leaflet.css' %}" />
+<script src="{% static 'js/leaflet.js' %}"></script>
+<link rel="stylesheet" href="{% static 'css/leaflet.control.geocoder.css' %}" />
+<script src="{% static 'js/leaflet.control.geocoder.js' %}"></script>
+{% endif %}
+{% endblock head %}
+
+{% block extra_meta %}
+{% if canonical_url %}<link rel="canonical" href="{{ canonical_url }}" />{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid locate-container">
+  <div class="row justify-content-center">
+    <div class="col-md-10 col-lg-8 py-5">
+      <h1 class="py-2">{{ facet_heading }}</h1>
+      <p class="lead">{{ facet_lead }}</p>
+
+      {% if page_obj.object_list %}
+        {% if map_has_features %}{% include "partials/works_map.html" %}{% endif %}
+        <h2 class="h4 mb-3">{{ work_count_total }} work{{ work_count_total|pluralize }}</h2>
+        {% include "_pagination.html" with show_meta=True pagination_label="Facet pagination" %}
+        <div class="publication-grid">
+          {% for work in page_obj.object_list %}
+            {% include "partials/work_card.html" %}
+          {% endfor %}
+        </div>
+        {% include "_pagination.html" with pagination_label="Facet pagination" %}
+      {% else %}
+        <div class="alert alert-warning" role="alert">
+          <i class="fas fa-exclamation-triangle"></i> No published works found here yet.
+        </div>
+      {% endif %}
+
+      <div class="mt-5 d-flex flex-wrap" style="gap: .5rem;">
+        {% if show_place_nav %}
+          <a href="{% url 'optimap:countries' %}" class="btn btn-outline-secondary"><i class="fas fa-flag"></i> Browse countries</a>
+          <a href="{% url 'optimap:at-index' %}" class="btn btn-outline-secondary"><i class="fas fa-map-marker-alt"></i> All places</a>
+        {% endif %}
+        <a href="{% url 'optimap:browse' %}" class="btn btn-outline-secondary"><i class="fas fa-list"></i> Browse all</a>
+        <a href="/" class="btn btn-outline-secondary"><i class="fas fa-map"></i> Browse map</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}
+
+{% block scripts %}
+{{ block.super }}
+{% if map_has_features %}{% include "partials/works_map_scripts.html" %}{% endif %}
+{% endblock scripts %}

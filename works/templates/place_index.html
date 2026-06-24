@@ -1,0 +1,46 @@
+{# SPDX-FileCopyrightText: 2026 OPTIMETA and KOMET projects <https://projects.tib.eu/komet> #}
+{# SPDX-License-Identifier: GPL-3.0-or-later #}
+{# /at/ index: every place that resolves under /at/<slug> (#29). #}
+{% extends "base.html" %}
+
+{% block title %}Places | {% endblock %}
+
+{% block extra_meta %}
+{% if canonical_url %}<link rel="canonical" href="{{ canonical_url }}" />{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container py-5 facet-page">
+  <h1 class="py-2">Places</h1>
+  <p class="lead">Every place you can browse works for: continents, oceans, and countries.</p>
+
+  <section class="mb-4" aria-labelledby="place-continents">
+    <h2 class="h5" id="place-continents">Continents</h2>
+    <p>
+      {% for r in continents %}
+        <a href="{% url 'optimap:at-place' r.slug %}" class="badge badge-pill badge-light border mr-1 mb-1">{{ r.name }}</a>
+      {% endfor %}
+    </p>
+  </section>
+
+  <section class="mb-4" aria-labelledby="place-oceans">
+    <h2 class="h5" id="place-oceans">Oceans</h2>
+    <p>
+      {% for r in oceans %}
+        <a href="{% url 'optimap:at-place' r.slug %}" class="badge badge-pill badge-light border mr-1 mb-1">{{ r.name }}</a>
+      {% endfor %}
+    </p>
+  </section>
+
+  <section class="mb-4" aria-labelledby="place-countries">
+    <h2 class="h5" id="place-countries">Countries</h2>
+    <p>Browse all {{ groups|length }} continents' countries on the dedicated countries overview.</p>
+    <a href="{% url 'optimap:countries' %}" class="btn btn-outline-primary"><i class="fas fa-flag"></i> Countries overview</a>
+  </section>
+
+  <div class="mt-4 d-flex" style="gap: .5rem;">
+    <a href="{% url 'optimap:feeds' %}" class="btn btn-outline-secondary"><i class="fas fa-globe"></i> Regions</a>
+    <a href="{% url 'optimap:browse' %}" class="btn btn-outline-secondary"><i class="fas fa-list"></i> Browse all</a>
+  </div>
+</div>
+{% endblock content %}

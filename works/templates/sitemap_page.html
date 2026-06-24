@@ -25,6 +25,22 @@
           <p class="text-muted mb-0 small">List of all published scientific works with spatial and temporal metadata</p>
         </li>
         <li class="list-group-item">
+          <a href="{% url 'optimap:browse' %}"><strong><i class="fas fa-sitemap"></i> Browse by place, year, source, topic</strong></a>
+          <p class="text-muted mb-0 small">Directory of permalink pages for countries, regions, years, journals/sources, and topics</p>
+        </li>
+        <li class="list-group-item">
+          <a href="{% url 'optimap:countries' %}"><strong><i class="fas fa-flag"></i> Countries</strong></a>
+          <p class="text-muted mb-0 small">All countries grouped by continent, each linking to its works</p>
+        </li>
+        <li class="list-group-item">
+          <a href="{% url 'optimap:at-index' %}"><strong><i class="fas fa-map-marker-alt"></i> Places</strong></a>
+          <p class="text-muted mb-0 small">Continents, oceans, and countries you can browse works for</p>
+        </li>
+        <li class="list-group-item">
+          <a href="{% url 'optimap:in-index' %}"><strong><i class="fas fa-book"></i> Journals &amp; sources</strong></a>
+          <p class="text-muted mb-0 small">All harvested sources, each with a landing page, coverage stats, and feeds</p>
+        </li>
+        <li class="list-group-item">
           <a href="{% url 'optimap:contribute' %}"><strong><i class="fas fa-hands-helping"></i> Contribute</strong></a>
           <p class="text-muted mb-0 small">Help improve OPTIMAP by contributing geospatial and temporal metadata</p>
         </li>

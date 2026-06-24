@@ -35,10 +35,11 @@ from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
 from rest_framework_gis import filters
 
-from .models import Collection, GlobalRegion, Source, Subscription, Work
+from .models import Collection, Country, GlobalRegion, Source, Subscription, Work
 from .serializers import (
     CollectionSerializer,
     ContributeDoiSerializer,
+    CountrySerializer,
     GeoextentBatchSerializer,
     GeoextentExtractSerializer,
     GeoextentExtractTextSerializer,
@@ -761,6 +762,33 @@ class GlobalRegionViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = GlobalRegion.objects.all().order_by("region_type", "name")
     serializer_class = GlobalRegionSerializer
+    permission_classes = [AllowAny]
+
+
+@extend_schema_view(
+    list=extend_schema(
+        summary="List countries (outline geometries)",
+        description=(
+            "Country outlines (simplified Natural Earth geometries) as a GeoJSON FeatureCollection, "
+            "used by the toggleable countries map layer. `iso_code` is ISO 3166-1 alpha-2 and matches "
+            "`Work.country_code`; `absolute_url` links to the `/at/<country>/` landing page."
+        ),
+        tags=["Global regions"],
+    ),
+    retrieve=extend_schema(
+        summary="Retrieve a country by ID",
+        tags=["Global regions"],
+        responses={
+            200: CountrySerializer,
+            404: OpenApiResponse(_ERROR_RESPONSE, description="No country with this ID."),
+        },
+    ),
+)
+class CountryViewSet(viewsets.ReadOnlyModelViewSet):
+    """Country geometries for map layers. Read-only — loaded via load_countries."""
+
+    queryset = Country.objects.all().order_by("name")
+    serializer_class = CountrySerializer
     permission_classes = [AllowAny]
 
 

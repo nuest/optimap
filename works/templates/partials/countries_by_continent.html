@@ -1,0 +1,28 @@
+{# SPDX-FileCopyrightText: 2026 OPTIMETA and KOMET projects <https://projects.tib.eu/komet> #}
+{# SPDX-License-Identifier: GPL-3.0-or-later #}
+{# Renders `groups` (from views_indexed._countries_by_continent) as continent #}
+{# sections. Countries with no published works are shown but not clickable. #}
+{% for group in groups %}
+  <section class="mb-4" aria-labelledby="continent-{{ forloop.counter }}">
+    <h2 class="h5 d-flex align-items-center" id="continent-{{ forloop.counter }}">
+      <span>{{ group.continent }}</span>
+      {% if group.landing_url %}
+        <a href="{{ group.landing_url }}" class="ml-2"
+           title="Go to {{ group.continent }} landing page"
+           aria-label="Go to {{ group.continent }} landing page">
+          <i class="fas fa-link" aria-hidden="true"></i>
+          <span class="sr-only">Go to {{ group.continent }} landing page</span>
+        </a>
+      {% endif %}
+    </h2>
+    <div class="d-flex flex-wrap">
+      {% for c in group.countries %}
+        {% if c.count %}
+          <a href="{% url 'optimap:at-place' c.slug %}" class="badge badge-pill badge-light border mr-1 mb-1">{% if c.flag %}<span aria-hidden="true">{{ c.flag }}</span> {% endif %}{{ c.name }} ({{ c.count }})</a>
+        {% else %}
+          <span class="badge badge-pill badge-light border mr-1 mb-1 text-muted" title="No published works yet">{% if c.flag %}<span aria-hidden="true">{{ c.flag }}</span> {% endif %}{{ c.name }}</span>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </section>
+{% endfor %}

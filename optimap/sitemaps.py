@@ -2,9 +2,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from django.contrib.sitemaps import Sitemap
+from django.db.models import Count, Q
 from django.urls import reverse
 
-from works.models import Collection, GlobalRegion, Work
+from works.models import Collection, Country, GlobalRegion, Source, Work
 
 
 class WorksSitemap(Sitemap):  # based on django.contrib.sitemaps.GenericSitemap
@@ -36,6 +37,10 @@ class StaticViewSitemap(Sitemap):
             "main",  # Home page (/)
             "about",  # About page (/about/)
             "accessibility",  # Accessibility statement (/accessibility/)
+            "browse",  # Facet directory (/browse/)
+            "countries",  # Countries overview (/countries/)
+            "at-index",  # Places index (/at/)
+            "in-index",  # Sources index (/in/)
             "collections",  # Collections index (/collections/)
             "contribute",  # Contribute page (/contribute/)
             "data",  # Data download page (/data/)
@@ -132,3 +137,96 @@ class CollectionDownloadsSitemap(Sitemap):
 
     def lastmod(self, item):
         return item[0].updated_at
+
+
+# --- Faceted permalink pages (#29) + source landing pages (#253) ------------
+
+
+class CountrySitemap(Sitemap):
+    """Sitemap for /at/<country>/ pages with at least one published work."""
+
+    priority = 0.5
+    changefreq = "weekly"
+
+    def items(self):
+        codes = set(
+            Work.objects.filter(status="p")
+            .exclude(country_code__isnull=True)
+            .exclude(country_code="")
+            .values_list("country_code", flat=True)
+            .distinct()
+        )
+        return Country.objects.filter(iso_code__in=codes).order_by("name")
+
+    def location(self, obj):
+        return obj.get_absolute_url()
+
+    def lastmod(self, obj):
+        return obj.last_loaded
+
+
+class YearSitemap(Sitemap):
+    """Sitemap for /during/<year>/ pages, keyed by data-coverage years."""
+
+    priority = 0.5
+    changefreq = "weekly"
+
+    def items(self):
+        from works.views_indexed import data_year_counts
+
+        return sorted(data_year_counts().keys(), reverse=True)
+
+    def location(self, year):
+        return reverse("optimap:during-year", kwargs={"year": year})
+
+
+class TopicSitemap(Sitemap):
+    """Sitemap for /on/<topic>/ pages (OpenAlex topics on published works)."""
+
+    priority = 0.5
+    changefreq = "weekly"
+
+    def items(self):
+        from works.views_indexed import topic_slug_map
+
+        return sorted(topic_slug_map().keys())
+
+    def location(self, topic_slug):
+        return reverse("optimap:on-topic", kwargs={"topic_slug": topic_slug})
+
+
+def _published_sources():
+    return (
+        Source.objects.exclude(slug__isnull=True)
+        .annotate(n=Count("works", filter=Q(works__status="p")))
+        .filter(n__gt=0)
+        .order_by("name")
+    )
+
+
+class SourceIndexSitemap(Sitemap):
+    """Sitemap for /in/<source>/ landing pages with published works."""
+
+    priority = 0.6
+    changefreq = "weekly"
+
+    def items(self):
+        return list(_published_sources())
+
+    def location(self, obj):
+        return obj.get_absolute_url()
+
+
+class SourceFeedsSitemap(Sitemap):
+    """Sitemap for per-source GeoRSS and Atom feed URLs (#253)."""
+
+    priority = 0.6
+    changefreq = "daily"
+
+    def items(self):
+        return [(s, fmt) for s in _published_sources() for fmt in ("rss", "atom")]
+
+    def location(self, item):
+        source, fmt = item
+        name = "api-source-georss" if fmt == "rss" else "api-source-atom"
+        return reverse(f"optimap:{name}", kwargs={"source_slug": source.slug})

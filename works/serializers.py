@@ -15,7 +15,7 @@ from rest_framework_gis.fields import GeoJsonDict
 from rest_framework_gis.fields import GeometryField as _BaseGeometryField
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
-from .models import Collection, GlobalRegion, Source, Subscription, Work
+from .models import Collection, Country, GlobalRegion, Source, Subscription, Work
 from .utils.geometry import COORDINATE_PRECISION, round_geojson_coordinates
 
 User = get_user_model()
@@ -79,12 +79,22 @@ class SourceSerializer(serializers.ModelSerializer):
     latest_coverage = serializers.SerializerMethodField(
         help_text="Most recent SourceCoverageSnapshot: optimap_count, openalex_total, coverage_pct, computed_at. Null if no snapshot exists.",
     )
+    landing_page_url = serializers.SerializerMethodField(
+        help_text="Absolute URL of the public source landing page (/in/<slug>/). Null if the source has no slug.",
+    )
+    feed_georss_url = serializers.SerializerMethodField(
+        help_text="Absolute URL of this source's GeoRSS feed. Null if the source has no slug.",
+    )
+    feed_atom_url = serializers.SerializerMethodField(
+        help_text="Absolute URL of this source's GeoAtom feed. Null if the source has no slug.",
+    )
 
     class Meta:
         model = Source
         fields = (
             "id",
             "name",
+            "slug",
             "issn_l",
             "openalex_id",
             "openalex_url",
@@ -99,9 +109,32 @@ class SourceSerializer(serializers.ModelSerializer):
             "is_oa",
             "is_preprint",
             "source_url",
+            "landing_page_url",
+            "feed_georss_url",
+            "feed_atom_url",
             "collection",
             "latest_coverage",
         )
+
+    def _abs(self, path):
+        request = self.context.get("request")
+        return request.build_absolute_uri(path) if request else path
+
+    @extend_schema_field(serializers.URLField(allow_null=True))
+    def get_landing_page_url(self, obj):
+        return self._abs(obj.get_absolute_url()) if obj.slug else None
+
+    @extend_schema_field(serializers.URLField(allow_null=True))
+    def get_feed_georss_url(self, obj):
+        if not obj.slug:
+            return None
+        return self._abs(reverse("optimap:api-source-georss", kwargs={"source_slug": obj.slug}))
+
+    @extend_schema_field(serializers.URLField(allow_null=True))
+    def get_feed_atom_url(self, obj):
+        if not obj.slug:
+            return None
+        return self._abs(reverse("optimap:api-source-atom", kwargs={"source_slug": obj.slug}))
 
     @extend_schema_field(serializers.URLField())
     def get_source_url(self, obj):
@@ -151,20 +184,8 @@ class SourceSerializer(serializers.ModelSerializer):
         )
     )
     def get_latest_coverage(self, obj):
-        snap = obj.coverage_snapshots.order_by("-computed_at").first()
-        if snap is None:
-            return None
-        return {
-            "optimap_count": snap.optimap_count,
-            "openalex_total": snap.openalex_total,
-            "coverage_pct": snap.coverage_pct,
-            "spatial_rate": snap.spatial_rate,
-            "temporal_rate": snap.temporal_rate,
-            "open_access_ratio": snap.open_access_ratio,
-            "contributors_count": snap.contributors_count,
-            "by_year": snap.by_year,
-            "computed_at": snap.computed_at,
-        }
+        snap = obj.latest_coverage()
+        return snap.as_summary() if snap is not None else None
 
 
 class WorkSerializer(GeoFeatureModelSerializer):
@@ -521,6 +542,25 @@ class GlobalRegionSerializer(GeoFeatureModelSerializer):
             "absolute_url",
             "source_url",
             "license",
+        ]
+
+
+class CountrySerializer(GeoFeatureModelSerializer):
+    """Country outline as a GeoJSON feature for the countries map layer."""
+
+    slug = serializers.CharField(source="get_slug", read_only=True)
+    absolute_url = serializers.CharField(source="get_absolute_url", read_only=True)
+
+    class Meta:
+        model = Country
+        geo_field = "geom"
+        auto_bbox = True
+        fields = [
+            "id",
+            "name",
+            "iso_code",
+            "slug",
+            "absolute_url",
         ]
 
 

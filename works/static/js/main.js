@@ -168,6 +168,12 @@ async function initMap() {
         console.log('Global regions layer initialized');
       }
 
+      // Initialize countries layer
+      if (typeof MapCountriesManager !== 'undefined') {
+        window.mapCountriesManager = new MapCountriesManager(map, layerControl);
+        console.log('Countries layer initialized');
+      }
+
       // Fit to first chunk immediately so the user sees content fast.
       if (pubsGroup.getBounds().isValid()) {
         map.fitBounds(pubsGroup.getBounds());

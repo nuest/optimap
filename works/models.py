@@ -15,6 +15,7 @@ from django.db import connection
 from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.text import slugify
 from django.utils.timezone import now
 from django_currentuser.db.models import CurrentUserField
 from django_q.models import Schedule
@@ -603,6 +604,55 @@ class GlobalRegion(models.Model):
             return reverse("optimap:feed-ocean-page", kwargs={"ocean_slug": slug})
 
 
+class Country(models.Model):
+    """A country with a simplified outline geometry, used for the /at/<country>
+    permalink pages (issue #29) and a toggleable countries map layer.
+
+    ``iso_code`` is ISO 3166-1 alpha-2 and matches ``Work.country_code`` (set by
+    reverse-geocoding), which is how works are associated with a country. The
+    geometry is a simplified Natural Earth outline, stored for the map layer and
+    any future spatial filtering. Mirrors :class:`GlobalRegion`.
+    """
+
+    name = models.CharField(max_length=100, unique=True)
+    iso_code = models.CharField(max_length=2, unique=True, db_index=True)
+    slug = models.SlugField(
+        max_length=100,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="URL slug for /at/<slug>/, derived from the name. Indexed so place_page can look it up without scanning every country.",
+    )
+    continent = models.CharField(
+        max_length=50,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="Continent name (from Natural Earth), used to group the /countries/ overview.",
+    )
+    geom = models.MultiPolygonField(srid=4326)
+    last_loaded = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name_plural = "Countries"
+
+    def __str__(self):
+        return f"{self.name} ({self.iso_code})"
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
+
+    def get_slug(self):
+        """URL slug from the country name (mirrors GlobalRegion.get_slug)."""
+        return self.slug or slugify(self.name)
+
+    def get_absolute_url(self):
+        return reverse("optimap:at-place", kwargs={"place_slug": self.get_slug()})
+
+
 class Collection(models.Model):
     """
     A curated grouping of Works.
@@ -735,6 +785,16 @@ class Source(models.Model):
         max_length=255,
         help_text="Display name shown in the admin source list and on /pages, /sitemap.",
     )
+    slug = models.SlugField(
+        max_length=100,
+        unique=True,
+        blank=True,
+        null=True,
+        help_text=(
+            "URL-safe identifier for the public /in/<slug>/ landing page and "
+            "per-source feeds. Auto-generated from name when left blank."
+        ),
+    )
     issn_l = models.CharField(
         max_length=9,
         blank=True,
@@ -860,6 +920,27 @@ class Source(models.Model):
     def __str__(self):
         return self.name
 
+    def get_absolute_url(self) -> str | None:
+        """Public landing-page URL (``/in/<slug>/``). None until a slug exists."""
+        if not self.slug:
+            return None
+        return reverse("optimap:in-source", kwargs={"source_slug": self.slug})
+
+    def latest_coverage(self):
+        """Most recent SourceCoverageSnapshot for this source, or None."""
+        return self.coverage_snapshots.order_by("-computed_at").first()
+
+    def _generate_unique_slug(self) -> str:
+        """Slugify the name and append a numeric suffix on collision."""
+        base = slugify(self.name) or f"source-{self.pk or ''}".rstrip("-")
+        candidate = base
+        n = 2
+        qs = Source.objects.exclude(pk=self.pk)
+        while qs.filter(slug=candidate).exists():
+            candidate = f"{base}-{n}"
+            n += 1
+        return candidate
+
     @property
     def works_api_url(self) -> str | None:
         if not self.openalex_id:
@@ -878,6 +959,8 @@ class Source(models.Model):
         return f"https://openalex.org/{s_id}"
 
     def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = self._generate_unique_slug()
         super().save(*args, **kwargs)
         schedule_name = f"Harvest Source {self.id}"
         existing = Schedule.objects.filter(name=schedule_name).first()
@@ -1062,6 +1145,27 @@ class SourceCoverageSnapshot(models.Model):
     def __str__(self):
         pct = f"{self.coverage_pct:.1f}%" if self.coverage_pct is not None else "N/A"
         return f"Coverage {self.source_id} @ {self.computed_at:%Y-%m-%d}: {pct}"
+
+    def as_summary(self):
+        """Canonical dict of this snapshot's fields.
+
+        Single source of truth shared by the public API
+        (``SourceSerializer.get_latest_coverage``) and the source landing page
+        (``works.views_sources._coverage_context``) so the two never diverge.
+        Adding a field here surfaces it in both — keep the serializer's
+        ``@extend_schema`` inline_serializer in sync.
+        """
+        return {
+            "optimap_count": self.optimap_count,
+            "openalex_total": self.openalex_total,
+            "coverage_pct": self.coverage_pct,
+            "spatial_rate": self.spatial_rate,
+            "temporal_rate": self.temporal_rate,
+            "open_access_ratio": self.open_access_ratio,
+            "contributors_count": self.contributors_count,
+            "by_year": self.by_year,
+            "computed_at": self.computed_at,
+        }
 
 
 class ServiceToken(models.Model):

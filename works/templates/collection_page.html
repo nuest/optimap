@@ -587,6 +587,7 @@
 <script src="{% static 'js/map-gazetteer.js' %}"></script>
 <script src="{% static 'js/map-zoom-to-all.js' %}"></script>
 <script src="{% static 'js/map-status-layers.js' %}"></script>
+<script src="{% static 'js/map-countries.js' %}"></script>
 <script src="{% static 'js/map-base.js' %}"></script>
 <script src="{% static 'js/map-locate-card.js' %}"></script>
 <script type="text/javascript">
@@ -603,6 +604,10 @@
 
     const layerControl = L.control.layers({ 'OpenStreetMap': osmLayer }, {}).addTo(map);
     window.mapLayerControl = layerControl;
+
+    if (typeof MapCountriesManager !== 'undefined') {
+      window.mapCountriesManager = new MapCountriesManager(map, layerControl);
+    }
 
     let currentStatusLayers = null;
     let currentZoomCtrl = null;

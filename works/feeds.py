@@ -16,7 +16,7 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.utils.feedgenerator import Atom1Feed, Rss201rev2Feed
 
-from .models import Collection, GlobalRegion, Work
+from .models import Collection, GlobalRegion, Source, Work
 from .utils.geometry import COORDINATE_PRECISION
 
 logger = logging.getLogger(__name__)
@@ -504,6 +504,33 @@ class CollectionGeoFeed(BaseCachedGeoFeed):
     def items(self, obj):
         return (
             Work.objects.filter(collections=obj, status="p")
+            .exclude(geometry__isnull=True)
+            .order_by("-creationDate")[: settings.FEED_MAX_ITEMS]
+        )
+
+
+class SourceGeoFeed(BaseCachedGeoFeed):
+    """Feed of published works from a single source (issue #253)."""
+
+    def __init__(self, feed_type_variant="georss"):
+        self.feed_type_variant = feed_type_variant
+        super().__init__()
+
+    def get_object(self, request, source_slug):
+        return get_object_or_404(Source, slug=source_slug)
+
+    def title(self, obj):
+        return f"OPTIMAP – {obj.name}"
+
+    def link(self, obj):
+        return obj.get_absolute_url()
+
+    def description(self, obj):
+        return f"Latest works from source '{obj.name}'"
+
+    def items(self, obj):
+        return (
+            Work.objects.filter(source=obj, status="p")
             .exclude(geometry__isnull=True)
             .order_by("-creationDate")[: settings.FEED_MAX_ITEMS]
         )

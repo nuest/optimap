@@ -816,6 +816,38 @@ When to clear which:
 - `python manage.py simplify_ocean_geometries --tolerance <float> --percentile <float>` — re-run the simplification pass standalone (e.g. when retuning); writes `goas_v01_simplified.geojson` from `goas_v01.gpkg` in the data dir.
 - How global feeds (`/feeds/georss/<slug>/`) resolve a slug to a `GlobalRegion`.
 
+### Manage countries (for `/at/<country>/` and the countries map layer)
+
+- `python manage.py load_countries` — required once (and after a country data refresh); loads simplified country outlines into the `Country` model from Natural Earth 50m Admin-0 Countries.
+  - **Data source & workflow** (mirrors `load_global_regions`: retrieve → simplify → store):
+    1. *Retrieve* the public-domain **Natural Earth 1:50m Admin-0 Countries** GeoJSON (the 50m resolution — not the coarse 110m — so borders align well with the basemap). The official `naciscdn.org` host 403s without a User-Agent, so the command uses the canonical **`nvkelso/natural-earth-vector`** GitHub mirror. The file is cached and **committed** at `works/management/commands/ne_50m_admin_0_countries.geojson` (~3.1 MB), so installs/deploys don't re-download; `--force` deletes the cache and re-downloads.
+    2. *Read* per feature: `NAME_EN` → `name`, a clean alpha-2 from `ISO_A2` (falling back to `ISO_A2_EH` when `ISO_A2` is non-standard, e.g. Taiwan's `CN-TW`; rows with no clean alpha-2 are skipped), and `CONTINENT` → `continent` (used to group the `/countries/` and `/at/` overviews). When several features share one alpha-2 (e.g. Australia plus its `Australian Indian Ocean Territories` / `Ashmore and Cartier Islands` dependencies, all `AU`), their geometries are **merged** into one record and the name/continent come from the largest-area feature (the sovereign country).
+    3. *Simplify* each geometry with Douglas–Peucker (`OPTIMAP_COUNTRY_SIMPLIFICATION_TOLERANCE`, default `0.01` ≈ 1 km; raise to shrink the payload, `--tolerance 0` keeps full resolution) and wrap as `MultiPolygon`.
+    4. *Store* via `update_or_create(iso_code=…)`, so re-running updates in place. Data dir honors `OPTIMAP_GLOBAL_REGIONS_DATA_DIR`. Loads ~237 countries/territories.
+  - **File sizes:** 50m source GeoJSON ≈ 3.1 MB; the `/api/v1/countries/` payload served to the map is ≈ 1.6 MB at the default 0.01° tolerance (for comparison, the previous 110m source simplified at 0.05° was only ≈ 0.25 MB but far too coarse). The Countries overlay is off by default and fetched lazily only when toggled, so the larger payload has no cost until a user opts in.
+  - `iso_code` is ISO 3166-1 alpha-2 and matches `Work.country_code` — that's how `/at/<country>/` finds works.
+  - Exposed at `/api/v1/countries/` (GeoJSON) and rendered as the toggleable **Countries** overlay (off by default) on the main and collection maps.
+  - **Coverage caveat:** `/at/<country>/` undercounts when works lack a `country_code` — see the reverse-geocoding section below and issue [#261](https://github.com/GeoinformationSystems/optimap/issues/261). Run `python manage.py backfill_placenames` to populate codes for existing works.
+
+### Faceted permalink pages and source landing pages (#29, #253)
+
+Short, indexable URLs that list published works:
+
+- `/at/<place>/` — continent/ocean (`GlobalRegion`) or country (`Country`, by `country_code`).
+- `/during/<year>/` — works whose **temporal coverage** (`Work.timeperiod_*` data years) covers the year — *not* `publicationDate`.
+- `/on/<topic>/` — works tagged with an OpenAlex topic (`Work.topics`).
+- `/in/<source-slug>/` — the **source landing page**: work list + coverage panel (latest `SourceCoverageSnapshot`: coverage %, with-geometry/temporal/open-access rates, contributors, per-year chart) + known totals (`Source.statistics`) + per-source GeoRSS/Atom feeds (`/api/v1/feeds/source-<slug>.rss|.atom`).
+- `/browse/` — directory of all of the above with counts (also linked from the footer and `/pages/`).
+
+**Index / overview pages** (in the burger menu, `/pages/`, and the XML sitemap):
+
+- `/countries/` — all countries grouped by continent; each continent header links to its continent landing page. Cross-linked with `/regions/` via buttons. (Distinct from `/in/`, which is the **sources** index.)
+- `/at/` — umbrella places index: lists continents and oceans, and points to `/countries/` for the full country list (it does not duplicate it).
+- `/in/` — all journals/sources with their published-work counts.
+- `/at/<ISO>` (e.g. `/at/DE`) **301-redirects** to the canonical name slug (`/at/germany`) for every loaded country code.
+
+`Source.slug` is auto-generated from the name on save and editable in the Source admin (each row links to its `/in/<slug>/` page). All four facet families plus source feeds appear in the sitemap. Coverage statistics are computed weekly into `SourceCoverageSnapshot` (no per-request computation); the `/statistics/` page links each source row, each **by-country** row (by ISO code → `/at/<country>/`), and each **by-journal** row (→ `/in/<source>/`) to its landing page. The `/works/` page carries a row of facet-exploration buttons.
+
 ### Sync external metadata
 
 - `python manage.py sync_source_metadata` — syncs metadata from configured OAI-PMH endpoints back into the `Source` rows.

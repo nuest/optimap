@@ -1,0 +1,85 @@
+{# SPDX-FileCopyrightText: 2026 OPTIMETA and KOMET projects <https://projects.tib.eu/komet> #}
+{# SPDX-License-Identifier: GPL-3.0-or-later #}
+{# Script half of the shared works map (see partials/works_map.html). Goes in #}
+{# the host template's {% block scripts %}. Mirrors the collection/region map: #}
+{# a page/all scope toggle with current-page highlighting, persisted per facet. #}
+{% load static %}
+<script src="{% static 'js/map-styles.js' %}"></script>
+<script src="{% static 'js/map-popup.js' %}"></script>
+<script src="{% static 'js/map-interaction.js' %}"></script>
+<script src="{% static 'js/map-gazetteer.js' %}"></script>
+<script src="{% static 'js/map-zoom-to-all.js' %}"></script>
+<script src="{% static 'js/map-base.js' %}"></script>
+<script src="{% static 'js/map-locate-card.js' %}"></script>
+<script type="text/javascript">
+  $(document).ready(function () {
+    if (!document.getElementById('facet-map')) { return; }
+    const { map } = createBaseMap('facet-map');
+
+    const pageData = {{ map_page_geojson|safe }};
+    const allData = {{ map_all_geojson|safe }};
+    const pageWorkIds = new Set([{% for work in page_obj.object_list %}{{ work.id }},{% endfor %}]);
+    const scopeKey = 'facet_map_scope:{{ map_scope_key }}';
+
+    let pubLayer = null;
+    let zoomCtrl = null;
+
+    function buildMap(data, highlightIds) {
+      if (pubLayer) { map.removeLayer(pubLayer); }
+      if (zoomCtrl) { zoomCtrl.destroy(); zoomCtrl = null; }
+
+      const styleFn = highlightIds
+        ? function (feature) {
+            const fid = feature && (feature.id || (feature.properties && feature.properties.id));
+            return highlightIds.has(fid)
+              ? { color: '#FF6B00', weight: 3, fillOpacity: 0.55 }
+              : publicationStyle(feature);
+          }
+        : publicationStyle;
+
+      pubLayer = L.geoJSON(data, {
+        style: styleFn,
+        pointToLayer: publicationPointToLayer,
+        onEachFeature: publicationPopup,
+      }).addTo(map);
+
+      if (typeof MapInteractionManager !== 'undefined') { window.__optimapInteraction = new MapInteractionManager(map, pubLayer); }
+      if (typeof MapZoomToAllControl !== 'undefined') { zoomCtrl = new MapZoomToAllControl(map, pubLayer); }
+
+      if (pubLayer.getBounds().isValid()) {
+        map.fitBounds(pubLayer.getBounds(), { padding: [20, 20] });
+      } else {
+        map.setView([0, 0], 2);
+      }
+    }
+
+    const btnPage = document.getElementById('map-scope-page');
+    const btnAll = document.getElementById('map-scope-all');
+
+    function setScope(scope) {
+      sessionStorage.setItem(scopeKey, scope);
+      if (btnPage && btnAll) {
+        btnAll.classList.toggle('active', scope === 'all');
+        btnPage.classList.toggle('active', scope !== 'all');
+      }
+    }
+
+    if (sessionStorage.getItem(scopeKey) === 'all' && btnAll) {
+      buildMap(allData, pageWorkIds);
+      setScope('all');
+    } else {
+      buildMap(pageData);
+    }
+
+    if (typeof MapLocateCardManager !== 'undefined') {
+      new MapLocateCardManager(map, function () { return pubLayer; }, function () { return window.__optimapInteraction; });
+    }
+
+    if (btnAll) { btnAll.addEventListener('click', function () { setScope('all'); buildMap(allData, pageWorkIds); }); }
+    if (btnPage) { btnPage.addEventListener('click', function () { setScope('page'); buildMap(pageData); }); }
+
+    if (typeof MapGazetteerManager !== 'undefined') {
+      new MapGazetteerManager(map, { provider: 'nominatim', placeholder: 'Search for a location...' });
+    }
+  });
+</script>

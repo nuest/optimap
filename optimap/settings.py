@@ -84,6 +84,11 @@ FEED_CACHE_HOURS = int(os.getenv("OPTIMAP_FEED_CACHE_HOURS", 24))
 OCEAN_SIMPLIFICATION_TOLERANCE = float(os.getenv("OPTIMAP_OCEAN_SIMPLIFICATION_TOLERANCE", "0.05"))
 OCEAN_SIMPLIFICATION_PERCENTILE = float(os.getenv("OPTIMAP_OCEAN_SIMPLIFICATION_PERCENTILE", "80.0"))
 
+# Country geometry simplification (load_countries). Degrees of tolerance for the
+# Douglas-Peucker simplification applied to the Natural Earth 50m outlines.
+# 0.01° (~1 km) keeps borders crisp; raise to shrink the payload, 0 to disable.
+COUNTRY_SIMPLIFICATION_TOLERANCE = float(os.getenv("OPTIMAP_COUNTRY_SIMPLIFICATION_TOLERANCE", "0.01"))
+
 # Global regions data directory (for storing downloaded ocean/continent files)
 # Default: <project_root>/works/management/commands (backwards compatible)
 # For deployment: set to a non-volatile directory like /var/opt/optimap/data

@@ -23,6 +23,10 @@ python manage.py migrate
 echo "OPTIMAP ENTRYPOINT | Load global regions data"
 python manage.py load_global_regions
 
+# Load country outlines (cached GeoJSON, mirrors load_global_regions)
+echo "OPTIMAP ENTRYPOINT | Load country outlines"
+python manage.py load_countries
+
 # Generate pygeoapi OpenAPI document (required for /ogcapi/ endpoint)
 echo "OPTIMAP ENTRYPOINT | Generate pygeoapi OpenAPI document"
 python manage.py generate_pygeoapi_openapi --force || echo "WARNING: OGC API setup failed (non-fatal)"

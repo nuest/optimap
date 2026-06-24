@@ -23,6 +23,7 @@ from works.models import (
     BlockedEmail,
     Collection,
     Contribution,
+    Country,
     CustomUser,
     EmailLog,
     GlobalRegion,
@@ -524,6 +525,7 @@ class OpenAlexStatsFilter(admin.SimpleListFilter):
 class SourceAdmin(admin.ModelAdmin):
     list_display = (
         "name",
+        "landing_link",
         "source_type",
         "collection",
         "is_oa",
@@ -537,7 +539,8 @@ class SourceAdmin(admin.ModelAdmin):
         "crossref_works_count_display",
     )
     list_filter = ("source_type", "is_oa", "is_preprint", "default_work_type", "collection", OpenAlexStatsFilter)
-    search_fields = ("name", "url_field", "issn_l", "publisher_name", "openalex_id", "collection__name")
+    search_fields = ("name", "slug", "url_field", "issn_l", "publisher_name", "openalex_id", "collection__name")
+    prepopulated_fields = {"slug": ("name",)}
     actions = [trigger_harvesting_for_specific, trigger_harvesting_for_all, schedule_harvesting]
     inlines = [RecentHarvestingEventInline]
     # Grouped fieldsets so operators can find which fields belong together —
@@ -547,11 +550,13 @@ class SourceAdmin(admin.ModelAdmin):
         (
             "Identification (mandatory)",
             {
-                "fields": ("name", "source_type", "url_field"),
+                "fields": ("name", "slug", "source_type", "url_field"),
                 "description": (
                     "<code>name</code>, <code>source_type</code>, and <code>url_field</code> "
                     "are the only mandatory fields. What to put in <code>url_field</code> "
-                    "depends on the source type — see docs/manage.md."
+                    "depends on the source type — see docs/manage.md. <code>slug</code> "
+                    "powers the public <code>/in/&lt;slug&gt;/</code> landing page and feeds; "
+                    "leave it blank to auto-generate from the name."
                 ),
             },
         ),
@@ -615,6 +620,13 @@ class SourceAdmin(admin.ModelAdmin):
         ),
     )
     readonly_fields = ("last_harvest", "statistics")
+
+    @admin.display(description="Landing page")
+    def landing_link(self, obj):
+        url = obj.get_absolute_url()
+        if not url:
+            return "—"
+        return format_html('<a href="{}" target="_blank" rel="noopener">/in/{}/</a>', url, obj.slug)
 
     @admin.display(description="Latest event")
     def latest_event_status(self, obj):
@@ -895,6 +907,15 @@ class UserAdmin(admin.ModelAdmin):
 @admin.register(GlobalRegion)
 class GlobalRegionAdmin(admin.ModelAdmin):
     """GlobalRegion Admin."""
+
+
+@admin.register(Country)
+class CountryAdmin(admin.ModelAdmin):
+    """Country outlines for /at/<country>/ pages and the countries map layer."""
+
+    list_display = ("name", "iso_code", "last_loaded")
+    search_fields = ("name", "iso_code")
+    ordering = ("name",)
 
 
 @admin.register(Collection)

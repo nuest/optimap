@@ -1,0 +1,150 @@
+{# SPDX-FileCopyrightText: 2026 OPTIMETA and KOMET projects <https://projects.tib.eu/komet> #}
+{# SPDX-License-Identifier: GPL-3.0-or-later #}
+{# Source landing page: coverage panel + feeds + work list (#29 /in/, #253). #}
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ source.name }} | {% endblock %}
+
+{% block head %}
+{{ block.super }}
+{% if map_has_features %}
+<link rel="stylesheet" href="{% static 'css/leaflet.css' %}" />
+<script src="{% static 'js/leaflet.js' %}"></script>
+<link rel="stylesheet" href="{% static 'css/leaflet.control.geocoder.css' %}" />
+<script src="{% static 'js/leaflet.control.geocoder.js' %}"></script>
+{% endif %}
+{% endblock head %}
+
+{% block extra_meta %}
+{% if canonical_url %}<link rel="canonical" href="{{ canonical_url }}" />{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid locate-container">
+  <div class="row justify-content-center">
+    <div class="col-md-10 col-lg-8 py-5">
+      <h1 class="py-2">{{ source.name }}</h1>
+      <p class="lead">{{ work_count_total }} published work{{ work_count_total|pluralize }} on OPTIMAP from this source.</p>
+
+      <div class="alert alert-info" role="alert">
+        <i class="fas fa-rss"></i>
+        <strong>Subscribe to this source:</strong>
+        <a href="{{ feed_urls.georss }}" class="alert-link">RSS</a> |
+        <a href="{{ feed_urls.atom }}" class="alert-link">Atom</a>
+        {% if source.homepage_url %}
+          &middot; <a href="{{ source.homepage_url }}" class="alert-link" target="_blank" rel="noopener noreferrer">Source homepage</a>
+        {% endif %}
+        {% if collection %}
+          &middot; <a href="{{ collection.get_absolute_url }}" class="alert-link">Collection: {{ collection.name }}</a>
+        {% endif %}
+      </div>
+
+      {# --- Coverage panel (#253) ------------------------------------------- #}
+      <section class="card mb-4" aria-labelledby="coverage-heading">
+        <div class="card-body">
+          <h2 class="h5 card-title" id="coverage-heading">Coverage and metadata quality</h2>
+
+          {% if coverage.snapshot %}
+            <div class="row text-center">
+              {% if coverage.coverage_pct is not None %}
+              <div class="col-6 col-md-3 mb-2">
+                <div class="h4 mb-0">{{ coverage.coverage_pct }}%</div>
+                <small class="text-muted">Coverage<br>{{ coverage.optimap_count }} of {{ coverage.snapshot_openalex_total }} OpenAlex</small>
+              </div>
+              {% endif %}
+              {% if coverage.spatial_rate is not None %}
+              <div class="col-6 col-md-3 mb-2">
+                <div class="h4 mb-0">{{ coverage.spatial_rate }}%</div>
+                <small class="text-muted">With geometry</small>
+              </div>
+              {% endif %}
+              {% if coverage.temporal_rate is not None %}
+              <div class="col-6 col-md-3 mb-2">
+                <div class="h4 mb-0">{{ coverage.temporal_rate }}%</div>
+                <small class="text-muted">With temporal extent</small>
+              </div>
+              {% endif %}
+              {% if coverage.open_access_ratio is not None %}
+              <div class="col-6 col-md-3 mb-2">
+                <div class="h4 mb-0">{{ coverage.open_access_ratio }}%</div>
+                <small class="text-muted">Open access</small>
+              </div>
+              {% endif %}
+            </div>
+            <p class="text-muted small mb-2">
+              {{ coverage.contributors_count }} contributor{{ coverage.contributors_count|pluralize }}.
+              Computed {{ coverage.computed_at|date:"Y-m-d" }}.
+            </p>
+            {% if coverage.by_year %}
+              <canvas id="byYearChart" height="70" aria-label="Published works per year, bar chart"></canvas>
+              {{ coverage.by_year|json_script:"byYearData" }}
+            {% endif %}
+          {% else %}
+            <p class="text-muted mb-0">No coverage snapshot yet for this source.</p>
+          {% endif %}
+
+          {# Known totals from harvest statistics — shown regardless of snapshot. #}
+          {% if coverage.openalex_total or coverage.oai_total or coverage.crossref_total %}
+            <hr>
+            <p class="small mb-0">
+              <strong>Known totals:</strong>
+              {% if coverage.openalex_total %}OpenAlex: {{ coverage.openalex_total }}{% endif %}
+              {% if coverage.oai_total %}&middot; OAI-PMH: {{ coverage.oai_total }}{% endif %}
+              {% if coverage.crossref_total %}&middot; Crossref: {{ coverage.crossref_total }}{% endif %}
+            </p>
+          {% endif %}
+        </div>
+      </section>
+
+      {# --- Work list ------------------------------------------------------- #}
+      {% if page_obj.object_list %}
+        {% if map_has_features %}{% include "partials/works_map.html" %}{% endif %}
+        <h2 class="h4 mb-3">{{ work_count_total }} work{{ work_count_total|pluralize }}</h2>
+        {% include "_pagination.html" with show_meta=True pagination_label="Source pagination" %}
+        <div class="publication-grid">
+          {% for work in page_obj.object_list %}
+            {% include "partials/work_card.html" %}
+          {% endfor %}
+        </div>
+        {% include "_pagination.html" with pagination_label="Source pagination" %}
+      {% else %}
+        <div class="alert alert-warning" role="alert">
+          <i class="fas fa-exclamation-triangle"></i> No published works from this source yet.
+        </div>
+      {% endif %}
+
+      <div class="mt-5">
+        <a href="{% url 'optimap:browse' %}" class="btn btn-outline-secondary"><i class="fas fa-list"></i> Browse all</a>
+        <a href="/" class="btn btn-outline-secondary"><i class="fas fa-map"></i> Browse map</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}
+
+{% block scripts %}
+{{ block.super }}
+{% if coverage.by_year %}
+<script src="{% static 'js/chart.umd.min.js' %}"></script>
+<script type="text/javascript">
+  (function () {
+    const ctx = document.getElementById('byYearChart');
+    if (!ctx) { return; }
+    const data = JSON.parse(document.getElementById('byYearData').textContent);
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: data.map(d => d.year),
+        datasets: [{ label: 'Published works', data: data.map(d => d.count), backgroundColor: '#1E90FF' }],
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+      },
+    });
+  })();
+</script>
+{% endif %}
+{% if map_has_features %}{% include "partials/works_map_scripts.html" %}{% endif %}
+{% endblock scripts %}

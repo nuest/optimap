@@ -1,0 +1,38 @@
+{# SPDX-FileCopyrightText: 2026 OPTIMETA and KOMET projects <https://projects.tib.eu/komet> #}
+{# SPDX-License-Identifier: GPL-3.0-or-later #}
+{# /in/ index: all sources with a landing page (#29, #253). #}
+{% extends "base.html" %}
+
+{% block title %}Sources | {% endblock %}
+
+{% block extra_meta %}
+{% if canonical_url %}<link rel="canonical" href="{{ canonical_url }}" />{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container py-5 facet-page">
+  <h1 class="py-2">Journals &amp; sources</h1>
+  <p class="lead">All sources harvested into OPTIMAP. The count shows published works; click a source for its landing page, coverage statistics, and feeds.</p>
+
+  <table class="table table-sm">
+    <thead>
+      <tr><th scope="col">Source</th><th scope="col">Type</th><th scope="col" class="text-right">Published works</th></tr>
+    </thead>
+    <tbody>
+      {% for s in sources %}
+        <tr>
+          <td><a href="{% url 'optimap:in-source' s.slug %}">{{ s.name }}</a></td>
+          <td class="text-muted small">{{ s.source_type }}</td>
+          <td class="text-right">{{ s.n }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="3" class="text-muted">No sources yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="mt-3">
+    <a href="{% url 'optimap:browse' %}" class="btn btn-outline-secondary"><i class="fas fa-list"></i> Browse all</a>
+  </div>
+</div>
+{% endblock content %}

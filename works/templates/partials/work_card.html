@@ -1,0 +1,50 @@
+{# SPDX-FileCopyrightText: 2026 OPTIMETA and KOMET projects <https://projects.tib.eu/komet> #}
+{# SPDX-License-Identifier: GPL-3.0-or-later #}
+{# Reusable work card for list-only facet/source landing pages (#29, #253). #}
+<div class="card locate-card">
+  <div class="card-body">
+    <h5 class="card-title">
+      {% if work.doi %}
+        <a href="{% url 'optimap:work-landing' work.doi %}" rel="noopener">{{ work.title|truncatechars:120 }}</a>
+      {% elif work.url %}
+        <a href="{{ work.url }}" target="_blank" rel="noopener noreferrer">{{ work.title|truncatechars:120 }}</a>
+      {% else %}
+        <span>{{ work.title|truncatechars:120 }}</span>
+      {% endif %}
+    </h5>
+    <div class="abstract-area">
+      {% if work.abstract %}
+        <p class="card-text text-muted small">{{ work.abstract|truncatechars:180 }}</p>
+      {% endif %}
+    </div>
+  </div>
+  <div class="card-footer">
+    <small class="text-muted">
+      {% if work.publicationDate %}
+        <div class="mb-1"><i class="fas fa-calendar"></i> Published: {{ work.publicationDate|date:"M d, Y" }}</div>
+      {% endif %}
+      {% if work.source %}
+        <div class="mb-1">
+          <i class="fas fa-book"></i> Source:
+          {% if work.source.slug %}
+            <a href="{% url 'optimap:in-source' work.source.slug %}">{{ work.source.name }}</a>
+          {% else %}{{ work.source.name }}{% endif %}
+        </div>
+      {% endif %}
+      {% if work.doi %}
+        <div class="mb-1"><i class="fas fa-fingerprint"></i> DOI: <span class="doi-text">{{ work.doi }}</span></div>
+      {% endif %}
+    </small>
+    <div class="d-flex" style="gap: .5rem;">
+      {% if work.doi %}
+        <a href="{% url 'optimap:work-landing' work.doi %}" class="btn btn-primary btn-sm" style="flex: 2 1 0;">
+          <i class="fas fa-map-marked-alt"></i> View work's page
+        </a>
+      {% elif work.url %}
+        <a href="{{ work.url }}" class="btn btn-primary btn-sm" style="flex: 2 1 0;" target="_blank" rel="noopener noreferrer">
+          View work (external)
+        </a>
+      {% endif %}
+    </div>
+  </div>
+</div>

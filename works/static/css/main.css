@@ -26,8 +26,15 @@ main {
 /* Override white-space for content pages that need text wrapping */
 main .locate-container,
 main .work-landing-page,
-main .works-page {
+main .works-page,
+main .facet-page {
   white-space: normal;
+}
+
+/* Faceted directory/overview pages (/browse, /countries, /at, /in): allow the
+   badge lists to wrap and keep the last rows clear of the fixed-bottom footer. */
+main .facet-page {
+  padding-bottom: 5rem;
 }
 
 /* Ensure Bootstrap text utilities work properly */

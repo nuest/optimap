@@ -1,0 +1,43 @@
+{# SPDX-FileCopyrightText: 2026 OPTIMETA and KOMET projects <https://projects.tib.eu/komet> #}
+{# SPDX-License-Identifier: GPL-3.0-or-later #}
+{# Countries overview, grouped by continent (#29). Mirrors /regions/. #}
+{% extends "base.html" %}
+
+{% block title %}Countries | {% endblock %}
+
+{% block extra_meta %}
+{% if canonical_url %}<link rel="canonical" href="{{ canonical_url }}" />{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container py-5 facet-page">
+  <h1 class="py-2">Countries</h1>
+  <p class="lead">Browse published research works by country, grouped by continent. Each continent links to its landing page.</p>
+
+  {% include "partials/countries_by_continent.html" %}
+
+  <div class="mt-5 mb-4">
+    <h3 class="h5 mb-2">Sources &amp; licenses for country data</h3>
+    <div class="text-muted small">
+      <p class="mb-1">
+        <strong>Source:</strong>
+        <a href="https://www.naturalearthdata.com/downloads/50m-cultural-vectors/50m-admin-0-countries/" target="_blank" rel="noopener">Natural Earth — 1:50m Admin 0 – Countries</a>
+        (<a href="https://www.naturalearthdata.com/about/terms-of-use/" target="_blank" rel="noopener">public domain / terms of use</a>),
+        retrieved via the <a href="https://github.com/nvkelso/natural-earth-vector" target="_blank" rel="noopener">nvkelso/natural-earth-vector</a> mirror.
+      </p>
+      <p class="ml-4">
+        <strong>Fields used:</strong> country name (<code>NAME_EN</code>), ISO 3166-1 alpha-2 code (<code>ISO_A2</code>, matched to <code>Work.country_code</code>), and continent (<code>CONTINENT</code>).
+      </p>
+    </div>
+    <div class="mt-2 p-3 bg-light border rounded small text-muted">
+      <p class="mb-1"><strong>Geometric processing:</strong></p>
+      <p class="mb-0">Country outlines are simplified (Douglas–Peucker, tolerance {{ country_simplification_tolerance }} degrees) to reduce file size while preserving geographic accuracy.</p>
+    </div>
+  </div>
+
+  <div class="mt-4 d-flex" style="gap: .5rem;">
+    <a href="{% url 'optimap:feeds' %}" class="btn btn-outline-secondary"><i class="fas fa-globe"></i> Continents &amp; oceans</a>
+    <a href="{% url 'optimap:browse' %}" class="btn btn-outline-secondary"><i class="fas fa-list"></i> Browse all</a>
+  </div>
+</div>
+{% endblock content %}

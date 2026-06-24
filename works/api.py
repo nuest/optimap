@@ -7,6 +7,7 @@ from rest_framework import routers
 
 from works.viewsets import (
     CollectionViewSet,
+    CountryViewSet,
     GeoextentViewSet,
     GlobalRegionViewSet,
     SourceViewSet,
@@ -20,6 +21,7 @@ router.register(r"sources", SourceViewSet, basename="source")
 router.register(r"works", WorkViewSet, basename="work")
 router.register(r"subscriptions", SubscriptionViewSet, basename="subscription")
 router.register(r"global-regions", GlobalRegionViewSet, basename="global-region")
+router.register(r"countries", CountryViewSet, basename="country")
 router.register(r"collections", CollectionViewSet, basename="collection")
 router.register(r"geoextent", GeoextentViewSet, basename="geoextent")
 router.register(r"statistics", StatisticsViewSet, basename="statistics")

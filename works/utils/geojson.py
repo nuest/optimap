@@ -3,6 +3,9 @@
 
 import json
 
+from django.conf import settings
+from django.core.cache import cache
+
 from works.utils.geometry import COORDINATE_PRECISION, round_geojson_coordinates
 
 # W3C SDW-BP 15: include CRS and precision metadata in every FeatureCollection.
@@ -72,3 +75,36 @@ def publications_to_geojson(publications) -> str:
         )
 
     return json.dumps({"type": "FeatureCollection", **_GEOJSON_METADATA, "features": features})
+
+
+def build_works_map_context(page_object_list, all_works, scope_key, *, all_cache_key=None, force_refresh=False):
+    """Context for the shared works map (partials/works_map*.html).
+
+    ``page_object_list`` is the current page's works (inline-rendered), ``all_works``
+    is every work in the facet (for the "show all" toggle), and ``scope_key``
+    namespaces the per-facet sessionStorage scope. Works without geometry are
+    dropped by :func:`publications_to_geojson`; ``map_has_features`` says whether
+    any survived, so the template can skip rendering an empty map.
+
+    Serializing *all* works in a facet is the expensive part (a source can have
+    thousands), so when ``all_cache_key`` is given the all-works GeoJSON + the
+    has-features flag are cached for ``FEED_CACHE_HOURS`` (``?now`` →
+    ``force_refresh=True`` bypasses, mirroring the region pages). The current
+    page's GeoJSON is small and always computed fresh.
+    """
+    cached = None if force_refresh or not all_cache_key else cache.get(all_cache_key)
+    if cached is None:
+        all_list = list(all_works)
+        all_geojson = publications_to_geojson(all_list)
+        has_features = any(w.geometry is not None and not w.geometry.empty for w in all_list)
+        if all_cache_key:
+            timeout = getattr(settings, "FEED_CACHE_HOURS", 24) * 3600
+            cache.set(all_cache_key, (all_geojson, has_features), timeout)
+    else:
+        all_geojson, has_features = cached
+    return {
+        "map_page_geojson": publications_to_geojson(list(page_object_list)),
+        "map_all_geojson": all_geojson,
+        "map_scope_key": scope_key,
+        "map_has_features": has_features,
+    }

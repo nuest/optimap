@@ -162,13 +162,16 @@
   <div class="row">
     <div class="col-md-6 mb-4">
       <h2>By country <small class="text-muted" style="font-size:0.6em">(ISO 3166-1 code, top 100)</small></h2>
-      {% if snapshot.by_country %}
+      {% if snapshot_by_country %}
       <div style="max-height: 320px; overflow-y: auto;">
         <table class="table table-sm table-striped mb-0">
           <thead><tr><th scope="col">Country</th><th scope="col" class="text-right">Works</th></tr></thead>
           <tbody>
-            {% for row in snapshot.by_country %}
-            <tr><td>{{ row.name }}</td><td class="text-right">{{ row.count }}</td></tr>
+            {% for row in snapshot_by_country %}
+            <tr>
+              <td>{% if row.url %}<a href="{{ row.url }}">{{ row.name }}</a>{% else %}{{ row.name }}{% endif %}</td>
+              <td class="text-right">{{ row.count }}</td>
+            </tr>
             {% endfor %}
           </tbody>
         </table>
@@ -195,13 +198,16 @@
   <div class="row">
     <div class="col-md-6 mb-4">
       <h2>By journal / source <small class="text-muted" style="font-size:0.6em">(top 50)</small></h2>
-      {% if snapshot.by_journal %}
+      {% if snapshot_by_journal %}
       <div style="max-height: 320px; overflow-y: auto;">
         <table class="table table-sm table-striped mb-0">
           <thead><tr><th scope="col">Journal / source</th><th scope="col" class="text-right">Works</th></tr></thead>
           <tbody>
-            {% for row in snapshot.by_journal %}
-            <tr><td>{{ row.name }}</td><td class="text-right">{{ row.count }}</td></tr>
+            {% for row in snapshot_by_journal %}
+            <tr>
+              <td>{% if row.url %}<a href="{{ row.url }}">{{ row.name }}</a>{% else %}{{ row.name }}{% endif %}</td>
+              <td class="text-right">{{ row.count }}</td>
+            </tr>
             {% endfor %}
           </tbody>
         </table>
@@ -271,7 +277,11 @@
       <tbody>
         {% for snap in sources_coverage %}
         <tr>
-          <td>{{ snap.source.name }}</td>
+          <td>
+            {% if snap.source.slug %}
+              <a href="{% url 'optimap:in-source' snap.source.slug %}">{{ snap.source.name }}</a>
+            {% else %}{{ snap.source.name }}{% endif %}
+          </td>
           <td class="text-right">{{ snap.optimap_count }}</td>
           <td class="text-right">{% if snap.openalex_total is not None %}{{ snap.openalex_total }}{% else %}<span class="text-muted">N/A</span>{% endif %}</td>
           <td class="text-right">{% if snap.coverage_pct is not None %}{{ snap.coverage_pct }}%{% else %}<span class="text-muted">N/A</span>{% endif %}</td>

@@ -101,5 +101,10 @@
     <p>Ocean geometries are simplified to reduce file size while preserving geographic accuracy. Simplification uses a tolerance of {{ ocean_simplification_tolerance }} degrees and removes the smallest {{ ocean_simplification_percentile }}% of interior holes (islands are preserved).</p>
   </div>
 
+  <div class="mt-4 d-flex" style="gap: .5rem;">
+    <a href="{% url 'optimap:countries' %}" class="btn btn-outline-secondary"><i class="fas fa-flag"></i> Browse countries</a>
+    <a href="{% url 'optimap:at-index' %}" class="btn btn-outline-secondary"><i class="fas fa-map-marker-alt"></i> All places</a>
+  </div>
+
 </div>
 {% endblock content %}

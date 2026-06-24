@@ -27,9 +27,14 @@ from optimap.sitemaps import (
     CollectionDownloadsSitemap,
     CollectionFeedsSitemap,
     CollectionsSitemap,
+    CountrySitemap,
     FeedsSitemap,
+    SourceFeedsSitemap,
+    SourceIndexSitemap,
     StaticViewSitemap,
+    TopicSitemap,
     WorksSitemap,
+    YearSitemap,
 )
 from optimap.views import RobotsView, sitemap_index_gz, sitemap_section_gz
 
@@ -40,6 +45,11 @@ sitemaps = {
     "collections": CollectionsSitemap,
     "collection-feeds": CollectionFeedsSitemap,
     "collection-downloads": CollectionDownloadsSitemap,
+    "countries": CountrySitemap,
+    "years": YearSitemap,
+    "topics": TopicSitemap,
+    "sources-index": SourceIndexSitemap,
+    "source-feeds": SourceFeedsSitemap,
 }
 
 urlpatterns = [

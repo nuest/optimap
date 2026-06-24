@@ -11,11 +11,18 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView
 
 from optimap import views as general_views
 from works import views as work_views
-from works import views_collections, views_gazetteer, views_geometry, views_regions
+from works import (
+    views_collections,
+    views_gazetteer,
+    views_geometry,
+    views_indexed,
+    views_regions,
+    views_sources,
+)
 from works.api import router as publications_router
 from works.bok import views as bok_views
 
-from .feeds import CollectionGeoFeed, GlobalGeoFeed, RegionalGeoFeed
+from .feeds import CollectionGeoFeed, GlobalGeoFeed, RegionalGeoFeed, SourceGeoFeed
 
 app_name = "optimap"
 
@@ -80,6 +87,17 @@ urlpatterns = [
         "api/v1/feeds/collection-<slug:collection_slug>.atom",
         CollectionGeoFeed(feed_type_variant="atom"),
         name="api-collection-atom",
+    ),
+    # API v1 Feed endpoints - Source feeds (#253)
+    path(
+        "api/v1/feeds/source-<slug:source_slug>.rss",
+        SourceGeoFeed(feed_type_variant="georss"),
+        name="api-source-georss",
+    ),
+    path(
+        "api/v1/feeds/source-<slug:source_slug>.atom",
+        SourceGeoFeed(feed_type_variant="atom"),
+        name="api-source-atom",
     ),
     # Region HTML pages (human-readable)
     path("regions/continent/<slug:continent_slug>/", views_regions.continent_feed_page, name="feed-continent-page"),
@@ -211,6 +229,17 @@ urlpatterns = [
         RedirectView.as_view(pattern_name="optimap:api-feed-georss", permanent=True),
         name="w3cgeo_feed",
     ),
+    # Faceted permalink pages (#29) + source landing pages (#253).
+    # `in/<slug>/` is the unified source landing page (work list + coverage + feeds).
+    # Index pages (no slug) must come before the <slug> patterns.
+    path("browse/", views_indexed.browse_page, name="browse"),
+    path("countries/", views_indexed.countries_overview, name="countries"),
+    path("at/", views_indexed.place_index, name="at-index"),
+    path("at/<slug:place_slug>/", views_indexed.place_page, name="at-place"),
+    path("during/<int:year>/", views_indexed.year_page, name="during-year"),
+    path("on/<slug:topic_slug>/", views_indexed.topic_page, name="on-topic"),
+    path("in/", views_sources.source_index, name="in-index"),
+    path("in/<slug:source_slug>/", views_sources.source_page, name="in-source"),
     # Collection vanity short URL — must be last so the explicit patterns above win.
     # Resolves only when a Collection has the matching short_slug; otherwise 404.
     path("<slug:short_slug>/", views_collections.collection_short_redirect, name="collection-short-redirect"),

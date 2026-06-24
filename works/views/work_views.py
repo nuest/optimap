@@ -700,6 +700,38 @@ def statistics_page(request):
     snapshot_by_continent = _with_url(snapshot.by_continent) if snapshot else []
     snapshot_by_ocean = _with_url(snapshot.by_ocean) if snapshot else []
 
+    # by_country uses ISO codes as "name"; map to /at/<country>/ pages and show
+    # the full country name where we know it.
+    from works.models import Country, Source
+
+    # only name+iso_code+slug are needed; defer the (large) geometry column.
+    country_by_code = {c.iso_code: c for c in Country.objects.only("iso_code", "name", "slug")}
+
+    def _with_country(rows):
+        out = []
+        for r in rows:
+            country = country_by_code.get(r["name"])
+            out.append(
+                {
+                    "name": country.name if country else r["name"],
+                    "code": r["name"],
+                    "count": r["count"],
+                    "url": country.get_absolute_url() if country else None,
+                }
+            )
+        return out
+
+    # by_journal uses source names; link to /in/<slug>/ where the name matches a Source.
+    source_urls = {
+        s.name: s.get_absolute_url() for s in Source.objects.exclude(slug__isnull=True).only("name", "slug")
+    }
+
+    def _with_source(rows):
+        return [{"name": r["name"], "count": r["count"], "url": source_urls.get(r["name"])} for r in rows]
+
+    snapshot_by_country = _with_country(snapshot.by_country) if snapshot else []
+    snapshot_by_journal = _with_source(snapshot.by_journal) if snapshot else []
+
     return render(
         request,
         "statistics.html",
@@ -707,6 +739,8 @@ def statistics_page(request):
             "snapshot": snapshot,
             "snapshot_by_continent": snapshot_by_continent,
             "snapshot_by_ocean": snapshot_by_ocean,
+            "snapshot_by_country": snapshot_by_country,
+            "snapshot_by_journal": snapshot_by_journal,
             "history_json": _json.dumps(
                 [
                     {

@@ -569,6 +569,38 @@ def build_feed_page_meta(
     return meta
 
 
+def build_facet_page_meta(request, *, title: str, description: str, page_url: str, about: dict | None = None) -> Meta:
+    """``CollectionPage`` schema.org for faceted permalink pages.
+
+    Shared by the source (``/in/``), place (``/at/``), year (``/during/``) and
+    topic (``/on/``) landing pages so every indexed page gets a canonical URL,
+    an Open Graph card, and a schema.org ``CollectionPage`` block (#29).
+    """
+    canonical = _abs(request, page_url)
+    meta = Meta(
+        request=request,
+        title=title,
+        description=description,
+        url=canonical,
+        image=_abs(request, _OG_FALLBACK_IMAGE),
+        site_name="OPTIMAP",
+        object_type="website",
+        schemaorg_title=title,
+        schemaorg_description=description,
+    )
+    schema: dict = {
+        "@context": "https://schema.org",
+        "@type": "CollectionPage",
+        "name": title,
+        "url": canonical,
+        "description": description,
+    }
+    if about:
+        schema["about"] = about
+    meta.schema = schema
+    return meta
+
+
 def _bok_defined_terms(work) -> list[dict]:
     """Render `Work.bok_concepts` as schema.org `DefinedTerm` entries.
 

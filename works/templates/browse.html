@@ -1,0 +1,70 @@
+{# SPDX-FileCopyrightText: 2026 OPTIMETA and KOMET projects <https://projects.tib.eu/komet> #}
+{# SPDX-License-Identifier: GPL-3.0-or-later #}
+{# Directory of all faceted permalink pages (#29). #}
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Browse | {% endblock %}
+
+{% block extra_meta %}
+{% if canonical_url %}<link rel="canonical" href="{{ canonical_url }}" />{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container py-5 facet-page">
+  <h1 class="py-2">Browse</h1>
+  <p class="lead">Explore published works by place, year, source, and topic.</p>
+
+  <section class="mb-5" aria-labelledby="browse-places">
+    <h2 class="h4" id="browse-places">Places</h2>
+    <h3 class="h6 text-muted">Continents &amp; oceans</h3>
+    <div class="d-flex flex-wrap">
+      {% for r in regions %}
+        <a href="{% url 'optimap:at-place' r.slug %}" class="badge badge-pill badge-light border mr-1 mb-1">{{ r.name }} ({{ r.count }})</a>
+      {% endfor %}
+    </div>
+    {% if countries %}
+      <h3 class="h6 text-muted mt-3">Countries</h3>
+      <div class="d-flex flex-wrap">
+        {% for c in countries %}
+          <a href="{% url 'optimap:at-place' c.slug %}" class="badge badge-pill badge-light border mr-1 mb-1">{{ c.name }} ({{ c.count }})</a>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </section>
+
+  <section class="mb-5" aria-labelledby="browse-years">
+    <h2 class="h4" id="browse-years">Years</h2>
+    <p class="text-muted small">By data coverage (temporal extent).</p>
+    <div class="d-flex flex-wrap">
+      {% for y in years %}
+        <a href="{% url 'optimap:during-year' y.year %}" class="badge badge-pill badge-light border mr-1 mb-1">{{ y.year }} ({{ y.count }})</a>
+      {% empty %}
+        <span class="text-muted">No temporal coverage data yet.</span>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="mb-5" aria-labelledby="browse-sources">
+    <h2 class="h4" id="browse-sources">Journals &amp; sources</h2>
+    <ul class="list-unstyled">
+      {% for s in sources %}
+        <li><a href="{% url 'optimap:in-source' s.slug %}">{{ s.name }}</a> <span class="text-muted">({{ s.n }})</span></li>
+      {% empty %}
+        <li class="text-muted">No sources with published works yet.</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="mb-5" aria-labelledby="browse-topics">
+    <h2 class="h4" id="browse-topics">Topics</h2>
+    <div class="d-flex flex-wrap">
+      {% for t in topics %}
+        <a href="{% url 'optimap:on-topic' t.slug %}" class="badge badge-pill badge-light border mr-1 mb-1">{{ t.name }} ({{ t.count }})</a>
+      {% empty %}
+        <span class="text-muted">No topics yet.</span>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+{% endblock content %}

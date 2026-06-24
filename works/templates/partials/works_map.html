@@ -1,0 +1,17 @@
+{# SPDX-FileCopyrightText: 2026 OPTIMETA and KOMET projects <https://projects.tib.eu/komet> #}
+{# SPDX-License-Identifier: GPL-3.0-or-later #}
+{# Map of works for a facet/source landing page, with a page/all scope toggle. #}
+{# Requires context: map_page_geojson, map_all_geojson, map_scope_key, page_obj. #}
+{# Pair with partials/works_map_scripts.html in the page's {% block scripts %}. #}
+{# Leaflet CSS/JS must be loaded by the host template's {% block head %}. #}
+<div id="facet-map" style="height: 480px; width: 100%; margin-bottom: 0.5rem; border-radius: 8px;"></div>
+{% if page_obj.paginator.num_pages > 1 %}
+<div class="d-flex justify-content-end mb-3">
+  <div class="btn-group btn-group-sm" id="map-scope-toggle" role="group" aria-label="Map scope">
+    <button type="button" class="btn btn-outline-secondary active" id="map-scope-page"
+      title="Show only the {{ page_obj.object_list|length }} work{{ page_obj.object_list|length|pluralize }} on the current page.">Show only page on map</button>
+    <button type="button" class="btn btn-outline-secondary" id="map-scope-all"
+      title="Show all {{ page_obj.paginator.count }} work{{ page_obj.paginator.count|pluralize }}. Current-page works are highlighted in orange.">Show all on map</button>
+  </div>
+</div>
+{% endif %}

@@ -9,6 +9,15 @@
   <div class="container py-5 works-page">
     <h1>All Works</h1>
 
+    <p class="text-muted mb-2">Explore works by facet:</p>
+    <div class="mb-4 d-flex flex-wrap" style="gap: .5rem;">
+      <a href="{% url 'optimap:at-index' %}" class="btn btn-outline-secondary btn-sm"><i class="fas fa-map-marker-alt"></i> Places</a>
+      <a href="{% url 'optimap:countries' %}" class="btn btn-outline-secondary btn-sm"><i class="fas fa-flag"></i> Countries</a>
+      <a href="{% url 'optimap:feeds' %}" class="btn btn-outline-secondary btn-sm"><i class="fas fa-globe"></i> Regions</a>
+      <a href="{% url 'optimap:in-index' %}" class="btn btn-outline-secondary btn-sm"><i class="fas fa-book"></i> Journals &amp; sources</a>
+      <a href="{% url 'optimap:browse' %}" class="btn btn-outline-secondary btn-sm"><i class="fas fa-sitemap"></i> Browse all (years, topics…)</a>
+    </div>
+
     {% if is_admin %}
       <p class="alert alert-info">
         <strong>Admin view:</strong> You can see all works regardless of status. Status labels are shown next to each entry.
