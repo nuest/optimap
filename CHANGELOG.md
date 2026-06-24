@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Country landing pages (`/at/<country>/`) now draw the country outline on the map**: when the map is shown (i.e. the country's published works have geometry) the country boundary is overlaid. The outline is taken from a new shared, browser-cached copy of the all-countries GeoJSON (`works/static/js/countries-cache.js`, `localStorage`, one-week TTL). The main map's Countries layer (`map-countries.js`) now uses the same loader, so the data is fetched once from `/api/v1/countries/` and reused across the main map and country pages on subsequent visits.
 
+### Fixed
+
+- **Native (plain) update script is now versioned and self-updating**: the `update-app.sh` body used to be copied out of [docs/deployment-plain.md](docs/deployment-plain.md) into `/opt/optimap/scripts/update-app.sh` by hand, so on-server copies went stale and missed new steps (such as `load_countries`). The script now lives in the repository at [`etc/deploy-plain/update-app.sh`](etc/deploy-plain/update-app.sh) and is symlinked from `/opt/optimap/scripts/update-app.sh` (created by `install.sh`), so `git pull` keeps it current. It runs in two phases — stop services + pull, then re-exec the freshly pulled script (guarded by `OPTIMAP_UPDATE_REEXEC`) for the dependency/migration/restart steps — so an update that changes the update procedure itself takes effect in the same run. Existing servers need a one-time `ln -sfn /opt/optimap/app/etc/deploy-plain/update-app.sh /opt/optimap/scripts/update-app.sh`.
+
 ## [0.32.0] - 2026-06-23
 
 ### Fixed

@@ -17,3 +17,4 @@ Configuration templates for deploying OPTIMAP as a native Django application (no
 | `nginx-optimap.conf` | nginx reverse proxy configuration | `/etc/nginx/sites-available/optimap` |
 | `env.example` | Environment variable template | `/opt/optimap/app/optimap/.env` |
 | `install.sh` | Automated installation script (runs the system-package / user / venv steps from the guide) | Run directly as root |
+| `update-app.sh` | Versioned update script (pull, deps, migrate, collectstatic, region/country load, restart, cache clear) | Symlinked to `/opt/optimap/scripts/update-app.sh` |

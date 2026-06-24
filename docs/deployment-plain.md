@@ -369,6 +369,9 @@ python manage.py createcachetable
 # Load global regions
 python manage.py load_global_regions
 
+# Load country outlines (cached GeoJSON, mirrors load_global_regions)
+python manage.py load_countries
+
 # Collect static files (will be collected to /opt/optimap/static via symlink)
 python manage.py collectstatic --noinput
 '
@@ -946,104 +949,38 @@ Add:
 
 ### Application update script
 
-Create `/opt/optimap/scripts/update-app.sh`:
+The update script is **versioned in the repository** at
+[`etc/deploy-plain/update-app.sh`](../etc/deploy-plain/update-app.sh), so it is
+itself kept up to date by the `git pull` it performs. Rather than copying its
+body onto the server (which would go stale), symlink the on-server path to the
+checked-out file — do this once:
 
 ```bash
-sudo nano /opt/optimap/scripts/update-app.sh
+sudo mkdir -p /opt/optimap/scripts
+sudo ln -sfn /opt/optimap/app/etc/deploy-plain/update-app.sh \
+  /opt/optimap/scripts/update-app.sh
 ```
+
+From then on, `sudo /opt/optimap/scripts/update-app.sh` always runs the latest
+version. Because the script pulls code that may rewrite the script itself, it
+runs in two phases: phase 1 stops the services and runs `git pull`, then
+re-execs itself (guarded by `OPTIMAP_UPDATE_REEXEC`) so phase 2 — dependency
+install, migrations, `collectstatic`, `load_global_regions`, `load_countries`,
+source/OpenAPI refresh, restart, and cache clear — runs from the freshly pulled
+script. Paths default to `/opt/optimap` and the `optimap` user but honor
+`OPTIMAP_HOME` / `OPTIMAP_USER` / `OPTIMAP_BRANCH` overrides.
+
+The script is committed executable; if your checkout lost the bit, restore it
+with:
 
 ```bash
-#!/bin/bash
-# Application update script for OPTIMAP
-
-set -e
-
-echo "=== OPTIMAP Update Script ==="
-echo "Started at: $(date)"
-
-# Navigate to app directory
-cd /opt/optimap/app
-
-# Stop services
-echo "Stopping services..."
-sudo systemctl stop optimap optimap-worker
-
-# Pull latest code
-echo "Pulling latest code..."
-sudo -u optimap git fetch origin
-sudo -u optimap git pull origin main
-
-# Activate virtual environment and update
-echo "Updating dependencies..."
-sudo -u optimap bash -c '
-source /opt/optimap/venv/bin/activate
-cd /opt/optimap/app
-
-# Update pip
-pip install --upgrade pip
-
-# Reinstall GDAL if system version changed
-pip install gdal=="$(gdal-config --version).*"
-
-# Update dependencies
-pip install -r requirements.txt
-
-# Apply migrations
-python manage.py migrate --noinput
-
-# Collect static files
-python manage.py collectstatic --noinput
-
-# Update global regions if needed
-python manage.py load_global_regions
-
-# Insert / update built-in sources from SOURCE_CONFIG.
-python manage.py harvest_sources --insert-sources
-
-# Regenerate OGC API OpenAPI document (required for /ogcapi/ endpoint).
-# The DB connection is derived from DATABASE_URL, so this connects to the same
-# database as Django (a reachable DB is required for the works collection).
-python manage.py generate_pygeoapi_openapi --force || echo "WARNING: OGC API setup failed (non-fatal)"
-' #end of bash command
-
-# Start services
-echo "Starting services..."
-sudo systemctl start optimap optimap-worker
-
-# Clear Django caches so the next request regenerates content from the new code
-#
-# Notes:
-# - The 'memory' (LocMemCache) backend is already empty after the restart
-#   since each Gunicorn worker starts fresh; re-clearing is harmless.
-# - The 'default' (DatabaseCache) backend persists across restarts and
-#   stores login-magic tokens, email-change confirmations, and GeoRSS feed
-#   bodies. Clearing it invalidates in-flight tokens. To preserve them,
-#   replace the call below with:
-#       python manage.py clear_caches --exclude default
-# - Browsers may still serve their own cached copies of pages
-#   (Cache-Control: max-age=…) and static files (expires 30d on /static/);
-#   a hard refresh (Ctrl+Shift+R / Cmd+Shift+R) bypasses both.
-echo "Clearing Django caches..."
-sudo -u optimap bash -c '
-source /opt/optimap/venv/bin/activate
-cd /opt/optimap/app
-python manage.py clear_caches
-'
-
-# Verify services
-sleep 5
-if systemctl is-active --quiet optimap && systemctl is-active --quiet optimap-worker; then
-    echo "Update completed successfully at: $(date)"
-else
-    echo "WARNING: Services may not have started correctly"
-    systemctl status optimap optimap-worker
-    exit 1
-fi
+sudo chmod +x /opt/optimap/app/etc/deploy-plain/update-app.sh
 ```
 
-```bash
-sudo chmod +x /opt/optimap/scripts/update-app.sh
-```
+> **Bootstrapping note:** the symlink resolves only after the repository has been
+> cloned to `/opt/optimap/app` (see [Clone the repository](#clone-the-repository)).
+> The very first update after that clone already runs the in-repo script, so no
+> manual copy is ever needed.
 
 ## Monitoring
 

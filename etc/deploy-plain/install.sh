@@ -120,6 +120,9 @@ systemctl daemon-reload
 # nginx config (but don't enable yet)
 cp "${OPTIMAP_HOME}/app/etc/deploy-plain/nginx-optimap.conf" /etc/nginx/sites-available/optimap
 
+# Symlink the versioned update script so `git pull` keeps it current
+ln -sfn "${OPTIMAP_HOME}/app/etc/deploy-plain/update-app.sh" "${OPTIMAP_HOME}/scripts/update-app.sh"
+
 log_info "Step 8/10: Configuration files installed"
 log_warn "You need to manually:"
 log_warn "  1. Create database and user in PostgreSQL"
