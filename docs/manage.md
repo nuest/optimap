@@ -575,7 +575,14 @@ Staff users additionally see the full provenance (including `original_record`, W
     "n_geocoded": 3,
     "geocoded_at": "2026-04-30T12:00:05+00:00",
     "matches": [ ... ]                     // per-point Nominatim results
-  },                                       // country association is the Work.countries M2M, not here
+  },
+  "countries": {                           // how the Work.countries M2M was joined (#261)
+    "source": "natural_earth",
+    "method": "buffer_snap",               // "intersects" for a direct hit
+    "snap_tolerance_degrees": 0.12,        // only when method == buffer_snap (~12 nm Territorial Sea)
+    "iso_codes": ["ID"],
+    "assigned_at": "2026-04-30T12:00:06+00:00"
+  },
   "dedup": {                               // on the CANONICAL work (absorbed duplicates)
     "openalex_id": "https://openalex.org/W123",
     "merged_work_ids": [17, 88],
@@ -655,7 +662,7 @@ The command sleeps `--sleep` seconds (default 1.1) between cache *misses* to hon
 
 ### Country association (offline, issue #261)
 
-`Work.countries` is set by `works.services.countries.countries_for_geometry`, which intersects the geometry against the simplified `Country` outlines — so **`python manage.py load_countries` must have populated the `Country` table** for this to do anything. It runs in two places, both gated by `OPTIMAP_GEOCODE_WORKS_ON_SAVE`:
+`Work.countries` is set by `works.services.countries.lookup_countries`, which intersects the geometry against the simplified `Country` outlines — so **`python manage.py load_countries` must have populated the `Country` table** for this to do anything. The input geometry is repaired with PostGIS `ST_MakeValid` first (so an invalid, self-intersecting geometry can't crash the join with `TopologyException`). When a strict intersection finds nothing, the geometry is buffered by **0.12°** (≈ 12 nautical miles, the Territorial Sea zone) and retried, so coastal / small-island works that fall just outside the simplified outline still resolve to their country. How each work was joined is recorded in `Work.provenance.countries` (`method`: `intersects` or `buffer_snap`, with `snap_tolerance_degrees` for the latter) — see [Work provenance](#work-provenance). It runs in two places, both gated by `OPTIMAP_GEOCODE_WORKS_ON_SAVE`:
 
 - a `post_save` signal (`works.signals.assign_work_countries`) on every save, and
 - a **weekly self-healing sweep** (`works.tasks.backfill_work_countries`, scheduled automatically) that links any work which has geometry but no countries yet — covering works saved with the flag off, harvested before #261, or whose geometry only matched after `load_countries` ran. Ocean / no-match works are simply retried each run (the join is cheap). The sweep emails active staff a summary **only when something changed or errored**.

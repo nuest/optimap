@@ -163,8 +163,13 @@ def assign_work_countries(sender, instance, **kwargs):
     if not geom or geom.empty:
         return
     try:
-        from works.services.countries import countries_for_geometry
+        from works.services.countries import lookup_countries
 
-        instance.countries.set(countries_for_geometry(geom))
+        countries, prov = lookup_countries(geom)
+        instance.countries.set(countries)
+        if prov is not None:
+            from works.utils.provenance import set_block
+
+            set_block(instance, "countries", prov)
     except Exception as err:  # pragma: no cover — non-critical path
         logger.warning("country assignment failed for work %s: %s", instance.pk, err)

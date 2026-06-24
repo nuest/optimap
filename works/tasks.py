@@ -717,16 +717,17 @@ def backfill_work_countries(trigger_source="scheduled", limit=None, dry_run=Fals
     geocoding off, harvested before #261, or whose geometry never matched (the
     offline point-in-polygon join is deterministic and cheap, so ocean / no-match
     works are simply retried each run). Uses
-    ``works.services.countries.countries_for_geometry`` — the same helper as the
+    ``works.services.countries.lookup_countries`` — the same helper as the
     post-save signal — so multi-country geometries link every intersecting
-    country.
+    country and the join method (direct vs. snap) is recorded in provenance.
 
     Emails active staff a summary **only when something changed or errored**
     (silent on no-op runs), following the ``check_service_token_renewals``
     pattern. Returns the tally dict for callers/tests.
     """
     from works.models import Country
-    from works.services.countries import countries_for_geometry
+    from works.services.countries import lookup_countries
+    from works.utils.provenance import set_block
 
     tally = {"processed": 0, "updated": 0, "multi_country": 0, "no_match": 0, "errors": 0}
 
@@ -756,7 +757,7 @@ def backfill_work_countries(trigger_source="scheduled", limit=None, dry_run=Fals
                 tally["errors"],
             )
         try:
-            countries = countries_for_geometry(work.geometry)
+            countries, prov = lookup_countries(work.geometry)
         except Exception:  # noqa: BLE001
             logger.exception("backfill_work_countries: lookup failed for work %s.", work.pk)
             tally["errors"] += 1
@@ -768,6 +769,8 @@ def backfill_work_countries(trigger_source="scheduled", limit=None, dry_run=Fals
             tally["multi_country"] += 1
         if not dry_run:
             work.countries.set(countries)
+            # Record how the join was made (direct vs. territorial-sea snap).
+            set_block(work, "countries", prov)
         tally["updated"] += 1
 
     logger.info(

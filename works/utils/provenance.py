@@ -24,6 +24,13 @@ Schema:
             "matched_id": "https://openalex.org/W123",
             "top_candidate": {...}        # only when unverified
         },
+        "countries": {                    # offline point-in-polygon join (#261)
+            "source": "natural_earth",
+            "method": "intersects" | "buffer_snap",
+            "snap_tolerance_degrees": 0.12,  # only when method == buffer_snap
+            "iso_codes": ["CR"],
+            "assigned_at": "2026-04-30T..."
+        },
         "events": [                       # chronological audit log
             {"type": "doi_contribution", "user_id": 42, "doi": "10.5194/...",
              "at": "2026-04-30T..."},     # user added this work by submitting its DOI
@@ -79,6 +86,19 @@ def _ensure_dict(value):
     if isinstance(value, dict):
         return value
     return {}
+
+
+def set_block(work, key, value):
+    """Persist ``work.provenance[key] = value`` via a queryset update.
+
+    Uses ``.update()`` rather than ``work.save()`` so it neither re-fires the
+    ``Work`` save signals (which would re-run reverse geocoding / country
+    assignment) nor bumps ``lastUpdate``. Mutates the in-memory instance too so
+    the caller sees the merged provenance.
+    """
+    merged = {**_ensure_dict(work.provenance), key: value}
+    type(work).objects.filter(pk=work.pk).update(provenance=merged)
+    work.provenance = merged
 
 
 def append_event(work, event_type, **fields):

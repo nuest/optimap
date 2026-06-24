@@ -64,6 +64,26 @@ class CountriesForGeometryTests(TestCase):
         self.assertEqual(countries_for_geometry(GeometryCollection()), [])
         self.assertEqual(countries_for_geometry(None), [])
 
+    def test_invalid_geometry_is_repaired(self):
+        # Self-intersecting "bow-tie" polygon inside Germany's box: feeding it
+        # raw to GEOSIntersects raises TopologyException; MakeValid repairs it.
+        bowtie = Polygon(((6, 48), (8, 50), (8, 48), (6, 50), (6, 48)))
+        self.assertFalse(bowtie.valid)
+        self.assertEqual([c.iso_code for c in countries_for_geometry(GeometryCollection(bowtie))], ["DE"])
+
+    def test_coastal_point_snaps_within_tolerance(self):
+        # 0.05° west of Germany's x=5 edge: no direct hit, snapped via 0.12° buffer.
+        geom = GeometryCollection(Point(4.95, 51))
+        self.assertEqual([c.iso_code for c in countries_for_geometry(geom)], ["DE"])
+
+    def test_far_point_no_match(self):
+        # 0.2° west of every box → outside the 0.12° snap tolerance.
+        self.assertEqual(countries_for_geometry(GeometryCollection(Point(4.8, 51))), [])
+
+    def test_snap_disabled_with_zero_tolerance(self):
+        geom = GeometryCollection(Point(4.95, 51))
+        self.assertEqual(countries_for_geometry(geom, snap_tolerance=0), [])
+
 
 @override_settings(GEOCODE_WORKS_ON_SAVE=True)
 class AssignWorkCountriesSignalTests(TestCase):
@@ -157,6 +177,23 @@ class BackfillWorkCountriesTests(TestCase):
         tally = backfill_work_countries()
         self.assertEqual(tally["updated"], 0)
         self.assertEqual(len(mail.outbox), 0)
+
+    def test_records_join_provenance(self):
+        # Direct hit and a 0.05° near-miss (snapped) record how they matched.
+        direct = self._work(GeometryCollection(Point(7, 51)))
+        snapped = self._work(GeometryCollection(Point(4.95, 51)))
+
+        backfill_work_countries()
+
+        direct.refresh_from_db()
+        snapped.refresh_from_db()
+        self.assertEqual(direct.provenance["countries"]["method"], "intersects")
+        self.assertNotIn("snap_tolerance_degrees", direct.provenance["countries"])
+        self.assertEqual(direct.provenance["countries"]["iso_codes"], ["DE"])
+
+        self.assertEqual(snapped.provenance["countries"]["method"], "buffer_snap")
+        self.assertEqual(snapped.provenance["countries"]["snap_tolerance_degrees"], 0.12)
+        self.assertEqual(snapped.provenance["countries"]["source"], "natural_earth")
 
     def test_empty_country_table_skips(self):
         Country.objects.all().delete()

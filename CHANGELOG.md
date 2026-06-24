@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Country backfill (`backfill_work_countries`) no longer crashes with `TopologyException` on invalid (e.g. self-intersecting) work geometries — the geometry is now repaired with PostGIS `ST_MakeValid` before the spatial join. Coastal and small-island works within ~12 nautical miles (0.12°) of a simplified country outline now snap to that country instead of returning no match. How each work was joined (`intersects` vs. `buffer_snap`, with the tolerance used) is recorded transparently in `Work.provenance.countries` (issue #261).
+
 ## [0.34.0] - 2026-06-24
 
 ### Added

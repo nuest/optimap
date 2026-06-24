@@ -271,6 +271,14 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
             "| `n_geocoded` | integer | Number of geometry points successfully reverse-geocoded |\n"
             "| `geocoded_at` | string | ISO 8601 timestamp |\n"
             "| `matches` | array | Per-point Nominatim results (display name, OSM type/id/url, lat, lon) |\n\n"
+            "**`countries` keys** (offline point-in-polygon join behind the `Work.countries` M2M):\n"
+            "| Key | Type | Description |\n"
+            "|-----|------|-------------|\n"
+            "| `source` | string | Outline dataset; always `natural_earth` |\n"
+            "| `method` | string | `intersects` (geometry directly intersects an outline) or `buffer_snap` (matched only after buffering — coastal/island works just outside the simplified outline) |\n"
+            "| `snap_tolerance_degrees` | number | Buffer applied for the snap, in degrees (e.g. `0.12` ≈ 12 nautical miles); present only when `method` is `buffer_snap` |\n"
+            "| `iso_codes` | array | ISO 3166-1 alpha-2 codes of the matched countries |\n"
+            "| `assigned_at` | string | ISO 8601 timestamp |\n\n"
             "**`events` — event types:**\n"
             "| `type` | Extra fields | Description |\n"
             "|--------|-------------|-------------|\n"
@@ -333,6 +341,14 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
                         help_text=(
                             "Reverse-geocoding via Nominatim. "
                             "Keys: gazetteer, placename, n_geocoded, geocoded_at, matches."
+                        ),
+                    ),
+                    "countries": drf_serializers.DictField(
+                        required=False,
+                        help_text=(
+                            "Offline point-in-polygon country join (Work.countries M2M). "
+                            "Keys: source (natural_earth), method (intersects/buffer_snap), "
+                            "snap_tolerance_degrees (only for buffer_snap), iso_codes, assigned_at."
                         ),
                     ),
                     "dedup": drf_serializers.DictField(
@@ -412,6 +428,12 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
                         "n_geocoded": 2,
                         "geocoded_at": "2026-04-30T12:00:05+00:00",
                     },
+                    "countries": {
+                        "source": "natural_earth",
+                        "method": "intersects",
+                        "iso_codes": ["ID"],
+                        "assigned_at": "2026-04-30T12:00:06+00:00",
+                    },
                     "events": [
                         {
                             "type": "harvest_update",
@@ -476,6 +498,13 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
                         "placename": "Uttarakhand, India",
                         "n_geocoded": 5,
                         "geocoded_at": "2026-03-10T06:30:10+00:00",
+                    },
+                    "countries": {
+                        "source": "natural_earth",
+                        "method": "buffer_snap",
+                        "snap_tolerance_degrees": 0.12,
+                        "iso_codes": ["IN"],
+                        "assigned_at": "2026-03-10T06:30:11+00:00",
                     },
                     "events": [
                         {
