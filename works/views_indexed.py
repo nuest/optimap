@@ -18,24 +18,31 @@ get SEO metadata via :func:`works.seo.build_facet_page_meta`.
 """
 
 import datetime
+import json
 import logging
 import re
 from collections import Counter
 
 from django.conf import settings
+from django.contrib.admin.views.decorators import staff_member_required
 from django.core.cache import cache
 from django.db.models import Count, Q
-from django.http import Http404
-from django.shortcuts import redirect, render
+from django.http import Http404, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.text import slugify
+from django.views.decorators.http import require_POST
+from django_q.humanhash import humanize as humanize_task_id
+from django_q.tasks import async_task
 
 from .feeds import get_region_from_slug, normalize_region_slug
-from .models import Country, GlobalRegion, Source, StatisticsSnapshot, Work
+from .models import SENTINEL_COUNTRY_ISO, Country, GlobalRegion, Source, StatisticsSnapshot, Work
 from .seo import build_facet_page_meta, coins_title
 from .utils.geojson import build_works_map_context
 from .utils.geometry import annotate_rounded_geometry
 from .utils.pagination import paginate_works
+from .utils.provenance import append_event, set_block
 from .views_regions import _get_regional_publications
 
 logger = logging.getLogger(__name__)
@@ -219,7 +226,7 @@ def place_page(request, place_slug):
     """
     # ISO alpha-2 shortcode → permanent redirect to the canonical name slug.
     if len(place_slug) == 2 and place_slug.isalpha():
-        by_code = Country.objects.filter(iso_code=place_slug.upper()).first()
+        by_code = Country.objects.real().filter(iso_code=place_slug.upper()).first()
         if by_code is not None:
             return redirect(by_code.get_absolute_url(), permanent=True)
 
@@ -229,7 +236,7 @@ def place_page(request, place_slug):
     # spatial landing pages under /regions/ (linked from the place index).
     # Lookup is via the indexed Country.slug, not a full-table scan.
     normalized = normalize_region_slug(place_slug)
-    country = Country.objects.filter(slug=normalized).first()
+    country = Country.objects.real().filter(slug=normalized).first()
     is_country = country is not None
     extra = {"show_place_nav": True}
     if is_country:
@@ -329,7 +336,7 @@ def browse_page(request):
         country_counts = {row["name"]: row["count"] for row in (snapshot.by_country or [])}
     countries = [
         {"name": c.name, "slug": c.slug, "count": country_counts.get(c.iso_code, 0)}
-        for c in Country.objects.all().only("name", "slug", "iso_code")
+        for c in Country.objects.real().only("name", "slug", "iso_code")
         if country_counts.get(c.iso_code, 0)
     ]
     countries.sort(key=lambda x: (-x["count"], x["name"]))
@@ -401,6 +408,7 @@ def _published_country_counts():
     """{iso_code: published-work count} for the country overviews."""
     rows = (
         Work.objects.filter(status="p", countries__isnull=False)
+        .exclude(countries__iso_code=SENTINEL_COUNTRY_ISO)
         .values("countries__iso_code")
         .annotate(n=Count("id", distinct=True))
     )
@@ -416,7 +424,7 @@ def _countries_by_continent():
     counts = _published_country_counts()
     landing = {r.name: r.get_absolute_url() for r in GlobalRegion.objects.filter(region_type=GlobalRegion.CONTINENT)}
     groups = {}
-    for c in Country.objects.all().only("name", "slug", "iso_code", "continent").order_by("name"):
+    for c in Country.objects.real().only("name", "slug", "iso_code", "continent").order_by("name"):
         groups.setdefault(c.continent or "Other", []).append(
             {
                 "name": c.name,
@@ -437,8 +445,25 @@ def _countries_by_continent():
     return ordered
 
 
+def _unmatched_works_qs():
+    """Works with geometry but no linked country (same set the backfill sweep
+    processes — see ``works.tasks.backfill_work_countries``). Works marked "will
+    not be matched" carry the sentinel country, so they are already excluded."""
+    return (
+        Work.objects.filter(geometry__isnull=False)
+        .exclude(geometry__isempty=True)
+        .filter(countries__isnull=True)
+        .only("id", "title", "doi")  # the curation list renders only these
+        .order_by("id")
+    )
+
+
 def countries_overview(request):
-    """`/countries/` — all countries grouped by continent (mirrors `/regions/`)."""
+    """`/countries/` — all countries grouped by continent (mirrors `/regions/`).
+
+    Staff additionally see a collapsible curation section listing works that
+    could not be matched to a country (#261).
+    """
     page_url = reverse("optimap:countries")
     meta = build_facet_page_meta(
         request,
@@ -446,16 +471,96 @@ def countries_overview(request):
         description="Browse research works by country, grouped by continent.",
         page_url=page_url,
     )
-    return render(
-        request,
-        "countries.html",
+    context = {
+        "groups": _countries_by_continent(),
+        "country_simplification_tolerance": getattr(settings, "COUNTRY_SIMPLIFICATION_TOLERANCE", 0.05),
+        "meta": meta,
+        "canonical_url": request.build_absolute_uri(page_url),
+    }
+    if request.user.is_staff:
+        page_obj, page_size = paginate_works(request, _unmatched_works_qs())
+        context.update(
+            {
+                "page_obj": page_obj,
+                "page_size": page_size,
+                "page_size_options": settings.WORKS_PAGE_SIZE_OPTIONS,
+                "country_options": list(Country.objects.real().values("iso_code", "name").order_by("name")),
+            }
+        )
+    return render(request, "countries.html", context)
+
+
+@staff_member_required
+@require_POST
+def set_work_country(request, work_id):
+    """Manually assign a country to a work, or mark it "will not be matched" (#261).
+
+    Staff-only. Body is JSON: ``{"iso_code": "DE"}`` to assign, or
+    ``{"exclude": true}`` to mark the work as not applicable (assigns the
+    sentinel ``Country``). Records a manual provenance block and an audit event;
+    the manual decision is preserved until the work's geometry changes (see
+    ``works.signals.assign_work_countries``).
+    """
+    work = get_object_or_404(Work, pk=work_id)
+    try:
+        data = json.loads(request.body or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"success": False, "error": "Invalid JSON body."}, status=400)
+
+    now = timezone.now().isoformat()
+    # Resolve the target country and the decision-specific provenance values;
+    # the persistence tail below is shared between assign and exclude.
+    if data.get("exclude"):
+        country = Country.objects.filter(iso_code=SENTINEL_COUNTRY_ISO).first()
+        if country is None:
+            return JsonResponse({"success": False, "error": "Sentinel country missing; run migrations."}, status=500)
+        decision, method, iso_codes = "excluded", "curator_excluded", []
+    else:
+        iso = (data.get("iso_code") or "").upper()
+        country = Country.objects.real().filter(iso_code=iso).first()
+        if country is None:
+            return JsonResponse({"success": False, "error": f"Unknown country code {iso!r}."}, status=400)
+        decision, method, iso_codes = "assigned", "curator_assigned", [iso]
+
+    work.countries.set([country])
+    # append_event mutates provenance in-memory; set_block then persists the
+    # whole dict via .update() without re-firing the save signals.
+    append_event(
+        work,
+        "country_curation",
+        user_id=request.user.id,
+        user_email=request.user.email,
+        decision=decision,
+        iso_code=iso_codes[0] if iso_codes else None,
+    )
+    set_block(
+        work,
+        "countries",
         {
-            "groups": _countries_by_continent(),
-            "country_simplification_tolerance": getattr(settings, "COUNTRY_SIMPLIFICATION_TOLERANCE", 0.05),
-            "meta": meta,
-            "canonical_url": request.build_absolute_uri(page_url),
+            "source": "manual",
+            "method": method,
+            "iso_codes": iso_codes,
+            "decided_by": request.user.id,
+            "decided_at": now,
         },
     )
+    return JsonResponse(
+        {"success": True, "decision": decision, "iso_codes": iso_codes, "country": country.name if iso_codes else None}
+    )
+
+
+@staff_member_required
+@require_POST
+def trigger_country_backfill(request):
+    """Enqueue a one-time background run of the country backfill task (#261).
+
+    Staff-only. Mirrors the data-dump regeneration button: queues
+    ``works.tasks.backfill_work_countries`` via Django-Q and returns the task id.
+    """
+    task_id = async_task("works.tasks.backfill_work_countries", trigger_source="manual")
+    task_name = humanize_task_id(task_id)
+    logger.info("User %s triggered country backfill (task %s)", request.user, task_name)
+    return JsonResponse({"success": True, "task_id": task_id, "task_name": task_name})
 
 
 def place_index(request):

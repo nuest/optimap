@@ -234,6 +234,8 @@ urlpatterns = [
     # Index pages (no slug) must come before the <slug> patterns.
     path("browse/", views_indexed.browse_page, name="browse"),
     path("countries/", views_indexed.countries_overview, name="countries"),
+    path("countries/curate/work/<int:work_id>/", views_indexed.set_work_country, name="set-work-country"),
+    path("countries/curate/backfill/", views_indexed.trigger_country_backfill, name="trigger-country-backfill"),
     path("at/", views_indexed.place_index, name="at-index"),
     path("at/<slug:place_slug>/", views_indexed.place_page, name="at-place"),
     path("during/<int:year>/", views_indexed.year_page, name="during-year"),

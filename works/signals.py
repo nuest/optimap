@@ -145,6 +145,30 @@ def update_work_placename(sender, instance, **kwargs):
     instance.provenance = provenance
 
 
+@receiver(pre_save, sender=_Work)
+def track_work_geometry_change(sender, instance, **kwargs):
+    """Flag whether the geometry changed, for ``assign_work_countries`` (#261).
+
+    A curator's manual country decision is only valid for the geometry it was
+    made against; when the geometry changes the decision is void and the work
+    re-enters automated matching. New works (no PK) count as changed.
+    """
+    if not instance.pk:
+        instance._geometry_changed = True
+        return
+    update_fields = kwargs.get("update_fields")
+    if update_fields is not None and "geometry" not in update_fields:
+        # A targeted save that doesn't touch geometry can't void a country
+        # decision — skip the extra SELECT + WKB parse.
+        instance._geometry_changed = False
+        return
+    old = sender.objects.filter(pk=instance.pk).values_list("geometry", flat=True).first()
+    new = instance.geometry
+    instance._geometry_changed = (old is None) != (new is None) or (
+        old is not None and new is not None and not old.equals(new)
+    )
+
+
 @receiver(post_save, sender=_Work)
 def assign_work_countries(sender, instance, **kwargs):
     """Populate ``Work.countries`` via an offline point-in-polygon join (#261).
@@ -156,20 +180,32 @@ def assign_work_countries(sender, instance, **kwargs):
     legacy records. Naturally multi-valued: a transboundary geometry links
     every intersecting country. ``set()`` does not re-fire ``Work`` save, so
     there is no recursion.
+
+    A manual curation decision (``provenance["countries"]["source"] ==
+    "manual"`` — a curator-assigned country or a "will not be matched"
+    exclusion) is preserved across unrelated saves and only voided when the
+    geometry changes, at which point the automated join below overwrites it.
     """
     if not getattr(settings, "GEOCODE_WORKS_ON_SAVE", False):
         return
     geom = instance.geometry
     if not geom or geom.empty:
         return
+    provenance = instance.provenance if isinstance(instance.provenance, dict) else {}
+    is_manual = provenance.get("countries", {}).get("source") == "manual"
+    if is_manual and not getattr(instance, "_geometry_changed", True):
+        return
     try:
         from works.services.countries import lookup_countries
+        from works.utils.provenance import set_block
 
         countries, prov = lookup_countries(geom)
         instance.countries.set(countries)
         if prov is not None:
-            from works.utils.provenance import set_block
-
             set_block(instance, "countries", prov)
+        elif is_manual:
+            # Geometry changed to one that matches no country: drop the now-void
+            # manual block so the work isn't still flagged as a manual decision.
+            set_block(instance, "countries", None)
     except Exception as err:  # pragma: no cover — non-critical path
         logger.warning("country assignment failed for work %s: %s", instance.pk, err)

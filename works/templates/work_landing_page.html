@@ -203,7 +203,7 @@
   {% if work.placename %}
     <span class="meta-item"><i class="fas fa-map-marker-alt text-muted"></i> <strong>Placename:</strong> {{ work.placename }} <i class="fas fa-info-circle text-muted" data-toggle="tooltip" title="This information was derived from the geometries of the work based on the Nominatim gazetteer." aria-label="This information was derived from the geometries of the work based on the Nominatim gazetteer."></i></span>
   {% endif %}
-  {% with work_countries=work.countries.all %}
+  {% with work_countries=work.display_countries %}
   {% if work_countries %}
     <span class="meta-item"><i class="fas fa-globe text-muted"></i> <strong>{% if work_countries|length > 1 %}Countries{% else %}Country{% endif %}:</strong> {% for country in work_countries %}<a href="{{ country.get_absolute_url }}">{{ country.name }}</a>{% if not forloop.last %}, {% endif %}{% endfor %} <i class="fas fa-info-circle text-muted" data-toggle="tooltip" title="Derived from the work's geometries against Natural Earth country outlines." aria-label="Derived from the work's geometries against Natural Earth country outlines."></i></span>
   {% endif %}

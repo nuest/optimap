@@ -587,11 +587,14 @@ Staff users additionally see the full provenance (including `original_record`, W
     "matches": [ ... ]                     // per-point Nominatim results
   },
   "countries": {                           // how the Work.countries M2M was joined (#261)
-    "source": "natural_earth",
-    "method": "buffer_snap",               // "intersects" for a direct hit
+    "source": "natural_earth",             // | "manual" for a staff curation decision
+    "method": "buffer_snap",               // "intersects" for a direct hit;
+                                           // "curator_assigned" / "curator_excluded" when source == "manual"
     "snap_tolerance_degrees": 0.12,        // only when method == buffer_snap (~12 nm Territorial Sea)
-    "iso_codes": ["ID"],
-    "assigned_at": "2026-04-30T12:00:06+00:00"
+    "iso_codes": ["ID"],                   // [] for curator_excluded ("will not be matched")
+    "assigned_at": "2026-04-30T12:00:06+00:00",
+    "decided_by": 1,                       // manual only: staff user id
+    "decided_at": "2026-04-30T12:00:06+00:00" // manual only
   },
   "dedup": {                               // on the CANONICAL work (absorbed duplicates)
     "openalex_id": "https://openalex.org/W123", // null for doi_version dedup
@@ -621,7 +624,8 @@ Staff users additionally see the full provenance (including `original_record`, W
       "source_url": "https://api.openaire.eu/graph/v1/researchProducts?pid=10.1007/978-3-540-78946-8_4",
       "fields_filled": ["abstract"],            // were empty, now populated
       "fields_offered_not_applied": ["authors"] // OpenAIRE had a value but one already existed (kept)
-    }
+    },
+    { "type": "country_curation", "at": "...", "user_id": 1, "decision": "assigned", "iso_code": "DE" }, // staff /countries curation; decision "excluded" for "will not be matched"
   ],
 }
 ```
@@ -684,6 +688,36 @@ python manage.py backfill_work_countries              # link all works missing c
 python manage.py backfill_work_countries --limit 200  # batch the first 200
 python manage.py backfill_work_countries --dry-run    # report counts, no DB writes or email
 ```
+
+#### Staff curation of unmatched works (on `/countries`)
+
+Some works have a geometry but never match a country (open ocean, Antarctica,
+geometry just offshore, bad geometry). Staff see a **collapsible "Curation:
+works without a country" section on `/countries`** to resolve them:
+
+- A **paginated list** of works with geometry but no country (the same set the
+  weekly sweep processes).
+- Per work: **assign a country** from a dropdown, or mark it **"will not be
+  matched to a country"**.
+- A **"Run country backfill now"** button that enqueues
+  `works.tasks.backfill_work_countries` (needs a running `qcluster`) and shows
+  the task id.
+
+"Will not be matched" assigns a **reserved sentinel country** (`iso_code="ZZ"`,
+"No country / not applicable", empty geometry — created by migration
+`0032_country_sentinel`) via the normal `Work.countries` M2M. Because the work
+then "has a country", the backfill's `countries__isnull=True` query skips it
+with no extra logic. The sentinel is hidden from every public country listing
+(the `/countries` overview, `/at/`, the `/api/v1/countries/` map layer,
+statistics, and `Work.country_codes`).
+
+Both actions record a manual decision in `Work.provenance.countries`
+(`source: "manual"`, `method: "curator_assigned"` or `"curator_excluded"`) plus
+a `country_curation` event in `provenance.events`. **A manual decision is
+preserved across unrelated saves but voided when the work's geometry changes** —
+then the work re-runs automated matching and, if still unmatched, returns to the
+curation list. To undo an exclusion outside this UI, remove the `ZZ` country
+from the work in the Django admin.
 
 ## Block emails and domains (anti-spam)
 

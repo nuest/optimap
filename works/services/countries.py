@@ -57,13 +57,13 @@ def lookup_countries(geom, snap_tolerance: float = 0.12) -> tuple[list, dict | N
 
     geom_field = GeometryField(srid=4326)
     valid = MakeValid(Value(geom, output_field=geom_field))
-    matches = list(Country.objects.filter(geom__intersects=valid))
+    matches = list(Country.objects.real().filter(geom__intersects=valid))
     if matches:
         return matches, _provenance(matches, "intersects")
     if snap_tolerance:
         # ST_Buffer (no Django GIS function wrapper) — snap to nearby outlines.
         buffered = Func(valid, Value(snap_tolerance), function="ST_Buffer", output_field=geom_field)
-        matches = list(Country.objects.filter(geom__intersects=buffered))
+        matches = list(Country.objects.real().filter(geom__intersects=buffered))
         if matches:
             return matches, _provenance(matches, "buffer_snap", snap_tolerance)
     return [], None

@@ -1,0 +1,52 @@
+{# SPDX-FileCopyrightText: 2026 OPTIMETA and KOMET projects <https://projects.tib.eu/komet> #}
+{# SPDX-License-Identifier: GPL-3.0-or-later #}
+{# Staff-only country curation list for unmatched works (#261). #}
+<p class="text-muted small">
+  These works have a geometry but could not be matched to any country. Assign a
+  country manually, or mark a work as "will not be matched" (e.g. open-ocean or
+  global studies) so the automated backfill leaves it alone. Editing a work's
+  geometry later voids a manual decision and re-runs automated matching.
+</p>
+
+{% if page_obj.paginator.count %}
+  {% include "_pagination.html" with show_meta=True pagination_label="Unmatched works pagination" %}
+
+  <div class="table-responsive">
+    <table class="table table-sm align-middle">
+      <thead>
+        <tr>
+          <th scope="col">Work</th>
+          <th scope="col">Assign country</th>
+          <th scope="col" class="text-nowrap">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for work in page_obj %}
+        <tr id="curation-row-{{ work.id }}" data-curate-url="{% url 'optimap:set-work-country' work.id %}">
+          <td>
+            <a href="{% url 'optimap:work-landing' work.id %}">{{ work.title|default:"(untitled)" }}</a>
+            {% if work.doi %}<br><span class="text-muted small">{{ work.doi }}</span>{% endif %}
+          </td>
+          <td>
+            <select class="form-control form-control-sm curation-country-select" aria-label="Country for work {{ work.id }}">
+              <option value="">— select country —</option>
+              {% for c in country_options %}
+              <option value="{{ c.iso_code }}">{{ c.name }} ({{ c.iso_code }})</option>
+              {% endfor %}
+            </select>
+          </td>
+          <td class="text-nowrap">
+            <button type="button" class="btn btn-sm btn-primary curation-assign-btn">Assign</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary curation-exclude-btn">Will not be matched</button>
+            <span class="curation-row-status small ml-2"></span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% include "_pagination.html" with pagination_label="Unmatched works pagination" %}
+{% else %}
+  <p class="text-success"><i class="fas fa-check-circle"></i> No unmatched works — every work with a geometry is linked to a country (or marked not applicable).</p>
+{% endif %}

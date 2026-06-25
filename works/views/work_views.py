@@ -705,7 +705,7 @@ def statistics_page(request):
     from works.models import Country, Source
 
     # only name+iso_code+slug are needed; defer the (large) geometry column.
-    country_by_code = {c.iso_code: c for c in Country.objects.only("iso_code", "name", "slug")}
+    country_by_code = {c.iso_code: c for c in Country.objects.real().only("iso_code", "name", "slug")}
 
     def _with_country(rows):
         out = []

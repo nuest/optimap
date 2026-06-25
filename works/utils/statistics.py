@@ -8,7 +8,7 @@ from django.core.cache import cache
 from django.db.models import Count, Q
 from django.utils import timezone
 
-from works.models import Collection, Source, Work
+from works.models import SENTINEL_COUNTRY_ISO, Collection, Source, Work
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +80,7 @@ def calculate_statistics():
         {"name": row["countries__iso_code"], "count": row["cnt"]}
         for row in (
             published.filter(countries__isnull=False)
+            .exclude(countries__iso_code=SENTINEL_COUNTRY_ISO)
             .values("countries__iso_code")
             .annotate(cnt=Count("id", distinct=True))
             .order_by("-cnt")[:100]

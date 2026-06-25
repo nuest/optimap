@@ -22,6 +22,12 @@ from django_q.models import Schedule
 
 logger = logging.getLogger(__name__)
 
+# ISO code of the reserved sentinel Country used to mark a work as "will not be
+# matched to a country" (manual curation, issue #261). It carries an empty
+# geometry so the point-in-polygon join never auto-assigns it, and it is hidden
+# from every public country/iso enumeration. See Country.real().
+SENTINEL_COUNTRY_ISO = "ZZ"
+
 STATUS_CHOICES = (
     ("d", "Draft"),
     ("p", "Published"),
@@ -276,9 +282,25 @@ class Work(models.Model):
         a fresh query per work. Empty for unsaved works or works with no
         country association.
         """
+        return sorted(c.iso_code for c in self.display_countries)
+
+    @property
+    def display_countries(self) -> list["Country"]:
+        """Linked countries excluding the sentinel, for public display (#261).
+
+        Reuses any ``prefetch_related("countries")`` cache. A work marked "will
+        not be matched" carries only the sentinel, so this is empty for it.
+        """
         if not self.pk:
             return []
-        return sorted(c.iso_code for c in self.countries.all())
+        return [c for c in self.countries.all() if c.iso_code != SENTINEL_COUNTRY_ISO]
+
+    @property
+    def country_match_excluded(self) -> bool:
+        """True when a curator marked this work "will not be matched" (#261)."""
+        if not self.pk:
+            return False
+        return any(c.iso_code == SENTINEL_COUNTRY_ISO for c in self.countries.all())
 
     def canonical_work(self) -> "Work":
         """Return the canonical work this row resolves to.
@@ -618,6 +640,16 @@ class GlobalRegion(models.Model):
             return reverse("optimap:feed-ocean-page", kwargs={"ocean_slug": slug})
 
 
+class CountryQuerySet(models.QuerySet):
+    def real(self):
+        """Exclude the reserved sentinel row (see ``SENTINEL_COUNTRY_ISO``)."""
+        return self.exclude(iso_code=SENTINEL_COUNTRY_ISO)
+
+
+class CountryManager(models.Manager.from_queryset(CountryQuerySet)):
+    pass
+
+
 class Country(models.Model):
     """A country with a simplified outline geometry, used for the /at/<country>
     permalink pages (issue #29) and a toggleable countries map layer.
@@ -629,6 +661,8 @@ class Country(models.Model):
     simplified Natural Earth outline, used for that join, the map layer, and the
     ``/at/<country>`` pages. Mirrors :class:`GlobalRegion`.
     """
+
+    objects = CountryManager()
 
     name = models.CharField(max_length=100, unique=True)
     iso_code = models.CharField(max_length=2, unique=True, db_index=True)

@@ -274,11 +274,13 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
             "**`countries` keys** (offline point-in-polygon join behind the `Work.countries` M2M):\n"
             "| Key | Type | Description |\n"
             "|-----|------|-------------|\n"
-            "| `source` | string | Outline dataset; always `natural_earth` |\n"
-            "| `method` | string | `intersects` (geometry directly intersects an outline) or `buffer_snap` (matched only after buffering — coastal/island works just outside the simplified outline) |\n"
+            "| `source` | string | Outline dataset (`natural_earth`), or `manual` for a staff curation decision |\n"
+            "| `method` | string | `intersects` (geometry directly intersects an outline) or `buffer_snap` (matched only after buffering — coastal/island works just outside the simplified outline); `curator_assigned` or `curator_excluded` when `source` is `manual` |\n"
             "| `snap_tolerance_degrees` | number | Buffer applied for the snap, in degrees (e.g. `0.12` ≈ 12 nautical miles); present only when `method` is `buffer_snap` |\n"
-            "| `iso_codes` | array | ISO 3166-1 alpha-2 codes of the matched countries |\n"
-            "| `assigned_at` | string | ISO 8601 timestamp |\n\n"
+            "| `iso_codes` | array | ISO 3166-1 alpha-2 codes of the matched countries (empty for `curator_excluded`) |\n"
+            "| `assigned_at` | string | ISO 8601 timestamp (automated joins) |\n"
+            "| `decided_by` | integer | Staff user id; present only when `source` is `manual` |\n"
+            "| `decided_at` | string | ISO 8601 timestamp; present only when `source` is `manual` |\n\n"
             "**`events` — event types:**\n"
             "| `type` | Extra fields | Description |\n"
             "|--------|-------------|-------------|\n"
@@ -289,7 +291,8 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
             "| `publish` | `status_from`, `status_to`, `user_id`\\*, `user_email`\\* | Work was published |\n"
             "| `unpublish` | `status_from`, `user_id`\\*, `user_email`\\* | Work was unpublished |\n"
             "| `source_migration` | `from_source`, `to_source` | Work was reassigned to a different `Source` by the `migrate_source_works` management command |\n"
-            "| `openaire_enrich` | `openaire_id`, `doi`, `source_url`, `fields_filled` (array), `fields_offered_not_applied` (array) | OpenAIRE enrichment ran; `fields_filled` were empty and were populated, `fields_offered_not_applied` had an OpenAIRE value but a value already existed (kept under the fill-if-empty policy) |\n\n"
+            "| `openaire_enrich` | `openaire_id`, `doi`, `source_url`, `fields_filled` (array), `fields_offered_not_applied` (array) | OpenAIRE enrichment ran; `fields_filled` were empty and were populated, `fields_offered_not_applied` had an OpenAIRE value but a value already existed (kept under the fill-if-empty policy) |\n"
+            '| `country_curation` | `decision` (`assigned`/`excluded`), `iso_code` (for `assigned`), `user_id`\\*, `user_email`\\* | Staff manually assigned a country, or marked the work "will not be matched", on the /countries curation section |\n\n'
             "\\* `user_id` and `user_email` are present for staff and curators only.\n\n"
             "**Other top-level keys:**\n"
             "| Key | Type | Description |\n"
@@ -346,9 +349,11 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
                     "countries": drf_serializers.DictField(
                         required=False,
                         help_text=(
-                            "Offline point-in-polygon country join (Work.countries M2M). "
-                            "Keys: source (natural_earth), method (intersects/buffer_snap), "
-                            "snap_tolerance_degrees (only for buffer_snap), iso_codes, assigned_at."
+                            "Offline point-in-polygon country join (Work.countries M2M), or a staff "
+                            "curation decision. Keys: source (natural_earth/manual), method "
+                            "(intersects/buffer_snap/curator_assigned/curator_excluded), "
+                            "snap_tolerance_degrees (only for buffer_snap), iso_codes, assigned_at, "
+                            "decided_by/decided_at (manual only)."
                         ),
                     ),
                     "dedup": drf_serializers.DictField(
@@ -815,7 +820,7 @@ class GlobalRegionViewSet(viewsets.ReadOnlyModelViewSet):
 class CountryViewSet(viewsets.ReadOnlyModelViewSet):
     """Country geometries for map layers. Read-only — loaded via load_countries."""
 
-    queryset = Country.objects.all().order_by("name")
+    queryset = Country.objects.real().order_by("name")
     serializer_class = CountrySerializer
     permission_classes = [AllowAny]
 

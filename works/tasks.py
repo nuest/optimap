@@ -731,7 +731,9 @@ def backfill_work_countries(trigger_source="scheduled", limit=None, dry_run=Fals
 
     tally = {"processed": 0, "updated": 0, "multi_country": 0, "no_match": 0, "errors": 0}
 
-    if not Country.objects.exists():
+    # .real() excludes the always-present sentinel row, so this still detects a
+    # Country table with no real countries loaded yet.
+    if not Country.objects.real().exists():
         logger.warning("backfill_work_countries: Country table empty — run load_countries first; skipping.")
         return tally
 

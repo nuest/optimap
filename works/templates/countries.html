@@ -16,6 +16,30 @@
 
   {% include "partials/countries_by_continent.html" %}
 
+  {% if request.user.is_staff %}
+  <div class="card border-info mt-5" id="countryCurationCard">
+    <div class="card-header bg-light">
+      <button class="btn btn-link p-0 text-decoration-none" type="button" data-toggle="collapse"
+              data-target="#countryCurationBody" aria-expanded="false" aria-controls="countryCurationBody">
+        <i class="fas fa-user-shield"></i> Curation: works without a country
+        <span class="badge badge-secondary ml-1">{{ page_obj.paginator.count }}</span>
+      </button>
+    </div>
+    <div id="countryCurationBody" class="collapse">
+      <div class="card-body">
+        <div class="d-flex justify-content-end mb-3" style="gap: .5rem;">
+          <button id="countryBackfillBtn" class="btn btn-sm btn-outline-primary" data-csrf="{{ csrf_token }}">
+            <i class="fas fa-sync-alt"></i> Run country backfill now
+          </button>
+          <span id="countryBackfillStatus" class="small align-self-center"></span>
+        </div>
+        {% csrf_token %}
+        {% include "partials/country_curation.html" %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   <div class="mt-5 mb-4">
     <h3 class="h5 mb-2">Sources &amp; licenses for country data</h3>
     <div class="text-muted small">
@@ -40,4 +64,93 @@
     <a href="{% url 'optimap:browse' %}" class="btn btn-outline-secondary"><i class="fas fa-list"></i> Browse all</a>
   </div>
 </div>
+
+{% if request.user.is_staff %}
+<script>
+// Staff country-curation section (#261).
+(function () {
+  const card = document.getElementById('countryCurationCard');
+  if (!card) return;
+  const csrf = document.querySelector('#countryCurationCard [name=csrfmiddlewaretoken]').value;
+
+  function post(url, body, status, onDone) {
+    status.textContent = 'Saving…';
+    status.className = 'curation-row-status small ml-2 text-muted';
+    fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+      credentials: 'same-origin',
+      body: JSON.stringify(body),
+    })
+      .then(r => r.json().then(d => ({ ok: r.ok, d })))
+      .then(({ ok, d }) => {
+        if (!ok || !d.success) throw new Error(d.error || 'request failed');
+        onDone(d);
+      })
+      .catch(err => {
+        status.textContent = 'Error: ' + err.message;
+        status.className = 'curation-row-status small ml-2 text-danger';
+      });
+  }
+
+  // Remove a resolved row; show a hint if the page is now empty.
+  function resolveRow(row) {
+    const tbody = row.parentNode;
+    row.remove();
+    if (tbody && tbody.querySelectorAll('tr').length === 0) {
+      tbody.insertAdjacentHTML('beforeend',
+        '<tr><td colspan="3" class="text-success">Resolved on this page — reload to refresh counts.</td></tr>');
+    }
+  }
+
+  card.addEventListener('click', function (ev) {
+    const assign = ev.target.closest('.curation-assign-btn');
+    const exclude = ev.target.closest('.curation-exclude-btn');
+    if (!assign && !exclude) return;
+    const row = ev.target.closest('tr');
+    const status = row.querySelector('.curation-row-status');
+    const url = row.dataset.curateUrl;
+    if (assign) {
+      const iso = row.querySelector('.curation-country-select').value;
+      if (!iso) {
+        status.textContent = 'Pick a country first.';
+        status.className = 'curation-row-status small ml-2 text-danger';
+        return;
+      }
+      post(url, { iso_code: iso }, status, () => resolveRow(row));
+    } else {
+      post(url, { exclude: true }, status, () => resolveRow(row));
+    }
+  });
+
+  // "Run country backfill now" button.
+  const backfillBtn = document.getElementById('countryBackfillBtn');
+  const backfillStatus = document.getElementById('countryBackfillStatus');
+  const backfillLabel = backfillBtn.innerHTML;
+  backfillBtn.addEventListener('click', function () {
+    backfillBtn.disabled = true;
+    backfillBtn.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Scheduling…';
+    backfillStatus.textContent = '';
+    fetch('{% url "optimap:trigger-country-backfill" %}', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': backfillBtn.dataset.csrf },
+      credentials: 'same-origin',
+    })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(data => {
+        backfillBtn.innerHTML = backfillLabel;
+        backfillBtn.disabled = false;
+        backfillStatus.textContent = 'Backfill scheduled (task ' + data.task_name + ') — reload in a moment to see resolved works.';
+        backfillStatus.className = 'small align-self-center text-success';
+      })
+      .catch(err => {
+        backfillBtn.innerHTML = backfillLabel;
+        backfillBtn.disabled = false;
+        backfillStatus.textContent = 'Error: ' + err;
+        backfillStatus.className = 'small align-self-center text-danger';
+      });
+  });
+})();
+</script>
+{% endif %}
 {% endblock content %}
