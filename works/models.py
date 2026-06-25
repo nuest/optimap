@@ -197,6 +197,13 @@ class Work(models.Model):
         help_text="Countries whose outline intersects the work's geometry "
         "(offline point-in-polygon join; multi-valued for transboundary studies).",
     )
+    regions = models.ManyToManyField(
+        "GlobalRegion",
+        related_name="works",
+        blank=True,
+        help_text="Global regions (continents and oceans) whose outline intersects the "
+        "work's geometry (offline point-in-polygon join; multi-valued).",
+    )
 
     # OpenAlex-specific fields (only from OpenAlex)
     openalex_id = models.CharField(max_length=255, blank=True, null=True, db_index=True)
@@ -301,6 +308,19 @@ class Work(models.Model):
         if not self.pk:
             return False
         return any(c.iso_code == SENTINEL_COUNTRY_ISO for c in self.countries.all())
+
+    @property
+    def region_names(self) -> list[str]:
+        """Sorted global-region names from the ``regions`` M2M.
+
+        Iterates the related manager (not ``values_list``) so a
+        ``prefetch_related("regions")`` cache is reused rather than triggering a
+        fresh query per work. Empty for unsaved works or works with no region
+        association.
+        """
+        if not self.pk:
+            return []
+        return sorted(r.name for r in self.regions.all())
 
     def canonical_work(self) -> "Work":
         """Return the canonical work this row resolves to.

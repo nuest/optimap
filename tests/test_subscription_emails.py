@@ -16,6 +16,7 @@ from django.contrib.gis.geos import GeometryCollection, MultiPolygon, Point, Pol
 from django.test import TestCase
 from django.utils import timezone
 
+from tests.region_linking import link_all_work_regions
 from works.models import EmailLog, GlobalRegion, Source, Subscription, Work
 from works.tasks import send_subscription_based_email
 
@@ -30,6 +31,12 @@ class SubscriptionEmailTests(TestCase):
     without polluting siblings) — saves ~80% of the per-test wall-clock that
     the previous per-test ``setUp`` was eating.
     """
+
+    def _send(self, **kwargs):
+        # Region→work matching now reads the persisted Work.regions M2M; populate
+        # it (as the production signal/sweep would) before exercising the digest.
+        link_all_work_regions()
+        return send_subscription_based_email(**kwargs)
 
     @classmethod
     def setUpTestData(cls):
@@ -118,7 +125,7 @@ class SubscriptionEmailTests(TestCase):
         subscription.regions.add(self.africa)
 
         # Send emails
-        send_subscription_based_email(trigger_source="test")
+        self._send(trigger_source="test")
 
         # Verify email was sent
         self.assertTrue(mock_email.called)
@@ -141,7 +148,7 @@ class SubscriptionEmailTests(TestCase):
         subscription.regions.add(self.africa, self.asia)
 
         # Send emails
-        send_subscription_based_email(trigger_source="test")
+        self._send(trigger_source="test")
 
         # Verify email structure
         self.assertTrue(mock_email.called)
@@ -164,7 +171,7 @@ class SubscriptionEmailTests(TestCase):
         subscription = Subscription.objects.create(user=self.user, name="test_subscription", subscribed=True)
         subscription.regions.add(self.africa)
 
-        send_subscription_based_email(trigger_source="test")
+        self._send(trigger_source="test")
 
         content = mock_email.call_args[0][1]
 
@@ -183,7 +190,7 @@ class SubscriptionEmailTests(TestCase):
         self.pub_pacific.delete()
 
         # Send emails
-        send_subscription_based_email(trigger_source="test")
+        self._send(trigger_source="test")
 
         # Verify no email was sent
         self.assertFalse(mock_email.called)
@@ -195,7 +202,7 @@ class SubscriptionEmailTests(TestCase):
         Subscription.objects.create(user=self.user, name="empty_subscription", subscribed=True)
 
         # Send emails
-        send_subscription_based_email(trigger_source="test")
+        self._send(trigger_source="test")
 
         # Verify no email was sent
         self.assertFalse(mock_email.called)
@@ -206,7 +213,7 @@ class SubscriptionEmailTests(TestCase):
         subscription = Subscription.objects.create(user=self.user, name="test_subscription", subscribed=True)
         subscription.regions.add(self.africa)
 
-        send_subscription_based_email(trigger_source="test")
+        self._send(trigger_source="test")
 
         content = mock_email.call_args[0][1]
 
@@ -231,7 +238,7 @@ class SubscriptionEmailTests(TestCase):
         subscription = Subscription.objects.create(user=self.user, name="test_subscription", subscribed=True)
         subscription.regions.add(self.africa)
 
-        send_subscription_based_email(trigger_source="test")
+        self._send(trigger_source="test")
 
         content = mock_email.call_args[0][1]
 
@@ -258,7 +265,7 @@ class SubscriptionEmailTests(TestCase):
         subscription = Subscription.objects.create(user=self.user, name="test_subscription", subscribed=True)
         subscription.regions.add(self.africa)
 
-        send_subscription_based_email(trigger_source="test")
+        self._send(trigger_source="test")
 
         content = mock_email.call_args[0][1]
 
@@ -284,7 +291,7 @@ class SubscriptionEmailTests(TestCase):
         subscription = Subscription.objects.create(user=self.user, name="test_subscription", subscribed=True)
         subscription.regions.add(self.africa)
 
-        send_subscription_based_email(trigger_source="test")
+        self._send(trigger_source="test")
 
         content = mock_email.call_args[0][1]
 
@@ -301,7 +308,7 @@ class SubscriptionEmailTests(TestCase):
             mock_instance = mock_email.return_value
             mock_instance.send.return_value = None
 
-            send_subscription_based_email(trigger_source="test")
+            self._send(trigger_source="test")
 
             # Check EmailLog was created
             log_entry = EmailLog.objects.filter(recipient_email=self.user.email).first()
@@ -335,7 +342,7 @@ class SubscriptionEmailTests(TestCase):
         )
         Work.objects.filter(pk=recent.pk).update(creationDate=timezone.now() - timedelta(days=3))
 
-        send_subscription_based_email(trigger_source="test", interval="weekly")
+        self._send(trigger_source="test", interval="weekly")
 
         self.assertTrue(mock_email.called)
         content = mock_email.call_args[0][1]
@@ -365,7 +372,7 @@ class SubscriptionEmailTests(TestCase):
         )
         Work.objects.filter(pk=mid.pk).update(creationDate=timezone.now() - timedelta(days=10))
 
-        send_subscription_based_email(trigger_source="test", interval="monthly")
+        self._send(trigger_source="test", interval="monthly")
 
         self.assertTrue(mock_email.called)
         content = mock_email.call_args[0][1]
@@ -383,7 +390,7 @@ class SubscriptionEmailTests(TestCase):
         )
         subscription.regions.add(self.africa)
 
-        send_subscription_based_email(trigger_source="test", interval="weekly")
+        self._send(trigger_source="test", interval="weekly")
 
         self.assertFalse(mock_email.called)
 
@@ -399,7 +406,7 @@ class SubscriptionEmailTests(TestCase):
         self.assertIsNone(subscription.last_notified)
 
         before = timezone.now()
-        send_subscription_based_email(trigger_source="test")
+        self._send(trigger_source="test")
         after = timezone.now()
 
         subscription.refresh_from_db()
@@ -420,7 +427,7 @@ class SubscriptionEmailTests(TestCase):
         # Push pub_africa far into the past so it falls outside the 31-day window
         Work.objects.filter(pk=self.pub_africa.pk).update(creationDate=timezone.now() - timedelta(days=60))
 
-        send_subscription_based_email(trigger_source="test")
+        self._send(trigger_source="test")
 
         self.assertFalse(mock_email.called)
         subscription.refresh_from_db()
@@ -449,7 +456,7 @@ class SubscriptionEmailTests(TestCase):
         )
         Work.objects.filter(pk=old.pk).update(creationDate=timezone.now() - timedelta(days=8))
 
-        send_subscription_based_email(trigger_source="test")
+        self._send(trigger_source="test")
 
         self.assertTrue(mock_email.called)
         content = mock_email.call_args[0][1]

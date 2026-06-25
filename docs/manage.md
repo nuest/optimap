@@ -596,6 +596,14 @@ Staff users additionally see the full provenance (including `original_record`, W
     "decided_by": 1,                       // manual only: staff user id
     "decided_at": "2026-04-30T12:00:06+00:00" // manual only
   },
+  "regions": {                             // how the Work.regions M2M was joined (continents + oceans)
+    "source": "global_regions",
+    "method": "intersects",                // always a direct hit (no buffer-snap for regions)
+    "regions": [                           // multi-valued: a coastal work links continent + ocean
+      {"name": "Asia", "region_type": "Continent"}
+    ],
+    "assigned_at": "2026-04-30T12:00:07+00:00"
+  },
   "dedup": {                               // on the CANONICAL work (absorbed duplicates)
     "openalex_id": "https://openalex.org/W123", // null for doi_version dedup
     "merged_work_ids": [17, 88],
@@ -718,6 +726,39 @@ preserved across unrelated saves but voided when the work's geometry changes** �
 then the work re-runs automated matching and, if still unmatched, returns to the
 curation list. To undo an exclusion outside this UI, remove the `ZZ` country
 from the work in the Django admin.
+
+### Global-region association (offline)
+
+`Work.regions` mirrors `Work.countries` for **continents and oceans**: it is set
+by `works.services.regions.lookup_regions`, which intersects the geometry against
+the `GlobalRegion` outlines — so **`python manage.py load_global_regions` must
+have populated the `GlobalRegion` table** for this to do anything. As with the
+country join, the geometry is repaired with PostGIS `ST_MakeValid` first so an
+invalid geometry can't crash it with `TopologyException`. There is **no
+buffer-snap**: continents and oceans tile the whole globe, so a coastal point
+already falls inside an ocean region, and snapping would risk pulling a work into
+two adjacent continents. The join is **multi-valued** (a coastal work links its
+continent *and* its ocean) and recorded in `Work.provenance.regions` (`method`
+always `intersects`) — see [Work provenance](#work-provenance). It powers the
+region feed pages, the regional subscription emails, and the `by_continent` /
+`by_ocean` statistics, all of which now read this M2M instead of re-intersecting
+geometry on every request. It runs in two places, both gated by
+`OPTIMAP_GEOCODE_WORKS_ON_SAVE`:
+
+- a `post_save` signal (`works.signals.assign_work_regions`) on every geometry
+  change, and
+- a **weekly self-healing sweep** (`works.tasks.backfill_work_regions`, scheduled
+  automatically, staggered after the country sweep) that links any work which has
+  geometry but no regions yet. The sweep emails active staff a summary **only when
+  something changed or errored**.
+
+Backfill or re-check on demand:
+
+```bash
+python manage.py backfill_work_regions               # link all works missing regions
+python manage.py backfill_work_regions --limit 200   # batch the first 200
+python manage.py backfill_work_regions --dry-run     # report counts, no DB writes or email
+```
 
 ## Block emails and domains (anti-spam)
 

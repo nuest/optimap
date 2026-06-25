@@ -17,7 +17,10 @@ from works.models import Country, Work
 from works.services.countries import countries_for_geometry
 from works.tasks import backfill_work_countries
 
-_LOCMEM_EMAIL = override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+_LOCMEM_EMAIL = override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    ADMINS=[],  # suppress AdminEmailHandler noise in mail.outbox (e.g. empty-table warning)
+)
 
 
 def _box(minx, miny, maxx, maxy):

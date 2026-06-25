@@ -96,10 +96,9 @@
     </div>
   </div>
 
-  <div class="mt-6 mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-xs text-gray-600">
-    <p class="mb-1"><strong>Geometric processing:</strong></p>
-    <p>Ocean geometries are simplified to reduce file size while preserving geographic accuracy. Simplification uses a tolerance of {{ ocean_simplification_tolerance }} degrees and removes the smallest {{ ocean_simplification_percentile }}% of interior holes (islands are preserved).</p>
-  </div>
+  <p class="mt-6 mb-4">
+    <strong>Geometric processing:</strong> Ocean geometries are simplified to reduce file size while preserving geographic accuracy. Simplification uses a tolerance of {{ ocean_simplification_tolerance }} degrees and removes the smallest {{ ocean_simplification_percentile }}% of interior holes (islands are preserved).
+  </p>
 
   <div class="mt-4 d-flex" style="gap: .5rem;">
     <a href="{% url 'optimap:countries' %}" class="btn btn-outline-secondary"><i class="fas fa-flag"></i> Browse countries</a>

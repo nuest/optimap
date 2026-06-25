@@ -31,6 +31,12 @@ Schema:
             "iso_codes": ["CR"],
             "assigned_at": "2026-04-30T..."
         },
+        "regions": {                      # offline point-in-polygon join (continents + oceans)
+            "source": "global_regions",
+            "method": "intersects",
+            "regions": [{"name": "Asia", "region_type": "Continent"}],
+            "assigned_at": "2026-04-30T..."
+        },
         "events": [                       # chronological audit log
             {"type": "doi_contribution", "user_id": 42, "doi": "10.5194/...",
              "at": "2026-04-30T..."},     # user added this work by submitting its DOI

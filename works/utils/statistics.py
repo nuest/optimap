@@ -65,11 +65,14 @@ def calculate_statistics():
 
     # --- Breakdowns ---
 
-    # by_continent / by_ocean via spatial intersection with GlobalRegion geometries
+    # by_continent / by_ocean — read the persisted Work.regions M2M (populated by
+    # the assign_work_regions signal / backfill_work_regions sweep), counted the
+    # same way as by_country. A single grouped query over every region (zero-count
+    # regions included) replaces the previous per-region spatial intersection.
     by_continent, by_ocean = [], []
-    for region in GlobalRegion.objects.all():
-        count = Work.objects.filter(status="p", geometry__intersects=region.geom).count()
-        entry = {"name": region.name, "count": count}
+    regions = GlobalRegion.objects.annotate(cnt=Count("works", filter=Q(works__status="p"), distinct=True))
+    for region in regions:
+        entry = {"name": region.name, "count": region.cnt}
         (by_continent if region.region_type == GlobalRegion.CONTINENT else by_ocean).append(entry)
     stats["by_continent"] = sorted(by_continent, key=lambda x: -x["count"])
     stats["by_ocean"] = sorted(by_ocean, key=lambda x: -x["count"])

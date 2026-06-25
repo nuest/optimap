@@ -341,16 +341,15 @@ def send_subscription_based_email(trigger_source="manual", sent_by=None, user_id
         total_publications = 0
 
         for region in subscribed_regions:
-            prepared_geom = region.geom.prepared
-
-            candidates = Work.objects.filter(
-                status="p",
-                geometry__isnull=False,
-                geometry__bboverlaps=region.geom,
-                creationDate__gte=cutoff,
-            ).order_by("-creationDate")[:50]
-
-            matching_pubs = [work for work in candidates if prepared_geom.intersects(work.geometry)]
+            # Read the persisted Work.regions M2M (populated by the
+            # assign_work_regions signal / backfill_work_regions sweep) rather
+            # than re-intersecting every published work's geometry here.
+            matching_pubs = list(
+                region.works.filter(
+                    status="p",
+                    creationDate__gte=cutoff,
+                ).order_by("-creationDate")[:50]
+            )
 
             if matching_pubs:
                 region_publications[region] = matching_pubs
@@ -825,6 +824,117 @@ def schedule_backfill_work_countries():
             intended_date_kwarg="scheduled_for",
         )
         logger.info("Scheduled backfill_work_countries weekly.")
+
+
+def backfill_work_regions(trigger_source="scheduled", limit=None, dry_run=False):
+    """Link ``Work.regions`` for works that have geometry but no regions yet.
+
+    The global-region mirror of :func:`backfill_work_countries`: self-healing
+    catch-up for the on-save signal, filling works saved with geocoding off,
+    harvested before regions were persisted, or whose geometry never matched
+    (the offline join is deterministic and cheap, so no-match works are simply
+    retried each run). Uses ``works.services.regions.lookup_regions`` — the same
+    helper as the post-save signal — so a coastal work links its continent and
+    ocean and the join is recorded in provenance.
+
+    Emails active staff a summary **only when something changed or errored**
+    (silent on no-op runs). Returns the tally dict for callers/tests.
+    """
+    from works.models import GlobalRegion
+    from works.services.regions import lookup_regions
+    from works.utils.provenance import set_block
+
+    tally = {"processed": 0, "updated": 0, "multi_region": 0, "no_match": 0, "errors": 0}
+
+    if not GlobalRegion.objects.exists():
+        logger.warning("backfill_work_regions: GlobalRegion table empty — run load_global_regions first; skipping.")
+        return tally
+
+    qs = (
+        Work.objects.filter(geometry__isnull=False)
+        .exclude(geometry__isempty=True)
+        .filter(regions__isnull=True)
+        .order_by("id")
+    )
+    if limit:
+        qs = qs[:limit]
+
+    for work in qs.iterator():
+        tally["processed"] += 1
+        if tally["processed"] % 100 == 0:
+            logger.info(
+                "backfill_work_regions: progress — processed %d, updated %d, no-match %d, errors %d.",
+                tally["processed"],
+                tally["updated"],
+                tally["no_match"],
+                tally["errors"],
+            )
+        try:
+            regions, prov = lookup_regions(work.geometry)
+        except Exception:  # noqa: BLE001
+            logger.exception("backfill_work_regions: lookup failed for work %s.", work.pk)
+            tally["errors"] += 1
+            continue
+        if not regions:
+            tally["no_match"] += 1
+            continue
+        if len(regions) > 1:
+            tally["multi_region"] += 1
+        if not dry_run:
+            work.regions.set(regions)
+            set_block(work, "regions", prov)
+        tally["updated"] += 1
+
+    logger.info(
+        "backfill_work_regions: processed %d, updated %d (multi %d), no-match %d, errors %d%s.",
+        tally["processed"],
+        tally["updated"],
+        tally["multi_region"],
+        tally["no_match"],
+        tally["errors"],
+        " (dry-run)" if dry_run else "",
+    )
+
+    if dry_run or not (tally["updated"] or tally["errors"]):
+        return tally
+
+    User = get_user_model()
+    admin_emails = list(
+        User.objects.filter(is_staff=True, is_active=True).exclude(email="").values_list("email", flat=True)
+    )
+    if not admin_emails:
+        logger.warning("backfill_work_regions: no staff emails configured; skipping notification.")
+        return tally
+
+    subject, body = render_email(
+        "email/region_backfill.en.txt",
+        {"tally": tally, "base_url": settings.BASE_URL},
+    )
+    for admin_email in admin_emails:
+        try:
+            send_mail(subject, body, settings.EMAIL_HOST_USER, [admin_email], fail_silently=False)
+            EmailLog.log_email(admin_email, subject, body, trigger_source=trigger_source, status="success")
+        except Exception as ex:  # noqa: BLE001
+            logger.exception("backfill_work_regions: failed to email %s.", admin_email)
+            EmailLog.log_email(
+                admin_email, subject, body, trigger_source=trigger_source, status="failed", error_message=str(ex)
+            )
+        time.sleep(settings.EMAIL_SEND_DELAY)
+
+    return tally
+
+
+def schedule_backfill_work_regions():
+    if not Schedule.objects.filter(func="works.tasks.backfill_work_regions").exists():
+        schedule(
+            "works.tasks.backfill_work_regions",
+            schedule_type="W",
+            repeats=-1,
+            # Offset from the country sweep (Mon 04:00) so they don't fire together.
+            next_run=_next_monday().replace(hour=5),
+            intended_date_kwarg="scheduled_for",
+        )
+        logger.info("Scheduled backfill_work_regions weekly.")
 
 
 # -----------------------------------------------------------------------------

@@ -10,6 +10,7 @@ from django.core import mail
 from django.test import TestCase, override_settings
 from django.utils.timezone import now
 
+from tests.region_linking import link_all_work_regions
 from works.models import EmailLog, GlobalRegion, Subscription, UserProfile, Work
 from works.tasks import send_subscription_based_email
 
@@ -21,6 +22,12 @@ class SubscriptionEmailTest(TestCase):
     """Class-level fixture (``setUpTestData``) so the user/region/subscription
     seed runs once instead of once per test method — see the matching note in
     ``tests/test_subscription_emails.py``."""
+
+    def _send(self, **kwargs):
+        # Region→work matching now reads the persisted Work.regions M2M; populate
+        # it (as the production signal/sweep would) before exercising the digest.
+        link_all_work_regions()
+        return send_subscription_based_email(**kwargs)
 
     @classmethod
     def setUpTestData(cls):
@@ -58,7 +65,7 @@ class SubscriptionEmailTest(TestCase):
             doi="10.1234/sub-doi",
             geometry=GeometryCollection(Point(13.7373, 51.0504)),  # Dresden
         )
-        send_subscription_based_email(sent_by=self.user)
+        self._send(sent_by=self.user)
 
         self.assertEqual(len(mail.outbox), 1)
         body = mail.outbox[0].body
@@ -88,7 +95,7 @@ class SubscriptionEmailTest(TestCase):
         )
         mail.outbox.clear()
 
-        send_subscription_based_email(sent_by=self.user)
+        self._send(sent_by=self.user)
         self.assertEqual(len(mail.outbox), 1)
         body = mail.outbox[0].body
         self.assertIn(pub.title, body)
@@ -106,6 +113,6 @@ class SubscriptionEmailTest(TestCase):
             geometry=GeometryCollection(Point(9.7320, 52.3759)),  # Hannover (outside Dresden region)
         )
 
-        send_subscription_based_email(sent_by=self.user)
+        self._send(sent_by=self.user)
         self.assertEqual(len(mail.outbox), 0)
         self.assertFalse(EmailLog.objects.exists())

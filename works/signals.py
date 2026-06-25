@@ -209,3 +209,37 @@ def assign_work_countries(sender, instance, **kwargs):
             set_block(instance, "countries", None)
     except Exception as err:  # pragma: no cover — non-critical path
         logger.warning("country assignment failed for work %s: %s", instance.pk, err)
+
+
+@receiver(post_save, sender=_Work)
+def assign_work_regions(sender, instance, **kwargs):
+    """Populate ``Work.regions`` via an offline point-in-polygon join.
+
+    The global-region mirror of :func:`assign_work_countries`: runs post-save
+    (M2M needs a PK), gated by ``OPTIMAP_GEOCODE_WORKS_ON_SAVE``, with the
+    recurring sweep (``works.tasks.backfill_work_regions``) as the guaranteed
+    catch-up path for works saved with it off, before ``load_global_regions``
+    ran, or legacy records. Naturally multi-valued (a coastal work links its
+    continent and ocean). ``set()`` does not re-fire ``Work`` save, so there is
+    no recursion.
+
+    There is no manual-curation concept for regions, so — like the non-manual
+    path of :func:`assign_work_countries` — the join re-runs on every save and
+    overwrites, which keeps it self-healing (a work that matched nothing because
+    ``GlobalRegion`` was empty at save time is re-linked on its next save).
+    """
+    if not getattr(settings, "GEOCODE_WORKS_ON_SAVE", False):
+        return
+    geom = instance.geometry
+    if not geom or geom.empty:
+        return
+    try:
+        from works.services.regions import lookup_regions
+        from works.utils.provenance import set_block
+
+        regions, prov = lookup_regions(geom)
+        instance.regions.set(regions)
+        if prov is not None:
+            set_block(instance, "regions", prov)
+    except Exception as err:  # pragma: no cover — non-critical path
+        logger.warning("region assignment failed for work %s: %s", instance.pk, err)

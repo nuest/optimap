@@ -198,16 +198,16 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
                 ).order_by("_status_priority", "-creationDate", "-id")
             else:
                 qs = qs.order_by("-creationDate", "-id")
-            return annotate_rounded_geometry(qs).prefetch_related("countries")
+            return annotate_rounded_geometry(qs).prefetch_related("countries", "regions")
         if getattr(self, "action", None) == "provenance" and self.request.user.is_authenticated:
             curated = Work.objects.filter(collections__curators=self.request.user)
             public = Work.objects.filter(status="p")
             qs = (curated | public).distinct()
             if not include_redirected:
                 qs = qs.exclude(status="r")
-            return annotate_rounded_geometry(qs).prefetch_related("countries")
+            return annotate_rounded_geometry(qs).prefetch_related("countries", "regions")
         public = Work.objects.filter(status="p").order_by("-creationDate", "-id").distinct()
-        return annotate_rounded_geometry(public).prefetch_related("countries")
+        return annotate_rounded_geometry(public).prefetch_related("countries", "regions")
 
     @extend_schema(
         summary="Retrieve provenance for a work",
@@ -281,6 +281,13 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
             "| `assigned_at` | string | ISO 8601 timestamp (automated joins) |\n"
             "| `decided_by` | integer | Staff user id; present only when `source` is `manual` |\n"
             "| `decided_at` | string | ISO 8601 timestamp; present only when `source` is `manual` |\n\n"
+            "**`regions` keys** (offline point-in-polygon join behind the `Work.regions` M2M):\n"
+            "| Key | Type | Description |\n"
+            "|-----|------|-------------|\n"
+            "| `source` | string | Outline dataset (`global_regions`) |\n"
+            "| `method` | string | Always `intersects` (geometry directly intersects a continent/ocean outline; no buffer-snap) |\n"
+            "| `regions` | array | Matched regions as `{name, region_type}` objects (`region_type` is `Continent` or `Ocean`) |\n"
+            "| `assigned_at` | string | ISO 8601 timestamp |\n\n"
             "**`events` — event types:**\n"
             "| `type` | Extra fields | Description |\n"
             "|--------|-------------|-------------|\n"
@@ -354,6 +361,14 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
                             "(intersects/buffer_snap/curator_assigned/curator_excluded), "
                             "snap_tolerance_degrees (only for buffer_snap), iso_codes, assigned_at, "
                             "decided_by/decided_at (manual only)."
+                        ),
+                    ),
+                    "regions": drf_serializers.DictField(
+                        required=False,
+                        help_text=(
+                            "Offline point-in-polygon global-region join (Work.regions M2M). "
+                            "Keys: source (global_regions), method (intersects), "
+                            "regions (array of {name, region_type}), assigned_at."
                         ),
                     ),
                     "dedup": drf_serializers.DictField(
@@ -441,6 +456,12 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
                         "iso_codes": ["ID"],
                         "assigned_at": "2026-04-30T12:00:06+00:00",
                     },
+                    "regions": {
+                        "source": "global_regions",
+                        "method": "intersects",
+                        "regions": [{"name": "Asia", "region_type": "Continent"}],
+                        "assigned_at": "2026-04-30T12:00:07+00:00",
+                    },
                     "events": [
                         {
                             "type": "harvest_update",
@@ -512,6 +533,12 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
                         "snap_tolerance_degrees": 0.12,
                         "iso_codes": ["IN"],
                         "assigned_at": "2026-03-10T06:30:11+00:00",
+                    },
+                    "regions": {
+                        "source": "global_regions",
+                        "method": "intersects",
+                        "regions": [{"name": "Asia", "region_type": "Continent"}],
+                        "assigned_at": "2026-03-10T06:30:12+00:00",
                     },
                     "events": [
                         {

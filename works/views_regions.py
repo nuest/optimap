@@ -13,7 +13,7 @@ from django.shortcuts import render
 from django.urls import reverse
 
 from .feeds import get_region_from_slug
-from .models import GlobalRegion, Work
+from .models import GlobalRegion
 from .seo import build_feed_page_meta
 from .utils.geojson import publications_to_geojson
 from .utils.geometry import annotate_rounded_geometry
@@ -22,20 +22,17 @@ logger = logging.getLogger(__name__)
 
 
 def _get_regional_publications(region):
-    """Get published works whose geometry intersects the region."""
-    candidates = annotate_rounded_geometry(
-        Work.objects.filter(
-            status="p",
-            geometry__isnull=False,
-            geometry__bboverlaps=region.geom,
-        )
-        .exclude(url__isnull=True)
-        .exclude(url__exact="")
-        .order_by("-creationDate")
-    )
+    """Get published works linked to the region (offline point-in-polygon M2M).
 
-    prepared_geom = region.geom.prepared
-    return [work for work in candidates if prepared_geom.intersects(work.geometry)]
+    Reads the persisted ``Work.regions`` association (populated by the
+    ``assign_work_regions`` signal and the ``backfill_work_regions`` sweep)
+    rather than re-intersecting every published work's geometry on each request.
+    """
+    return list(
+        annotate_rounded_geometry(
+            region.works.filter(status="p").exclude(url__isnull=True).exclude(url__exact="").order_by("-creationDate")
+        )
+    )
 
 
 def continent_feed_page(request, continent_slug):

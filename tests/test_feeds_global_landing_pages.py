@@ -23,6 +23,7 @@ from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
+from tests.region_linking import link_all_work_regions
 from works.models import GlobalRegion, Work
 
 NSPS = {"atom": "http://www.w3.org/2005/Atom", "georss": "http://www.georss.org/georss"}
@@ -99,6 +100,7 @@ class GlobalFeedsAndLandingPageTests(TestCase):
         call_command("flush", "--no-input")
         call_command("load_global_regions")
         call_command("loaddata", "test_data_global_feeds")
+        link_all_work_regions()
 
     def slugify(self, name):
         """Convert region name to slug."""
@@ -412,6 +414,7 @@ class GeometryTypeFeedTests(TestCase):
         call_command("flush", "--no-input")
         call_command("load_global_regions")
         call_command("loaddata", "test_data_global_feeds")
+        link_all_work_regions()
 
     def slugify(self, name):
         return name.lower().replace(" ", "-")

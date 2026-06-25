@@ -65,6 +65,12 @@ def schedule_country_backfill_tasks(sender, **kwargs):
     schedule_backfill_work_countries()
 
 
+def schedule_region_backfill_tasks(sender, **kwargs):
+    from works.tasks import schedule_backfill_work_regions
+
+    schedule_backfill_work_regions()
+
+
 def _update_pygeoapi_extent(sender=None, **kwargs):
     """Compute the bounding box of all published works and patch PYGEOAPI_CONFIG.
 
@@ -129,5 +135,11 @@ class WorksConfig(AppConfig):
             sender=self,
             weak=False,
             dispatch_uid="works.schedule_country_backfill_tasks",
+        )
+        post_migrate.connect(
+            schedule_region_backfill_tasks,
+            sender=self,
+            weak=False,
+            dispatch_uid="works.schedule_region_backfill_tasks",
         )
         import works.signals  # noqa: F401 — connects @receiver decorators

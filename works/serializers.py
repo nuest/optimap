@@ -201,6 +201,10 @@ class WorkSerializer(GeoFeatureModelSerializer):
         help_text="ISO 3166-1 alpha-2 codes of the countries the geometry intersects "
         "(offline point-in-polygon join; multi-valued for transboundary works)."
     )
+    region_names = serializers.SerializerMethodField(
+        help_text="Names of the global regions (continents and oceans) the geometry "
+        "intersects (offline point-in-polygon join; multi-valued)."
+    )
 
     class Meta:
         model = Work
@@ -218,6 +222,7 @@ class WorkSerializer(GeoFeatureModelSerializer):
             "timeperiod_enddate",
             "placename",
             "country_codes",
+            "region_names",
             "source_details",
             "status",
             "status_display",
@@ -264,6 +269,10 @@ class WorkSerializer(GeoFeatureModelSerializer):
     @extend_schema_field(serializers.ListField(child=serializers.CharField()))
     def get_country_codes(self, obj):
         return obj.country_codes
+
+    @extend_schema_field(serializers.ListField(child=serializers.CharField()))
+    def get_region_names(self, obj):
+        return obj.region_names
 
     @extend_schema_field(serializers.ListField(child=serializers.DictField()))
     def get_bok_concepts_resolved(self, obj):
