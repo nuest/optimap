@@ -236,10 +236,14 @@ def assign_work_regions(sender, instance, **kwargs):
     try:
         from works.services.regions import lookup_regions
         from works.utils.provenance import set_block
+        from works.views_regions import invalidate_region_page_cache
 
         regions, prov = lookup_regions(geom)
+        previous = set(instance.regions.all())
         instance.regions.set(regions)
         if prov is not None:
             set_block(instance, "regions", prov)
+        for region in set(regions) | previous:
+            invalidate_region_page_cache(region)
     except Exception as err:  # pragma: no cover — non-critical path
         logger.warning("region assignment failed for work %s: %s", instance.pk, err)

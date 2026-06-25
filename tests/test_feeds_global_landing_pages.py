@@ -372,6 +372,53 @@ class GlobalFeedsAndLandingPageTests(TestCase):
         response3 = self.client.get(url + "?now")
         self.assertEqual(response3.status_code, 200)
 
+    @override_settings(
+        CACHES={
+            "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "regions-test"},
+            "memory": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "optimap-locmem"},
+            "dummy": {"BACKEND": "django.core.cache.backends.dummy.DummyCache"},
+        },
+        ADMINS=[],
+    )
+    def test_backfill_invalidates_cached_region_page(self):
+        """Linking a work to a region must invalidate its (possibly empty) cached page.
+
+        Regression for stale region landing pages: a page rendered before works are
+        linked was cached for FEED_CACHE_HOURS and kept serving the empty version.
+        """
+        from django.contrib.gis.geos import GeometryCollection
+        from django.core.cache import cache
+
+        from works.tasks import backfill_work_regions
+
+        cache.clear()
+        region = GlobalRegion.objects.get(name="Africa")
+        slug = self.slugify(region.name)
+        url = reverse("optimap:feed-continent-page", kwargs={"continent_slug": slug})
+
+        title = "Cache Invalidation Regression Work"
+        work = Work.objects.create(
+            title=title,
+            status="p",
+            url="https://example.org/cache-invalidation",
+            geometry=GeometryCollection(region.geom.point_on_surface),
+        )
+        self.assertFalse(work.regions.exists(), "new work should start unlinked")
+
+        # Prime the cache while the work is still unlinked.
+        primed = self.client.get(url)
+        self.assertEqual(primed.status_code, 200)
+        self.assertNotContains(primed, title)
+
+        # Backfill links the work and must clear the cached page.
+        backfill_work_regions(trigger_source="test")
+        self.assertIn(region, set(work.regions.all()))
+
+        # No ?now: a stale cache would still hide the work; the fix shows it.
+        refreshed = self.client.get(url)
+        self.assertEqual(refreshed.status_code, 200)
+        self.assertContains(refreshed, title)
+
     def test_invalid_continent_returns_404(self):
         """Test that invalid continent slug returns 404."""
         url = reverse("optimap:feed-continent-page", kwargs={"continent_slug": "invalid-continent"})

@@ -35,6 +35,20 @@ def _get_regional_publications(region):
     )
 
 
+def invalidate_region_page_cache(region):
+    """Delete the cached landing-page context for a region.
+
+    Called whenever ``Work.regions`` membership changes (the ``assign_work_regions``
+    signal or the ``backfill_work_regions`` sweep) so the page reflects new
+    associations before ``FEED_CACHE_HOURS`` elapses, instead of serving a stale
+    (possibly empty) page for up to a day.
+    """
+    if region is None:
+        return
+    kind = "continent" if region.region_type == GlobalRegion.CONTINENT else "ocean"
+    cache.delete(f"feed_page:{kind}:{region.get_slug()}")
+
+
 def continent_feed_page(request, continent_slug):
     """Display HTML landing page for a continent region. Supports ?now to bypass cache."""
     force_refresh = request.GET.get("now") is not None

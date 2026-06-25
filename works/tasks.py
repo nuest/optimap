@@ -859,6 +859,7 @@ def backfill_work_regions(trigger_source="scheduled", limit=None, dry_run=False)
     if limit:
         qs = qs[:limit]
 
+    touched_regions = set()
     for work in qs.iterator():
         tally["processed"] += 1
         if tally["processed"] % 100 == 0:
@@ -883,7 +884,14 @@ def backfill_work_regions(trigger_source="scheduled", limit=None, dry_run=False)
         if not dry_run:
             work.regions.set(regions)
             set_block(work, "regions", prov)
+            touched_regions.update(regions)
         tally["updated"] += 1
+
+    if touched_regions:
+        from works.views_regions import invalidate_region_page_cache
+
+        for region in touched_regions:
+            invalidate_region_page_cache(region)
 
     logger.info(
         "backfill_work_regions: processed %d, updated %d (multi %d), no-match %d, errors %d%s.",
