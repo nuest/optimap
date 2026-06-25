@@ -48,15 +48,18 @@
         <a href="https://www.naturalearthdata.com/downloads/50m-cultural-vectors/50m-admin-0-countries/" target="_blank" rel="noopener">Natural Earth — 1:50m Admin 0 – Countries</a>
         (<a href="https://www.naturalearthdata.com/about/terms-of-use/" target="_blank" rel="noopener">public domain / terms of use</a>),
         retrieved via the <a href="https://github.com/nvkelso/natural-earth-vector" target="_blank" rel="noopener">nvkelso/natural-earth-vector</a> mirror.
+        Natural Earth draws boundaries on a de facto basis and includes disputed areas; see its
+        <a href="https://www.naturalearthdata.com/about/disputed-boundaries-policy/" target="_blank" rel="noopener">disputed boundaries policy</a>.
+        OPTIMAP does not endorse any disputed borders. As a research prototype, the dedicated display and
+        handling of disputed or contested borders is out of scope; for questions or concerns please use the
+        contact options on the <a href="{% url 'optimap:about' %}">about page</a>.
       </p>
       <p class="ml-4">
         <strong>Fields used:</strong> country name (<code>NAME_EN</code>), ISO 3166-1 alpha-2 code (<code>ISO_A2</code>, linked to works via <code>Work.countries</code>), and continent (<code>CONTINENT</code>).
       </p>
-    </div>
-    <div class="mt-2 p-3 bg-light border rounded small text-muted">
-      <p class="mb-1"><strong>Geometric processing:</strong></p>
-      <p class="mb-0">Country outlines are simplified (Douglas–Peucker, tolerance {{ country_simplification_tolerance }} degrees) to reduce file size while preserving geographic accuracy.</p>
-    </div>
+      <p class="mb-0">
+        <strong>Geometric processing:</strong> Country outlines are simplified (Douglas–Peucker, tolerance {{ country_simplification_tolerance }} degrees) to reduce file size while preserving geographic accuracy.
+      </p>
   </div>
 
   <div class="mt-4 d-flex" style="gap: .5rem;">
