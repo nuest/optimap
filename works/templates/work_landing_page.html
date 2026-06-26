@@ -224,7 +224,7 @@
   {% if work.publicationDate %}<span class="meta-item"><i class="fas fa-calendar-alt text-muted"></i> <strong>Published:</strong> {{ work.publicationDate }}</span>{% endif %}
   {% if work.source %}
     <span class="meta-item"><i class="fas fa-newspaper text-muted"></i> <strong>Source:</strong>
-    {% if work.source.homepage_url %}<a href="{{ work.source.homepage_url }}" target="_blank" rel="noopener">{{ work.source.name }}</a>{% else %}{{ work.source.name }}{% endif %}</span>
+    {% if work.source.get_absolute_url %}<a href="{{ work.source.get_absolute_url }}">{{ work.source.name }}</a>{% elif work.source.homepage_url %}<a href="{{ work.source.homepage_url }}" target="_blank" rel="noopener">{{ work.source.name }}</a>{% else %}{{ work.source.name }}{% endif %}</span>
   {% endif %}
   {% if work.openalex_id %}
     <span class="meta-item"><i class="fas fa-atom text-muted"></i> <strong>OpenAlex:</strong> <a href="{{ work.openalex_id }}" target="_blank" rel="noopener">View in OpenAlex</a></span>

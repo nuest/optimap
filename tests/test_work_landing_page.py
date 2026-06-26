@@ -167,24 +167,26 @@ class WorkLandingPageTest(TestCase):
         self.assertContains(response, expected_doi_url)
         self.assertContains(response, f'<a href="{expected_doi_url}"')
 
-    def test_source_link_with_homepage_url(self):
-        """Test that the source link points to the homepage_url when available."""
+    def test_source_link_points_to_internal_source_page(self):
+        """The source link points to the internal /in/<slug>/ landing page, not the external homepage."""
         response = self.client.get(f"/work/{self.pub_with_doi.doi}/")
         self.assertEqual(response.status_code, 200)
 
-        # Check that the source homepage link is present
-        self.assertContains(response, self.source.homepage_url)
-        self.assertContains(response, f'<a href="{self.source.homepage_url}"')
-        self.assertContains(response, self.source.name)
+        # Source links to the internal landing page (keeps users in OPTIMAP)
+        internal_url = self.source.get_absolute_url()
+        self.assertIsNotNone(internal_url)
+        self.assertContains(response, f'<a href="{internal_url}">{self.source.name}</a>')
+        # It should no longer link the source name directly to the external homepage
+        self.assertNotContains(response, f'<a href="{self.source.homepage_url}"')
 
-    def test_source_without_homepage_url(self):
-        """Test that source name is displayed as text when homepage_url is not available."""
+    def test_source_without_homepage_url_still_links_internally(self):
+        """A source without a homepage_url still links to its internal landing page."""
         response = self.client.get(f"/work/{self.pub_no_homepage.doi}/")
         self.assertEqual(response.status_code, 200)
 
-        # Check that the source name is present but not as a link
-        self.assertContains(response, self.source_no_homepage.name)
-        # Should not have a link to the source since homepage_url is None
+        internal_url = self.source_no_homepage.get_absolute_url()
+        self.assertIsNotNone(internal_url)
+        self.assertContains(response, f'<a href="{internal_url}">{self.source_no_homepage.name}</a>')
         self.assertNotContains(response, '<a href="None"')
 
     def test_raw_json_api_link_is_correct(self):
