@@ -850,10 +850,15 @@ def backfill_work_regions(trigger_source="scheduled", limit=None, dry_run=False)
         logger.warning("backfill_work_regions: GlobalRegion table empty — run load_global_regions first; skipping.")
         return tally
 
+    from works.views_regions import NOT_MANUAL_REGION
+
     qs = (
         Work.objects.filter(geometry__isnull=False)
         .exclude(geometry__isempty=True)
         .filter(regions__isnull=True)
+        # Skip works a curator decided manually (assigned a region, or marked
+        # "will not be matched" with zero regions) so the sweep does not undo it.
+        .filter(NOT_MANUAL_REGION)
         .order_by("id")
     )
     if limit:

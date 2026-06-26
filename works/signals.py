@@ -223,15 +223,22 @@ def assign_work_regions(sender, instance, **kwargs):
     continent and ocean). ``set()`` does not re-fire ``Work`` save, so there is
     no recursion.
 
-    There is no manual-curation concept for regions, so — like the non-manual
-    path of :func:`assign_work_countries` — the join re-runs on every save and
-    overwrites, which keeps it self-healing (a work that matched nothing because
-    ``GlobalRegion`` was empty at save time is re-linked on its next save).
+    A manual curation decision (``provenance["regions"]["source"] == "manual"``
+    — a curator-assigned region or a "will not be matched" exclusion, set on the
+    ``/regions/`` page) is preserved across unrelated saves and only voided when
+    the geometry changes, mirroring :func:`assign_work_countries`. Otherwise the
+    join re-runs on every save and overwrites, which keeps it self-healing (a
+    work that matched nothing because ``GlobalRegion`` was empty at save time is
+    re-linked on its next save).
     """
     if not getattr(settings, "GEOCODE_WORKS_ON_SAVE", False):
         return
     geom = instance.geometry
     if not geom or geom.empty:
+        return
+    provenance = instance.provenance if isinstance(instance.provenance, dict) else {}
+    is_manual = provenance.get("regions", {}).get("source") == "manual"
+    if is_manual and not getattr(instance, "_geometry_changed", True):
         return
     try:
         from works.services.regions import lookup_regions
@@ -243,6 +250,10 @@ def assign_work_regions(sender, instance, **kwargs):
         instance.regions.set(regions)
         if prov is not None:
             set_block(instance, "regions", prov)
+        elif is_manual:
+            # Geometry changed to one matching no region: drop the now-void manual
+            # block so the work re-enters automated matching / the curation list.
+            set_block(instance, "regions", None)
         for region in set(regions) | previous:
             invalidate_region_page_cache(region)
     except Exception as err:  # pragma: no cover — non-critical path

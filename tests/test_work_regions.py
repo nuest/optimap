@@ -199,3 +199,39 @@ class RegionStatisticsAndFeedConsistencyTests(TestCase):
         self.assertEqual(land_count, len(feed_works))
         # Zero-count regions are still listed (parity with previous behaviour).
         self.assertEqual(next(e["count"] for e in stats["by_ocean"] if e["name"] == "Testsea"), 0)
+
+
+@override_settings(GEOCODE_WORKS_ON_SAVE=True)
+class WorkLandingPageRegionsTests(TestCase):
+    """The landing page lists linked regions (between Authors and Countries),
+    each name linking to the region feed page — mirroring the countries list."""
+
+    def setUp(self):
+        self.land = _make_region("Testland", GlobalRegion.CONTINENT, _box(5, 47, 10, 55))
+        self.sea = _make_region("Testsea", GlobalRegion.OCEAN, _box(10, 47, 20, 55))
+
+    def test_landing_page_lists_region_links(self):
+        # A box straddling the shared edge links both regions via the post_save signal.
+        work = Work.objects.create(
+            status="p",
+            title="Straddler",
+            url="https://example.org/s",
+            geometry=GeometryCollection(Polygon(((8, 50), (12, 50), (12, 52), (8, 52), (8, 50)))),
+        )
+        self.assertEqual(sorted(r.name for r in work.regions.all()), ["Testland", "Testsea"])
+
+        html = self.client.get(f"/work/{work.id}/").content.decode()
+        self.assertIn(">Regions:</strong>", html)
+        self.assertIn(f'href="{self.land.get_absolute_url()}">Testland</a>', html)
+        self.assertIn(f'href="{self.sea.get_absolute_url()}">Testsea</a>', html)
+
+    def test_landing_page_uses_singular_region_label(self):
+        work = Work.objects.create(
+            status="p",
+            title="Single",
+            url="https://example.org/single",
+            geometry=GeometryCollection(Point(7, 51)),
+        )
+        html = self.client.get(f"/work/{work.id}/").content.decode()
+        self.assertIn(">Region:</strong>", html)
+        self.assertNotIn(">Regions:</strong>", html)

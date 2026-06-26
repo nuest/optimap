@@ -1,0 +1,53 @@
+{# SPDX-FileCopyrightText: 2026 OPTIMETA and KOMET projects <https://projects.tib.eu/komet> #}
+{# SPDX-License-Identifier: GPL-3.0-or-later #}
+{# Staff-only region curation list for works with geometry but no region. #}
+<p class="text-muted small">
+  These works have a geometry but could not be matched to any continent or ocean
+  — usually a coastal point falling in the sliver gap between the continent and
+  ocean outlines. Assign a region manually, or mark a work as "will not be
+  matched" so the automated backfill leaves it alone. Editing a work's geometry
+  later voids a manual decision and re-runs automated matching.
+</p>
+
+{% if page_obj.paginator.count %}
+  {% include "_pagination.html" with show_meta=True pagination_label="Unmatched works pagination" %}
+
+  <div class="table-responsive">
+    <table class="table table-sm align-middle">
+      <thead>
+        <tr>
+          <th scope="col">Work</th>
+          <th scope="col">Assign region</th>
+          <th scope="col" class="text-nowrap">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for work in page_obj %}
+        <tr id="region-curation-row-{{ work.id }}" data-curate-url="{% url 'optimap:set-work-region' work.id %}">
+          <td>
+            <a href="{% url 'optimap:work-landing' work.id %}">{{ work.title|default:"(untitled)" }}</a>
+            {% if work.doi %}<br><span class="text-muted small">{{ work.doi }}</span>{% endif %}
+          </td>
+          <td>
+            <select class="form-control form-control-sm curation-region-select" aria-label="Region for work {{ work.id }}">
+              <option value="">— select region —</option>
+              {% for r in region_options %}
+              <option value="{{ r.id }}">{{ r.name }}{% if r.region_type == 'O' %} (ocean){% else %} (continent){% endif %}</option>
+              {% endfor %}
+            </select>
+          </td>
+          <td class="text-nowrap">
+            <button type="button" class="btn btn-sm btn-primary curation-assign-btn">Assign</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary curation-exclude-btn">Will not be matched</button>
+            <span class="curation-row-status small ml-2"></span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% include "_pagination.html" with pagination_label="Unmatched works pagination" %}
+{% else %}
+  <p class="text-success"><i class="fas fa-check-circle"></i> No unmatched works — every work with a geometry is linked to a region (or marked not applicable).</p>
+{% endif %}

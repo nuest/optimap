@@ -284,10 +284,11 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
             "**`regions` keys** (offline point-in-polygon join behind the `Work.regions` M2M):\n"
             "| Key | Type | Description |\n"
             "|-----|------|-------------|\n"
-            "| `source` | string | Outline dataset (`global_regions`) |\n"
-            "| `method` | string | Always `intersects` (geometry directly intersects a continent/ocean outline; no buffer-snap) |\n"
-            "| `regions` | array | Matched regions as `{name, region_type}` objects (`region_type` is `Continent` or `Ocean`) |\n"
-            "| `assigned_at` | string | ISO 8601 timestamp |\n\n"
+            "| `source` | string | Outline dataset (`global_regions`), or `manual` for a curator decision |\n"
+            "| `method` | string | `intersects` (geometry directly intersects a continent/ocean outline; no buffer-snap); `curator_assigned` or `curator_excluded` when `source` is `manual` |\n"
+            "| `regions` | array | Matched regions as `{name, region_type}` objects (`region_type` is `Continent` or `Ocean`; empty for `curator_excluded`) |\n"
+            "| `assigned_at` | string | ISO 8601 timestamp (automated join only) |\n"
+            "| `decided_by` / `decided_at` | int / string | Staff user id and ISO 8601 timestamp of a manual decision |\n\n"
             "**`events` — event types:**\n"
             "| `type` | Extra fields | Description |\n"
             "|--------|-------------|-------------|\n"
@@ -299,7 +300,8 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
             "| `unpublish` | `status_from`, `user_id`\\*, `user_email`\\* | Work was unpublished |\n"
             "| `source_migration` | `from_source`, `to_source` | Work was reassigned to a different `Source` by the `migrate_source_works` management command |\n"
             "| `openaire_enrich` | `openaire_id`, `doi`, `source_url`, `fields_filled` (array), `fields_offered_not_applied` (array) | OpenAIRE enrichment ran; `fields_filled` were empty and were populated, `fields_offered_not_applied` had an OpenAIRE value but a value already existed (kept under the fill-if-empty policy) |\n"
-            '| `country_curation` | `decision` (`assigned`/`excluded`), `iso_code` (for `assigned`), `user_id`\\*, `user_email`\\* | Staff manually assigned a country, or marked the work "will not be matched", on the /countries curation section |\n\n'
+            '| `country_curation` | `decision` (`assigned`/`excluded`), `iso_code` (for `assigned`), `user_id`\\*, `user_email`\\* | Staff manually assigned a country, or marked the work "will not be matched", on the /countries curation section |\n'
+            '| `region_curation` | `decision` (`assigned`/`excluded`), `region` (for `assigned`), `user_id`\\*, `user_email`\\* | Staff manually assigned a global region, or marked the work "will not be matched", on the /regions curation section |\n\n'
             "\\* `user_id` and `user_email` are present for staff and curators only.\n\n"
             "**Other top-level keys:**\n"
             "| Key | Type | Description |\n"
@@ -366,9 +368,11 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
                     "regions": drf_serializers.DictField(
                         required=False,
                         help_text=(
-                            "Offline point-in-polygon global-region join (Work.regions M2M). "
-                            "Keys: source (global_regions), method (intersects), "
-                            "regions (array of {name, region_type}), assigned_at."
+                            "Offline point-in-polygon global-region join (Work.regions M2M), "
+                            "or a manual staff curation decision. "
+                            "Keys: source (global_regions/manual), method "
+                            "(intersects/curator_assigned/curator_excluded), "
+                            "regions (array of {name, region_type}), assigned_at, decided_by, decided_at."
                         ),
                     ),
                     "dedup": drf_serializers.DictField(

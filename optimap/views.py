@@ -277,7 +277,9 @@ def custom_500(request):
     return render(request, "500.html", status=500)
 
 
-@cache_page(settings.PAGE_CACHE_SHORT, cache="memory")
+# Not cached with @cache_page: the page now carries a staff-only curation section,
+# and cache_page keys only on URL (not user), so a cached staff render would leak
+# to anonymous visitors. Mirrors countries_overview, which is likewise uncached.
 def feeds(request):
     global_feeds = [
         {"title": "Geo RSS", "url": reverse("optimap:api-feed-georss")},
@@ -293,14 +295,31 @@ def feeds(request):
         region.normalized_slug = slug
         regions_with_slugs.append(region)
 
-    return render(
-        request,
-        "feeds.html",
-        {
-            "global_feeds": global_feeds,
-            "regions": regions_with_slugs,
-        },
-    )
+    context = {
+        "global_feeds": global_feeds,
+        "regions": regions_with_slugs,
+    }
+
+    # Staff see a collapsible curation section for works that have a geometry but
+    # could not be matched to any region (the sliver gaps between continent and
+    # ocean outlines at coastlines). Mirrors the country curation on /countries/.
+    if request.user.is_staff:
+        from works.utils.pagination import paginate_works
+        from works.views_regions import unmatched_regions_qs
+
+        page_obj, page_size = paginate_works(request, unmatched_regions_qs())
+        context.update(
+            {
+                "page_obj": page_obj,
+                "page_size": page_size,
+                "page_size_options": settings.WORKS_PAGE_SIZE_OPTIONS,
+                "region_options": list(
+                    GlobalRegion.objects.order_by("region_type", "name").values("id", "name", "region_type")
+                ),
+            }
+        )
+
+    return render(request, "feeds.html", context)
 
 
 @cache_page(settings.PAGE_CACHE_SHORT, cache="memory")

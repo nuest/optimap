@@ -603,6 +603,9 @@ Staff users additionally see the full provenance (including `original_record`, W
       {"name": "Asia", "region_type": "Continent"}
     ],
     "assigned_at": "2026-04-30T12:00:07+00:00"
+    // staff /regions curation instead writes: "source": "manual",
+    // "method": "curator_assigned" | "curator_excluded" (regions [] for excluded),
+    // "decided_by": <user_id>, "decided_at": "..."
   },
   "dedup": {                               // on the CANONICAL work (absorbed duplicates)
     "openalex_id": "https://openalex.org/W123", // null for doi_version dedup
@@ -634,6 +637,7 @@ Staff users additionally see the full provenance (including `original_record`, W
       "fields_offered_not_applied": ["authors"] // OpenAIRE had a value but one already existed (kept)
     },
     { "type": "country_curation", "at": "...", "user_id": 1, "decision": "assigned", "iso_code": "DE" }, // staff /countries curation; decision "excluded" for "will not be matched"
+    { "type": "region_curation", "at": "...", "user_id": 1, "decision": "assigned", "region": "Asia" }, // staff /regions curation; decision "excluded" for "will not be matched"
   ],
 }
 ```
@@ -739,7 +743,9 @@ buffer-snap**: continents and oceans tile the whole globe, so a coastal point
 already falls inside an ocean region, and snapping would risk pulling a work into
 two adjacent continents. The join is **multi-valued** (a coastal work links its
 continent *and* its ocean) and recorded in `Work.provenance.regions` (`method`
-always `intersects`) — see [Work provenance](#work-provenance). It powers the
+`intersects`, or `curator_assigned`/`curator_excluded` for a manual staff
+decision — see [staff curation](#staff-curation-of-unmatched-works-on-regions)
+below) — see [Work provenance](#work-provenance). It powers the
 region feed pages, the regional subscription emails, and the `by_continent` /
 `by_ocean` statistics, all of which now read this M2M instead of re-intersecting
 geometry on every request. It runs in two places, both gated by
@@ -759,6 +765,30 @@ python manage.py backfill_work_regions               # link all works missing re
 python manage.py backfill_work_regions --limit 200   # batch the first 200
 python manage.py backfill_work_regions --dry-run     # report counts, no DB writes or email
 ```
+
+#### Staff curation of unmatched works (on `/regions`)
+
+Mirroring the country curation, staff see a **collapsible "Curation: works
+without a region" section on `/regions`** for works that have a geometry but
+match no continent or ocean — almost always a coastal point falling in the
+sliver gap between the continent and ocean outlines:
+
+- A **paginated list** of works with geometry but no region (the same set the
+  weekly sweep processes, minus already-curated works).
+- Per work: **assign a region** from a dropdown (additive — repeat to add a
+  work's continent *and* ocean), or mark it **"will not be matched"**.
+- A **"Run region backfill now"** button that enqueues
+  `works.tasks.backfill_work_regions` (needs a running `qcluster`).
+
+Unlike countries there is **no sentinel region**: both actions write a manual
+decision to `Work.provenance.regions` (`source: "manual"`, `method:
+"curator_assigned"` or `"curator_excluded"`) plus a `region_curation` event. The
+unmatched-list query and the backfill sweep both `exclude` works with a
+`provenance.regions.source == "manual"` block, so a curated work — including one
+excluded with zero regions — stays resolved. **A manual decision is preserved
+across unrelated saves but voided when the work's geometry changes**, after which
+the work re-runs automated matching. To undo a decision outside this UI, clear
+the work's `provenance.regions` block in the Django admin.
 
 ## Block emails and domains (anti-spam)
 

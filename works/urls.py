@@ -102,6 +102,9 @@ urlpatterns = [
     # Region HTML pages (human-readable)
     path("regions/continent/<slug:continent_slug>/", views_regions.continent_feed_page, name="feed-continent-page"),
     path("regions/ocean/<slug:ocean_slug>/", views_regions.ocean_feed_page, name="feed-ocean-page"),
+    # Staff region curation (works with geometry but no region)
+    path("regions/curate/work/<int:work_id>/", views_regions.set_work_region, name="set-work-region"),
+    path("regions/curate/backfill/", views_regions.trigger_region_backfill, name="trigger-region-backfill"),
     path(
         "feeds/continent/<slug:continent_slug>/",
         RedirectView.as_view(pattern_name="optimap:feed-continent-page", permanent=True),
@@ -190,6 +193,7 @@ urlpatterns = [
     path("work/<path:identifier>/contribute-bok/", views_geometry.contribute_bok, name="contribute-bok"),
     path("work/<path:identifier>/publish/", views_geometry.publish_work, name="publish-work"),
     path("work/<path:identifier>/unpublish/", views_geometry.unpublish_work, name="unpublish-work"),
+    path("work/<path:identifier>/reharvest/", views_geometry.reharvest_work, name="reharvest-work"),
     path("work/<path:identifier>/preview.png", work_views.work_preview_png, name="work-preview"),
     path("work/<path:identifier>/", work_views.work_landing, name="work-landing"),
     # Authentication/User management

@@ -3,22 +3,136 @@
 
 """Views for region HTML landing pages (continents and oceans) with caching support."""
 
+import json
 import logging
 
 from django.conf import settings
+from django.contrib.admin.views.decorators import staff_member_required
 from django.core.cache import cache
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.http import Http404
-from django.shortcuts import render
+from django.db.models import Q
+from django.http import Http404, JsonResponse
+from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
+from django.utils import timezone
+from django.views.decorators.http import require_POST
+from django_q.humanhash import humanize as humanize_task_id
+from django_q.tasks import async_task
 
 from .feeds import get_region_from_slug
-from .models import GlobalRegion
+from .models import GlobalRegion, Work
 from .seo import build_feed_page_meta
 from .utils.geojson import publications_to_geojson
 from .utils.geometry import annotate_rounded_geometry
+from .utils.provenance import append_event, set_block
 
 logger = logging.getLogger(__name__)
+
+# A work whose ``provenance['regions']['source']`` is NOT the curator sentinel
+# ``"manual"``. Written as an explicit ``isnull OR != manual`` because a plain
+# ``.exclude(provenance__regions__source="manual")`` also drops rows where the
+# JSON path is absent (SQL ``NOT NULL`` is NULL, i.e. not TRUE) — that would hide
+# every yet-uncurated work. Reused by the backfill sweep in works.tasks.
+NOT_MANUAL_REGION = Q(provenance__regions__source__isnull=True) | ~Q(provenance__regions__source="manual")
+
+
+def unmatched_regions_qs():
+    """Works with a geometry but no linked region, awaiting curation.
+
+    The region mirror of ``works.views_indexed._unmatched_works_qs``: the same
+    set the region backfill sweep processes, minus works a curator has already
+    decided on manually. A manual decision (assign or "will not be matched")
+    writes a ``provenance['regions']['source'] == 'manual'`` block, so excluding
+    it keeps a curated work — including one excluded with **zero** regions —
+    from reappearing in the list.
+    """
+    return (
+        Work.objects.filter(geometry__isnull=False)
+        .exclude(geometry__isempty=True)
+        .filter(regions__isnull=True)
+        .filter(NOT_MANUAL_REGION)
+        .only("id", "title", "doi")  # the curation list renders only these
+        .order_by("id")
+    )
+
+
+@staff_member_required
+@require_POST
+def set_work_region(request, work_id):
+    """Manually assign a global region to a work, or mark it "will not be matched".
+
+    Staff-only. Body is JSON: ``{"region_id": 5}`` to add a region, or
+    ``{"exclude": true}`` to mark the work as not applicable (e.g. a coastal
+    point falling in the sliver gap between continent and ocean outlines).
+    Records a detailed manual provenance block plus a ``region_curation`` audit
+    event. The decision is preserved by ``works.signals.assign_work_regions``
+    until the work's geometry changes, at which point automated matching resumes.
+
+    Assignment is additive (``regions.add``) since a work legitimately spans
+    several regions (its continent and ocean); repeat the action to add more.
+    """
+    work = get_object_or_404(Work, pk=work_id)
+    try:
+        data = json.loads(request.body or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"success": False, "error": "Invalid JSON body."}, status=400)
+
+    now = timezone.now().isoformat()
+    if data.get("exclude"):
+        decision, method, region = "excluded", "curator_excluded", None
+        work.regions.clear()  # "no region applies" — drop any auto-linked regions
+    else:
+        raw_id = data.get("region_id")
+        region = (
+            GlobalRegion.objects.filter(pk=raw_id).first()
+            if isinstance(raw_id, int) or str(raw_id).isdigit()
+            else None
+        )
+        if region is None:
+            return JsonResponse({"success": False, "error": f"Unknown region {raw_id!r}."}, status=400)
+        decision, method = "assigned", "curator_assigned"
+        work.regions.add(region)
+
+    region_name = region.name if region else None
+    regions_block = [{"name": r.name, "region_type": r.get_region_type_display()} for r in work.regions.all()]
+    # append_event mutates provenance in-memory; set_block then persists the whole
+    # dict via .update() without re-firing the save signals (and the M2M change
+    # above does not fire post_save either).
+    append_event(
+        work,
+        "region_curation",
+        user_id=request.user.id,
+        user_email=request.user.email,
+        decision=decision,
+        region=region_name,
+    )
+    set_block(
+        work,
+        "regions",
+        {
+            "source": "manual",
+            "method": method,
+            "regions": regions_block,
+            "decided_by": request.user.id,
+            "decided_at": now,
+        },
+    )
+    invalidate_region_page_cache(region)
+    return JsonResponse({"success": True, "decision": decision, "region": region_name})
+
+
+@staff_member_required
+@require_POST
+def trigger_region_backfill(request):
+    """Enqueue a one-time background run of the region backfill task.
+
+    Staff-only. The region mirror of ``trigger_country_backfill``: queues
+    ``works.tasks.backfill_work_regions`` via Django-Q and returns the task id.
+    """
+    task_id = async_task("works.tasks.backfill_work_regions", trigger_source="manual")
+    task_name = humanize_task_id(task_id)
+    logger.info("User %s triggered region backfill (task %s)", request.user, task_name)
+    return JsonResponse({"success": True, "task_id": task_id, "task_name": task_name})
 
 
 def _get_regional_publications(region):

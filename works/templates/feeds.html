@@ -5,7 +5,7 @@
 {% block title %}Regions | {% endblock title %}
 
 {% block content %}
-<div class="container px-4 py-8 max-w-3xl text-wrap">
+<div class="container px-4 py-8 max-w-3xl text-wrap facet-page">
 
   <h1 class="text-3xl mb-6 py-4">OPTIMAP regions</h1>
 
@@ -70,6 +70,30 @@
     {% endfor %}
   </ul>
 
+  {% if request.user.is_staff %}
+  <div class="card border-info mt-5 mb-4" id="regionCurationCard">
+    <div class="card-header bg-light">
+      <button class="btn btn-link p-0 text-decoration-none" type="button" data-toggle="collapse"
+              data-target="#regionCurationBody" aria-expanded="false" aria-controls="regionCurationBody">
+        <i class="fas fa-user-shield"></i> Curation: works without a region
+        <span class="badge badge-secondary ml-1">{{ page_obj.paginator.count }}</span>
+      </button>
+    </div>
+    <div id="regionCurationBody" class="collapse">
+      <div class="card-body">
+        <div class="d-flex justify-content-end mb-3" style="gap: .5rem;">
+          <button id="regionBackfillBtn" class="btn btn-sm btn-outline-primary" data-csrf="{{ csrf_token }}">
+            <i class="fas fa-sync-alt"></i> Run region backfill now
+          </button>
+          <span id="regionBackfillStatus" class="small align-self-center"></span>
+        </div>
+        {% csrf_token %}
+        {% include "partials/region_curation.html" %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   <div class="mt-8 mb-4">
     <h3 class="text-lg font-semibold mb-2">Sources &amp; licenses for region data</h3>
 
@@ -106,4 +130,93 @@
   </div>
 
 </div>
+
+{% if request.user.is_staff %}
+<script>
+// Staff region-curation section (mirrors the country curation on /countries/).
+(function () {
+  const card = document.getElementById('regionCurationCard');
+  if (!card) return;
+  const csrf = document.querySelector('#regionCurationCard [name=csrfmiddlewaretoken]').value;
+
+  function post(url, body, status, onDone) {
+    status.textContent = 'Saving…';
+    status.className = 'curation-row-status small ml-2 text-muted';
+    fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+      credentials: 'same-origin',
+      body: JSON.stringify(body),
+    })
+      .then(r => r.json().then(d => ({ ok: r.ok, d })))
+      .then(({ ok, d }) => {
+        if (!ok || !d.success) throw new Error(d.error || 'request failed');
+        onDone(d);
+      })
+      .catch(err => {
+        status.textContent = 'Error: ' + err.message;
+        status.className = 'curation-row-status small ml-2 text-danger';
+      });
+  }
+
+  // Remove a resolved row; show a hint if the page is now empty.
+  function resolveRow(row) {
+    const tbody = row.parentNode;
+    row.remove();
+    if (tbody && tbody.querySelectorAll('tr').length === 0) {
+      tbody.insertAdjacentHTML('beforeend',
+        '<tr><td colspan="3" class="text-success">Resolved on this page — reload to refresh counts.</td></tr>');
+    }
+  }
+
+  card.addEventListener('click', function (ev) {
+    const assign = ev.target.closest('.curation-assign-btn');
+    const exclude = ev.target.closest('.curation-exclude-btn');
+    if (!assign && !exclude) return;
+    const row = ev.target.closest('tr');
+    const status = row.querySelector('.curation-row-status');
+    const url = row.dataset.curateUrl;
+    if (assign) {
+      const regionId = row.querySelector('.curation-region-select').value;
+      if (!regionId) {
+        status.textContent = 'Pick a region first.';
+        status.className = 'curation-row-status small ml-2 text-danger';
+        return;
+      }
+      post(url, { region_id: regionId }, status, () => resolveRow(row));
+    } else {
+      post(url, { exclude: true }, status, () => resolveRow(row));
+    }
+  });
+
+  // "Run region backfill now" button.
+  const backfillBtn = document.getElementById('regionBackfillBtn');
+  const backfillStatus = document.getElementById('regionBackfillStatus');
+  const backfillLabel = backfillBtn.innerHTML;
+  backfillBtn.addEventListener('click', function () {
+    backfillBtn.disabled = true;
+    backfillBtn.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Scheduling…';
+    backfillStatus.textContent = '';
+    fetch('{% url "optimap:trigger-region-backfill" %}', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': backfillBtn.dataset.csrf },
+      credentials: 'same-origin',
+    })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(data => {
+        backfillBtn.innerHTML = backfillLabel;
+        backfillBtn.disabled = false;
+        backfillStatus.textContent = 'Backfill scheduled (task ' + data.task_name + ') — reload in a moment to see resolved works.';
+        backfillStatus.className = 'small align-self-center text-success';
+      })
+      .catch(err => {
+        backfillBtn.innerHTML = backfillLabel;
+        backfillBtn.disabled = false;
+        backfillStatus.textContent = 'Error: ' + err;
+        backfillStatus.className = 'small align-self-center text-danger';
+      });
+  });
+})();
+</script>
+{% endif %}
 {% endblock content %}
