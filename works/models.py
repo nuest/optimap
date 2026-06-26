@@ -141,12 +141,16 @@ class Work(models.Model):
     abstract = models.TextField(null=True, blank=True)
     # Journal-citation fields. Strings (not ints) because publishers use roman
     # numerals, electronic locators like "e12345", and ranges with non-digit
-    # separators. Currently populated only via the OpenAlex matcher; other
-    # harvesters leave them blank.
+    # separators. Populated by harvesters (Crossref, GeoScienceWorld) and by the
+    # OpenAlex matcher / OpenAIRE enrichment; many harvesters leave them blank.
     volume = models.CharField(max_length=64, null=True, blank=True)
     issue = models.CharField(max_length=64, null=True, blank=True)
     first_page = models.CharField(max_length=64, null=True, blank=True)
     last_page = models.CharField(max_length=64, null=True, blank=True)
+    language = models.CharField(
+        max_length=8, null=True, blank=True, help_text="ISO 639-2 alpha-3 language code (e.g. 'eng')"
+    )
+    publisher = models.CharField(max_length=255, null=True, blank=True)
     url = models.URLField(max_length=1024, null=True, blank=True, unique=True)
     geometry = models.GeometryCollectionField(verbose_name="Work geometry/ies", srid=4326, null=True, blank=True)
     timeperiod_startdate = ArrayField(models.CharField(max_length=1024, null=True), null=True, blank=True)

@@ -222,6 +222,11 @@
   {% endwith %}
   {% if work.doi %}<span class="meta-item"><i class="fas fa-fingerprint text-muted"></i> <strong>DOI:</strong> <a href="https://doi.org/{{ work.doi }}" target="_blank" rel="noopener">{{ work.doi }}</a></span>{% endif %}
   {% if work.publicationDate %}<span class="meta-item"><i class="fas fa-calendar-alt text-muted"></i> <strong>Published:</strong> {{ work.publicationDate }}</span>{% endif %}
+  {% if work.publisher %}<span class="meta-item"><i class="fas fa-building text-muted"></i> <strong>Publisher:</strong> {{ work.publisher }}</span>{% endif %}
+  {% if work.volume or work.issue or work.first_page %}
+    <span class="meta-item"><i class="fas fa-book text-muted"></i> <strong>Citation:</strong>
+    {% if work.volume %}Vol. {{ work.volume }}{% endif %}{% if work.issue %}{% if work.volume %}, {% endif %}No. {{ work.issue }}{% endif %}{% if work.first_page %}{% if work.volume or work.issue %}, {% endif %}pp. {{ work.first_page }}{% if work.last_page %}&ndash;{{ work.last_page }}{% endif %}{% endif %}</span>
+  {% endif %}
   {% if work.source %}
     <span class="meta-item"><i class="fas fa-newspaper text-muted"></i> <strong>Source:</strong>
     {% if work.source.get_absolute_url %}<a href="{{ work.source.get_absolute_url }}">{{ work.source.name }}</a>{% elif work.source.homepage_url %}<a href="{{ work.source.homepage_url }}" target="_blank" rel="noopener">{{ work.source.name }}</a>{% else %}{{ work.source.name }}{% endif %}</span>

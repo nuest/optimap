@@ -41,7 +41,7 @@ from works.harvesting.sessions import (
     OPENAIRE_USER_AGENT,
     _openaire_session,
 )
-from works.models import HarvestingEvent
+from works.models import HarvestingEvent, Work
 from works.utils.provenance import append_event
 
 logger = logging.getLogger(__name__)
@@ -68,9 +68,21 @@ def openaire_task_q_options():
 _AUTOMATED_SUBJECT_SCHEMES = {"sdg", "fos"}
 
 # Work fields OpenAIRE may fill (fill-if-empty). `type` is excluded (OpenAIRE's
-# coarse "publication"/"dataset" is less useful than the source default);
-# `language` has no Work model field.
-ENRICHABLE_FIELDS = ("abstract", "keywords", "authors")
+# coarse "publication"/"dataset" is less useful than the source default).
+ENRICHABLE_FIELDS = (
+    "abstract",
+    "keywords",
+    "authors",
+    "volume",
+    "issue",
+    "first_page",
+    "last_page",
+    "language",
+    "publisher",
+)
+
+# OpenAIRE `container` sub-keys → Work journal-citation fields.
+_CONTAINER_FIELD_MAP = {"vol": "volume", "iss": "issue", "sp": "first_page", "ep": "last_page"}
 
 # Public OpenAIRE Explore landing page for a matched research product, keyed by
 # the OpenAIRE internal id (e.g. ``doi_dedup___::…``). Recorded in
@@ -225,6 +237,29 @@ def build_openaire_fields(record):
     authors = [a["fullName"].strip() for a in (record.get("authors") or []) if (a or {}).get("fullName")]
     if authors:
         candidates["authors"] = authors
+
+    container = record.get("container") or {}
+    for source_key, field in _CONTAINER_FIELD_MAP.items():
+        value = container.get(source_key)
+        value = str(value).strip() if value is not None else ""
+        if value:
+            candidates[field] = value
+
+    language = ((record.get("language") or {}).get("code") or "").strip()
+    if language:
+        candidates["language"] = language
+
+    publisher = (record.get("publisher") or "").strip()
+    if publisher:
+        candidates["publisher"] = publisher
+
+    # OpenAIRE values are free-text; cap each CharField-backed candidate at its
+    # model max_length so an over-long value can't raise DataError on save.
+    # (abstract is a TextField; keywords/authors are list fields — all unbounded.)
+    for field in ("volume", "issue", "first_page", "last_page", "language", "publisher"):
+        value = candidates.get(field)
+        if value:
+            candidates[field] = value[: Work._meta.get_field(field).max_length]
 
     return candidates
 

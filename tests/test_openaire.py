@@ -51,6 +51,9 @@ FAKE_RECORD = {
         {"subject": {"scheme": "", "value": "accuracy"}},
         {"subject": {"scheme": "FOS", "value": "Engineering"}},
     ],
+    "container": {"name": "Lecture Notes in Geoinformation", "vol": "12", "iss": "3", "sp": "41", "ep": "58"},
+    "language": {"code": "eng", "label": "English"},
+    "publisher": "Springer",
 }
 
 
@@ -70,6 +73,30 @@ class BuildOpenaireFieldsTest(TestCase):
     def test_authors_from_fullname_skip_blanks(self):
         fields = build_openaire_fields(FAKE_RECORD)
         self.assertEqual(fields["authors"], ["Gerald Gruber", "Christian Menard"])
+
+    def test_extracts_container_pagination(self):
+        fields = build_openaire_fields(FAKE_RECORD)
+        self.assertEqual(fields["volume"], "12")
+        self.assertEqual(fields["issue"], "3")
+        self.assertEqual(fields["first_page"], "41")
+        self.assertEqual(fields["last_page"], "58")
+
+    def test_extracts_language_code_and_publisher(self):
+        fields = build_openaire_fields(FAKE_RECORD)
+        self.assertEqual(fields["language"], "eng")
+        self.assertEqual(fields["publisher"], "Springer")
+
+    def test_overlong_publisher_language_capped_to_field_length(self):
+        record = {"publisher": "P" * 500, "language": {"code": "x" * 40}}
+        fields = build_openaire_fields(record)
+        self.assertEqual(len(fields["publisher"]), 255)
+        self.assertEqual(len(fields["language"]), 8)
+
+    def test_missing_container_language_publisher_omitted(self):
+        record = {"descriptions": ["abstract"], "container": {}, "language": {}, "publisher": ""}
+        fields = build_openaire_fields(record)
+        for key in ("volume", "issue", "first_page", "last_page", "language", "publisher"):
+            self.assertNotIn(key, fields)
 
     def test_empty_record_yields_no_candidates(self):
         self.assertEqual(build_openaire_fields(None), {})
@@ -132,6 +159,31 @@ class EnrichWorkFromOpenaireTest(TestCase):
         self.assertIn("abstract", events[-1]["fields_filled"])
 
     @patch("works.harvesting.openaire.fetch_openaire_record", return_value=FAKE_RECORD)
+    def test_match_fills_pagination_language_publisher(self, _mock):
+        enrich_work_from_openaire(self.work)
+        self.work.refresh_from_db()
+        self.assertEqual(self.work.volume, "12")
+        self.assertEqual(self.work.issue, "3")
+        self.assertEqual(self.work.first_page, "41")
+        self.assertEqual(self.work.last_page, "58")
+        self.assertEqual(self.work.language, "eng")
+        self.assertEqual(self.work.publisher, "Springer")
+        filled = self.work.provenance["events"][-1]["fields_filled"]
+        for key in ("volume", "issue", "first_page", "last_page", "language", "publisher"):
+            self.assertIn(key, filled)
+            self.assertEqual(self.work.provenance["metadata_sources"][key], "openaire")
+
+    @patch("works.harvesting.openaire.fetch_openaire_record", return_value=FAKE_RECORD)
+    def test_existing_publisher_not_overwritten(self, _mock):
+        self.work.publisher = "Curator Press"
+        self.work.save(update_fields=["publisher"])
+        enrich_work_from_openaire(self.work)
+        self.work.refresh_from_db()
+        self.assertEqual(self.work.publisher, "Curator Press")
+        event = self.work.provenance["events"][-1]
+        self.assertIn("publisher", event["fields_offered_not_applied"])
+
+    @patch("works.harvesting.openaire.fetch_openaire_record", return_value=FAKE_RECORD)
     def test_offered_not_applied_logged(self, _mock):
         self.work.abstract = "Curator-supplied abstract"
         self.work.save(update_fields=["abstract"])
@@ -187,7 +239,19 @@ class EnrichEventSweepTest(TestCase):
     def test_sweep_checks_all_doi_works_for_audit_trail(self, mock_fetch):
         missing = Work.objects.create(title="m", doi="10.1/m", abstract="", status="h", job=self.event)
         complete = Work.objects.create(
-            title="c", doi="10.1/c", abstract="has one", authors=["A"], keywords=["k"], status="h", job=self.event
+            title="c",
+            doi="10.1/c",
+            abstract="has one",
+            authors=["A"],
+            keywords=["k"],
+            volume="1",
+            issue="2",
+            first_page="3",
+            last_page="4",
+            language="deu",
+            publisher="Existing Press",
+            status="h",
+            job=self.event,
         )
         no_doi = Work.objects.create(title="n", abstract="", status="h", job=self.event)
 

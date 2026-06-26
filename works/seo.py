@@ -50,6 +50,17 @@ def _truncate_for_description(text: str | None, n: int = 200) -> str:
     return cut + "…"
 
 
+def _publisher_name(work) -> str | None:
+    """Publisher display name: the work's own ``publisher`` (e.g. from OpenAIRE
+    enrichment) if set, else the harvesting source name. Shared by the JSON-LD,
+    Highwire ``citation_*``, and COinS builders so they stay in sync."""
+    if work.publisher:
+        return work.publisher
+    if work.source and getattr(work.source, "name", None):
+        return str(work.source.name)
+    return None
+
+
 def _normalize_author_list(work) -> list[str]:
     """Return ``[\"Given Family\", …]`` from a Work's ArrayField, mirroring
     the human-readable form used on the landing page."""
@@ -220,15 +231,17 @@ def _build_schema_org(work, request, canonical, image, authors, keywords, descri
         payload["about"] = bok_about
     if image:
         payload["image"] = image
-    if work.source and getattr(work.source, "name", None):
+    publisher_name = _publisher_name(work)
+    if publisher_name:
         publisher: dict = {
             "@type": "Organization",
-            "name": str(work.source.name),
+            "name": publisher_name,
         }
-        if getattr(work.source, "homepage_url", None):
+        if work.source and getattr(work.source, "homepage_url", None):
             publisher["url"] = work.source.homepage_url
         payload["publisher"] = publisher
 
+    if work.source and getattr(work.source, "name", None):
         periodical: dict = {"@type": "Periodical", "name": str(work.source.name)}
         if getattr(work.source, "issn_l", None):
             periodical["issn"] = work.source.issn_l
@@ -273,7 +286,7 @@ def _build_schema_org(work, request, canonical, image, authors, keywords, descri
     temporal_intervals = _temporal_iso_intervals(work)
     if temporal_intervals:
         payload["temporalCoverage"] = temporal_intervals[0] if len(temporal_intervals) == 1 else temporal_intervals
-    payload["inLanguage"] = "en"
+    payload["inLanguage"] = work.language or "en"
     return payload
 
 
@@ -424,7 +437,9 @@ def citation_meta_tags(work, request) -> list[dict]:
         tags.append({"name": "citation_abstract", "content": work.abstract})
     if work.source and getattr(work.source, "name", None):
         tags.append({"name": "citation_journal_title", "content": str(work.source.name)})
-        tags.append({"name": "citation_publisher", "content": str(work.source.name)})
+    publisher = _publisher_name(work)
+    if publisher:
+        tags.append({"name": "citation_publisher", "content": publisher})
     if work.source and getattr(work.source, "issn_l", None):
         tags.append({"name": "citation_issn", "content": work.source.issn_l})
     if work.volume:
@@ -442,7 +457,7 @@ def citation_meta_tags(work, request) -> list[dict]:
         keywords.extend(t for t in work.topics if t)
     for kw in keywords:
         tags.append({"name": "citation_keywords", "content": kw})
-    tags.append({"name": "citation_language", "content": "en"})
+    tags.append({"name": "citation_language", "content": work.language or "en"})
     pdf_url = _derive_pdf_url(work)
     if pdf_url:
         tags.append({"name": "citation_pdf_url", "content": pdf_url})
@@ -473,6 +488,9 @@ def coins_title(work) -> str | None:
         pairs.append(("rft.date", work.publicationDate.isoformat()))
     if work.source and getattr(work.source, "name", None):
         pairs.append(("rft.jtitle", str(work.source.name)))
+    publisher = _publisher_name(work)
+    if publisher:
+        pairs.append(("rft.pub", publisher))
     if work.source and getattr(work.source, "issn_l", None):
         pairs.append(("rft.issn", work.source.issn_l))
     if work.volume:
