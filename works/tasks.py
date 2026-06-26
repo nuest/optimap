@@ -70,6 +70,7 @@ from works.harvesting.crossref import (  # noqa: F401
     harvest_crossref_doi,
     harvest_crossref_prefix,
     parse_crossref_response_and_save_works,
+    reharvest_work,
 )
 from works.harvesting.geoscienceworld import (  # noqa: F401
     harvest_geoscienceworld,

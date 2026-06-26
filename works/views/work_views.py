@@ -483,6 +483,9 @@ def work_landing(request, identifier):
         work.status in ("c", "d") or (work.status == "h" and (cacheable["has_geometry"] or cacheable["has_temporal"]))
     )
     can_unpublish = is_admin and work.status == "p"
+    # Admins can re-harvest any DOI-bearing work to refresh its metadata from
+    # Crossref + enrichment (OpenAlex/OpenAIRE), synchronously.
+    can_reharvest = is_admin and bool(work.doi)
 
     # BoK tagging is open to any logged-in user while a work is still in the
     # contribution pipeline (h or c). Admins keep full control via the admin.
@@ -559,6 +562,7 @@ def work_landing(request, identifier):
         "prompt_login_to_contribute": prompt_login_to_contribute,
         "can_publish": can_publish,
         "can_unpublish": can_unpublish,
+        "can_reharvest": can_reharvest,
         "can_tag_bok": can_tag_bok,
         "prompt_login_to_tag_bok": prompt_login_to_tag_bok,
         "missing_for_logged_in": missing_for_logged_in,

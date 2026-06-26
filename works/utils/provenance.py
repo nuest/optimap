@@ -122,6 +122,25 @@ def append_event(work, event_type, **fields):
     work.provenance = provenance
 
 
+def work_has_contribution_kind(work, kind) -> bool:
+    """True if *any* user has contributed ``kind`` (e.g. ``"spatial"``) to ``work``.
+
+    The user-agnostic counterpart of :func:`user_has_contributed_kind`. Used by
+    the admin re-harvest to decide whether a source-derived field may be
+    overridden: a field a curator/contributor has touched is never clobbered by
+    a re-harvest, regardless of who touched it.
+    """
+    if kind is None:
+        return False
+    provenance = _ensure_dict(work.provenance)
+    for evt in provenance.get("events", []) or []:
+        if evt.get("type") != "contribution":
+            continue
+        if kind in (evt.get("kinds") or []):
+            return True
+    return False
+
+
 def user_has_contributed_kind(work, user_id, kind) -> bool:
     """True if ``user_id`` has already contributed ``kind`` to ``work``.
 

@@ -325,6 +325,69 @@ def unpublish_work_by_id(request, work_id):
         return JsonResponse({"error": str(e)}, status=500)
 
 
+def _extents_message(info):
+    """Human-readable suffix describing the geometry/temporal re-harvest outcome.
+
+    ``info`` is the dict returned by ``reharvest_work`` (geometry/temporal each
+    one of ``updated`` / ``preserved_user_contribution`` / ``no_source_value`` /
+    ``skipped``). Communicates clearly when a value was left untouched because a
+    user had contributed it.
+    """
+    labels = {
+        "geometry": "Geometry",
+        "temporal": "Temporal extent",
+    }
+    parts = []
+    for field, label in labels.items():
+        status = (info or {}).get(field)
+        if status == "updated":
+            parts.append(f"{label} updated from source.")
+        elif status == "preserved_user_contribution":
+            parts.append(f"{label} preserved (user-contributed, not overridden).")
+        elif status == "no_source_value":
+            parts.append(f"No {label.lower()} found at source (existing kept).")
+    return (" " + " ".join(parts)) if parts else ""
+
+
+@staff_member_required
+@require_POST
+def reharvest_work_by_id(request, work_id):
+    """API endpoint for admins to re-harvest a single work by ID.
+
+    Re-fetches the work's metadata from Crossref by DOI and re-runs all
+    enrichment steps (OpenAlex inline + OpenAIRE) synchronously, updating the
+    work in place with the careful-update policy (user/curator contributions
+    such as status, geometry, and temporal extent are preserved). Requires the
+    work to have a DOI.
+    """
+    try:
+        work = Work.objects.get(id=work_id)
+    except Work.DoesNotExist:
+        return JsonResponse({"error": "Work not found"}, status=404)
+
+    if not work.doi:
+        return JsonResponse({"error": "Cannot re-harvest a work without a DOI"}, status=400)
+
+    try:
+        from works.harvesting.crossref import reharvest_work as _reharvest
+
+        _work, action, info = _reharvest(work, user=request.user)
+
+        if action == "updated":
+            logger.info("Admin %s re-harvested work %s (ID: %s)", request.user.username, work.title[:50], work.id)
+            message = "Work metadata re-harvested from the original source." + _extents_message(info)
+            messages.success(request, message)
+            return JsonResponse({"success": True, "message": message})
+        if action == "no_doi":
+            return JsonResponse({"error": "Cannot re-harvest a work without a DOI"}, status=400)
+        # action == "not_found"
+        return JsonResponse({"error": "No record found for this DOI at the source"}, status=404)
+
+    except Exception as e:
+        logger.error("Error re-harvesting work %s: %s", work_id, str(e), exc_info=True)
+        return JsonResponse({"error": str(e)}, status=500)
+
+
 # DOI-based views (wrappers that translate DOI to ID)
 
 
@@ -391,6 +454,23 @@ def unpublish_work(request, identifier):
         return JsonResponse({"error": "Work not found"}, status=404)
 
     return unpublish_work_by_id(request, work.id)
+
+
+@staff_member_required
+@require_POST
+def reharvest_work(request, identifier):
+    """API endpoint for admins to re-harvest a work by various identifiers.
+
+    Resolves the identifier (DOI / internal ID / handle) and delegates to
+    reharvest_work_by_id.
+    """
+
+    try:
+        work = get_work_by_identifier(identifier)
+    except Http404:
+        return JsonResponse({"error": "Work not found"}, status=404)
+
+    return reharvest_work_by_id(request, work.id)
 
 
 # BoK concept contribution ----------------------------------------------------

@@ -242,7 +242,8 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
             "| `keywords` | `original_source`, `openalex`, `openaire` |\n"
             "| `topics` | `openalex` |\n"
             "| `type` | `openalex` |\n"
-            "| `geometry` | `DC.SpatialCoverage`, `DC.box`, `link rel=alternate geo+json`, `study_sites` |\n"
+            "| `geometry` | `DC.SpatialCoverage`, `DC.box`, `link rel=alternate geo+json`, `study_sites`, `reharvest_html` (re-extracted from the landing page by the admin re-harvest) |\n"
+            "| `timeperiod` | `reharvest_html` (re-extracted from the landing page by the admin re-harvest) |\n"
             "| `doi` | `original_source`, `openalex` |\n"
             "| `date` | `original_source (year-only)` |\n"
             "| `volume` / `issue` / `first_page` / `last_page` | `openalex` |\n"
@@ -293,6 +294,7 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
             "| `type` | Extra fields | Description |\n"
             "|--------|-------------|-------------|\n"
             "| `harvest_update` | `harvesting_event_id` | Recorded each time an existing work is re-harvested |\n"
+            "| `reharvest_source_extents` | `geometry`, `temporal` (each `updated` when present) | Admin re-harvest re-extracted geometry / temporal extent from the landing page and overrode the stored value (only for values not user-contributed) |\n"
             "| `doi_backfill` | `doi`, `harvesting_event_id` | DOI was added to a previously DOI-less work |\n"
             "| `doi_contribution` | `doi`, `user_id`\\*, `user_email`\\* | A user added this work to OPTIMAP by submitting its DOI on /contribute/ (harvested from Crossref + enriched) |\n"
             "| `contribution` | `kinds` (array: `spatial`, `temporal`, `bok`), `user_id`\\*, `user_email`\\*, `game` (bool, optional) | User added spatial/temporal/BoK metadata; `game: true` when submitted via the georeferencing game |\n"
@@ -400,8 +402,8 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
                         required=False,
                         help_text=(
                             "Chronological audit log. Each event has type (string) and at (ISO timestamp). "
-                            "Event types: harvest_update, doi_backfill, doi_contribution, contribution, publish, "
-                            "unpublish, source_migration, openaire_enrich, dedup_merge, dedup_unmerge. "
+                            "Event types: harvest_update, reharvest_source_extents, doi_backfill, doi_contribution, "
+                            "contribution, publish, unpublish, source_migration, openaire_enrich, dedup_merge, dedup_unmerge. "
                             "user_id and user_email are present for staff/curators only."
                         ),
                     ),

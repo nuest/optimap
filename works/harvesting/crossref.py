@@ -29,12 +29,14 @@ from django.conf import settings
 from django.utils import timezone
 
 from works.models import HarvestingEvent, Source
-from works.utils.provenance import append_event
+from works.utils.provenance import append_event, work_has_contribution_kind
 
 from .bok_pdf import agile_giss_doi_to_pdf_url, extract_bok_from_agile_pdf
 from .common import (
     HarvestStats,
     HarvestWarningCollector,
+    _carefully_update_work,
+    _is_empty_for_update,
     _save_or_update_work,
     complete_harvest,
     ensure_collection_for_source,
@@ -44,6 +46,7 @@ from .common import (
     send_harvest_email,
     start_harvesting_event,
 )
+from .metadata_html import extract_geometry_from_html, extract_timeperiod_from_html
 from .openaire import enrich_work_from_openaire
 from .openalex import build_openalex_fields
 from .sessions import (
@@ -877,6 +880,23 @@ def get_user_contributions_source():
     return source
 
 
+def _fetch_crossref_item(doi, session):
+    """Fetch the single Crossref ``works`` record for ``doi``.
+
+    Returns the ``message`` dict, or ``None`` on a 404, network/JSON error, or
+    empty payload (callers map ``None`` to their own "not found" result).
+    """
+    try:
+        resp = session.get(f"{CROSSREF_API_URL}/{doi}", timeout=CROSSREF_HTTP_TIMEOUT)
+        if resp.status_code == 404:
+            return None
+        resp.raise_for_status()
+        return (resp.json() or {}).get("message") or None
+    except (requests.RequestException, ValueError) as exc:
+        logger.warning("Crossref single-DOI lookup failed for %s: %s", doi, exc)
+        return None
+
+
 def harvest_crossref_doi(doi, user=None, source_id=None):
     """Harvest a single DOI from Crossref into a ``Work`` (synchronous).
 
@@ -898,20 +918,11 @@ def harvest_crossref_doi(doi, user=None, source_id=None):
 
     session = _crossref_session()
     try:
-        resp = session.get(f"{CROSSREF_API_URL}/{doi}", timeout=CROSSREF_HTTP_TIMEOUT)
-        if resp.status_code == 404:
+        item = _fetch_crossref_item(doi, session)
+        if not item:
             return None, "not_found"
-        resp.raise_for_status()
-        item = (resp.json() or {}).get("message")
-    except (requests.RequestException, ValueError) as exc:
-        logger.warning("Crossref single-DOI lookup failed for %s: %s", doi, exc)
-        return None, "not_found"
 
-    if not item:
-        return None, "not_found"
-
-    event = HarvestingEvent.objects.create(source=source, status="in_progress")
-    try:
+        event = HarvestingEvent.objects.create(source=source, status="in_progress")
         kwargs = _crossref_item_to_work_kwargs(
             item,
             source,
@@ -947,5 +958,183 @@ def harvest_crossref_doi(doi, user=None, source_id=None):
         event.completed_at = timezone.now()
         event.save(update_fields=["status", "completed_at"])
         return work, "created"
+    finally:
+        session.close()
+
+
+def _refresh_source_geometry_temporal(work, session):
+    """Re-extract geometry + temporal extent from the work's landing page and
+    override the stored values **unless a user contributed them**.
+
+    Spatial / temporal metadata is not part of the Crossref JSON — it is parsed
+    from the publisher landing-page HTML (DC.SpatialCoverage / geo+json /
+    JSON-LD), the same source the OAI/prefix harvesters use. The re-harvest
+    refreshes it from source, but a curator/contributor's geometry or temporal
+    extent (recorded as a ``contribution`` event in provenance) is never
+    clobbered — see :func:`works.utils.provenance.work_has_contribution_kind`.
+
+    Returns ``{"geometry": <status>, "temporal": <status>}`` where each status
+    is one of ``"updated"``, ``"preserved_user_contribution"``,
+    ``"no_source_value"``, or ``"skipped"`` (no landing page / fetch failed).
+    """
+    info = {"geometry": "skipped", "temporal": "skipped"}
+
+    spatial_locked = work_has_contribution_kind(work, "spatial")
+    temporal_locked = work_has_contribution_kind(work, "temporal")
+    if spatial_locked:
+        info["geometry"] = "preserved_user_contribution"
+    if temporal_locked:
+        info["temporal"] = "preserved_user_contribution"
+    if spatial_locked and temporal_locked:
+        return info
+    if not work.url:
+        return info
+
+    try:
+        # Force an HTML Accept header: the Crossref session defaults to
+        # `Accept: application/json`, which makes a doi.org URL resolve via DOI
+        # *content negotiation* to Crossref's metadata transform endpoint
+        # instead of the publisher's HTML landing page — so we'd never see the
+        # spatial/temporal markup. Override it to land on the real article page.
+        resp = session.get(
+            work.url,
+            timeout=CROSSREF_HTTP_TIMEOUT,
+            allow_redirects=True,
+            headers={"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"},
+        )
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.content, "html.parser")
+    except (requests.RequestException, ValueError) as exc:
+        logger.info("Re-harvest landing-page fetch failed for %s: %s", work.url, exc)
+        return info
+
+    prov = work.provenance if isinstance(work.provenance, dict) else {}
+    metadata_sources = prov.setdefault("metadata_sources", {})
+    changed_fields = []
+
+    if not spatial_locked:
+        try:
+            geom, geom_label = extract_geometry_from_html(soup, base_url=work.url)
+        except Exception as exc:  # noqa: BLE001 — extraction must never fail a re-harvest
+            geom, geom_label = None, None
+            logger.info("Re-harvest geometry extraction failed for %s: %s", work.url, exc)
+        if geom is not None and not _is_empty_for_update(geom):
+            work.geometry = geom
+            metadata_sources["geometry"] = geom_label or "reharvest_html"
+            changed_fields.append("geometry")
+            info["geometry"] = "updated"
+        else:
+            info["geometry"] = "no_source_value"
+
+    if not temporal_locked:
+        try:
+            ts, te = extract_timeperiod_from_html(soup)
+        except Exception as exc:  # noqa: BLE001 — extraction must never fail a re-harvest
+            ts, te = [], []
+            logger.info("Re-harvest temporal extraction failed for %s: %s", work.url, exc)
+        # extract_timeperiod_from_html returns [None]/[None] (not []) when the
+        # page has no dates — guard on a real (non-None) value, not truthiness.
+        has_temporal = any(d is not None for d in (ts or [])) or any(d is not None for d in (te or []))
+        if has_temporal:
+            work.timeperiod_startdate = ts or []
+            work.timeperiod_enddate = te or []
+            metadata_sources["timeperiod"] = "reharvest_html"
+            changed_fields += ["timeperiod_startdate", "timeperiod_enddate"]
+            info["temporal"] = "updated"
+        else:
+            info["temporal"] = "no_source_value"
+
+    if changed_fields:
+        append_event(
+            work,
+            "reharvest_source_extents",
+            geometry="updated" if info["geometry"] == "updated" else None,
+            temporal="updated" if info["temporal"] == "updated" else None,
+        )
+        work.provenance = prov
+        # Bump lastUpdate so the landing-page cache invalidates and the map
+        # reflects the new geometry immediately.
+        work.save(update_fields=changed_fields + ["provenance", "lastUpdate"])
+
+    return info
+
+
+def reharvest_work(work, user=None):
+    """Re-harvest a single existing ``Work`` by its DOI (synchronous).
+
+    Used by the admin "Re-harvest" button on the work landing page. Re-fetches
+    the Crossref record for ``work.doi``, re-runs inline OpenAlex enrichment
+    (via ``_crossref_item_to_work_kwargs``) and then OpenAIRE enrichment, and
+    updates the work **in place** using the careful-update policy
+    (``_carefully_update_work``) — refreshing upstream metadata while preserving
+    user/curator contributions (status, geometry, temporal extent, and
+    abstract/keywords/authors when the fresh harvest brings nothing).
+
+    Unlike ``harvest_crossref_doi`` this does not go through
+    ``_save_or_update_work``: that helper's per-source dedup would treat the
+    Crossref fetch as a *different* source from the work's original origin and
+    refuse to update. Re-harvest deliberately bypasses the source-match guard
+    and updates the existing record regardless of its original source.
+
+    Geometry and temporal extent — which Crossref does not carry — are
+    re-extracted from the landing page and **overridden in place unless a user
+    contributed them** (see :func:`_refresh_source_geometry_temporal`).
+
+    Returns ``(work_or_none, action, info)`` where ``action`` is one of:
+      * ``"updated"`` — metadata refreshed in place,
+      * ``"no_doi"`` — the work has no DOI to re-harvest from,
+      * ``"not_found"`` — Crossref has no (usable) record for the DOI.
+    ``info`` is the geometry/temporal outcome dict from
+    :func:`_refresh_source_geometry_temporal` (empty on the non-``"updated"`` paths).
+    """
+    if not work.doi:
+        return None, "no_doi", {}
+
+    user = resolve_user(user)
+    source = work.source or get_user_contributions_source()
+
+    session = _crossref_session()
+    try:
+        item = _fetch_crossref_item(work.doi, session)
+        if not item:
+            return work, "not_found", {}
+
+        event = HarvestingEvent.objects.create(source=source, user=user, status="in_progress")
+        try:
+            kwargs = _crossref_item_to_work_kwargs(
+                item,
+                source,
+                event,
+                fetch_abstract_from_publisher=True,
+                abstract_session=session,
+                harvester_name="reharvest_work",
+            )
+            if not kwargs:
+                event.status = "failed"
+                event.save(update_fields=["status"])
+                return work, "not_found", {}
+
+            # Careful-update preserves user/curator data and appends a
+            # `harvest_update` provenance event; OpenAlex enrichment already ran
+            # inside _crossref_item_to_work_kwargs.
+            _carefully_update_work(work, kwargs, event)
+            extents_info = _refresh_source_geometry_temporal(work, session)
+            _try_bok_pdf_extraction(work, work.doi, session)
+
+            # OpenAIRE enrichment, synchronous (fill-if-empty; never raises).
+            try:
+                enrich_work_from_openaire(work)
+            except Exception as exc:  # noqa: BLE001 — enrichment must never fail a re-harvest
+                logger.info("OpenAIRE enrichment failed for %s: %s", work.doi, exc)
+
+            event.status = "completed"
+            event.completed_at = timezone.now()
+            event.save(update_fields=["status", "completed_at"])
+            logger.info("Re-harvested work id=%s (DOI %s) by user %s", work.id, work.doi, getattr(user, "id", None))
+            return work, "updated", extents_info
+        except Exception:
+            event.status = "failed"
+            event.save(update_fields=["status"])
+            raise
     finally:
         session.close()

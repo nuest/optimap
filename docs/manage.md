@@ -275,6 +275,14 @@ python manage.py migrate_source_works --from-source "eScholarship Publishing" --
 
 Use `--update` when you want OpenAlex enrichment to re-run on previously-harvested works (e.g. after a matcher change), or when an upstream metadata change should propagate without losing curator additions. Without it, re-running the harvester is a no-op for already-known records.
 
+#### Re-harvest a single work (landing-page button)
+
+Staff viewing any **DOI-bearing** work's landing page (`/work/<identifier>/`) see a **Re-harvest** button next to Publish/Unpublish. Clicking it (with a confirm prompt) **synchronously** re-fetches that work's metadata from Crossref by DOI and re-runs all enrichment steps (OpenAlex inline + OpenAIRE), then reloads the page. For the bibliographic metadata it uses the same careful-update policy (`_carefully_update_work`), so `status`, `created_by`, and `abstract`/`keywords`/`authors` (when the fresh harvest brings nothing) are preserved, and a `harvest_update` event is appended to `Work.provenance`.
+
+**Geometry and temporal extent are refreshed from the source, not preserved blindly.** Crossref JSON carries no spatial/temporal data, so re-harvest additionally re-fetches the landing-page HTML and re-extracts geometry (`DC.SpatialCoverage` / `geo+json` / JSON-LD) and time period — the same parsers the OAI/prefix harvesters use. It **overrides** the stored value **unless a user contributed it**: if `Work.provenance.events` contains a `contribution` event with `spatial` (resp. `temporal`) in its `kinds`, that value is left untouched (`work_has_contribution_kind`). The outcome per field (`updated` / `preserved (user-contributed)` / `no … found at source`) is reported in the success message, and a `reharvest_source_extents` event is recorded. Overriding geometry bumps `lastUpdate`, so the landing-page cache, map, and country/region joins refresh immediately.
+
+Unlike a normal harvest, re-harvest **bypasses the per-source dedup guard** so it updates the work regardless of which source originally harvested it (the work's existing `Source` is kept; the `HarvestingEvent` is attributed to it). The button is hidden for works without a DOI (Crossref lookup is by DOI). Endpoint: `POST /work/<identifier>/reharvest/` (staff only). Code: `works.harvesting.crossref.reharvest_work`; view `works.views_geometry.reharvest_work`.
+
 ### OpenAIRE enrichment
 
 OPTIMAP enriches works from the [OpenAIRE Graph API](https://graph.openaire.eu/docs/apis/graph-api/) as a second enrichment source besides OpenAlex. Its main job is to recover **abstracts** (and, when empty, keywords/authors) for works whose harvest origin does not supply them — most notably the AGILE Springer LNCS chapters (`agile-gi-lncs` source, DOI prefix `10.1007/978-…`), for which Crossref carries no abstract and the publisher landing page is not scraped.
@@ -565,7 +573,8 @@ Staff users additionally see the full provenance (including `original_record`, W
   "metadata_sources": {                    // per-field attribution
     "authors": "openalex",
     "abstract": "openaire",                // crossref | openaire
-    "geometry": "DC.SpatialCoverage"
+    "geometry": "DC.SpatialCoverage",      // … | reharvest_html (admin re-harvest)
+    "timeperiod": "reharvest_html"         // present when re-harvest overrode temporal extent
   },
   "openalex_match": {
     "status": "verified",                  // verified | unverified | none | skipped
@@ -624,6 +633,7 @@ Staff users additionally see the full provenance (including `original_record`, W
   },
   "events": [                              // chronological audit log
     { "type": "harvest",      "at": "..." },
+    { "type": "reharvest_source_extents", "at": "...", "geometry": "updated", "temporal": "updated" }, // admin re-harvest overrode source-derived extents (skipped for user-contributed values)
     { "type": "doi_contribution", "at": "...", "user_id": 42, "doi": "10.5194/..." },  // user added this work by submitting its DOI on /contribute/
     { "type": "contribution", "at": "...", "user_id": 42, "kind": "spatial" },
     { "type": "publish",      "at": "...", "user_id": 1 },

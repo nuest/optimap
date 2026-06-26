@@ -74,6 +74,13 @@
             <i class="fas fa-archive"></i> Unpublish
           </button>
         {% endif %}
+        {% if can_reharvest %}
+          <button id="reharvest-btn" class="btn btn-info btn-sm mr-2"
+                  data-toggle="tooltip"
+                  title="Re-fetch metadata from Crossref and re-run OpenAlex/OpenAIRE enrichment. Geometry and temporal extent are refreshed from the source unless a user contributed them; status is preserved.">
+            <i class="fas fa-sync"></i> Re-harvest
+          </button>
+        {% endif %}
         <a href="/admin/works/work/{{ work.id }}/change/" class="btn btn-primary btn-sm" target="_blank" rel="noopener">
           <i class="fas fa-edit"></i> Edit in Admin
         </a>
@@ -775,6 +782,7 @@
     const GEOMETRY_MAX_UPLOAD_KB = {{ geometry_max_upload_kb|default:2048 }};
     const canPublish = {{ can_publish|yesno:"true,false" }};
     const canUnpublish = {{ can_unpublish|yesno:"true,false" }};
+    const canReharvest = {{ can_reharvest|yesno:"true,false" }};
     const hasGeometry = {{ has_geometry|yesno:"true,false" }};
     const doi = "{{ work.doi|default:'' }}";
     const useIdUrls = {{ use_id_urls|default:"false"|yesno:"true,false" }};
@@ -1215,6 +1223,55 @@
             console.error('Error:', error);
             OPTIMAP_FLASH('error', 'An error occurred while unpublishing the work.');
             unpublishBtn.disabled = false;
+          });
+        });
+      }
+    }
+
+    // Re-harvest button handler — synchronous Crossref re-fetch + enrichment.
+    // Confirm first (it makes outbound API calls and can take several seconds)
+    // and show an in-flight state. On success the page reloads to surface the
+    // refreshed metadata and the server-side success flash.
+    if (canReharvest) {
+      const reharvestBtn = document.getElementById('reharvest-btn');
+      if (reharvestBtn) {
+        const reharvestLabel = reharvestBtn.innerHTML;
+        reharvestBtn.addEventListener('click', function() {
+          if (!confirm('Re-harvest this work from the original source? This re-fetches metadata from Crossref and re-runs enrichment. Geometry and temporal extent are refreshed from source unless a user contributed them; status is preserved.')) {
+            return;
+          }
+          const csrfElement = document.querySelector('[name=csrfmiddlewaretoken]');
+          if (!csrfElement) {
+            OPTIMAP_FLASH('error', 'CSRF token not found. Please refresh the page.');
+            return;
+          }
+          const csrftoken = csrfElement.value;
+
+          reharvestBtn.disabled = true;
+          reharvestBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Re-harvesting…';
+          const reharvestUrl = useIdUrls ? `/work/${pubId}/reharvest/` : `/work/${doi}/reharvest/`;
+          fetch(reharvestUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': csrftoken
+            }
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              location.reload();
+            } else {
+              OPTIMAP_FLASH('error', 'Error: ' + (data.error || 'Unknown error'));
+              reharvestBtn.disabled = false;
+              reharvestBtn.innerHTML = reharvestLabel;
+            }
+          })
+          .catch(error => {
+            console.error('Error:', error);
+            OPTIMAP_FLASH('error', 'An error occurred while re-harvesting the work.');
+            reharvestBtn.disabled = false;
+            reharvestBtn.innerHTML = reharvestLabel;
           });
         });
       }
