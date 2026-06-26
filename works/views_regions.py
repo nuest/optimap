@@ -59,17 +59,17 @@ def unmatched_regions_qs():
 @staff_member_required
 @require_POST
 def set_work_region(request, work_id):
-    """Manually assign a global region to a work, or mark it "will not be matched".
+    """Manually assign one or more global regions to a work, or mark it "will not
+    be matched".
 
-    Staff-only. Body is JSON: ``{"region_id": 5}`` to add a region, or
+    Staff-only. Body is JSON: ``{"region_ids": [5, 9]}`` to set several regions
+    at once (multi-valued, since a work legitimately spans its continent and an
+    ocean), the single-value ``{"region_id": 5}`` to *add* one region, or
     ``{"exclude": true}`` to mark the work as not applicable (e.g. a coastal
     point falling in the sliver gap between continent and ocean outlines).
     Records a detailed manual provenance block plus a ``region_curation`` audit
     event. The decision is preserved by ``works.signals.assign_work_regions``
     until the work's geometry changes, at which point automated matching resumes.
-
-    Assignment is additive (``regions.add``) since a work legitimately spans
-    several regions (its continent and ocean); repeat the action to add more.
     """
     work = get_object_or_404(Work, pk=work_id)
     try:
@@ -81,6 +81,19 @@ def set_work_region(request, work_id):
     if data.get("exclude"):
         decision, method, region = "excluded", "curator_excluded", None
         work.regions.clear()  # "no region applies" — drop any auto-linked regions
+    elif "region_ids" in data:
+        # Multi-assign: replace the work's regions with exactly the chosen set.
+        raw_ids = data.get("region_ids") or []
+        if not isinstance(raw_ids, list):
+            return JsonResponse({"success": False, "error": "region_ids must be a list."}, status=400)
+        ids = [r for r in raw_ids if isinstance(r, int) or str(r).isdigit()]
+        if len(ids) != len(raw_ids) or not ids:
+            return JsonResponse({"success": False, "error": f"Invalid region ids {raw_ids!r}."}, status=400)
+        regions = list(GlobalRegion.objects.filter(pk__in=ids))
+        if len(regions) != len(set(ids)):
+            return JsonResponse({"success": False, "error": f"Unknown region in {raw_ids!r}."}, status=400)
+        decision, method, region = "assigned", "curator_assigned", None
+        work.regions.set(regions)
     else:
         raw_id = data.get("region_id")
         region = (
@@ -91,10 +104,12 @@ def set_work_region(request, work_id):
         if region is None:
             return JsonResponse({"success": False, "error": f"Unknown region {raw_id!r}."}, status=400)
         decision, method = "assigned", "curator_assigned"
-        work.regions.add(region)
+        work.regions.add(region)  # additive single-region path
 
     region_name = region.name if region else None
-    regions_block = [{"name": r.name, "region_type": r.get_region_type_display()} for r in work.regions.all()]
+    assigned = list(work.regions.all())  # read the resulting set once
+    regions_block = [{"name": r.name, "region_type": r.get_region_type_display()} for r in assigned]
+    region_names = [r.name for r in assigned]
     # append_event mutates provenance in-memory; set_block then persists the whole
     # dict via .update() without re-firing the save signals (and the M2M change
     # above does not fire post_save either).
@@ -104,7 +119,8 @@ def set_work_region(request, work_id):
         user_id=request.user.id,
         user_email=request.user.email,
         decision=decision,
-        region=region_name,
+        region=region_name,  # the single-region path keeps this for back-compat
+        regions=region_names or None,
     )
     set_block(
         work,
@@ -117,8 +133,10 @@ def set_work_region(request, work_id):
             "decided_at": now,
         },
     )
-    invalidate_region_page_cache(region)
-    return JsonResponse({"success": True, "decision": decision, "region": region_name})
+    # Refresh every affected region's landing page (the work joined/left each one).
+    for r in assigned:
+        invalidate_region_page_cache(r)
+    return JsonResponse({"success": True, "decision": decision, "region": region_name, "regions": region_names})
 
 
 @staff_member_required

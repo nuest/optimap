@@ -313,9 +313,10 @@ def feeds(request):
                 "page_obj": page_obj,
                 "page_size": page_size,
                 "page_size_options": settings.WORKS_PAGE_SIZE_OPTIONS,
-                "region_options": list(
-                    GlobalRegion.objects.order_by("region_type", "name").values("id", "name", "region_type")
-                ),
+                "region_options": [
+                    {"id": r.id, "name": r.name, "type": r.get_region_type_display()}
+                    for r in GlobalRegion.objects.order_by("region_type", "name")
+                ],
             }
         )
 

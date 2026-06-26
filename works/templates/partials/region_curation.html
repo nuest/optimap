@@ -4,10 +4,13 @@
 <p class="text-muted small">
   These works have a geometry but could not be matched to any continent or ocean
   — usually a coastal point falling in the sliver gap between the continent and
-  ocean outlines. Assign a region manually, or mark a work as "will not be
-  matched" so the automated backfill leaves it alone. Editing a work's geometry
-  later voids a manual decision and re-runs automated matching.
+  ocean outlines. Assign one or more regions manually (start typing to search,
+  then click or press Enter to add), or mark a work as "will not be matched" so
+  the automated backfill leaves it alone. Editing a work's geometry later voids a
+  manual decision and re-runs automated matching.
 </p>
+
+{{ region_options|json_script:"curation-region-options" }}
 
 {% if page_obj.paginator.count %}
   {% include "_pagination.html" with show_meta=True pagination_label="Unmatched works pagination" %}
@@ -29,12 +32,23 @@
             {% if work.doi %}<br><span class="text-muted small">{{ work.doi }}</span>{% endif %}
           </td>
           <td>
-            <select class="form-control form-control-sm curation-region-select" aria-label="Region for work {{ work.id }}">
-              <option value="">— select region —</option>
-              {% for r in region_options %}
-              <option value="{{ r.id }}">{{ r.name }}{% if r.region_type == 'O' %} (ocean){% else %} (continent){% endif %}</option>
-              {% endfor %}
-            </select>
+            <div class="curation-tagger"
+                 id="region-tagger-{{ work.id }}"
+                 data-options="curation-region-options"
+                 data-value-key="id"
+                 data-post-key="region_ids"
+                 data-search-fields="name"
+                 data-label-suffix-key="type"
+                 data-noun="region">
+              <div class="bok-combobox" role="combobox" aria-haspopup="listbox" aria-expanded="false">
+                <input type="text" class="form-control form-control-sm curation-search"
+                       autocomplete="off" spellcheck="false"
+                       placeholder="Search continents and oceans…"
+                       aria-label="Regions for work {{ work.id }}" aria-autocomplete="list">
+                <ul class="bok-suggestions curation-suggestions" role="listbox" hidden></ul>
+              </div>
+              <ul class="bok-chip-list curation-selected mt-2" aria-label="Selected regions"></ul>
+            </div>
           </td>
           <td class="text-nowrap">
             <button type="button" class="btn btn-sm btn-primary curation-assign-btn">Assign</button>

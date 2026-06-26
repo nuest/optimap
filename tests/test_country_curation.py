@@ -26,6 +26,7 @@ class _Base(TestCase):
         self.staff = User.objects.create_user(username="staff", email="staff@example.org", password="x", is_staff=True)
         self.user = User.objects.create_user(username="joe", email="joe@example.org", password="x")
         self.de = Country.objects.create(name="Germany", iso_code="DE", geom=_box(5, 47, 10, 55))
+        self.pl = Country.objects.create(name="Poland", iso_code="PL", geom=_box(10, 47, 20, 55))
         # The sentinel row is created by migration 0032_country_sentinel.
         self.sentinel = Country.objects.get(iso_code=SENTINEL_COUNTRY_ISO)
 
@@ -102,6 +103,31 @@ class AssignAndExcludeTests(_Base):
         events = self.work.provenance["events"]
         self.assertEqual(events[-1]["type"], "country_curation")
         self.assertEqual(events[-1]["decision"], "assigned")
+
+    def test_assign_multiple_countries(self):
+        resp = self._post({"iso_codes": ["DE", "PL"]})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(sorted(c.iso_code for c in self.work.countries.all()), ["DE", "PL"])
+        self.work.refresh_from_db()
+        block = self.work.provenance["countries"]
+        self.assertEqual(block["source"], "manual")
+        self.assertEqual(block["method"], "curator_assigned")
+        self.assertEqual(block["iso_codes"], ["DE", "PL"])
+
+    def test_assign_codes_replace_previous_set(self):
+        # iso_codes replaces (set), not adds: a second call overwrites the first.
+        self._post({"iso_codes": ["DE", "PL"]})
+        self._post({"iso_codes": ["DE"]})
+        self.assertEqual([c.iso_code for c in self.work.countries.all()], ["DE"])
+
+    def test_assign_empty_list_rejected(self):
+        self.assertEqual(self._post({"iso_codes": []}).status_code, 400)
+
+    def test_assign_list_with_unknown_code_rejected(self):
+        resp = self._post({"iso_codes": ["DE", "XX"]})
+        self.assertEqual(resp.status_code, 400)
+        # Nothing assigned when any code is invalid.
+        self.assertEqual(list(self.work.countries.all()), [])
 
     def test_assign_unknown_code_rejected(self):
         self.assertEqual(self._post({"iso_code": "XX"}).status_code, 400)

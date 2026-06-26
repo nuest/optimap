@@ -302,8 +302,8 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
             "| `unpublish` | `status_from`, `user_id`\\*, `user_email`\\* | Work was unpublished |\n"
             "| `source_migration` | `from_source`, `to_source` | Work was reassigned to a different `Source` by the `migrate_source_works` management command |\n"
             "| `openaire_enrich` | `openaire_id`, `doi`, `source_url`, `fields_filled` (array), `fields_offered_not_applied` (array) | OpenAIRE enrichment ran; `fields_filled` were empty and were populated, `fields_offered_not_applied` had an OpenAIRE value but a value already existed (kept under the fill-if-empty policy) |\n"
-            '| `country_curation` | `decision` (`assigned`/`excluded`), `iso_code` (for `assigned`), `user_id`\\*, `user_email`\\* | Staff manually assigned a country, or marked the work "will not be matched", on the /countries curation section |\n'
-            '| `region_curation` | `decision` (`assigned`/`excluded`), `region` (for `assigned`), `user_id`\\*, `user_email`\\* | Staff manually assigned a global region, or marked the work "will not be matched", on the /regions curation section |\n\n'
+            '| `country_curation` | `decision` (`assigned`/`excluded`), `iso_codes` (array, for `assigned`), `user_id`\\*, `user_email`\\* | Staff manually assigned one or more countries, or marked the work "will not be matched", on the /countries curation section |\n'
+            '| `region_curation` | `decision` (`assigned`/`excluded`), `regions` (array, for `assigned`), `region` (single-region path only), `user_id`\\*, `user_email`\\* | Staff manually assigned one or more global regions, or marked the work "will not be matched", on the /regions curation section |\n\n'
             "\\* `user_id` and `user_email` are present for staff and curators only.\n\n"
             "**Other top-level keys:**\n"
             "| Key | Type | Description |\n"

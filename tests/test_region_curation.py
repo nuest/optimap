@@ -111,6 +111,29 @@ class AssignAndExcludeTests(_Base):
         self._post({"region_id": self.sea.id})
         self.assertEqual(sorted(r.name for r in self.work.regions.all()), ["Testland", "Testsea"])
 
+    def test_assign_multiple_regions(self):
+        resp = self._post({"region_ids": [self.land.id, self.sea.id]})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(sorted(r.name for r in self.work.regions.all()), ["Testland", "Testsea"])
+        self.work.refresh_from_db()
+        block = self.work.provenance["regions"]
+        self.assertEqual(block["method"], "curator_assigned")
+        self.assertEqual(sorted(r["name"] for r in block["regions"]), ["Testland", "Testsea"])
+
+    def test_region_ids_replace_previous_set(self):
+        # region_ids replaces (set), unlike the additive single region_id path.
+        self._post({"region_ids": [self.land.id, self.sea.id]})
+        self._post({"region_ids": [self.land.id]})
+        self.assertEqual([r.name for r in self.work.regions.all()], ["Testland"])
+
+    def test_assign_empty_region_ids_rejected(self):
+        self.assertEqual(self._post({"region_ids": []}).status_code, 400)
+
+    def test_assign_region_ids_with_unknown_rejected(self):
+        resp = self._post({"region_ids": [self.land.id, 999999]})
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(list(self.work.regions.all()), [])
+
     def test_assign_unknown_region_rejected(self):
         self.assertEqual(self._post({"region_id": 999999}).status_code, 400)
 

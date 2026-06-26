@@ -2,6 +2,7 @@
 {# SPDX-License-Identifier: GPL-3.0-or-later #}
 {# Countries overview, grouped by continent (#29). Mirrors /regions/. #}
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Countries | {% endblock %}
 
@@ -17,7 +18,8 @@
   {% include "partials/countries_by_continent.html" %}
 
   {% if request.user.is_staff %}
-  <div class="card border-info mt-5" id="countryCurationCard">
+  <link rel="stylesheet" href="{% static 'css/bok.css' %}">
+  <div class="card border-info mt-5" id="countryCurationCard" data-curation-card>
     <div class="card-header bg-light">
       <button class="btn btn-link p-0 text-decoration-none" type="button" data-toggle="collapse"
               data-target="#countryCurationBody" aria-expanded="false" aria-controls="countryCurationBody">
@@ -69,64 +71,14 @@
 </div>
 
 {% if request.user.is_staff %}
+<script src="{% static 'js/curation-tagger.js' %}"></script>
 <script>
-// Staff country-curation section (#261).
+// Staff country-curation "Run country backfill now" button (#261). The per-row
+// assign UI is handled by curation-tagger.js, shared with the region page.
 (function () {
   const card = document.getElementById('countryCurationCard');
   if (!card) return;
-  const csrf = document.querySelector('#countryCurationCard [name=csrfmiddlewaretoken]').value;
 
-  function post(url, body, status, onDone) {
-    status.textContent = 'Saving…';
-    status.className = 'curation-row-status small ml-2 text-muted';
-    fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
-      credentials: 'same-origin',
-      body: JSON.stringify(body),
-    })
-      .then(r => r.json().then(d => ({ ok: r.ok, d })))
-      .then(({ ok, d }) => {
-        if (!ok || !d.success) throw new Error(d.error || 'request failed');
-        onDone(d);
-      })
-      .catch(err => {
-        status.textContent = 'Error: ' + err.message;
-        status.className = 'curation-row-status small ml-2 text-danger';
-      });
-  }
-
-  // Remove a resolved row; show a hint if the page is now empty.
-  function resolveRow(row) {
-    const tbody = row.parentNode;
-    row.remove();
-    if (tbody && tbody.querySelectorAll('tr').length === 0) {
-      tbody.insertAdjacentHTML('beforeend',
-        '<tr><td colspan="3" class="text-success">Resolved on this page — reload to refresh counts.</td></tr>');
-    }
-  }
-
-  card.addEventListener('click', function (ev) {
-    const assign = ev.target.closest('.curation-assign-btn');
-    const exclude = ev.target.closest('.curation-exclude-btn');
-    if (!assign && !exclude) return;
-    const row = ev.target.closest('tr');
-    const status = row.querySelector('.curation-row-status');
-    const url = row.dataset.curateUrl;
-    if (assign) {
-      const iso = row.querySelector('.curation-country-select').value;
-      if (!iso) {
-        status.textContent = 'Pick a country first.';
-        status.className = 'curation-row-status small ml-2 text-danger';
-        return;
-      }
-      post(url, { iso_code: iso }, status, () => resolveRow(row));
-    } else {
-      post(url, { exclude: true }, status, () => resolveRow(row));
-    }
-  });
-
-  // "Run country backfill now" button.
   const backfillBtn = document.getElementById('countryBackfillBtn');
   const backfillStatus = document.getElementById('countryBackfillStatus');
   const backfillLabel = backfillBtn.innerHTML;

@@ -292,7 +292,7 @@ class WorkAdmin(LeafletGeoAdmin, ImportExportModelAdmin):
         "openalex_is_retracted",
         "openalex_open_access_status",
     )
-    filter_horizontal = ("collections",)
+    filter_horizontal = ("collections", "countries", "regions")
     fields = (
         "title",
         "type",
@@ -300,6 +300,8 @@ class WorkAdmin(LeafletGeoAdmin, ImportExportModelAdmin):
         "status",
         "source",
         "collections",
+        "countries",
+        "regions",
         "abstract",
         "geometry",
         "timeperiod_startdate",
@@ -907,6 +909,11 @@ class UserAdmin(admin.ModelAdmin):
 @admin.register(GlobalRegion)
 class GlobalRegionAdmin(admin.ModelAdmin):
     """GlobalRegion Admin."""
+
+    list_display = ("name", "region_type", "last_loaded")
+    list_filter = ("region_type",)
+    search_fields = ("name",)
+    ordering = ("region_type", "name")
 
 
 @admin.register(Country)

@@ -493,13 +493,15 @@ def countries_overview(request):
 @staff_member_required
 @require_POST
 def set_work_country(request, work_id):
-    """Manually assign a country to a work, or mark it "will not be matched" (#261).
+    """Manually assign one or more countries to a work, or mark it "will not be
+    matched" (#261).
 
-    Staff-only. Body is JSON: ``{"iso_code": "DE"}`` to assign, or
-    ``{"exclude": true}`` to mark the work as not applicable (assigns the
-    sentinel ``Country``). Records a manual provenance block and an audit event;
-    the manual decision is preserved until the work's geometry changes (see
-    ``works.signals.assign_work_countries``).
+    Staff-only. Body is JSON: ``{"iso_codes": ["DE", "PL"]}`` (or the
+    single-value ``{"iso_code": "DE"}``) to assign — multi-valued for
+    transboundary studies — or ``{"exclude": true}`` to mark the work as not
+    applicable (assigns the sentinel ``Country``). Records a manual provenance
+    block and an audit event; the manual decision is preserved until the work's
+    geometry changes (see ``works.signals.assign_work_countries``).
     """
     work = get_object_or_404(Work, pk=work_id)
     try:
@@ -508,21 +510,34 @@ def set_work_country(request, work_id):
         return JsonResponse({"success": False, "error": "Invalid JSON body."}, status=400)
 
     now = timezone.now().isoformat()
-    # Resolve the target country and the decision-specific provenance values;
+    # Resolve the target countries and the decision-specific provenance values;
     # the persistence tail below is shared between assign and exclude.
     if data.get("exclude"):
-        country = Country.objects.filter(iso_code=SENTINEL_COUNTRY_ISO).first()
-        if country is None:
+        sentinel = Country.objects.filter(iso_code=SENTINEL_COUNTRY_ISO).first()
+        if sentinel is None:
             return JsonResponse({"success": False, "error": "Sentinel country missing; run migrations."}, status=500)
-        decision, method, iso_codes = "excluded", "curator_excluded", []
+        decision, method, countries, iso_codes = "excluded", "curator_excluded", [sentinel], []
     else:
-        iso = (data.get("iso_code") or "").upper()
-        country = Country.objects.real().filter(iso_code=iso).first()
-        if country is None:
-            return JsonResponse({"success": False, "error": f"Unknown country code {iso!r}."}, status=400)
-        decision, method, iso_codes = "assigned", "curator_assigned", [iso]
+        # Accept a list (iso_codes) or the legacy single value (iso_code).
+        raw = data.get("iso_codes")
+        if raw is None:
+            raw = [data["iso_code"]] if data.get("iso_code") else []
+        if not isinstance(raw, list):
+            return JsonResponse({"success": False, "error": "iso_codes must be a list."}, status=400)
+        requested = [c.upper() for c in raw if isinstance(c, str) and c.strip()]
+        if not requested:
+            return JsonResponse({"success": False, "error": "No country codes provided."}, status=400)
+        countries = list(Country.objects.real().filter(iso_code__in=requested))
+        found = {c.iso_code for c in countries}
+        unknown = [c for c in requested if c not in found]
+        if unknown:
+            return JsonResponse(
+                {"success": False, "error": f"Unknown country code(s): {', '.join(unknown)}."}, status=400
+            )
+        decision, method = "assigned", "curator_assigned"
+        iso_codes = sorted(found)
 
-    work.countries.set([country])
+    work.countries.set(countries)
     # append_event mutates provenance in-memory; set_block then persists the
     # whole dict via .update() without re-firing the save signals.
     append_event(
@@ -531,7 +546,7 @@ def set_work_country(request, work_id):
         user_id=request.user.id,
         user_email=request.user.email,
         decision=decision,
-        iso_code=iso_codes[0] if iso_codes else None,
+        iso_codes=iso_codes or None,
     )
     set_block(
         work,
@@ -544,9 +559,7 @@ def set_work_country(request, work_id):
             "decided_at": now,
         },
     )
-    return JsonResponse(
-        {"success": True, "decision": decision, "iso_codes": iso_codes, "country": country.name if iso_codes else None}
-    )
+    return JsonResponse({"success": True, "decision": decision, "iso_codes": iso_codes})
 
 
 @staff_member_required

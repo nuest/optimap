@@ -2,11 +2,14 @@
 {# SPDX-License-Identifier: GPL-3.0-or-later #}
 {# Staff-only country curation list for unmatched works (#261). #}
 <p class="text-muted small">
-  These works have a geometry but could not be matched to any country. Assign a
-  country manually, or mark a work as "will not be matched" (e.g. open-ocean or
-  global studies) so the automated backfill leaves it alone. Editing a work's
-  geometry later voids a manual decision and re-runs automated matching.
+  These works have a geometry but could not be matched to any country. Assign one
+  or more countries manually (start typing to search, then click or press Enter to
+  add), or mark a work as "will not be matched" (e.g. open-ocean or global studies)
+  so the automated backfill leaves it alone. Editing a work's geometry later voids
+  a manual decision and re-runs automated matching.
 </p>
+
+{{ country_options|json_script:"curation-country-options" }}
 
 {% if page_obj.paginator.count %}
   {% include "_pagination.html" with show_meta=True pagination_label="Unmatched works pagination" %}
@@ -28,12 +31,23 @@
             {% if work.doi %}<br><span class="text-muted small">{{ work.doi }}</span>{% endif %}
           </td>
           <td>
-            <select class="form-control form-control-sm curation-country-select" aria-label="Country for work {{ work.id }}">
-              <option value="">— select country —</option>
-              {% for c in country_options %}
-              <option value="{{ c.iso_code }}">{{ c.name }} ({{ c.iso_code }})</option>
-              {% endfor %}
-            </select>
+            <div class="curation-tagger"
+                 id="country-tagger-{{ work.id }}"
+                 data-options="curation-country-options"
+                 data-value-key="iso_code"
+                 data-post-key="iso_codes"
+                 data-search-fields="name,iso_code"
+                 data-show-code="1"
+                 data-noun="country">
+              <div class="bok-combobox" role="combobox" aria-haspopup="listbox" aria-expanded="false">
+                <input type="text" class="form-control form-control-sm curation-search"
+                       autocomplete="off" spellcheck="false"
+                       placeholder="Search countries (name or code)…"
+                       aria-label="Countries for work {{ work.id }}" aria-autocomplete="list">
+                <ul class="bok-suggestions curation-suggestions" role="listbox" hidden></ul>
+              </div>
+              <ul class="bok-chip-list curation-selected mt-2" aria-label="Selected countries"></ul>
+            </div>
           </td>
           <td class="text-nowrap">
             <button type="button" class="btn btn-sm btn-primary curation-assign-btn">Assign</button>

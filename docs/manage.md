@@ -646,8 +646,8 @@ Staff users additionally see the full provenance (including `original_record`, W
       "fields_filled": ["abstract"],            // were empty, now populated
       "fields_offered_not_applied": ["authors"] // OpenAIRE had a value but one already existed (kept)
     },
-    { "type": "country_curation", "at": "...", "user_id": 1, "decision": "assigned", "iso_code": "DE" }, // staff /countries curation; decision "excluded" for "will not be matched"
-    { "type": "region_curation", "at": "...", "user_id": 1, "decision": "assigned", "region": "Asia" }, // staff /regions curation; decision "excluded" for "will not be matched"
+    { "type": "country_curation", "at": "...", "user_id": 1, "decision": "assigned", "iso_codes": ["DE", "PL"] }, // staff /countries curation (multi-valued); decision "excluded" for "will not be matched"
+    { "type": "region_curation", "at": "...", "user_id": 1, "decision": "assigned", "region": "Asia", "regions": ["Asia", "Indian Ocean"] }, // staff /regions curation; "region" set only for the single-region path; decision "excluded" for "will not be matched"
   ],
 }
 ```
@@ -719,8 +719,10 @@ works without a country" section on `/countries`** to resolve them:
 
 - A **paginated list** of works with geometry but no country (the same set the
   weekly sweep processes).
-- Per work: **assign a country** from a dropdown, or mark it **"will not be
-  matched to a country"**.
+- Per work: **assign one or more countries** with an autosuggest chip widget
+  (type to search, click/Enter to add a chip, × to remove — the same UX as the
+  BoK topic tagger; multi-valued for transboundary studies), or mark it **"will
+  not be matched to a country"**.
 - A **"Run country backfill now"** button that enqueues
   `works.tasks.backfill_work_countries` (needs a running `qcluster`) and shows
   the task id.
@@ -740,6 +742,14 @@ preserved across unrelated saves but voided when the work's geometry changes** �
 then the work re-runs automated matching and, if still unmatched, returns to the
 curation list. To undo an exclusion outside this UI, remove the `ZZ` country
 from the work in the Django admin.
+
+You can also **edit a work's countries and regions directly in the Django admin**
+on the work change page (`/admin/works/work/<id>/change/`) via the `countries`
+and `regions` dual-list (`filter_horizontal`) widgets, next to `collections`.
+Admin edits write the M2M directly and do **not** record a `provenance` manual
+block, so the self-healing sweeps leave admin-assigned works alone (they only
+process works with *no* country/region); clearing all values lets the next sweep
+re-populate them.
 
 ### Global-region association (offline)
 
@@ -785,8 +795,9 @@ sliver gap between the continent and ocean outlines:
 
 - A **paginated list** of works with geometry but no region (the same set the
   weekly sweep processes, minus already-curated works).
-- Per work: **assign a region** from a dropdown (additive — repeat to add a
-  work's continent *and* ocean), or mark it **"will not be matched"**.
+- Per work: **assign one or more regions** with the autosuggest chip widget (add
+  a work's continent *and* ocean in one pass), or mark it **"will not be
+  matched"**.
 - A **"Run region backfill now"** button that enqueues
   `works.tasks.backfill_work_regions` (needs a running `qcluster`).
 
