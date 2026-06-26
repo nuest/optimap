@@ -239,7 +239,7 @@
   <div class="subscriptions-header">
     <h1>Regional Subscriptions</h1>
     <p class="subtitle">
-      Get notified when new publications are added from specific continents and oceans.
+      Get notified when new works are added from specific continents and oceans.
       Select the regions you're interested in to receive email notifications.
     </p>
   </div>
@@ -258,7 +258,7 @@
           {% else %}
           Email notifications are sent <strong>monthly</strong> on the last day of each month,
           {% endif %}
-          summarizing new publications added to your selected regions since your last notification.
+          summarizing new works added to your selected regions since your last notification.
           Change the frequency in the form below.
         </p>
       </div>
@@ -279,12 +279,12 @@
         {% if selected_region_ids %}
         <p class="mb-0 small">
           Currently monitoring <strong>{{ selected_region_ids|length }} region{{ selected_region_ids|length|pluralize }}</strong>.
-          You'll receive email notifications when new publications are added to these regions.
+          You'll receive email notifications when new works are added to these regions.
         </p>
         {% else %}
         <p class="mb-0 small">
           <strong>No regions selected.</strong> Select one or more regions below to start
-          receiving notifications about new publications.
+          receiving notifications about new works.
         </p>
         {% endif %}
       </div>

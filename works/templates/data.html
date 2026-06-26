@@ -58,7 +58,7 @@
     </p>
 
     <p>
-      Query all publications via:
+      Query all works via:
       <pre class="bg-light p-2">
 curl -X GET {{ site|addstr:"/api" }}/api/optimap/ | jq
       </pre>
@@ -76,7 +76,7 @@ curl -X GET {{ site|addstr:"/api" }}/api/optimap/ | jq
 
     <hr>
 
-    <h2 class="py-2">Download Publication Data</h2>
+    <h2 class="py-2">Download Works Data</h2>
     <ul class="list-unstyled mb-4">
       {% if last_geojson %}
       <li class="mb-3">

@@ -385,14 +385,14 @@
   {# Logged-in viewer can fix at least one missing piece. #}
   <div class="alert alert-warning" role="alert">
     <strong><i class="fas fa-info-circle"></i> Missing information:</strong>
-    This publication is missing {% for item in missing_for_logged_in %}<a href="#{{ item.anchor }}" class="alert-link">{{ item.label }}</a>{% if not forloop.last %}{% if forloop.revcounter == 2 %} and {% else %}, {% endif %}{% endif %}{% endfor %}.
+    This work is missing {% for item in missing_for_logged_in %}<a href="#{{ item.anchor }}" class="alert-link">{{ item.label }}</a>{% if not forloop.last %}{% if forloop.revcounter == 2 %} and {% else %}, {% endif %}{% endif %}{% endfor %}.
     You can help by adding this information below!
   </div>
 {% elif missing_for_anonymous %}
   {# Anonymous viewer on a contributable work — invite login. #}
   <div class="alert alert-info" role="alert">
     <strong><i class="fas fa-info-circle"></i> Missing information:</strong>
-    This publication is missing {% for item in missing_for_anonymous %}<a href="#{{ item.anchor }}" class="alert-link">{{ item.label }}</a>{% if not forloop.last %}{% if forloop.revcounter == 2 %} and {% else %}, {% endif %}{% endif %}{% endfor %}.
+    This work is missing {% for item in missing_for_anonymous %}<a href="#{{ item.anchor }}" class="alert-link">{{ item.label }}</a>{% if not forloop.last %}{% if forloop.revcounter == 2 %} and {% else %}, {% endif %}{% endif %}{% endfor %}.
     Use the user menu in the top bar (the <i class="fas fa-user" aria-label="user menu"></i> icon) to log in with a magic link, then return to this page to add the missing information.
   </div>
 {% endif %}
@@ -422,7 +422,7 @@
         <h6 class="font-weight-bold"><i class="fas fa-map-marked-alt"></i> Spatial extent (geographic location)</h6>
         {% if has_geometry %}
           <div class="alert alert-info mb-2">
-            <i class="fas fa-info-circle"></i> This publication already has a geospatial extent. You can update or replace it if needed using the drawing tools on the map above.
+            <i class="fas fa-info-circle"></i> This work already has a geospatial extent. You can update or replace it if needed using the drawing tools on the map above.
           </div>
         {% endif %}
         <p class="text-muted small">Use the drawing tools on the map above to mark the geographic area covered by this research.</p>
@@ -566,7 +566,7 @@
         <h6 class="font-weight-bold"><i class="fas fa-calendar"></i> Temporal extent (time period)</h6>
         {% if has_temporal %}
           <div class="alert alert-info mb-2">
-            <i class="fas fa-info-circle"></i> This publication already has temporal extent data. You can update it if needed.
+            <i class="fas fa-info-circle"></i> This work already has temporal extent data. You can update it if needed.
           </div>
         {% endif %}
         <p class="text-muted small">Provide the time period(s) this research data covers (not the publication date). You can add multiple periods.</p>
@@ -674,7 +674,7 @@
   <div class="card-body">
     {% if bok_concepts_resolved %}
       <div class="alert alert-info mb-2">
-        <i class="fas fa-info-circle"></i> This publication already has topics metadata. You can update it if needed.
+        <i class="fas fa-info-circle"></i> This work already has topics metadata. You can update it if needed.
       </div>
     {% endif %}
     <p class="text-muted small">

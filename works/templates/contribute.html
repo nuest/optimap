@@ -97,7 +97,7 @@
     {% if total_count > 0 %}
       <div class="alert alert-info text-break" role="alert">
         <i class="fas fa-info-circle"></i>
-        <strong>{{ total_count }}</strong> publication{{ total_count|pluralize }} need{{ total_count|pluralize:"s," }} geolocation data{% if filter_collection %} in this collection{% endif %}.
+        <strong>{{ total_count }}</strong> work{{ total_count|pluralize }} need{{ total_count|pluralize:"s," }} geolocation data{% if filter_collection %} in this collection{% endif %}.
       </div>
 
       {% if request.user.is_authenticated %}
