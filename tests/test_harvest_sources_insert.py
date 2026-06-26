@@ -9,7 +9,7 @@ from django.core.management import call_command
 from django.test import TestCase
 
 from works.management.commands.harvest_sources import SOURCE_CONFIG, _is_enabled
-from works.models import Source
+from works.models import Collection, Source
 
 
 def _enabled_keys():
@@ -113,6 +113,51 @@ class InsertSourcesTest(TestCase):
         existing.refresh_from_db()
         self.assertIsNotNone(existing.collection)
         self.assertEqual(existing.collection.name, cfg["collection_name"])
+
+    def test_insert_sources_creates_collections_unpublished(self):
+        # The plain-deployment update process (etc/deploy-plain/update-app.sh)
+        # runs `--insert-sources` on every update, and on a fresh database that
+        # (re-)creates every built-in collection. New collections must start
+        # unpublished so they are not exposed to anonymous users / sitemaps
+        # before an operator reviews and publishes them explicitly.
+        call_command("harvest_sources", "--insert-sources", "--include-disabled", stdout=StringIO())
+
+        published = Collection.objects.filter(is_published=True)
+        self.assertFalse(
+            published.exists(),
+            f"--insert-sources must not auto-publish collections; published: {list(published)}",
+        )
+
+    def test_insert_sources_preserves_collection_publish_status(self):
+        # Regression guard for the plain-deployment update process: a collection
+        # an operator has published must stay published across re-runs, and an
+        # unpublished one must stay unpublished. is_published lives in
+        # get_or_create's `defaults`, so it is only applied at creation — never
+        # on subsequent runs.
+        call_command("harvest_sources", "--insert-sources", stdout=StringIO())
+
+        # Collections are created unpublished; an operator publishes one.
+        cfg = SOURCE_CONFIG["mountain-wetlands"]
+        collection = Collection.objects.get(name=cfg["collection_name"])
+        self.assertFalse(collection.is_published)
+        collection.is_published = True
+        collection.save(update_fields=["is_published"])
+
+        # A later deployment re-runs the insert step.
+        call_command("harvest_sources", "--insert-sources", stdout=StringIO())
+
+        collection.refresh_from_db()
+        self.assertTrue(
+            collection.is_published,
+            "Operator-published collection must survive a deployment --insert-sources re-run",
+        )
+
+        # And the inverse: an admin re-unpublishing it is also preserved.
+        collection.is_published = False
+        collection.save(update_fields=["is_published"])
+        call_command("harvest_sources", "--insert-sources", stdout=StringIO())
+        collection.refresh_from_db()
+        self.assertFalse(collection.is_published)
 
     def test_insert_sources_warns_about_non_oai_feeds(self):
         # SOURCE_CONFIG includes RSS (scientific-data) and crossref-prefix (copernicus);

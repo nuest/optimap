@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`harvest_sources --insert-sources` now creates collections unpublished.** Bootstrapping/re-inserting the built-in sources used to mark every auto-created `Collection` as published, which meant the `--insert-sources` step in the plain-deployment update process (`etc/deploy-plain/update-app.sh`, run on every deployment) would re-expose all built-in collections on a fresh database before anyone reviewed them. New collections now start unpublished (matching the model default and the harvest-time auto-create path), so an operator publishes each one explicitly in the admin. Re-running `--insert-sources` already never changed an existing collection's publish status, and that is now covered by a regression test; existing published collections are unaffected.
 - The **Source:** item on the work landing page now links to the internal source landing page (`/in/<slug>/`) instead of the source's external homepage, keeping users within OPTIMAP (the internal page itself links out to the homepage). Falls back to the external homepage link only when the source has no slug.
 
 ### Fixed

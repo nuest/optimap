@@ -577,6 +577,19 @@ def _get_or_create_collection(config):
     ``Collection.description`` both on creation and on every subsequent call
     (e.g. ``--insert-sources`` re-runs), so the description stays current
     without requiring a manual admin edit.
+
+    New collections start **unpublished** (matching the model default and the
+    harvest-time auto-create path in ``works/harvesting/common.py``): an
+    operator curates the name/description and flips ``is_published`` when the
+    collection is ready to be public. The deployment update process re-runs
+    ``--insert-sources`` on every update, so auto-publishing here would re-expose
+    every built-in collection on a fresh database before anyone has reviewed it.
+
+    Every other field — in particular ``is_published`` — lives only in
+    ``defaults`` and is therefore applied **once, at creation**. Re-runs must
+    not clobber admin/curator-managed state, so a collection an operator has
+    published (or unpublished) stays that way across updates. The description
+    save below is scoped with ``update_fields`` to keep that guarantee.
     """
     name = config.get("collection_name")
     if not name:
@@ -589,7 +602,8 @@ def _get_or_create_collection(config):
             "name": name,
             "description": description,
             "homepage_url": config.get("homepage_url") or None,
-            "is_published": True,
+            # Start unpublished; an admin reviews and publishes explicitly.
+            "is_published": False,
         },
     )
     if not created and description and collection.description != description:
