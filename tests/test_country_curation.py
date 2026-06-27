@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.gis.geos import GeometryCollection, MultiPolygon, Point, Polygon
+from django.core.cache import caches
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
@@ -22,6 +23,7 @@ def _box(minx, miny, maxx, maxy):
 
 class _Base(TestCase):
     def setUp(self):
+        caches["memory"].clear()
         User = get_user_model()
         self.staff = User.objects.create_user(username="staff", email="staff@example.org", password="x", is_staff=True)
         self.user = User.objects.create_user(username="joe", email="joe@example.org", password="x")

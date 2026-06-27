@@ -32,6 +32,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
+from django.views.decorators.cache import cache_page, never_cache
 from django.views.decorators.http import require_POST
 from django_q.humanhash import humanize as humanize_task_id
 from django_q.tasks import async_task
@@ -464,29 +465,43 @@ def countries_overview(request):
     Staff additionally see a collapsible curation section listing works that
     could not be matched to a country (#261).
     """
+    if request.user.is_staff:
+        return _countries_staff(request)
+    return _countries_anonymous(request)
+
+
+def _countries_context(request):
     page_url = reverse("optimap:countries")
-    meta = build_facet_page_meta(
-        request,
-        title="Countries — OPTIMAP",
-        description="Browse research works by country, grouped by continent.",
-        page_url=page_url,
-    )
-    context = {
+    return {
         "groups": _countries_by_continent(),
         "country_simplification_tolerance": getattr(settings, "COUNTRY_SIMPLIFICATION_TOLERANCE", 0.05),
-        "meta": meta,
+        "meta": build_facet_page_meta(
+            request,
+            title="Countries — OPTIMAP",
+            description="Browse research works by country, grouped by continent.",
+            page_url=page_url,
+        ),
         "canonical_url": request.build_absolute_uri(page_url),
     }
-    if request.user.is_staff:
-        page_obj, page_size = paginate_works(request, _unmatched_works_qs())
-        context.update(
-            {
-                "page_obj": page_obj,
-                "page_size": page_size,
-                "page_size_options": settings.WORKS_PAGE_SIZE_OPTIONS,
-                "country_options": list(Country.objects.real().values("iso_code", "name").order_by("name")),
-            }
-        )
+
+
+@cache_page(settings.PAGE_CACHE_SHORT, cache="memory")
+def _countries_anonymous(request):
+    return render(request, "countries.html", _countries_context(request))
+
+
+@never_cache
+def _countries_staff(request):
+    context = _countries_context(request)
+    page_obj, page_size = paginate_works(request, _unmatched_works_qs())
+    context.update(
+        {
+            "page_obj": page_obj,
+            "page_size": page_size,
+            "page_size_options": settings.WORKS_PAGE_SIZE_OPTIONS,
+            "country_options": list(Country.objects.real().values("iso_code", "name").order_by("name")),
+        }
+    )
     return render(request, "countries.html", context)
 
 

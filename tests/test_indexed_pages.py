@@ -6,7 +6,7 @@
 import datetime
 
 from django.contrib.gis.geos import GeometryCollection, MultiPolygon, Point, Polygon
-from django.core.cache import cache
+from django.core.cache import cache, caches
 from django.test import Client, TestCase
 from django.urls import reverse
 
@@ -21,6 +21,7 @@ class PlacePageTests(TestCase):
     def setUp(self):
         self.client = Client()
         cache.clear()
+        caches["memory"].clear()
         self.germany = Country.objects.create(
             name="Germany", iso_code="DE", continent="Europe", geom=MultiPolygon(_square(10, 51))
         )
@@ -86,6 +87,7 @@ class PlacePageTests(TestCase):
         Work.objects.create(status="p", title="AU tagged 2").countries.add(australia)
         Work.objects.create(status="p", title="In-continent only", geometry=GeometryCollection(Point(134, -25)))
         cache.clear()
+        caches["memory"].clear()
         resp = self.client.get("/at/australia/")
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "AU tagged")
@@ -99,6 +101,7 @@ class PlacePageTests(TestCase):
         self.assertEqual(_flag_emoji("XK"), "")  # Kosovo: no flag emoji
         Country.objects.create(name="Kosovo", iso_code="XK", continent="Europe", geom=MultiPolygon(_square(21, 42)))
         cache.clear()
+        caches["memory"].clear()
         resp = self.client.get(reverse("optimap:countries"))
         self.assertContains(resp, "\U0001f1e9\U0001f1ea")  # Germany flag present
         self.assertContains(resp, "Kosovo")  # listed without a flag
@@ -106,6 +109,7 @@ class PlacePageTests(TestCase):
     def test_zero_work_country_not_clickable(self):
         Country.objects.create(name="Tuvalu", iso_code="TV", continent="Oceania", geom=MultiPolygon(_square(178, -8)))
         cache.clear()
+        caches["memory"].clear()
         resp = self.client.get(reverse("optimap:countries"))
         self.assertContains(resp, "Tuvalu")
         self.assertNotContains(resp, "/at/tuvalu/")  # no link for 0-work country
@@ -115,6 +119,7 @@ class PlaceIndexTests(TestCase):
     def setUp(self):
         self.client = Client()
         cache.clear()
+        caches["memory"].clear()
         Country.objects.create(name="Germany", iso_code="DE", continent="Europe", geom=MultiPolygon(_square(10, 51)))
         Country.objects.create(name="Kenya", iso_code="KE", continent="Africa", geom=MultiPolygon(_square(37, 0)))
 
@@ -143,6 +148,7 @@ class PlaceIndexTests(TestCase):
             geom=MultiPolygon(_square(10, 50, 30)),
         )
         cache.clear()
+        caches["memory"].clear()
         resp = self.client.get(reverse("optimap:countries"))
         self.assertContains(resp, "/regions/continent/europe/")
 
@@ -151,6 +157,7 @@ class YearPageTests(TestCase):
     def setUp(self):
         self.client = Client()
         cache.clear()
+        caches["memory"].clear()
         # Temporal coverage 2018–2020, but published in 2023 — proves data-year matching.
         self.covered = Work.objects.create(
             status="p",
@@ -167,12 +174,14 @@ class YearPageTests(TestCase):
 
     def test_publication_year_without_coverage_is_empty(self):
         cache.clear()
+        caches["memory"].clear()
         resp = self.client.get(reverse("optimap:during-year", kwargs={"year": 2023}))
         self.assertEqual(resp.status_code, 200)
         self.assertNotContains(resp, "Spanning study")
 
     def test_empty_in_range_year_is_200(self):
         cache.clear()
+        caches["memory"].clear()
         resp = self.client.get(reverse("optimap:during-year", kwargs={"year": 1990}))
         self.assertEqual(resp.status_code, 200)
 
@@ -185,6 +194,7 @@ class TopicPageTests(TestCase):
     def setUp(self):
         self.client = Client()
         cache.clear()
+        caches["memory"].clear()
         Work.objects.create(status="p", title="RS work", topics=["Remote Sensing"])
         Work.objects.create(status="p", title="Hydro work", topics=["Hydrology"])
 
@@ -203,6 +213,7 @@ class BrowsePageTests(TestCase):
     def setUp(self):
         self.client = Client()
         cache.clear()
+        caches["memory"].clear()
         self.source = Source.objects.create(name="Browsable Journal", url_field="https://e.org/oai")
         Work.objects.create(
             status="p",
@@ -225,6 +236,7 @@ class BrowsePageTests(TestCase):
 class IndexedSitemapTests(TestCase):
     def setUp(self):
         cache.clear()
+        caches["memory"].clear()
         self.source = Source.objects.create(name="Sitemap Source", url_field="https://e.org/oai")
         germany = Country.objects.create(name="Germany", iso_code="DE", geom=MultiPolygon(_square(10, 51)))
         work = Work.objects.create(

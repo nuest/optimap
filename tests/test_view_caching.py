@@ -106,6 +106,11 @@ class StaticPageCacheTests(TestCase):
         url = reverse("optimap:feeds")
         self._hits_cache_on_second_request(url)
 
+    def test_countries_uses_cache_page(self):
+        # countries reads Country. Empty fixture is fine — page renders.
+        url = reverse("optimap:countries")
+        self._hits_cache_on_second_request(url)
+
     def test_robots_uses_cache_page(self):
         url = "/robots.txt"
         # robots.txt builds region lists; should still cache.
@@ -250,6 +255,57 @@ class CacheControlHeaderTests(TestCase):
         r = self.client.get(reverse("optimap:feeds"))
         self.assertEqual(r.status_code, 200)
         self._assert_max_age_and_expires(r, 3600)
+
+    def test_countries_advertises_1h_max_age(self):
+        r = self.client.get(reverse("optimap:countries"))
+        self.assertEqual(r.status_code, 200)
+        self._assert_max_age_and_expires(r, 3600)
+
+    def test_logged_in_non_staff_feeds_advertises_1h_max_age(self):
+        """Regular (non-staff) logged-in users take the same cached path as anonymous."""
+        user = User.objects.create_user(username="regularfeeds", email="rf@example.test", password="x")
+        self.client.force_login(user)
+        r = self.client.get(reverse("optimap:feeds"))
+        self.assertEqual(r.status_code, 200)
+        self._assert_max_age_and_expires(r, 3600)
+
+    def test_logged_in_non_staff_countries_advertises_1h_max_age(self):
+        """Regular (non-staff) logged-in users take the same cached path as anonymous."""
+        user = User.objects.create_user(username="regularcountries", email="rc@example.test", password="x")
+        self.client.force_login(user)
+        r = self.client.get(reverse("optimap:countries"))
+        self.assertEqual(r.status_code, 200)
+        self._assert_max_age_and_expires(r, 3600)
+
+    def test_staff_feeds_no_public_cache(self):
+        """Staff requests hit the uncached path — response must be marked private/no-cache."""
+        staff = User.objects.create_user(
+            username="feedsstaff", email="feedsstaff@example.test", password="x", is_staff=True
+        )
+        self.client.force_login(staff)
+        r = self.client.get(reverse("optimap:feeds"))
+        self.assertEqual(r.status_code, 200)
+        cache_control = r.get("Cache-Control", "")
+        directives = {d.strip().split("=")[0] for d in cache_control.split(",")}
+        self.assertTrue(
+            directives & {"private", "no-cache"},
+            f"Staff /feeds/ response should be private/no-cache, got: {cache_control!r}",
+        )
+
+    def test_staff_countries_no_public_cache(self):
+        """Staff requests hit the uncached path — response must be marked private/no-cache."""
+        staff = User.objects.create_user(
+            username="countriesstaff", email="countriesstaff@example.test", password="x", is_staff=True
+        )
+        self.client.force_login(staff)
+        r = self.client.get(reverse("optimap:countries"))
+        self.assertEqual(r.status_code, 200)
+        cache_control = r.get("Cache-Control", "")
+        directives = {d.strip().split("=")[0] for d in cache_control.split(",")}
+        self.assertTrue(
+            directives & {"private", "no-cache"},
+            f"Staff /countries/ response should be private/no-cache, got: {cache_control!r}",
+        )
 
     def test_sitemap_page_advertises_1h_max_age(self):
         r = self.client.get(reverse("optimap:sitemap-page"))

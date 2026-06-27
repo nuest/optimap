@@ -277,50 +277,52 @@ def custom_500(request):
     return render(request, "500.html", status=500)
 
 
-# Not cached with @cache_page: the page now carries a staff-only curation section,
-# and cache_page keys only on URL (not user), so a cached staff render would leak
-# to anonymous visitors. Mirrors countries_overview, which is likewise uncached.
 def feeds(request):
+    if request.user.is_staff:
+        return _feeds_staff(request)
+    return _feeds_anonymous(request)
+
+
+@cache_page(settings.PAGE_CACHE_SHORT, cache="memory")
+def _feeds_anonymous(request):
+    return _feeds_render(request)
+
+
+@never_cache
+def _feeds_staff(request):
+    from works.utils.pagination import paginate_works
+    from works.views_regions import unmatched_regions_qs
+
+    context = _feeds_context()
+    page_obj, page_size = paginate_works(request, unmatched_regions_qs())
+    context.update(
+        {
+            "page_obj": page_obj,
+            "page_size": page_size,
+            "page_size_options": settings.WORKS_PAGE_SIZE_OPTIONS,
+            "region_options": [
+                {"id": r.id, "name": r.name, "type": r.get_region_type_display()}
+                for r in GlobalRegion.objects.order_by("region_type", "name")
+            ],
+        }
+    )
+    return render(request, "feeds.html", context)
+
+
+def _feeds_render(request):
+    return render(request, "feeds.html", _feeds_context())
+
+
+def _feeds_context():
     global_feeds = [
         {"title": "Geo RSS", "url": reverse("optimap:api-feed-georss")},
         {"title": "Atom", "url": reverse("optimap:api-feed-atom")},
     ]
-
-    regions = GlobalRegion.objects.all().order_by("region_type", "name")
-
-    # Add normalized slugs to regions for URL generation
     regions_with_slugs = []
-    for region in regions:
-        slug = normalize_region_slug(region.name)
-        region.normalized_slug = slug
+    for region in GlobalRegion.objects.all().order_by("region_type", "name"):
+        region.normalized_slug = normalize_region_slug(region.name)
         regions_with_slugs.append(region)
-
-    context = {
-        "global_feeds": global_feeds,
-        "regions": regions_with_slugs,
-    }
-
-    # Staff see a collapsible curation section for works that have a geometry but
-    # could not be matched to any region (the sliver gaps between continent and
-    # ocean outlines at coastlines). Mirrors the country curation on /countries/.
-    if request.user.is_staff:
-        from works.utils.pagination import paginate_works
-        from works.views_regions import unmatched_regions_qs
-
-        page_obj, page_size = paginate_works(request, unmatched_regions_qs())
-        context.update(
-            {
-                "page_obj": page_obj,
-                "page_size": page_size,
-                "page_size_options": settings.WORKS_PAGE_SIZE_OPTIONS,
-                "region_options": [
-                    {"id": r.id, "name": r.name, "type": r.get_region_type_display()}
-                    for r in GlobalRegion.objects.order_by("region_type", "name")
-                ],
-            }
-        )
-
-    return render(request, "feeds.html", context)
+    return {"global_feeds": global_feeds, "regions": regions_with_slugs}
 
 
 @cache_page(settings.PAGE_CACHE_SHORT, cache="memory")
