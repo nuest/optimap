@@ -15,12 +15,14 @@ from typing import Dict, List, Optional, Tuple
 from urllib.parse import quote
 
 import requests
-from django.conf import settings
+
+from works.harvesting.sessions import _openalex_session
 
 logger = logging.getLogger(__name__)
 
 OPENALEX_API_BASE = "https://api.openalex.org"
-REQUEST_DELAY = 0.1  # 100ms delay between requests to be polite
+REQUEST_DELAY = 0.1  # 100ms between requests
+_VERSIONED_DOI_RE = re.compile(r"^(.+)/v(\d+)$", re.IGNORECASE)
 
 
 class OpenAlexMatcher:
@@ -34,12 +36,10 @@ class OpenAlexMatcher:
     """
 
     def __init__(self):
-        self.session = requests.Session()
-        self.session.headers.update({"User-Agent": settings.OPTIMAP_USER_AGENT, "Accept": "application/json"})
+        self.session = _openalex_session()
         self.last_request_time = 0
 
     def _rate_limit(self):
-        """Implement polite rate limiting."""
         elapsed = time.time() - self.last_request_time
         if elapsed < REQUEST_DELAY:
             time.sleep(REQUEST_DELAY - elapsed)
@@ -56,12 +56,34 @@ class OpenAlexMatcher:
             logger.warning("OpenAlex API request failed: %s", str(e))
             return None
 
+    @staticmethod
+    def _versioned_doi_fallbacks(doi: str) -> List[Tuple[str, str]]:
+        """Return (fallback_doi, label) pairs to try when an exact-DOI lookup fails.
+
+        Handles DOIs with a version suffix like ``/v2``:
+        - Tries the bare DOI (no version) first
+        - Then tries each earlier version number down to v1
+
+        Returns an empty list when the DOI has no version suffix.
+        """
+        m = _VERSIONED_DOI_RE.search(doi)
+        if not m:
+            return []
+        base, version = m.group(1), int(m.group(2))
+        return [(base, "no_version")] + [(f"{base}/v{v}", f"v{v}") for v in range(version - 1, 0, -1)]
+
     def match_by_doi(self, doi: str) -> Optional[Dict]:
         """
-        Exact match by DOI.
+        Exact match by DOI, with automatic version-suffix fallback.
+
+        When the exact DOI fails (e.g. ``10.x/y/v2`` → 404), tries the bare
+        DOI (``10.x/y``) and earlier version numbers (``/v1``, …) before
+        giving up.  A successful fallback match is annotated with a private
+        ``_doi_version_fallback`` key so callers can record the mismatch in
+        provenance (consumed and removed in :meth:`match_publication`).
 
         Args:
-            doi: The DOI string (e.g., "10.1234/example")
+            doi: The DOI string (e.g., "10.1234/example" or "10.1234/example/v2")
 
         Returns:
             OpenAlex work data if found, None otherwise
@@ -81,6 +103,25 @@ class OpenAlexMatcher:
         if data and data.get("id"):
             logger.info("Found OpenAlex match by DOI: %s -> %s", doi, data["id"])
             return data
+
+        # Try version-suffix fallbacks (bare DOI and earlier versions)
+        for fallback_doi, label in self._versioned_doi_fallbacks(doi):
+            fallback_url = f"{OPENALEX_API_BASE}/works/doi:{quote(fallback_doi)}"
+            logger.debug("Trying DOI version fallback (%s): %s", label, fallback_doi)
+            fallback_data = self._make_request(fallback_url)
+            if fallback_data and fallback_data.get("id"):
+                logger.info(
+                    "Found OpenAlex match via DOI version fallback (%s): %s -> %s",
+                    label,
+                    doi,
+                    fallback_data["id"],
+                )
+                # Annotate so match_publication can record this in provenance.
+                fallback_data["_doi_version_fallback"] = {
+                    "queried_doi": doi,
+                    "matched_doi": fallback_doi,
+                }
+                return fallback_data
 
         return None
 
@@ -291,17 +332,19 @@ class OpenAlexMatcher:
         if doi:
             work_data = self.match_by_doi(doi)
             if work_data:
+                # Pop the private fallback annotation before passing to extract.
+                doi_version_fallback = work_data.pop("_doi_version_fallback", None)
                 fields = self.extract_openalex_fields(work_data)
-                match_info = [
-                    {
-                        "openalex_id": work_data.get("id"),
-                        "title": work_data.get("title"),
-                        "doi": work_data.get("doi"),
-                        "match_type": "doi",
-                        "matched": True,
-                    }
-                ]
-                return fields, match_info
+                match_item = {
+                    "openalex_id": work_data.get("id"),
+                    "title": work_data.get("title"),
+                    "doi": work_data.get("doi"),
+                    "match_type": "doi",
+                    "matched": True,
+                }
+                if doi_version_fallback:
+                    match_item.update(doi_version_fallback)
+                return fields, [match_item]
 
         # Strategy 2 & 3: Title-based matching
         exact_match, partial_matches = self.match_by_title_author(title, author)

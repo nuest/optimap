@@ -24,6 +24,10 @@ Schema:
             "matched_id": "https://openalex.org/W123",
             "top_candidate": {...}        # only when unverified
         },
+        # present in metadata_sources when a versioned DOI (e.g. /v2) was not
+        # found in OpenAlex and enrichment fell back to an earlier version:
+        # "openalex_doi_version_fallback": {"queried_doi": "10.x/y/v2",
+        #                                   "matched_doi": "10.x/y/v1"}
         "countries": {                    # offline point-in-polygon join (#261)
             "source": "natural_earth",
             "method": "intersects" | "buffer_snap",

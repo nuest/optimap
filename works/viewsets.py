@@ -251,6 +251,7 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
             "| `publisher` | `openaire` |\n"
             "| `biblio` | `crossref` (volume/issue/pages from Crossref in one batch) |\n"
             "| `openalex_metadata` | `openalex` (any OpenAlex enrichment was applied) |\n"
+            "| `openalex_doi_version_fallback` | `{queried_doi, matched_doi}` dict — present when the work's versioned DOI (e.g. `/v2`) was not found in OpenAlex and enrichment succeeded via the bare DOI or an earlier version (e.g. `/v1`) |\n"
             "| `openalex` | `primary` (work was harvested directly from OpenAlex as the primary source) |\n\n"
             "**`openalex_match` keys:**\n"
             "| Key | Type | Description |\n"

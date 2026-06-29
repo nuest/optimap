@@ -166,19 +166,16 @@ def _crossref_session():
 # OpenAlex --------------------------------------------------------------------
 
 OPENALEX_API_URL = "https://api.openalex.org/works"
-# The mailto in OPTIMAP_USER_AGENT puts us in OpenAlex's polite pool
-# (faster + more reliable than anonymous).
 OPENALEX_USER_AGENT = settings.OPTIMAP_USER_AGENT
 OPENALEX_HTTP_TIMEOUT = 60
 OPENALEX_PAGE_SIZE = 200  # OpenAlex max per page
+# Free API key raises the search-query daily budget 10× ($0.10 → $1.00 ≈ 1 000 searches).
+# Direct DOI lookups (/works/doi:…) are always free. Get a key at openalex.org/settings/api.
+OPENALEX_API_KEY = getattr(settings, "OPTIMAP_OPENALEX_API_KEY", "") or ""
 
 
 def _openalex_session():
-    """Return a `requests.Session` configured with retries and the polite-pool UA.
-
-    The mailto in the User-Agent puts requests in OpenAlex's polite pool
-    (faster + more reliable than anonymous).
-    """
+    """Return a `requests.Session` configured with retries for OpenAlex list queries."""
     session = requests.Session()
     retry = Retry(
         total=4,
@@ -193,6 +190,8 @@ def _openalex_session():
             "Accept": "application/json",
         }
     )
+    if OPENALEX_API_KEY:
+        session.params = {"api_key": OPENALEX_API_KEY}
     return session
 
 

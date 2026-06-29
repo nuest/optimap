@@ -447,6 +447,12 @@ WIKIBASE_USER_AGENT = f"OPTIMAP/{optimap.__version__} (http://optimap.science; {
 # 90s accommodates slow endpoints (e.g. EarthArXiv ListRecords takes >30s for full history)
 OPTIMAP_OAI_HTTP_TIMEOUT = int(os.getenv("OPTIMAP_OAI_HTTP_TIMEOUT", 90))
 
+# OpenAlex API key — raises the daily search-query budget from $0.10 (≈100 searches) to
+# $1.00 (≈1 000 searches) at no cost. Get a free key at https://openalex.org/settings/api.
+# Direct DOI lookups are always free and unaffected; only title/author fallback searches
+# count against the budget, so this matters most during large harvest runs.
+OPTIMAP_OPENALEX_API_KEY = env("OPTIMAP_OPENALEX_API_KEY", default="")
+
 # OpenAIRE enrichment settings (second metadata enrichment source besides OpenAlex).
 # Anonymous access is limited to 60 requests/hour; set OPTIMAP_OPENAIRE_TOKEN
 # (a personal access token from https://develop.openaire.eu/personal-token) to

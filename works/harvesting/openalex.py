@@ -79,6 +79,15 @@ def build_openalex_fields(title, doi=None, author=None, existing_metadata=None):
                     openalex_fields[biblio_key] = openalex_data[biblio_key]
                     metadata_provenance[biblio_key] = "openalex"
 
+            # Record DOI version fallback so provenance reflects the mismatch.
+            if partial_matches:
+                first_match = partial_matches[0]
+                if first_match.get("queried_doi"):
+                    metadata_provenance["openalex_doi_version_fallback"] = {
+                        "queried_doi": first_match["queried_doi"],
+                        "matched_doi": first_match.get("matched_doi"),
+                    }
+
             metadata_provenance["openalex_metadata"] = "openalex"
 
         elif partial_matches:
