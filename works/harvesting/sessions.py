@@ -169,9 +169,27 @@ OPENALEX_API_URL = "https://api.openalex.org/works"
 OPENALEX_USER_AGENT = settings.OPTIMAP_USER_AGENT
 OPENALEX_HTTP_TIMEOUT = 60
 OPENALEX_PAGE_SIZE = 200  # OpenAlex max per page
-# Free API key raises the search-query daily budget 10× ($0.10 → $1.00 ≈ 1 000 searches).
-# Direct DOI lookups (/works/doi:…) are always free. Get a key at openalex.org/settings/api.
-OPENALEX_API_KEY = getattr(settings, "OPTIMAP_OPENALEX_API_KEY", "") or ""
+
+
+def get_openalex_api_key() -> str:
+    """Return the OpenAlex API key, preferring the DB ServiceToken over the env var.
+
+    The key can be stored in two places (DB takes precedence):
+    - Django admin → Service tokens → OpenAlex API (``refresh_token`` field).
+    - ``OPTIMAP_OPENALEX_API_KEY`` environment variable / ``.env`` file.
+
+    The DB lookup is wrapped in a try/except so this is safe to call during
+    tests and management commands where the DB may not be fully available.
+    """
+    try:
+        from works.models import ServiceToken
+
+        row = ServiceToken.objects.filter(service=ServiceToken.OPENALEX).first()
+        if row and row.refresh_token:
+            return row.refresh_token
+    except Exception:
+        pass
+    return getattr(settings, "OPTIMAP_OPENALEX_API_KEY", "") or ""
 
 
 def _openalex_session():
@@ -190,8 +208,9 @@ def _openalex_session():
             "Accept": "application/json",
         }
     )
-    if OPENALEX_API_KEY:
-        session.params = {"api_key": OPENALEX_API_KEY}
+    api_key = get_openalex_api_key()
+    if api_key:
+        session.params = {"api_key": api_key}
     return session
 
 

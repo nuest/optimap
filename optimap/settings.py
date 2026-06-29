@@ -451,6 +451,8 @@ OPTIMAP_OAI_HTTP_TIMEOUT = int(os.getenv("OPTIMAP_OAI_HTTP_TIMEOUT", 90))
 # $1.00 (≈1 000 searches) at no cost. Get a free key at https://openalex.org/settings/api.
 # Direct DOI lookups are always free and unaffected; only title/author fallback searches
 # count against the budget, so this matters most during large harvest runs.
+# The key can also be stored in the Django admin under Service tokens → OpenAlex API
+# (paste into the "Refresh token" field); the DB value takes precedence over this env var.
 OPTIMAP_OPENALEX_API_KEY = env("OPTIMAP_OPENALEX_API_KEY", default="")
 
 # OpenAIRE enrichment settings (second metadata enrichment source besides OpenAlex).
@@ -607,6 +609,7 @@ TEMPLATES = [
                 "optimap.urls.site",
                 "optimap.context_processors.get_version",
                 "optimap.context_processors.gazetteer_settings",
+                "optimap.context_processors.basemap_settings",
             ],
         },
     },

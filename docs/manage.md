@@ -247,7 +247,12 @@ python manage.py dedup_works --async          # enqueue works.tasks.dedup_sweep 
 
 The default run **populates `Work.locations` on every record with an OpenAlex id** (re-fetching the OpenAlex payload, rate-limited), not only duplicates. Progress is reported per work and per merged group (to the terminal for the sync command, to the Django-Q worker log for `--async`). Set `OPTIMAP_DEDUP_AUTO_MERGE=False` to capture/expose locations without auto-merging. This is separate from **enrichment** sources (OpenAlex/OpenAIRE) which fill empty fields; see [OpenAIRE enrichment](#openaire-enrichment).
 
-**OpenAlex rate limits & API key.** Direct DOI lookups (`/works/doi:…`) are always free. Title/author fallback searches (used when a DOI is missing or not found) count against a daily budget: ≈ 100 searches anonymous, ≈ 1 000 with a free API key. During large harvest runs or a full `dedup_works` backfill, the anonymous budget can be exhausted, producing silent 429 errors that drop enrichment for affected works — those will have `openalex_id = NULL`. Set `OPTIMAP_OPENALEX_API_KEY` (free key from <https://openalex.org/settings/api>) to raise the budget 10×. Works that lost enrichment can be recovered with `python manage.py harvest_sources --source <id> --update` or the per-work Re-harvest button once the key is configured.
+**OpenAlex rate limits & API key.** Direct DOI lookups (`/works/doi:…`) are always free. Title/author fallback searches (used when a DOI is missing or not found) count against a daily budget: ≈ 100 searches anonymous, ≈ 1 000 with a free API key. During large harvest runs or a full `dedup_works` backfill, the anonymous budget can be exhausted, producing silent 429 errors that drop enrichment for affected works — those will have `openalex_id = NULL`. Get a free key at <https://openalex.org/settings/api> and supply it in one of two ways (the DB value takes precedence over the env var):
+
+- **Django admin** (recommended for running instances): **Django admin → Service tokens → add** an *OpenAlex API* row and paste the key into the **Refresh token** field. No restart required.
+- **Environment variable / `.env`**: set `OPTIMAP_OPENALEX_API_KEY=<key>` before starting the server.
+
+Works that lost enrichment can be recovered with `python manage.py harvest_sources --source <id> --update` or the per-work Re-harvest button once the key is configured.
 
 **Un-merge (reverse a merge).** Merges are reversible. In the **Django admin → Works**, filter the list by status **Redirected**, select the wrongly-merged duplicate(s), and run the **"Un-merge (re-promote redirected duplicates)"** action: each tombstone returns to status **Harvested** and is detached from its canonical work's `provenance.dedup`. (Equivalent in a shell: `from works.dedup import unmerge; unmerge(work)`.) To inspect a merged-away duplicate without un-merging it, open it from the Redirected-filtered admin list or pass `?include=redirected` to the API.
 
@@ -835,6 +840,45 @@ OPTIMAP can block specific email addresses and entire domains from registering o
 2. **Block users via an admin action.** Go to `/admin/auth/user/`, select the offending users, and pick **"Delete user and block email"** or **"Delete user and block email and domain"** from the **Action** dropdown. The user row is deleted and the corresponding blocklist entry is created in the same action.
 
 The blocklist is consulted at signup and at magic-link login time; blocked entries are rejected before any email is sent.
+
+## Manage base map layers
+
+OPTIMAP's Leaflet maps show a layer switcher that lets visitors choose a background tile layer.
+The available layers are managed in the Django admin under **Works → Base map layers**.
+
+### Enable or disable a layer
+
+1. Go to **Admin → Works → Base map layers**.
+2. Toggle **Enabled** for any row in the inline list (the `list_editable` table).
+3. Save — the change is cached for up to 5 minutes and then live on all pages.
+
+### Set the default layer
+
+Check **Is default** on exactly one enabled row.  The admin enforces this:
+saving a row as default automatically un-sets the flag on any other enabled row.
+If no enabled row has the flag, `createBaseMap` falls back to the first enabled row.
+
+### Supply an API key
+
+Some providers (e.g. `Stadia.*`, `MapTiler.*`, `HERE.*`) require an API key.
+
+1. Add a row (or edit the existing disabled row) for the provider.
+2. Put `{"apiKey": "your-key-here"}` (or `{"key": "…"}` — check the provider's leaflet-providers docs) in the **Options** field.
+3. Enable the row.
+
+**Important:** enabling a tile provider whose tile URLs are served by a third-party
+always requires a matching privacy-policy paragraph.  The four default providers
+(OpenStreetMap, CARTO, Esri, OpenTopoMap) are already covered in `privacy.html`.
+For any new provider, add a paragraph in the same file before enabling the layer.
+
+### Available provider keys
+
+Provider keys follow the [leaflet-providers.js](https://leaflet-extras.github.io/leaflet-providers/preview/) convention: `Namespace.Variant` (e.g. `Stadia.AlidadeSmooth`, `Esri.WorldTopoMap`).
+The vendored file is at `works/static/js/leaflet-providers.js`; pin the version comment at the top when you update it.
+
+### Reorder layers
+
+Set the **Order** field (lower numbers appear first in the switcher) and save.
 
 ## Operate the Django-Q cluster
 

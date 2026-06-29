@@ -633,6 +633,79 @@ class BlockedDomain(models.Model):
         return self.domain
 
 
+class BaseMapLayer(models.Model):
+    """Admin-configurable background tile layers for all Leaflet maps.
+
+    Each row corresponds to a provider key in the vendored leaflet-providers.js
+    plugin (e.g. ``OpenStreetMap.Mapnik``, ``CartoDB.Voyager``).  Enabled layers
+    are exposed to JavaScript via the ``#optimap-basemaps`` json_script; the
+    ``createBaseMap`` factory reads them and builds an ``L.control.layers``
+    switcher.
+
+    Exactly one enabled row should have ``is_default=True`` (enforced by the
+    admin).  ``enabled_layers()`` falls back to the first enabled row when none
+    is marked as default.
+    """
+
+    provider_key = models.CharField(
+        max_length=100,
+        unique=True,
+        help_text="leaflet-providers.js id, e.g. 'OpenStreetMap.Mapnik', 'CartoDB.Voyager'.",
+    )
+    label = models.CharField(
+        max_length=100,
+        help_text="Display name shown in the map layer switcher.",
+    )
+    enabled = models.BooleanField(
+        default=False,
+        help_text="Show this layer in the switcher for all visitors.",
+    )
+    is_default = models.BooleanField(
+        default=False,
+        help_text="Layer shown on initial map load.  Exactly one enabled layer should be default.",
+    )
+    order = models.PositiveIntegerField(
+        default=0,
+        help_text="Position in the layer switcher (lower = earlier).",
+    )
+    options = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Extra options passed to L.tileLayer.provider(key, options), e.g. {'apiKey': '…'}.",
+    )
+
+    class Meta:
+        ordering = ["order", "label"]
+
+    def __str__(self):
+        return f"{self.label} ({self.provider_key})"
+
+    @classmethod
+    def enabled_layers(cls):
+        """Return enabled layers ordered by (order, label), guaranteeing one default.
+
+        If no enabled layer has ``is_default=True``, the first enabled row is
+        treated as the default in the serialized output.
+        """
+        layers = list(cls.objects.filter(enabled=True).order_by("order", "label"))
+        if not layers:
+            return []
+        has_default = any(l.is_default for l in layers)
+        result = []
+        first = True
+        for layer in layers:
+            result.append(
+                {
+                    "provider_key": layer.provider_key,
+                    "label": layer.label,
+                    "default": layer.is_default if has_default else first,
+                    "options": layer.options or {},
+                }
+            )
+            first = False
+        return result
+
+
 class GlobalRegion(models.Model):
     CONTINENT = "C"
     OCEAN = "O"
@@ -1259,7 +1332,11 @@ class ServiceToken(models.Model):
     """
 
     OPENAIRE = "openaire"
-    SERVICE_CHOICES = [(OPENAIRE, "OpenAIRE Graph API")]
+    OPENALEX = "openalex"
+    SERVICE_CHOICES = [
+        (OPENAIRE, "OpenAIRE Graph API"),
+        (OPENALEX, "OpenAlex API"),
+    ]
 
     # Refresh the cached access token slightly before it actually expires.
     ACCESS_TOKEN_SKEW_SECONDS = 60
@@ -1306,8 +1383,9 @@ class ServiceToken(models.Model):
         if not self.refresh_token_set_at:
             return None
         spec = self.spec
-        days = spec.lifetime_days if spec else 30
-        return self.refresh_token_set_at + timedelta(days=days)
+        if spec is None:
+            return None  # Key with no registered spec is treated as non-expiring.
+        return self.refresh_token_set_at + timedelta(days=spec.lifetime_days)
 
     def days_until_refresh_expiry(self):
         expires = self.refresh_token_expires_at
