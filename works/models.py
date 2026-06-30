@@ -479,6 +479,27 @@ class Work(models.Model):
             # If there's any error calculating extremes, return None
             return None
 
+    def save(self, *args, **kwargs):
+        # Repair a topologically invalid geometry (e.g. a self-intersecting
+        # polygon from harvested HTML) before it is written, so it can't later
+        # crash a GEOS predicate during save, a spatial query, or an export.
+        # Covers harvesting too, since every harvester ultimately calls save().
+        from works.utils.geometry import repair_geometry
+        from works.utils.provenance import append_event
+
+        update_fields = kwargs.get("update_fields")
+        geometry_written = update_fields is None or "geometry" in update_fields
+        if geometry_written and self.geometry is not None:
+            repaired = repair_geometry(self.geometry)
+            if repaired is not self.geometry:
+                # The geometry was topologically invalid and has been repaired;
+                # record it so the change of stored coordinates is auditable.
+                self.geometry = repaired
+                append_event(self, "geometry_repair", method="make_valid")
+                if update_fields is not None:
+                    kwargs["update_fields"] = set(update_fields) | {"provenance"}
+        super().save(*args, **kwargs)
+
 
 class Subscription(models.Model):
     NOTIFICATION_INTERVAL_CHOICES = [

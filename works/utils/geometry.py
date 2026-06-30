@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from django.contrib.gis.db.models.functions import AsGeoJSON
+from django.contrib.gis.geos import GeometryCollection
+from django.contrib.gis.geos.error import GEOSException
 
 # W3C SDW-BP 6: cap coordinate precision so we don't imply sub-meter accuracy
 # that the underlying metadata doesn't support.  5 decimal places ≈ 1.1 m at
@@ -118,6 +120,47 @@ def sanitize_geojson_geometry(obj):
         return {**obj, "features": cleaned_features}, dropped
 
     return obj, 0
+
+
+def repair_geometry(geom):
+    """Return a topologically valid version of *geom*, repairing it if needed.
+
+    A self-intersecting or otherwise invalid geometry (e.g. a "bowtie" polygon)
+    makes GEOS raise ``TopologyException`` from any predicate (``equals``,
+    ``intersects``, …), which can abort a ``Work`` save or break a spatial
+    query downstream. This wraps GEOS ``make_valid`` (PostGIS ``ST_MakeValid``)
+    so the stored geometry is cleaned at the point it is written.
+
+    Returns the input unchanged when it is ``None``, empty, or already valid.
+    On repair, the result is coerced back to a ``GeometryCollection`` (the type
+    of ``Work.geometry``) and the original SRID is restored, since GEOS
+    ``make_valid`` drops it. If the repair itself fails, the original geometry
+    is returned untouched (the save's own guards then apply).
+    """
+    if geom is None or geom.empty:
+        return geom
+    try:
+        if geom.valid:
+            return geom
+    except GEOSException:
+        # Some pathological geometries raise even from `.valid`; fall through
+        # to make_valid, which handles them.
+        pass
+
+    srid = geom.srid
+    try:
+        repaired = geom.make_valid()
+    except GEOSException:
+        # Repair failed — leave the original in place rather than dropping data.
+        return geom
+
+    if repaired is None or repaired.empty:
+        return geom
+    if repaired.geom_type != "GeometryCollection":
+        repaired = GeometryCollection(repaired)
+    if srid is not None:
+        repaired.srid = srid
+    return repaired
 
 
 def annotate_rounded_geometry(

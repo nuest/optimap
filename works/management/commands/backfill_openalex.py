@@ -118,19 +118,29 @@ class Command(BaseCommand):
                     time.sleep(throttle)
                 continue
 
+            if not dry_run:
+                try:
+                    fields_filled, _ = apply_enrichment(work, openalex_fields, "openalex")
+                    # Merge provenance patch into work.provenance.metadata_sources
+                    if provenance_patch:
+                        prov = work.provenance if isinstance(work.provenance, dict) else {}
+                        prov.setdefault("metadata_sources", {}).update(provenance_patch)
+                        work.provenance = prov
+                    work.save()
+                except Exception as exc:
+                    # One bad record (e.g. an invalid stored geometry that GEOS
+                    # rejects on save) must not abort the whole batch.
+                    failed += 1
+                    logger.error("backfill_openalex: saving work %s failed: %s", work.id, exc)
+                    self.stderr.write(self.style.ERROR(f"  ✗ [{work.id}] save failed: {exc}"))
+                    if throttle:
+                        time.sleep(throttle)
+                    continue
+
             matched += 1
             self.stdout.write(
                 self.style.SUCCESS(f"  ✓ [{work.id}] {work.title[:60]} → {openalex_fields['openalex_id']}")
             )
-
-            if not dry_run:
-                fields_filled, _ = apply_enrichment(work, openalex_fields, "openalex")
-                # Merge provenance patch into work.provenance.metadata_sources
-                if provenance_patch:
-                    prov = work.provenance if isinstance(work.provenance, dict) else {}
-                    prov.setdefault("metadata_sources", {}).update(provenance_patch)
-                    work.provenance = prov
-                work.save()
 
             if throttle:
                 time.sleep(throttle)

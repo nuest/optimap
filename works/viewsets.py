@@ -307,6 +307,7 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
             "| `openaire_enrich` | `openaire_id`, `doi`, `source_url`, `fields_filled` (array), `fields_offered_not_applied` (array) | OpenAIRE enrichment ran; `fields_filled` were empty and were populated, `fields_offered_not_applied` had an OpenAIRE value but a value already existed (kept under the fill-if-empty policy) |\n"
             '| `country_curation` | `decision` (`assigned`/`excluded`), `iso_codes` (array, for `assigned`), `user_id`\\*, `user_email`\\* | Staff manually assigned one or more countries, or marked the work "will not be matched", on the /countries curation section |\n'
             '| `region_curation` | `decision` (`assigned`/`excluded`), `regions` (array, for `assigned`), `region` (single-region path only), `user_id`\\*, `user_email`\\* | Staff manually assigned one or more global regions, or marked the work "will not be matched", on the /regions curation section |\n\n'
+            "| `geometry_repair` | `method` (`make_valid`) | A topologically invalid stored geometry was repaired with GEOS `make_valid` (PostGIS `ST_MakeValid`) on save |\n\n"
             "\\* `user_id` and `user_email` are present for staff and curators only.\n\n"
             "**Other top-level keys:**\n"
             "| Key | Type | Description |\n"

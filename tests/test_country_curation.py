@@ -210,6 +210,22 @@ class SignalInvalidationTests(_Base):
         # Provenance reverted to an automated join (no longer manual).
         self.assertEqual(work.provenance["countries"]["source"], "natural_earth")
 
+    def test_save_with_invalid_stored_geometry_does_not_crash(self):
+        # Defense-in-depth for the track_work_geometry_change signal: a legacy
+        # record whose *stored* geometry is invalid (written before save()-time
+        # repair existed) makes GEOS refuse the equality predicate. Saving such a
+        # record must not raise GEOSException. We bypass Work.save() with a raw
+        # UPDATE to plant the invalid geometry, mirroring a pre-existing row.
+        bowtie = GeometryCollection(Polygon(((0, 0), (1, 1), (1, 0), (0, 1), (0, 0))))
+        work = Work.objects.create(status="p", title="bowtie", geometry=GeometryCollection(Point(-30, 0)))
+        Work.objects.filter(pk=work.pk).update(geometry=bowtie)
+        work = Work.objects.get(pk=work.pk)
+        work.title = "bowtie renamed"
+        work.save()  # must not raise; save() also repairs the geometry
+        work.refresh_from_db()
+        self.assertEqual(work.title, "bowtie renamed")
+        self.assertTrue(work.geometry.valid)
+
     def test_geometry_change_to_ocean_clears_manual_block(self):
         work = Work.objects.create(status="p", title="o", geometry=GeometryCollection(Point(7, 51)))
         self.client.force_login(self.staff)

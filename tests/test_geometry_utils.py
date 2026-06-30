@@ -3,12 +3,14 @@
 
 import json
 
+from django.contrib.gis.geos import GeometryCollection, Point, Polygon
 from django.test import TestCase
 
 from works.models import Source, Work
 from works.utils.geometry import (
     COORDINATE_PRECISION,
     annotate_rounded_geometry,
+    repair_geometry,
     round_geojson_coordinates,
     sanitize_geojson_geometry,
 )
@@ -130,3 +132,41 @@ class AnnotateRoundedGeometryTests(TestCase):
         db_rounded = json.loads(annotated._rounded_geojson)
         python_rounded = round_geojson_coordinates(json.loads(self.work.geometry.geojson))
         self.assertEqual(db_rounded, python_rounded)
+
+
+class RepairGeometryTests(TestCase):
+    def _bowtie(self):
+        # Self-intersecting "bowtie" polygon — topologically invalid.
+        return GeometryCollection(Polygon(((0, 0), (1, 1), (1, 0), (0, 1), (0, 0))), srid=4326)
+
+    def test_returns_none_and_empty_unchanged(self):
+        self.assertIsNone(repair_geometry(None))
+        empty = GeometryCollection(srid=4326)
+        self.assertIs(repair_geometry(empty), empty)
+
+    def test_valid_geometry_returned_unchanged(self):
+        gc = GeometryCollection(Point(7, 51), srid=4326)
+        self.assertIs(repair_geometry(gc), gc)
+
+    def test_invalid_geometry_is_repaired(self):
+        repaired = repair_geometry(self._bowtie())
+        self.assertTrue(repaired.valid)
+        self.assertEqual(repaired.geom_type, "GeometryCollection")
+        self.assertEqual(repaired.srid, 4326)
+
+    def test_work_save_persists_valid_geometry(self):
+        source = Source.objects.create(name="S", url_field="http://example.com")
+        work = Work.objects.create(title="bowtie", source=source, geometry=self._bowtie())
+        work.refresh_from_db()
+        self.assertTrue(work.geometry.valid)
+        self.assertEqual(work.geometry.srid, 4326)
+        # The repair is recorded as a provenance event.
+        events = work.provenance.get("events", [])
+        self.assertTrue(any(e["type"] == "geometry_repair" and e["method"] == "make_valid" for e in events))
+
+    def test_valid_geometry_save_records_no_repair_event(self):
+        source = Source.objects.create(name="S", url_field="http://example.com")
+        work = Work.objects.create(title="ok", source=source, geometry=GeometryCollection(Point(7, 51), srid=4326))
+        work.refresh_from_db()
+        events = work.provenance.get("events", []) if isinstance(work.provenance, dict) else []
+        self.assertFalse(any(e.get("type") == "geometry_repair" for e in events))

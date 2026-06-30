@@ -6,6 +6,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 from django.contrib.auth import get_user_model
+from django.contrib.gis.geos.error import GEOSException
 from django.db.models.signals import pre_delete, pre_save
 from django.dispatch import receiver
 
@@ -164,9 +165,23 @@ def track_work_geometry_change(sender, instance, **kwargs):
         return
     old = sender.objects.filter(pk=instance.pk).values_list("geometry", flat=True).first()
     new = instance.geometry
-    instance._geometry_changed = (old is None) != (new is None) or (
-        old is not None and new is not None and not old.equals(new)
-    )
+    if (old is None) != (new is None):
+        instance._geometry_changed = True
+    elif old is None:  # both None
+        instance._geometry_changed = False
+    else:
+        try:
+            instance._geometry_changed = not old.equals(new)
+        except GEOSException as err:
+            # An invalid geometry (e.g. a self-intersecting polygon) makes GEOS
+            # refuse to evaluate the equality predicate. Don't let that abort the
+            # save; treat it as changed so automated country matching re-runs.
+            logger.warning(
+                "geometry equality check failed for work %s (%s); treating as changed",
+                instance.pk,
+                err,
+            )
+            instance._geometry_changed = True
 
 
 @receiver(post_save, sender=_Work)
