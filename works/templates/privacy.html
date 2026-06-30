@@ -39,6 +39,64 @@
       of displaying the map functions to the users of the website for interactive exploration of the presented datasets.
     </p>
 
+    {% if basemap_vendor_groups.carto %}
+    <p>This website also uses map background layers provided by CARTO, Inc.
+      (40 Wall St, 28th Floor, New York, NY 10005, USA).
+      When a CARTO base layer is active, your browser connects to CARTO's tile servers.
+      The operator of this site has no control over such connections and the processing of your data by CARTO.
+      You can find more information in the <a href="https://carto.com/privacy/">CARTO privacy policy</a>.
+      CARTO tile layers are used exclusively for the legitimate interest (cf. article 6.1f of the GDPR)
+      of providing internationalized map labels for the interactive exploration of research datasets.
+    </p>
+    {% endif %}
+
+    {% if basemap_vendor_groups.esri %}
+    <p>This website also uses map background layers provided by Esri
+      (Environmental Systems Research Institute, Inc., 380 New York Street, Redlands, CA 92373, USA).
+      When an Esri base layer is active, your browser connects to Esri's tile servers.
+      The operator of this site has no control over such connections and the processing of your data by Esri.
+      You can find more information in the <a href="https://www.esri.com/en-us/privacy/privacy-statements/privacy-statement">Esri privacy statement</a>.
+      Esri tile layers are used exclusively for the legitimate interest (cf. article 6.1f of the GDPR)
+      of providing satellite imagery for the interactive exploration of research datasets.
+    </p>
+    {% endif %}
+
+    {% if basemap_vendor_groups.opentopomap %}
+    <p>This website also uses map background layers provided by OpenTopoMap
+      (<a href="https://opentopomap.org">opentopomap.org</a>),
+      a community project based on OpenStreetMap data and SRTM elevation data.
+      When the OpenTopoMap base layer is active, your browser connects to OpenTopoMap's tile servers.
+      The operator of this site has no control over such connections and the processing of your data by OpenTopoMap.
+      You can find more information in the <a href="https://opentopomap.org/about">OpenTopoMap about page</a>.
+      The OpenTopoMap tile layer is used exclusively for the legitimate interest (cf. article 6.1f of the GDPR)
+      of providing topographic map views for the interactive exploration of research datasets.
+    </p>
+    {% endif %}
+
+    {% if basemap_vendor_groups.stadia %}
+    <p>This website also uses map background layers provided by Stadia Maps
+      (<a href="https://stadiamaps.com/">stadiamaps.com</a>).
+      When a Stadia base layer is active, your browser connects to Stadia Maps' tile servers.
+      The operator of this site has no control over such connections and the processing of your data by Stadia Maps.
+      You can find more information in the <a href="https://stadiamaps.com/privacy/">Stadia Maps privacy policy</a>.
+      Stadia tile layers are used exclusively for the legitimate interest (cf. article 6.1f of the GDPR)
+      of providing stylized map views for the interactive exploration of research datasets.
+    </p>
+    {% endif %}
+
+    {% if basemap_vendor_groups.bkg %}
+    <p>This website also uses map background layers provided by the Bundesamt für Kartographie und Geodäsie (BKG),
+      Richard-Strauss-Allee 11, 60598 Frankfurt am Main, Germany
+      (basemap.de / basemap.world, <a href="https://basemap.de">basemap.de</a>).
+      When a BKG base layer is active, your browser connects to BKG's map tile servers.
+      The operator of this site has no control over such connections and the processing of your data by BKG.
+      You can find more information in the
+      <a href="https://www.bkg.bund.de/DE/Service/Datenschutz/datenschutz.html">BKG privacy policy</a>.
+      BKG tile layers are used exclusively for the legitimate interest (cf. article 6.1f of the GDPR)
+      of providing worldwide map views for the interactive exploration of research datasets.
+    </p>
+    {% endif %}
+
     <h2 class="py-2">Delete account</h2>
 
     <p>You can <strong>delete</strong> your account yourself after logging in (Settings > Delete account), which will

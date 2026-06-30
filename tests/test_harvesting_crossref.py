@@ -100,6 +100,17 @@ class BuildCrossrefFilterTests(TestCase):
         self.assertIn("type:posted-content", out)
         self.assertIn("from-update-date:2026-01-01", out)
 
+    def test_with_issn(self):
+        # Journals with commas in their titles (e.g. Copernicus GI) use ISSN
+        # because Crossref treats commas in filter= as clause separators.
+        out = _build_crossref_filter("10.5194", issn="2193-0864")
+        self.assertIn("prefix:10.5194", out)
+        self.assertIn("issn:2193-0864", out)
+
+    def test_issn_omitted_when_not_provided(self):
+        out = _build_crossref_filter("10.5194")
+        self.assertNotIn("issn:", out)
+
 
 class CrossrefItemConversionTests(TestCase):
     def setUp(self):

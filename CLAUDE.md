@@ -306,6 +306,22 @@ python manage.py loaddata fixtures/test_data_global_feeds.json
 python manage.py shell -c "from works.tasks import regenerate_geojson_cache; regenerate_geojson_cache()"
 ```
 
+## Static assets — no CDN
+
+**All JavaScript and CSS libraries must be served from `works/static/`, never from a CDN.**
+See [`works/static/README.md`](works/static/README.md) for the full list and provenance of every
+vendored file, and [`works/static/download_libraries.sh`](works/static/download_libraries.sh)
+for how to (re-)download them.
+
+When adding a new JS or CSS dependency:
+1. Download the file(s) with `wget` into `works/static/js/` or `works/static/css/`.
+2. Reference them in templates with `{% static 'js/…' %}` / `{% static 'css/…' %}`.
+3. Add an entry to `works/static/README.md` (provenance, version, license, homepage).
+4. Add the `wget` line(s) to `works/static/download_libraries.sh` so the file can be refreshed.
+
+Do **not** add `<script src="https://unpkg.com/…">`, `<link href="https://cdn…">`, or any other
+external URL for JS/CSS assets — not even "temporarily" or "for now".
+
 ## Important Patterns
 
 ### Configuration

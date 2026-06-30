@@ -10,6 +10,7 @@
 {{ block.super }}
 <link rel="stylesheet" href="{% static 'css/leaflet.css' %}" />
 <script src="{% static 'js/leaflet.js' %}"></script>
+<script src="{% static 'js/leaflet-providers.js' %}"></script>
 <link rel="stylesheet" href="{% static 'css/leaflet.control.geocoder.css' %}" />
 <script src="{% static 'js/leaflet.control.geocoder.js' %}"></script>
 <link rel="canonical" href="{{ canonical_url }}">
@@ -587,13 +588,14 @@
 <script src="{% static 'js/map-gazetteer.js' %}"></script>
 <script src="{% static 'js/map-zoom-to-all.js' %}"></script>
 <script src="{% static 'js/map-status-layers.js' %}"></script>
+<script src="{% static 'js/countries-cache.js' %}"></script>
 <script src="{% static 'js/map-countries.js' %}"></script>
 <script src="{% static 'js/map-base.js' %}"></script>
 <script src="{% static 'js/map-locate-card.js' %}"></script>
 <script type="text/javascript">
   $(document).ready(function () {
     if (!document.getElementById('collection-map')) { return; }
-    const { map, tileLayer: osmLayer } = createBaseMap('collection-map');
+    const { map, layerControl } = createBaseMap('collection-map');
 
     const pageData = {{ publications_geojson|safe }};
     const collectionGeoJsonUrl = '{{ collection_geojson_url }}';
@@ -602,7 +604,6 @@
 
     const pageWorkIds = new Set([{% for work in page_obj.object_list %}{{ work.id }},{% endfor %}]);
 
-    const layerControl = L.control.layers({ 'OpenStreetMap': osmLayer }, {}).addTo(map);
     window.mapLayerControl = layerControl;
 
     if (typeof MapCountriesManager !== 'undefined') {

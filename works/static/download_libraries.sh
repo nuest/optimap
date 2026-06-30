@@ -46,6 +46,13 @@ wget -q https://unpkg.com/leaflet-control-geocoder@2.4.0/dist/Control.Geocoder.j
 echo "  - Bootstrap Datepicker 1.9.0"
 wget -q https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/js/bootstrap-datepicker.min.js -O js/bootstrap-datepicker.min.js
 
+# MapLibre GL JS (used for vector tile basemaps, e.g. basemap.world)
+echo "  - MapLibre GL JS 2.4.0"
+wget -q https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.js -O js/maplibre-gl.js
+
+echo "  - MapLibre GL Leaflet 0.0.17"
+wget -q https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.0.17/leaflet-maplibre-gl.js -O js/leaflet-maplibre-gl.js
+
 echo ""
 echo "Downloading CSS libraries..."
 
@@ -98,6 +105,10 @@ wget -q https://unpkg.com/leaflet-control-geocoder@2.4.0/dist/images/throbber.gi
 # Bootstrap Datepicker CSS
 echo "  - Bootstrap Datepicker 1.9.0 CSS"
 wget -q https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/css/bootstrap-datepicker.min.css -O css/bootstrap-datepicker.min.css
+
+# MapLibre GL CSS
+echo "  - MapLibre GL JS 2.4.0 CSS"
+wget -q https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.css -O css/maplibre-gl.css
 
 # Font Awesome 4.7.0 (minimal version for backward compatibility)
 echo "  - Font Awesome 4.7.0 CSS"

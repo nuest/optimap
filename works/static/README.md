@@ -57,6 +57,18 @@ This script downloads all dependencies listed below.
   - Files: `js/bootstrap-datepicker.min.js`
   - Homepage: https://github.com/uxsolutions/bootstrap-datepicker
 
+- **MapLibre GL JS 2.4.0** - BSD-3-Clause License
+  - Source: https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.js
+  - Files: `js/maplibre-gl.js`
+  - Homepage: https://maplibre.org/maplibre-gl-js/docs/
+
+- **MapLibre GL Leaflet 0.0.17** - BSD-2-Clause License
+  - Source: https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.0.17/leaflet-maplibre-gl.js
+  - Files: `js/leaflet-maplibre-gl.js`
+  - Homepage: https://github.com/maplibre/maplibre-gl-leaflet
+  - Note: Adapter wrapping a MapLibre GL map as a Leaflet layer; used for the
+    basemap.world Web Vector (BKG) tile layer (provider key `BasemapWorldVector`).
+
 ## CSS Libraries
 
 ### Core Stylesheets
@@ -80,6 +92,11 @@ This script downloads all dependencies listed below.
 - **Bootstrap Datepicker 1.9.0** - Apache License 2.0
   - Source: https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/
   - Files: `css/bootstrap-datepicker.min.css`
+
+- **MapLibre GL JS 2.4.0** - BSD-3-Clause License
+  - Source: https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.css
+  - Files: `css/maplibre-gl.css`
+  - Homepage: https://maplibre.org/maplibre-gl-js/docs/
 
 ### Fonts
 

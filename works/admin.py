@@ -19,6 +19,7 @@ from import_export.admin import ImportExportModelAdmin
 from leaflet.admin import LeafletGeoAdmin
 
 from works.models import (
+    BaseMapLayer,
     BlockedDomain,
     BlockedEmail,
     Collection,
@@ -910,6 +911,33 @@ class UserAdmin(admin.ModelAdmin):
 
     list_display = ("username", "email", "is_active")
     actions = [block_email, block_email_and_domain]
+
+
+@admin.register(BaseMapLayer)
+class BaseMapLayerAdmin(admin.ModelAdmin):
+    """Background tile layer switcher — one row per leaflet-providers.js key."""
+
+    list_display = ("label", "provider_key", "enabled", "is_default", "order")
+    list_editable = ("enabled", "is_default", "order")
+    list_display_links = ("label",)
+    ordering = ("order", "label")
+    search_fields = ("label", "provider_key")
+
+    def save_model(self, request, obj, form, change):
+        from django.core.cache import cache
+
+        super().save_model(request, obj, form, change)
+        # Enforce at most one is_default among enabled layers: if this row is
+        # being set as default, clear the flag on all other enabled rows.
+        if obj.enabled and obj.is_default:
+            BaseMapLayer.objects.filter(enabled=True, is_default=True).exclude(pk=obj.pk).update(is_default=False)
+        cache.delete("optimap_basemaps")
+
+    def delete_model(self, request, obj):
+        from django.core.cache import cache
+
+        super().delete_model(request, obj)
+        cache.delete("optimap_basemaps")
 
 
 @admin.register(GlobalRegion)

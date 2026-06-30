@@ -69,6 +69,10 @@
     <link rel="stylesheet" type="text/css" href="{% static 'css/accessibility.css' %}" />
     <link rel="stylesheet" type="text/css" href="{% static 'css/map-search.css' %}" />
     <script src="{% static 'js/accessibility-toggle.js' %}"></script>
+    {{ optimap_basemaps|json_script:"optimap-basemaps" }}
+    {% if has_maplibre_basemap %}
+    <link rel="stylesheet" href="{% static 'css/maplibre-gl.css' %}" />
+    {% endif %}
   </head>
 
   <body>
@@ -168,7 +172,12 @@
       {% block alert %}{% endblock %} {% block content %}{% endblock %}
     </main>
 
-    {% include 'footer.html' %} {% block scripts %}{% endblock %}
+    {% include 'footer.html' %}
+    {% if has_maplibre_basemap %}
+    <script src="{% static 'js/maplibre-gl.js' %}"></script>
+    <script src="{% static 'js/leaflet-maplibre-gl.js' %}"></script>
+    {% endif %}
+    {% block scripts %}{% endblock %}
 
     <script>
       // Self-closing flash messages — global behaviour for every page.

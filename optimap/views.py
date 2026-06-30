@@ -72,7 +72,24 @@ def accessibility(request):
 
 @cache_page(settings.PAGE_CACHE_LONG, cache="memory")
 def privacy(request):
-    return render(request, "privacy.html")
+    from django.core.cache import cache
+
+    from works.models import BaseMapLayer
+
+    try:
+        enabled = cache.get("optimap_basemaps") or BaseMapLayer.enabled_layers()
+        keys = {layer["provider_key"] for layer in enabled}
+    except Exception:
+        keys = set()
+
+    vendor_groups = {
+        "carto": any(k.startswith("CartoDB") for k in keys),
+        "esri": any(k.startswith("Esri") for k in keys),
+        "opentopomap": "OpenTopoMap" in keys,
+        "stadia": any(k.startswith("Stadia") for k in keys),
+        "bkg": any(k.startswith("BasemapDE") or k == "BasemapWorldVector" for k in keys),
+    }
+    return render(request, "privacy.html", {"basemap_vendor_groups": vendor_groups})
 
 
 @never_cache

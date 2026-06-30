@@ -23,18 +23,16 @@ async function initMap() {
   if (!mapEl) {
     return;
   }
-  const { map, tileLayer: osmLayer } = createBaseMap(mapEl, {}, {
-    attribution: OPTIMAP_OSM_ATTR + dataCopyright,
-  });
+  const { map, layerControl } = createBaseMap(mapEl);
   window._optimapMap = map;
 
-  // Controls: scale and layer switcher. The work overlays are added by
-  // MapStatusLayersManager once the data has loaded so that the layer-control
-  // labels reflect the actual published / unpublished split.
+  // Append the CC-0 data-license notice to the map's attribution control.
+  map.attributionControl.addAttribution(dataCopyright);
+
+  // Controls: scale bar. The work overlays are added by MapStatusLayersManager
+  // once the data has loaded so that the layer-control labels reflect the actual
+  // published / unpublished split.
   L.control.scale({ position: 'bottomright' }).addTo(map);
-  const layerControl = L.control
-    .layers({ 'OpenStreetMap': osmLayer }, {})
-    .addTo(map);
 
   // Make layer control globally available for search manager
   window.mapLayerControl = layerControl;

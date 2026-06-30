@@ -11,6 +11,7 @@
 <!-- Leaflet -->
 <link rel="stylesheet" href="{% static 'css/leaflet.css' %}" />
 <script src="{% static 'js/leaflet.js' %}"></script>
+<script src="{% static 'js/leaflet-providers.js' %}"></script>
 
 <!-- Leaflet Control Geocoder (Gazetteer) -->
 <link rel="stylesheet" href="{% static 'css/leaflet.control.geocoder.css' %}" />
@@ -157,7 +158,7 @@
 <script type="text/javascript">
   $(document).ready(function() {
     if (!document.getElementById('feed-map')) { return; }
-    const { map, tileLayer: osmLayer } = createBaseMap('feed-map');
+    const { map } = createBaseMap('feed-map');
 
     const pageData = {{ page_publications_geojson|safe }};
     const allData  = {{ publications_geojson|safe }};

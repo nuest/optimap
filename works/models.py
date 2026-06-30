@@ -690,19 +690,16 @@ class BaseMapLayer(models.Model):
         layers = list(cls.objects.filter(enabled=True).order_by("order", "label"))
         if not layers:
             return []
-        has_default = any(l.is_default for l in layers)
-        result = []
-        first = True
-        for layer in layers:
-            result.append(
-                {
-                    "provider_key": layer.provider_key,
-                    "label": layer.label,
-                    "default": layer.is_default if has_default else first,
-                    "options": layer.options or {},
-                }
-            )
-            first = False
+        has_default = any(layer.is_default for layer in layers)
+        result = [
+            {
+                "provider_key": layer.provider_key,
+                "label": layer.label,
+                "default": layer.is_default if has_default else (i == 0),
+                "options": layer.options,
+            }
+            for i, layer in enumerate(layers)
+        ]
         return result
 
 
