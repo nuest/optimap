@@ -252,7 +252,29 @@ The default run **populates `Work.locations` on every record with an OpenAlex id
 - **Django admin** (recommended for running instances): **Django admin → Service tokens → add** an *OpenAlex API* row and paste the key into the **Refresh token** field. No restart required.
 - **Environment variable / `.env`**: set `OPTIMAP_OPENALEX_API_KEY=<key>` before starting the server.
 
-Works that lost enrichment can be recovered with `python manage.py harvest_sources --source <id> --update` or the per-work Re-harvest button once the key is configured.
+Works that lost enrichment can be recovered once the key is configured — see [Recovering missing OpenAlex enrichment](#recovering-missing-openalex-enrichment) below.
+
+#### Recovering missing OpenAlex enrichment
+
+Works that lost their OpenAlex match due to 429 errors have `openalex_id = NULL`. Use `backfill_openalex` to re-enrich them without re-downloading from the original source:
+
+```bash
+# Re-enrich all works with openalex_id = NULL (default)
+python manage.py backfill_openalex
+
+# Preview only — shows what would be matched, writes nothing
+python manage.py backfill_openalex --dry-run
+
+# Restrict to one source, process slowly to stay within budget
+python manage.py backfill_openalex --source essoar --throttle 1
+
+# Re-enrich even already-matched works (e.g. after a matcher improvement)
+python manage.py backfill_openalex --all --limit 500
+```
+
+`backfill_openalex` queries OpenAlex by DOI then title/author, applies fill-if-empty enrichment (won't overwrite existing field values), and records attribution in `Work.provenance.metadata_sources`. Redirected works (`status='r'`) are skipped. `--throttle` (default 0.1 s) controls the per-work delay; raise it to `1` or more if you are near your daily search budget.
+
+Alternatively, `python manage.py harvest_sources --source <id> --update` re-fetches **all** metadata from the original source and re-runs enrichment inline — useful when the source itself has been updated, but heavier than a targeted enrichment backfill. The per-work **Re-harvest** button on the work landing page does the same for a single work.
 
 **Un-merge (reverse a merge).** Merges are reversible. In the **Django admin → Works**, filter the list by status **Redirected**, select the wrongly-merged duplicate(s), and run the **"Un-merge (re-promote redirected duplicates)"** action: each tombstone returns to status **Harvested** and is detached from its canonical work's `provenance.dedup`. (Equivalent in a shell: `from works.dedup import unmerge; unmerge(work)`.) To inspect a merged-away duplicate without un-merging it, open it from the Redirected-filtered admin list or pass `?include=redirected` to the API.
 
