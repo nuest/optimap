@@ -75,6 +75,24 @@ SOURCE_CONFIG = {
         "is_oa": True,
         "default_work_type": "article",
     },
+    # Copernicus journals whose titles contain a comma use issn_l for filtering
+    # because Crossref treats commas inside filter= as clause separators, making
+    # container-title: unable to match them.
+    "copernicus-gi": {
+        "name": "Geoscientific Instrumentation, Methods and Data Systems",
+        # container-title filter would break at the comma; issn_l is used instead.
+        # Display URL shows the actual Crossref filter applied (prefix + issn).
+        "url": "https://api.crossref.org/works?filter=prefix:10.5194,issn:2193-0864",
+        "collection_name": "Copernicus Publications",
+        "homepage_url": "https://gi.copernicus.org/",
+        "publisher_name": "Copernicus Publications",
+        "source_type": "crossref-prefix",
+        "crossref_prefix": "10.5194",
+        "issn_l": "2193-0864",
+        "fetch_abstract_from_publisher": True,
+        "is_oa": True,
+        "default_work_type": "article",
+    },
     # AGILE GI — two publishing streams for one collection.
     # Both source keys start with `agile-gi`, so --source-prefix agile-gi
     # harvests both in one run.
@@ -633,6 +651,16 @@ class Command(BaseCommand):
             ),
         )
         parser.add_argument(
+            "--source-issn",
+            dest="source_issn",
+            default=None,
+            help=(
+                "For Crossref-prefix sources, narrow the harvest to a specific journal "
+                "by ISSN (e.g. 2193-0864). Overrides the source's own issn_l. "
+                "Use when the journal title contains a comma and --source-title fails."
+            ),
+        )
+        parser.add_argument(
             "--all",
             action="store_true",
             help="Harvest from all enabled sources (skips entries marked enabled: False)",
@@ -773,6 +801,7 @@ class Command(BaseCommand):
 
         include_disabled = options["include_disabled"]
         source_titles = options["source_title"]
+        source_issn = options["source_issn"]
         no_publisher_abstract = options["no_publisher_abstract"]
         full_backfill = options["full"]
         since = options["since"]
@@ -848,6 +877,7 @@ class Command(BaseCommand):
                 user=user,
                 max_records=max_records,
                 source_titles=source_titles,
+                source_issn=source_issn,
                 no_publisher_abstract=no_publisher_abstract,
                 update_existing=update_existing,
                 full_backfill=full_backfill,
@@ -907,6 +937,7 @@ class Command(BaseCommand):
                         user=user,
                         max_records=max_records,
                         source_titles=source_titles,
+                        source_issn=source_issn,
                         no_publisher_abstract=no_publisher_abstract,
                         update_existing=update_existing,
                         full_backfill=full_backfill,
@@ -1002,6 +1033,7 @@ class Command(BaseCommand):
                             update_existing=update_existing,
                             full=full_backfill,
                             since=since,
+                            issn=source_issn,
                         )
                 elif source_type == "geoscienceworld":
                     self.stdout.write("Source type: GeoScienceWorld (Crossref + geoextent)")
@@ -1187,6 +1219,7 @@ class Command(BaseCommand):
         user,
         max_records,
         source_titles,
+        source_issn,
         no_publisher_abstract,
         update_existing,
         full_backfill,
@@ -1208,6 +1241,7 @@ class Command(BaseCommand):
             "--update": (bool(update_existing), "update_existing"),
             "--user-email": (user is not None, "user"),
             "--source-title": (bool(source_titles), "source_titles"),
+            "--source-issn": (bool(source_issn), "issn"),
             "--no-publisher-abstract": (bool(no_publisher_abstract), "fetch_abstract_from_publisher"),
             "--full": (bool(full_backfill), "full"),
             "--since": (bool(since), "since"),
@@ -1229,6 +1263,7 @@ class Command(BaseCommand):
                 user=user,
                 max_records=max_records,
                 source_titles=source_titles,
+                source_issn=source_issn,
                 no_publisher_abstract=no_publisher_abstract,
                 update_existing=update_existing,
                 full_backfill=full_backfill,
@@ -1256,6 +1291,7 @@ class Command(BaseCommand):
         update_existing,
         full_backfill=False,
         since=None,
+        source_issn=None,
     ):
         """Map a source config to its Django-Q task path and kwargs.
 
@@ -1283,6 +1319,7 @@ class Command(BaseCommand):
                 "fetch_abstract_from_publisher": fetch_abstract,
                 "full": full_backfill,
                 "since": since,
+                "issn": source_issn,
             }
         if source_type == "geoscienceworld":
             return "works.tasks.harvest_geoscienceworld", common

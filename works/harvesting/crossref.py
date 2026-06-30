@@ -88,7 +88,7 @@ def _strip_jats(jats_html):
 
 
 def _build_crossref_filter(
-    prefix, source_titles=None, since=None, extra_filters=None, created_from=None, created_until=None
+    prefix, source_titles=None, since=None, extra_filters=None, created_from=None, created_until=None, issn=None
 ):
     """Assemble a Crossref ``filter=...`` parameter value.
 
@@ -116,6 +116,8 @@ def _build_crossref_filter(
         parts.append(f"from-created-date:{created_from}")
     if created_until:
         parts.append(f"until-created-date:{created_until}")
+    if issn:
+        parts.append(f"issn:{issn}")
     if extra_filters:
         parts.extend(extra_filters)
     return ",".join(parts)
@@ -373,6 +375,7 @@ def parse_crossref_response_and_save_works(
     doi_contains=None,
     created_from=None,
     created_until=None,
+    issn=None,
 ):
     """Page through Crossref's ``works`` API and persist matched works.
 
@@ -414,6 +417,7 @@ def parse_crossref_response_and_save_works(
         extra_filters=extra_filters,
         created_from=created_from,
         created_until=created_until,
+        issn=issn,
     )
 
     # Crossref intermittently returns an empty `items` page (or drops the
@@ -561,6 +565,7 @@ def harvest_crossref_prefix(
     full=False,
     since=None,
     event_id=None,
+    issn=None,
 ):
     """Harvest publications from Crossref by DOI prefix.
 
@@ -581,6 +586,12 @@ def harvest_crossref_prefix(
     warning_collector = HarvestWarningCollector()
     warning_collector.setLevel(logging.INFO)
     logger.addHandler(warning_collector)
+
+    # Auto-derive ISSN from source.issn_l when not supplied by the caller.
+    # Used for journals whose title contains a comma — Crossref's filter parser
+    # treats commas as clause separators, so container-title: can't match them.
+    if issn is None and source:
+        issn = source.issn_l or None
 
     doi_contains = (source.doi_contains or None) if source else None
 
@@ -628,10 +639,11 @@ def harvest_crossref_prefix(
 
     try:
         logger.info(
-            "Starting Crossref harvest: prefix=%s filter=%s titles=%s doi_contains=%s since=%s max_records=%s",
+            "Starting Crossref harvest: prefix=%s filter=%s titles=%s issn=%s doi_contains=%s since=%s max_records=%s",
             resolved_prefix,
             extra_filters,
             source_titles,
+            issn,
             doi_contains,
             since,
             max_records,
@@ -671,6 +683,7 @@ def harvest_crossref_prefix(
                 doi_contains=doi_contains,
                 created_from=created_from,
                 created_until=created_until,
+                issn=issn,
             )
             saved += window_saved
             seen += window_seen

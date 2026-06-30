@@ -943,7 +943,12 @@ class Source(models.Model):
         max_length=9,
         blank=True,
         null=True,
-        help_text="Linking ISSN (display only).",
+        help_text=(
+            "Linking ISSN. For crossref-prefix sources, also used as an issn: "
+            "Crossref filter — the preferred alternative to source_titles when "
+            "the journal title contains a comma (which Crossref treats as a "
+            "filter-clause separator)."
+        ),
     )
     openalex_id = models.CharField(
         max_length=50,

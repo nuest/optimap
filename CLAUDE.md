@@ -215,7 +215,10 @@ python manage.py harvest_sources --all --max-records 50
 # Harvests from all configured sources with record limit
 python manage.py harvest_sources --source essd --source geo-leo
 # Harvests from specific sources by identifier
-# Supports: essd, agile-giss, geo-leo, eartharxiv, scientific-data, essoar
+# Supports: essd, agile-giss, geo-leo, eartharxiv, scientific-data, essoar, copernicus-gi
+python manage.py harvest_sources --source copernicus-gi --max-records 10 --create-sources
+# copernicus-gi = "Geoscientific Instrumentation, Methods and Data Systems" (ISSN 2193-0864);
+# uses issn_l for Crossref filtering because the journal name contains a comma
 
 # Source synchronization
 python manage.py sync_source_metadata
